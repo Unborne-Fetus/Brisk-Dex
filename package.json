@@ -24,7 +24,10 @@
     "files": [
       "main.js",
       "preload.js",
-      "index.html"
+      "index.html",
+      "brisk-dex-data.json",
+      "brisk-dex-icons/**/*",
+      "brisk-dex-trainers/**/*"
     ],
     "directories": {
       "output": "dist"

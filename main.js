@@ -11,7 +11,7 @@ function createWindow(){
     height: 820,
     minWidth: 720,
     minHeight: 560,
-    backgroundColor: '#0d1811',
+    backgroundColor: '#0b0b0c',
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -38,6 +38,17 @@ function storagePath(){
   return path.join(app.getPath('userData'), 'briskdex-storage.json');
 }
 
+async function writeFileAtomically(filePath, data){
+  const temporaryPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
+  try{
+    await fs.writeFile(temporaryPath, data, { flag: 'wx' });
+    await fs.rename(temporaryPath, filePath);
+  }catch(err){
+    try{ await fs.unlink(temporaryPath); }catch(_){}
+    throw err;
+  }
+}
+
 /* ---- Open a .sav file via native dialog, return its path + raw bytes ---- */
 ipcMain.handle('open-sav', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
@@ -61,7 +72,7 @@ ipcMain.handle('write-sav', async (event, filePath, bytes) => {
     if (fsSync.existsSync(filePath)){
       await fs.copyFile(filePath, backupPath);
     }
-    await fs.writeFile(filePath, Buffer.from(bytes));
+    await writeFileAtomically(filePath, Buffer.from(bytes));
     return { ok: true, backupPath };
   }catch(err){
     return { ok: false, error: err.message };
@@ -72,15 +83,49 @@ ipcMain.handle('write-sav', async (event, filePath, bytes) => {
 ipcMain.handle('load-storage', async () => {
   try{
     const raw = await fs.readFile(storagePath(), 'utf8');
-    return JSON.parse(raw);
+    const data = JSON.parse(raw);
+    if (!Array.isArray(data)) throw new Error('External storage file is not a Pokémon list.');
+    return data;
   }catch(err){
-    return [];
+    if (err.code === 'ENOENT') return [];
+    throw err;
   }
 });
 
 ipcMain.handle('save-storage', async (event, data) => {
-  await fs.writeFile(storagePath(), JSON.stringify(data));
-  return { ok: true };
+  try{
+    if (!Array.isArray(data)) throw new Error('Storage data must be a list.');
+    for (const entry of data){
+      if (!entry || typeof entry.id !== 'string' || typeof entry.raw80 !== 'string'){
+        throw new Error('Storage contains an invalid Pokémon record.');
+      }
+      const raw = Buffer.from(entry.raw80, 'base64');
+      if (raw.length !== 80) throw new Error('A Pokémon record must contain exactly 80 bytes.');
+    }
+    await writeFileAtomically(storagePath(), JSON.stringify(data));
+    return { ok: true };
+  }catch(err){
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('load-game-data', async () => {
+  const raw = await fs.readFile(path.join(__dirname, 'brisk-dex-data.json'), 'utf8');
+  return JSON.parse(raw);
+});
+
+ipcMain.handle('load-bundled-icons', async () => {
+  const folderPath = path.join(__dirname, 'brisk-dex-icons');
+  const icons = {};
+  const shinyIcons = {};
+  for (const entry of await fs.readdir(folderPath, { withFileTypes: true })){
+    if (!entry.isFile() || !/^\d+(?:_shiny)?\.png$/i.test(entry.name)) continue;
+    const data = await fs.readFile(path.join(folderPath, entry.name));
+    const match = entry.name.match(/^(\d+)(_shiny)?\.png$/i);
+    const target = match[2] ? shinyIcons : icons;
+    target[match[1]] = `data:image/png;base64,${data.toString('base64')}`;
+  }
+  return { icons, shinyIcons };
 });
 
 /* ---- Load a folder of icon images. Supports two layouts:
@@ -95,8 +140,7 @@ ipcMain.handle('open-icon-folder', async () => {
   if (result.canceled || result.filePaths.length === 0) return null;
   const folderPath = result.filePaths[0];
   const icons = {};
-
-  const entries = await fs.readdir(folderPath, { withFileTypes: true });
+  const shinyIcons = {};
 
   const toDataUrl = async (filePath) => {
     const buf = await fs.readFile(filePath);
@@ -105,16 +149,24 @@ ipcMain.handle('open-icon-folder', async () => {
     return `data:${mime};base64,${buf.toString('base64')}`;
   };
 
-  for (const entry of entries){
-    if (entry.isFile() && /^\d+\.(png|gif|jpg|jpeg)$/i.test(entry.name)){
-      const id = entry.name.replace(/\.[^.]+$/, '');
-      icons[id] = await toDataUrl(path.join(folderPath, entry.name));
-    } else if (entry.isDirectory()){
-      const iconFile = path.join(folderPath, entry.name, 'icon.png');
-      if (fsSync.existsSync(iconFile)){
-        icons['name:' + entry.name.toLowerCase()] = await toDataUrl(iconFile);
+  const walk = async (dir) => {
+    const rel = path.relative(folderPath, dir).split(path.sep).join('').replace(/[_-]/g, '').toLowerCase();
+    for (const entry of await fs.readdir(dir, { withFileTypes: true })){
+      const filePath = path.join(dir, entry.name);
+      if (entry.isDirectory()) await walk(filePath);
+      else if (entry.isFile()){
+        const numeric = entry.name.match(/^(\d+)(_shiny)?\.(png|gif|jpg|jpeg)$/i);
+        const nameMatch = entry.name.match(/^icon(_shiny)?\.png$/i);
+        if (numeric){
+          const target = numeric[2] ? shinyIcons : icons;
+          target[numeric[1]] = await toDataUrl(filePath);
+        } else if (nameMatch && rel){
+          const target = nameMatch[1] ? shinyIcons : icons;
+          target['name:' + rel] = await toDataUrl(filePath);
+        }
       }
     }
-  }
-  return { folderPath, icons };
+  };
+  await walk(folderPath);
+  return { folderPath, icons, shinyIcons };
 });

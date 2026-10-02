@@ -21,6 +21,13 @@ The desktop build of Brisk Dex — the companion app for Pokémon Brisk Emerald.
 This reads and edits `.sav` files directly on disk (with automatic timestamped
 backups) and keeps an external Pokémon storage file independent of any single save.
 
+External storage is available before opening a save file. It can be searched and
+sorted, exported as a portable JSON archive, and merged from a previously exported
+archive. Deposits are written to the archive before the source Pokémon is removed.
+Desktop withdrawals remain archived until the updated save has been written; in
+the browser build the archive copy is retained after download so it can be removed
+after the downloaded save is safely in place.
+
 ## What you need first
 
 - **Node.js** (LTS, v18 or newer). If you don't have it: https://nodejs.org
@@ -90,24 +97,27 @@ npm run dist:linux    # Linux AppImage
 
 ## Getting your real Brisk Emerald data (species, moves, abilities, items, icons)
 
-Brisk Dex ships with vanilla Gen I–III species names/types as a baseline, but
-your hack almost certainly renumbers and adds a lot more than that. There's a
-converter script included for this:
+Brisk Dex includes a species, move, ability, item, growth-rate, and icon snapshot
+extracted from the Brisk Emerald source. The Electron app loads this data on
+startup, so the displayed species and ability names match the game. Rebuild the
+snapshot after changing game data with:
 
 ```bash
 python3 tools/extract_data.py /path/to/your/Pokemon-Brisk-Emerald/checkout
 ```
 
-(No dependencies beyond Python 3 — it just reads your source files, it never
-touches the network.) It produces two things in the folder you ran it from:
+(No dependencies beyond Python 3 — it only reads the game source.) It updates
+these files in the Brisk Dex folder:
 
-- `brisk-dex-data.json` — species names/types/abilities, move names, ability
-  names, and item names, all pulled straight from your `include/constants/*.h`
+- `brisk-dex-data.json` — species names/types/abilities/growth rates, move names,
+  ability names, and item names, all pulled straight from `include/constants/*.h`
   and `src/data/*.h` files.
-- `brisk-dex-icons/` — your actual icon.png art for every species that has a
-  matching `graphics/pokemon/<name>/icon.png`, copied and renamed by species ID.
+- `brisk-dex-icons/` — icon art selected from each species' `.iconSprite` field,
+  plus form-specific shiny sprite sheets generated from Brisk Emerald's palettes.
+- `brisk-dex-trainers/` — male and female player sprite sheets used for the save's
+  trainer portrait.
 
-Then in Brisk Dex:
+Desktop builds bundle those files and load them on startup. In the browser version:
 
 1. **Load species/move data** → pick `brisk-dex-data.json`. This overrides/extends
    the built-in vanilla baseline with your real data (custom species keep their
@@ -122,6 +132,14 @@ If your repo's file layout doesn't quite match what the script expects (e.g.
 you've moved `species_info.h` somewhere nonstandard, or a version of expansion
 changed the struct field names), it'll still write out whatever it could match
 and print counts + a warning — share those details and I can adjust the script.
+
+The app crops the first frame from each two-frame animated icon sheet. It uses
+separate icons for forms when the source provides them. Shiny icon files named
+`<speciesId>_shiny.png` are used when available; otherwise the app applies a shiny
+tint. Brisk Emerald's current source does not include separate shiny icon sheets.
+
+Box Pokémon levels use the species growth curve from this data. The parser also
+handles Brisk Emerald's packed species, item, experience, move, and ability fields.
 
 
 

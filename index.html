@@ -9,19 +9,19 @@
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#15301f;
-  --bg-deep:#08110c;
-  --panel:#132720;
-  --panel-2:#0f1e18;
-  --line:#25453b;
-  --line-soft:#1b332b;
-  --accent:#c99a3a;
-  --accent-soft:#8a6b28;
-  --leaf:#4fae7a;
-  --leaf-bright:#7ee0a8;
-  --text:#eef2ea;
-  --muted:#93a99b;
-  --muted-2:#5f7568;
+  --bg:#0b0b0c;
+  --bg-deep:#080808;
+  --panel:#151515;
+  --panel-2:#101010;
+  --line:#303030;
+  --line-soft:#242424;
+  --accent:#d51f2a;
+  --accent-soft:#8e1720;
+  --leaf:#31bda8;
+  --leaf-bright:#55eee4;
+  --text:#f4f4f4;
+  --muted:#a0a0a0;
+  --muted-2:#757575;
   --danger:#e2635a;
   --hp-full:#7ee0a8;
   --hp-mid:#e0c257;
@@ -38,10 +38,7 @@ html,body{height:100%;}
 html{scroll-padding-top: env(safe-area-inset-top, 0px);}
 body{
   margin:0;
-  background:
-    radial-gradient(circle at 15% 0%, #16332777 0%, transparent 45%),
-    radial-gradient(circle at 100% 20%, #1a2f2333 0%, transparent 40%),
-    var(--bg);
+  background:var(--bg);
   color:var(--text);
   font-family:var(--font-body);
   line-height:1.5;
@@ -50,14 +47,14 @@ body{
 ::selection{ background:var(--accent); color:#101a14;}
 a{color:var(--leaf-bright);}
 
-.wrap{ max-width:1180px; margin:0 auto; padding:28px 20px 80px; }
+.wrap{ max-width:1180px; margin:0 auto; padding:16px 20px 80px; }
 
 /* ---------- header ---------- */
 header.top{
   display:flex; align-items:center; justify-content:space-between; gap:20px;
   flex-wrap:wrap;
-  padding-bottom:22px; margin-bottom:26px;
-  border-bottom:1px solid var(--line-soft);
+  padding-bottom:16px; margin-bottom:22px;
+  border-bottom:1px solid #1b1b1b;
 }
 .brand{ display:flex; align-items:center; gap:14px; }
 .brand-mark{
@@ -68,14 +65,15 @@ header.top{
   box-shadow:0 0 0 3px #0f1e18, 0 4px 14px -4px #0009;
   flex-shrink:0;
 }
+.brand-mark{display:none;}
 .brand-mark svg{ width:22px; height:22px; }
 .brand h1{
-  font-family:var(--font-display);
-  font-size:15px;
-  margin:0 0 6px;
-  letter-spacing:0.5px;
-  color:var(--leaf-bright);
-  text-shadow:0 0 18px #4fae7a44;
+  font-family:var(--font-body);
+  font-size:28px;
+  margin:0 0 2px;
+  letter-spacing:-.04em;
+  color:#fff;
+  text-shadow:none;
 }
 .brand p{ margin:0; color:var(--muted); font-size:13px; }
 .top-actions{ display:flex; gap:10px; flex-wrap:wrap; }
@@ -95,12 +93,8 @@ button, .btn{
 }
 button:hover, .btn:hover{ border-color:var(--leaf); background:#16302579; }
 button:active{ transform:translateY(1px); }
-button.primary{
-  background:linear-gradient(180deg, #4fae7a, #38875e);
-  border-color:#5fc08c;
-  color:#0a160f;
-}
-button.primary:hover{ background:linear-gradient(180deg, #5cc088, #3f9668); }
+button.primary{background:#b41420;border-color:#b41420;color:white;border-radius:3px;}
+button.primary:hover{background:#d21b29;}
 button.ghost{ background:transparent; }
 button:focus-visible, .btn:focus-visible, input:focus-visible, [tabindex]:focus-visible{
   outline:2px solid var(--leaf-bright); outline-offset:2px;
@@ -133,20 +127,25 @@ input[type=file]{ display:none; }
 
 /* ---------- trainer card ---------- */
 .trainer-card{
-  background:var(--panel);
-  border:1px solid var(--line);
-  border-radius:var(--radius);
-  padding:20px 24px;
+  background:linear-gradient(110deg,#142a27,#111 72%);
+  border:1px solid #263a37;
+  border-left:4px solid var(--leaf-bright);
+  border-radius:2px;
+  padding:16px 20px;
   display:flex; flex-wrap:wrap; gap:28px; align-items:center;
   margin-bottom:26px;
 }
 .trainer-id{ display:flex; align-items:center; gap:14px; }
 .trainer-badge{
   width:52px; height:52px; border-radius:50%;
-  background:radial-gradient(circle at 35% 30%, #7ee0a8, #2c6b48 70%);
-  border:2px solid #163827;
+  position:relative; overflow:hidden;
+  background:radial-gradient(circle at 35% 30%, #64cfaa, #1b6349 72%);
+  border:1px solid #55a887;
   flex-shrink:0;
 }
+.trainer-badge::after{content:"";position:absolute;width:26px;height:52px;left:50%;bottom:0;transform:translateX(-50%);background-repeat:no-repeat;background-size:900% 100%;background-position:0 0;image-rendering:pixelated;}
+.trainer-badge.gender-male::after{background-image:url("./brisk-dex-trainers/male.png");}
+.trainer-badge.gender-female::after{background-image:url("./brisk-dex-trainers/female.png");}
 .trainer-id h2{ margin:0 0 4px; font-size:19px; }
 .trainer-id span{ color:var(--muted); font-size:12.5px; }
 .trainer-stats{
@@ -160,7 +159,7 @@ input[type=file]{ display:none; }
 .section-heading{
   display:flex; align-items:baseline; gap:10px; margin:0 0 14px;
 }
-.section-heading h3{ font-size:13px; margin:0; letter-spacing:.06em; color:var(--muted); text-transform:uppercase; }
+.section-heading h3{ font-size:18px; margin:0; letter-spacing:-.02em; color:var(--leaf-bright); text-transform:none; }
 .section-heading .count{ font-size:12px; color:var(--muted-2); }
 
 /* ---------- party ---------- */
@@ -168,39 +167,57 @@ input[type=file]{ display:none; }
   display:grid; grid-template-columns:repeat(auto-fill, minmax(200px,1fr));
   gap:12px; margin-bottom:36px;
 }
+.storage-tools{ display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:0 0 14px; }
+.storage-tools input[type="search"], .storage-tools select{
+  min-height:36px; color:var(--text); background:var(--panel-2);
+  border:1px solid var(--line); border-radius:8px; padding:8px 11px; font:inherit;
+}
+.storage-tools input[type="search"]{ flex:1 1 260px; min-width:180px; }
+.storage-tools select{ flex:0 1 160px; }
+#file-storage{ display:none; }
 .mon-card{
-  background:var(--panel);
-  border:1px solid var(--line);
-  border-radius:var(--radius);
-  padding:14px;
+  --hero-color:#267c5a;
+  --hero-secondary:var(--hero-color);
+  background:linear-gradient(105deg,color-mix(in srgb,var(--hero-color) 44%,#111) 0%,color-mix(in srgb,var(--hero-color) 50%,var(--hero-secondary)) 48%,color-mix(in srgb,var(--hero-secondary) 44%,#111) 76%,#121212 100%);
+  border:1px solid #303030;
+  border-radius:2px;
+  padding:16px;
   cursor:pointer;
   transition:border-color .15s ease, transform .1s ease;
 }
 .mon-card:hover{ border-color:var(--leaf); transform:translateY(-1px); }
+.mon-card.pending-transfer{ border-color:var(--accent-soft); }
+.mon-card[draggable="true"],.slot[draggable="true"]{cursor:grab;}
+.mon-card.dragging,.slot.dragging{opacity:.42;cursor:grabbing;}
+.drag-over{outline:2px solid var(--leaf-bright)!important;outline-offset:2px;background-color:#173d31!important;}
+.mon-card.shiny{position:relative;overflow:hidden;border-color:#806d43;}
+.mon-card.shiny::after{content:"";position:absolute;inset:-35%;pointer-events:none;background:linear-gradient(110deg,transparent 42%,#fff0 45%,#fff5 50%,#fff0 55%,transparent 58%);transform:translateX(-115%);animation:shiny-box-sweep 4.2s ease-in-out infinite;}
 .mon-card .row1{ display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px;}
 .card-icon{
-  width:32px; height:32px; border-radius:8px; flex-shrink:0;
+  width:46px; height:46px; border-radius:3px; flex-shrink:0;
   background:radial-gradient(circle at 35% 30%, var(--leaf-bright), #2c6b48 70%);
   image-rendering: pixelated;
+  overflow:hidden; position:relative; display:block;
 }
+.icon-frame{position:absolute;top:0;left:0;width:100%;height:auto;image-rendering:pixelated;}
 .mon-card .name{ font-weight:600; font-size:14.5px; }
 .mon-card .species{ font-size:11.5px; color:var(--muted); }
 .mon-card .lvl{
-  font-size:11px; font-weight:700; color:#0a160f; background:var(--accent);
-  border-radius:6px; padding:3px 7px; flex-shrink:0;
+  font-size:11px; font-weight:700; color:#101010; background:#d9a936;
+  border-radius:3px; padding:3px 7px; flex-shrink:0;
 }
 .hp-bar{ height:6px; border-radius:4px; background:#1c332a; overflow:hidden; margin-bottom:6px;}
 .hp-bar > div{ height:100%; border-radius:4px; }
-.mon-card .hp-text{ font-size:11px; color:var(--muted); margin-bottom:8px; }
+.mon-card .hp-text{ font-size:11px; color:#fff; margin-bottom:8px; }
 .types-row{ display:flex; gap:5px; flex-wrap:wrap; }
 .type-pill{
   font-size:10px; font-weight:700; letter-spacing:.03em; text-transform:uppercase;
-  padding:2.5px 8px; border-radius:20px; color:#0a160f; background:var(--muted-2);
+  padding:2.5px 8px; border-radius:2px; color:#fff; background:var(--muted-2);
 }
-.mon-card .moves-mini{ margin-top:8px; font-size:11px; color:var(--muted-2); }
+.mon-card .moves-mini{ margin-top:8px; font-size:11px; color:#fff; }
 
 /* ---------- PC boxes ---------- */
-.pc-panel{ background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; }
+.pc-panel{ background:#101010; border:1px solid #2c2c2c; border-radius:2px; overflow:hidden; }
 .box-tabs{
   display:flex; overflow-x:auto; border-bottom:1px solid var(--line);
   background:var(--panel-2); scrollbar-width:thin;
@@ -211,6 +228,41 @@ input[type=file]{ display:none; }
 }
 .box-tabs button.active{ color:var(--leaf-bright); border-bottom-color:var(--leaf-bright); background:#12251d; }
 .box-tabs button:hover{ color:var(--text); }
+.main-tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin:0 0 22px;}
+.main-tabs button{border:0;border-radius:0;background:transparent;padding:12px 16px;color:var(--muted);border-bottom:2px solid transparent;font-size:14px;}
+.main-tabs button.active{color:var(--leaf-bright);border-bottom-color:var(--leaf-bright);}
+.main-tabs button:hover{color:var(--text);}
+.route-intro{margin:-5px 0 16px;color:var(--muted);font-size:13px;}
+.route-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+.route-tools input,.route-tools select{min-height:38px;color:var(--text);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:8px 11px;font:inherit;}
+.route-tools input{flex:1 1 260px;min-width:180px;}
+.route-tools select{flex:0 1 175px;}
+.route-layout{display:grid;grid-template-columns:minmax(210px,280px) minmax(0,1fr);gap:14px;align-items:start;}
+.route-list{display:flex;flex-direction:column;gap:5px;max-height:calc(100vh - 250px);min-height:240px;overflow:auto;padding:4px;border:1px solid var(--line);background:var(--panel-2);}
+.route-location{width:100%;text-align:left;border:1px solid transparent;background:transparent;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 10px;border-radius:4px;}
+.route-location.active{border-color:#285448;background:#142721;color:var(--leaf-bright);}
+.route-location small{color:var(--muted-2);font-size:11px;white-space:nowrap;}
+.route-detail{min-width:0;}
+.route-detail h2{font-size:22px;margin:2px 0 3px;}
+.route-subtitle{font-size:12px;color:var(--muted);margin-bottom:14px;}
+.encounter-card{background:var(--panel);border:1px solid var(--line);margin-bottom:12px;}
+.encounter-heading{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:11px 13px;border-bottom:1px solid var(--line-soft);}
+.encounter-heading h4{font-size:15px;margin:0;}
+.encounter-heading span{font-size:11px;color:var(--muted);}
+.encounter-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+.encounter-table th,.encounter-table td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--line-soft);}
+.encounter-table th{font-size:10px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.04em;}
+.encounter-table tr:last-child td{border-bottom:0;}
+.encounter-table tbody tr{--hero-color:#267c5a;--hero-secondary:var(--hero-color);background:linear-gradient(105deg,color-mix(in srgb,var(--hero-color) 34%,#111) 0%,color-mix(in srgb,var(--hero-color) 50%,var(--hero-secondary)) 48%,color-mix(in srgb,var(--hero-secondary) 34%,#111) 76%,var(--panel) 100%);}
+.encounter-level{font-size:13px;color:var(--text);font-weight:600;}
+.encounter-species{display:flex;align-items:center;gap:8px;font-weight:600;}
+.encounter-species-info{display:flex;flex-direction:column;gap:3px;min-width:0;}
+.encounter-species-info>span:first-child{font-size:13px;color:var(--text);font-weight:600;}
+.encounter-species-info .types-row{gap:3px;}
+.encounter-species-info .type-pill{font-size:8px;padding:1px 5px;}
+.encounter-icon{width:32px;height:32px;position:relative;display:inline-block;overflow:hidden;flex:none;background:#173229;border-radius:4px;}
+.route-empty{padding:20px;color:var(--muted);background:var(--panel-2);border:1px solid var(--line);}
+@media (max-width:720px){.route-layout{grid-template-columns:1fr}.route-list{max-height:230px;min-height:0}.route-tools select{flex:1 1 135px}.main-tabs button{padding:11px 10px;font-size:12px}}
 
 .box-grid{
   display:grid; grid-template-columns:repeat(6, 1fr); gap:8px;
@@ -219,23 +271,30 @@ input[type=file]{ display:none; }
 @media (max-width:640px){ .box-grid{ grid-template-columns:repeat(3, 1fr);} }
 
 .slot{
+  --hero-color:#267c5a;--hero-secondary:var(--hero-color);
   aspect-ratio:1; border-radius:8px; border:1px solid var(--line-soft);
-  background:var(--panel-2);
+  background:linear-gradient(105deg,color-mix(in srgb,var(--hero-color) 34%,#111) 0%,color-mix(in srgb,var(--hero-color) 50%,var(--hero-secondary)) 48%,color-mix(in srgb,var(--hero-secondary) 34%,#111) 76%,var(--panel-2) 100%);
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   cursor:pointer; position:relative; padding:6px 4px; text-align:center;
   transition:border-color .15s ease, background .15s ease;
 }
-.slot:hover{ border-color:var(--leaf); background:#16302579; }
+.slot:hover{ border-color:var(--leaf); }
 .slot.empty{ cursor:default; opacity:.35; }
+.slot .types-row{gap:2px;justify-content:center;}
+.slot .type-pill{font-size:7px;padding:1px 4px;letter-spacing:0;}
 .slot.empty:hover{ border-color:var(--line-soft); background:var(--panel-2); }
 .slot .mini-icon{
   width:26px; height:26px; border-radius:50%; margin-bottom:5px;
   background:radial-gradient(circle at 35% 30%, var(--leaf-bright), #2c6b48 70%);
-  flex-shrink:0;
+  flex-shrink:0; overflow:hidden; position:relative; display:block;
 }
 .slot .mini-name{ font-size:10px; font-weight:600; line-height:1.15; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.slot .mini-lvl{ font-size:9px; color:var(--muted-2); }
+.slot .mini-lvl{ font-size:10px; font-weight:600; line-height:1.15; color:var(--text); }
 .slot .shiny-star{ position:absolute; top:3px; right:5px; font-size:10px; color:var(--accent); }
+.slot.shiny{overflow:hidden;border-color:#806d43;}
+.slot.shiny::after{content:"";position:absolute;inset:-35%;pointer-events:none;background:linear-gradient(110deg,transparent 42%,#fff0 45%,#fff5 50%,#fff0 55%,transparent 58%);transform:translateX(-115%);animation:shiny-box-sweep 4.2s ease-in-out infinite;}
+@keyframes shiny-box-sweep{0%,18%{transform:translateX(-115%)}72%,100%{transform:translateX(115%)}}
+@media (prefers-reduced-motion:reduce){.slot.shiny::after,.mon-card.shiny::after{animation:none;transform:translateX(0);opacity:.35}}
 
 /* ---------- modal ---------- */
 .modal-overlay{
@@ -249,7 +308,11 @@ input[type=file]{ display:none; }
 }
 .modal h2{ margin:0 0 2px; font-size:20px; }
 .modal .sub{ color:var(--muted); font-size:12.5px; margin-bottom:18px; }
-.modal-close{ float:right; }
+.modal-header{display:flex;align-items:center;gap:14px;margin-bottom:18px;}
+.modal-heading{flex:1;min-width:0;}
+.modal-heading .sub{margin:3px 0 0;}
+.modal-close{flex-shrink:0;align-self:flex-start;}
+.modal-mon-icon{width:68px;height:68px;border-radius:12px;overflow:hidden;position:relative;display:block;flex-shrink:0;background:radial-gradient(circle at 35% 30%, var(--leaf-bright), #2c6b48 70%);image-rendering:pixelated;}
 .detail-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px 22px; margin:18px 0; }
 .detail-grid .full{ grid-column:1/-1; }
 .detail-grid .k{ font-size:10.5px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted-2); margin-bottom:3px; }
@@ -297,8 +360,15 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
     </div>
   </header>
 
+  <nav class="main-tabs" role="tablist" aria-label="Brisk Dex sections">
+    <button class="active" id="tab-save" role="tab" aria-selected="true" aria-controls="save-tab-panel">Pok&eacute;mon &amp; Storage</button>
+    <button id="tab-routes" role="tab" aria-selected="false" aria-controls="routes-tab-panel">Route Encounters</button>
+  </nav>
+
+  <div id="save-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-save">
+
   <div id="dirty-bar" class="loader-panel" style="display:none; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; border-color:var(--accent-soft);">
-    <span>You have unsaved deposits/withdrawals.</span>
+    <span>Transfers are staged in Brisk Dex. The .sav on disk still has the original until you save changes.</span>
     <button class="primary" id="btn-save-changes">Save changes</button>
   </div>
 
@@ -325,12 +395,58 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
       <div class="box-grid" id="box-grid"></div>
     </div>
 
-    <div id="storage-section" style="margin-top:36px;">
-      <div class="section-heading"><h3>External Storage</h3><span class="count" id="storage-count"></span></div>
-      <p style="color:var(--muted); font-size:13px; margin:-6px 0 14px;">Pok&eacute;mon kept here live outside any single save file &mdash; deposit from a box or party, then withdraw into any save you load, including a different file.</p>
-      <div class="party-grid" id="storage-grid"></div>
-    </div>
   </div>
+
+  <section id="storage-section" style="margin-top:36px;">
+    <div class="section-heading"><h3>External Storage</h3><span class="count" id="storage-count"></span></div>
+    <p style="color:var(--muted); font-size:13px; margin:-6px 0 14px;">Pok&eacute;mon kept here live outside any single save file. Drag a party or boxed Pok&eacute;mon here to store it, or drag one onto an empty box slot to withdraw it.</p>
+    <div class="storage-tools">
+      <input id="storage-search" type="search" placeholder="Search name, species, move, level, or source…" aria-label="Search external storage">
+      <select id="storage-sort" aria-label="Sort external storage">
+        <option value="recent">Recently added</option>
+        <option value="name">Name</option>
+        <option value="level">Level</option>
+        <option value="shiny">Shiny first</option>
+      </select>
+      <button class="ghost" id="btn-export-storage">Export archive</button>
+      <button class="ghost" id="btn-import-storage">Import archive</button>
+      <input type="file" id="file-storage" accept=".json,application/json">
+    </div>
+    <div class="party-grid" id="storage-grid"></div>
+  </section>
+  </div>
+
+  <section id="routes-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-routes" style="display:none;">
+    <div class="section-heading"><h3>Route Encounters</h3><span class="count" id="route-count"></span></div>
+    <p class="route-intro">Browse wild encounters, stationary Pok&eacute;mon, and gifts across Brisk Emerald. Wild slot odds are relative to the selected method; the listed encounter rate is the chance of an encounter per check.</p>
+    <div class="route-tools">
+      <input id="route-search" type="search" placeholder="Search locations, Pok&eacute;mon, or type…" aria-label="Search route encounters by location, Pokémon, or type">
+      <select id="route-kind" aria-label="Filter route or area">
+        <option value="all">Routes &amp; areas</option>
+        <option value="route">Routes only</option>
+        <option value="area">Other areas</option>
+      </select>
+      <select id="route-order" aria-label="Sort encounter locations">
+        <option value="chronological">Chronological</option>
+        <option value="alphabetical">Alphabetical</option>
+      </select>
+      <select id="encounter-method" aria-label="Filter encounter method">
+        <option value="all">All methods</option>
+        <option value="land_mons">Walking</option>
+        <option value="water_mons">Surfing</option>
+        <option value="rock_smash_mons">Rock Smash</option>
+        <option value="old_rod">Old Rod</option>
+        <option value="good_rod">Good Rod</option>
+        <option value="super_rod">Super Rod</option>
+        <option value="static">Static encounters</option>
+        <option value="gift">Gift Pok&eacute;mon</option>
+      </select>
+    </div>
+    <div class="route-layout">
+      <aside class="route-list" id="route-list" aria-label="Encounter locations"></aside>
+      <div class="route-detail" id="route-detail" aria-live="polite"></div>
+    </div>
+  </section>
 
   <footer class="foot">Brisk Dex &middot; reads Gen III GBA save data entirely in your browser</footer>
 </div>
@@ -380,13 +496,33 @@ function decodeGen3String(bytes){
   return out.trim();
 }
 
+function encodeGen3String(text, length){
+  var reverse = Object.create(null);
+  Object.keys(CHARMAP).sort(function(a,b){return Number(a)-Number(b);}).forEach(function(key){
+    var character = CHARMAP[key];
+    if (character && character.length === 1 && reverse[character] === undefined) reverse[character] = Number(key);
+  });
+  var normalized = String(text || '').replace(/'/g, '’');
+  var bytes = new Uint8Array(length);
+  bytes.fill(0xFF);
+  var pos = 0;
+  for (var ch of normalized){
+    if (pos >= length) break;
+    var code = reverse[ch];
+    if (code === undefined) code = reverse[ch.toUpperCase()];
+    if (code === undefined) code = reverse[' '];
+    bytes[pos++] = code;
+  }
+  return bytes;
+}
+
 var NATURES = ["Hardy","Lonely","Brave","Adamant","Naughty","Bold","Docile","Relaxed","Impish","Lax",
   "Timid","Hasty","Serious","Jolly","Naive","Modest","Mild","Quiet","Bashful","Rash",
   "Calm","Gentle","Sassy","Careful","Quirky"];
 
 var TYPE_COLORS = { "Normal":"#a3a48a","Fire":"#e2734f","Water":"#5f9bdc","Electric":"#e3c94a","Grass":"#6fbf6f",
-  "Ice":"#84d6d0","Fighting":"#c8564a","Poison":"#a15fb5","Ground":"#c9a95f","Flying":"#93a9e0",
-  "Psychic":"#e26b9a","Bug":"#a9bc42","Rock":"#b8a15f","Ghost":"#6c5f9c","Dragon":"#6f5fd6",
+  "Ice":"#84d6d0","Fighting":"#e88a3a","Poison":"#a15fb5","Ground":"#79502f","Flying":"#93a9e0",
+  "Psychic":"#e26b9a","Bug":"#a9bc42","Rock":"#c6a477","Ghost":"#6c5f9c","Dragon":"#6f5fd6",
   "Dark":"#6e6155","Steel":"#9aa4ad","Fairy":"#e0a0c4" };
 
 /* ============================================================
@@ -654,23 +790,23 @@ function decodePokemon(rec, isPartySlot){
 
   var gOff = subOffsets['G'], aOff = subOffsets['A'], eOff = subOffsets['E'], mOff = subOffsets['M'];
 
-  var species = dataView.getUint16(gOff+0, true);
-  var heldItem = dataView.getUint16(gOff+2, true);
-  var experience = dataView.getUint32(gOff+4, true);
+  var species = dataView.getUint16(gOff+0, true) & 0x07FF;
+  var heldItem = dataView.getUint16(gOff+2, true) & 0x03FF;
+  var experience = dataView.getUint32(gOff+4, true) & 0x001FFFFF;
   var ppBonuses = dataView.getUint8(gOff+8);
   var friendship = dataView.getUint8(gOff+9);
 
   var moves = [
-    dataView.getUint16(aOff+0, true),
-    dataView.getUint16(aOff+2, true),
-    dataView.getUint16(aOff+4, true),
-    dataView.getUint16(aOff+6, true)
+    dataView.getUint16(aOff+0, true) & 0x07FF,
+    dataView.getUint16(aOff+2, true) & 0x07FF,
+    dataView.getUint16(aOff+4, true) & 0x07FF,
+    dataView.getUint16(aOff+6, true) & 0x07FF
   ];
   var pp = [
-    dataView.getUint8(aOff+8),
-    dataView.getUint8(aOff+9),
-    dataView.getUint8(aOff+10),
-    dataView.getUint8(aOff+11)
+    dataView.getUint8(aOff+8) & 0x7F,
+    dataView.getUint8(aOff+9) & 0x7F,
+    dataView.getUint8(aOff+10) & 0x7F,
+    dataView.getUint8(aOff+11) & 0x7F
   ];
 
   var evs = {
@@ -692,7 +828,7 @@ function decodePokemon(rec, isPartySlot){
     spdef: (ivEggAbility >>> 25) & 0x1F
   };
   var isEgg = ((ivEggAbility >>> 30) & 1) === 1;
-  var abilitySlot = (ivEggAbility >>> 31) & 1;
+  var abilitySlot = (dataView.getUint32(mOff+8, true) >>> 29) & 3;
 
   var levelMet = originsInfo & 0x7F;
   var gameOfOrigin = (originsInfo >>> 7) & 0x0F;
@@ -700,11 +836,11 @@ function decodePokemon(rec, isPartySlot){
   var otGender = (originsInfo >>> 15) & 1;
 
   var nature = NATURES[personality % 25];
-  var isShiny = (function(){
-    var p1 = personality & 0xFFFF, p2 = (personality >>> 16) & 0xFFFF;
-    var t1 = otId & 0xFFFF, t2 = (otId >>> 16) & 0xFFFF;
-    return (p1 ^ p2 ^ t1 ^ t2) < 8;
-  })();
+  // Brisk Emerald stores an override bit alongside HP lost.
+  // The shiny result is the normal PID/Trainer ID check XOR that override.
+  var shinyValue = (personality & 0xFFFF) ^ (personality >>> 16) ^ (otId & 0xFFFF) ^ (otId >>> 16);
+  var shinyModifier = (u16(view, 0x1E) >>> 14) & 1;
+  var isShiny = (shinyValue < GAME_SHINY_ODDS) !== (shinyModifier === 1);
 
   var mon = {
     empty:false,
@@ -733,20 +869,221 @@ function decodePokemon(rec, isPartySlot){
   } else {
     // derive an approximate level from experience using a medium-fast curve
     // (exact curve depends on species growth rate, which we may not have data for)
-    mon.level = estimateLevelFromExp(experience);
+    mon.level = estimateLevelFromExp(experience, speciesGrowthRate(species));
     mon.maxHP = null; mon.currentHP = null;
   }
 
   return mon;
 }
 
-function estimateLevelFromExp(exp){
-  // medium-fast growth rate: exp = n^3, used as a rough fallback only
-  var n = Math.cbrt(exp);
-  var lvl = Math.floor(n);
-  if (lvl < 1) lvl = 1;
-  if (lvl > 100) lvl = 100;
-  return lvl;
+function speciesGrowthRate(id){
+  var entry = NAME_DATA.species[String(id)];
+  return entry && typeof entry === 'object' ? entry.growthRate : null;
+}
+function experienceForLevel(level, growthRate){
+  var n = level;
+  switch (growthRate){
+    case 'fast': return Math.floor(4*n*n*n/5);
+    case 'medium_slow': return Math.floor(6*n*n*n/5 - 15*n*n + 100*n - 140);
+    case 'slow': return Math.floor(5*n*n*n/4);
+    case 'erratic':
+      if (n <= 50) return Math.floor(n*n*n*(100-n)/50);
+      if (n <= 68) return Math.floor(n*n*n*(150-n)/100);
+      if (n <= 98) return Math.floor(n*n*n*Math.floor((1911-10*n)/3)/500);
+      return Math.floor(n*n*n*(160-n)/100);
+    case 'fluctuating':
+      if (n <= 15) return Math.floor(n*n*n*(Math.floor((n+1)/3)+24)/50);
+      if (n <= 36) return Math.floor(n*n*n*(n+14)/50);
+      return Math.floor(n*n*n*(Math.floor(n/2)+32)/50);
+    default: return n*n*n;
+  }
+}
+function estimateLevelFromExp(exp, growthRate){
+  var level = 1;
+  for (var candidate=2; candidate<=100; candidate++){
+    if (experienceForLevel(candidate, growthRate) > exp) break;
+    level = candidate;
+  }
+  return level;
+}
+
+function randomUint32(){
+  var value = new Uint32Array(1);
+  if (window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(value);
+  else value[0] = Math.floor(Math.random() * 0x100000000);
+  return value[0] >>> 0;
+}
+function randomInt(maxExclusive){ return maxExclusive > 0 ? randomUint32() % maxExclusive : 0; }
+function randomChoice(values){ return values[randomInt(values.length)]; }
+function shuffled(values){
+  var copy = values.slice();
+  for (var i=copy.length-1;i>0;i--){
+    var j=randomInt(i+1), tmp=copy[i]; copy[i]=copy[j]; copy[j]=tmp;
+  }
+  return copy;
+}
+function natureMultiplier(natureIndex, statIndex){
+  if (statIndex === 0 || natureIndex === 0) return 1;
+  var raised = natureIndex <= 4 ? 0 : natureIndex <= 9 ? 1 : natureIndex <= 14 ? 2 : natureIndex <= 19 ? 3 : 4;
+  var lowered = natureIndex % 5;
+  var nonHpStatIndex = statIndex - 1;
+  if (nonHpStatIndex === raised) return 1.1;
+  if (nonHpStatIndex === lowered) return 0.9;
+  return 1;
+}
+function calculateWonderTradeStats(species, level, ivs, natureIndex){
+  var base = species.baseStats || [1,1,1,1,1,1];
+  var stats = [];
+  stats[0] = species.constant === 'SHEDINJA' ? 1 : Math.floor(((2*base[0]+ivs[0])*level)/100)+level+10;
+  for (var i=1;i<6;i++){
+    var raw = Math.floor(((2*base[i]+ivs[i])*level)/100)+5;
+    stats[i] = Math.floor(raw * natureMultiplier(natureIndex, i));
+  }
+  return stats;
+}
+function makeWonderTradePokemon(speciesId, level, makeShiny){
+  var entry = NAME_DATA.species[String(speciesId)];
+  if (!entry || !Array.isArray(entry.baseStats) || !Array.isArray(entry.learnableMoves) || !entry.learnableMoves.length){
+    throw new Error('This species is missing the data needed for an offline trade.');
+  }
+  var moves = shuffled(entry.learnableMoves).slice(0,4);
+  var personality = randomUint32();
+  var genderRatio = Number.isInteger(entry.genderRatio) ? entry.genderRatio : 127;
+  var personalityLow = personality & 0xFF;
+  if (genderRatio === 255){
+    // Genderless species have no PID gender constraint.
+  }else if (genderRatio === 0){
+    personalityLow = 254 + randomInt(2);
+  }else if (genderRatio === 254){
+    personalityLow = randomInt(254);
+  }else if (personalityLow < genderRatio){
+    // Keep the random female result.
+  }else{
+    personalityLow = genderRatio + randomInt(256 - genderRatio);
+  }
+  personality = ((personality & 0xFFFFFF00) | personalityLow) >>> 0;
+  var otId = randomUint32();
+  var record = new Uint8Array(100);
+  record.fill(0);
+  var view = new DataView(record.buffer);
+  view.setUint32(0x00, personality, true);
+  view.setUint32(0x04, otId, true);
+  record.set(encodeGen3String(speciesName(speciesId), 10), 0x08);
+  view.setUint8(0x12, 2); // English
+  record.set(encodeGen3String('WONDER', 7), 0x14);
+
+  var secure = new Uint8Array(48);
+  var plain = new DataView(secure.buffer);
+  var g = 0, a = 12, e = 24, m = 36;
+  plain.setUint16(g, speciesId & 0x07FF, true);
+  plain.setUint16(g+2, 0, true);
+  plain.setUint32(g+4, experienceForLevel(level, entry.growthRate), true);
+  plain.setUint8(g+8, 0);
+  plain.setUint8(g+9, entry.friendship === undefined ? 70 : entry.friendship);
+
+  moves.forEach(function(moveId, index){
+    plain.setUint16(a + index*2, moveId & 0x07FF, true);
+    var pp = Number(BUNDLED_DATA.movePP[String(moveId)]) || 10;
+    plain.setUint8(a + 8 + index, Math.min(127, pp));
+  });
+
+  var ivs = [];
+  for (var i=0;i<6;i++) ivs[i]=randomInt(32);
+  var ivWord = (ivs[0]) | (ivs[1]<<5) | (ivs[2]<<10) | (ivs[3]<<15) | (ivs[4]<<20) | (ivs[5]<<25);
+  plain.setUint32(m+4, ivWord >>> 0, true);
+
+  // In Generation III the low personality bit selects ability slot 0 or 1.
+  var abilitySlot = personality & 1;
+  plain.setUint32(m+8, (abilitySlot << 29) >>> 0, true);
+  var otFemale = randomInt(2) === 1;
+  var origins = (level & 0x7F) | (3 << 7) | (4 << 11) | (otFemale ? 1 << 15 : 0);
+  plain.setUint16(m+2, origins, true);
+
+  var order = SUB_ORDERS[personality % 24];
+  var key = (otId ^ personality) >>> 0;
+  for (var sub=0;sub<4;sub++){
+    var sourceOffset = ({G:0,A:12,E:24,M:36})[order[sub]];
+    var targetOffset = 0x20 + sub*12;
+    for (var word=0;word<3;word++){
+      var encrypted = (plain.getUint32(sourceOffset+word*4, true) ^ key) >>> 0;
+      view.setUint32(targetOffset+word*4, encrypted, true);
+    }
+  }
+  var checksum = 0;
+  for (var check=0;check<24;check++) checksum = (checksum + plain.getUint16(check*2, true)) & 0xFFFF;
+  view.setUint16(0x1C, checksum, true);
+
+  var shinyValue = (personality & 0xFFFF) ^ (personality >>> 16) ^ (otId & 0xFFFF) ^ (otId >>> 16);
+  makeShiny = makeShiny === true;
+  var shinyModifier = (shinyValue < GAME_SHINY_ODDS) !== makeShiny;
+  view.setUint16(0x1E, shinyModifier ? 0x4000 : 0, true);
+
+  var natureIndex = personality % 25;
+  var stats = calculateWonderTradeStats(entry, level, ivs, natureIndex);
+  view.setUint32(0x50, 0, true);
+  view.setUint8(0x54, level);
+  view.setUint16(0x56, stats[0], true);
+  view.setUint16(0x58, stats[0], true);
+  view.setUint16(0x5A, stats[1], true);
+  view.setUint16(0x5C, stats[2], true);
+  view.setUint16(0x5E, stats[3], true);
+  view.setUint16(0x60, stats[4], true);
+  view.setUint16(0x62, stats[5], true);
+  return decodePokemon(record, true);
+}
+function getWonderTradePool(level){
+  return Object.keys(NAME_DATA.species).filter(function(id){
+    var species = NAME_DATA.species[id];
+    return species && species.constant && species.constant !== 'EGG' &&
+      Array.isArray(species.baseStats) && species.baseStats.length === 6 &&
+      Array.isArray(species.learnableMoves) && species.learnableMoves.length > 0 &&
+      (Number(species.minimumLevel) || 1) <= level;
+  });
+}
+async function wonderTradeAtLocation(mon, loc){
+  if (!currentSave || !loc || (loc.type !== 'party' && loc.type !== 'box')) return;
+  var locationName = loc.type === 'party' ? 'party slot' : 'box slot';
+  if (!window.confirm('Trade ' + (mon.nickname || speciesName(mon.species)) + ' from this ' + locationName + '? It will be replaced by a random Pokémon from the offline Brisk Emerald pool. This cannot be undone.')) return;
+
+  var latest = loc.type === 'party' ? currentSave.party[loc.index] : currentSave.boxes[loc.box] && currentSave.boxes[loc.box][loc.slot];
+  if (!latest || latest.empty || latest.personality !== mon.personality || latest.otId !== mon.otId || latest.species !== mon.species){
+    showError('This slot changed after the details window opened. Reopen the Pokémon details and try again.');
+    return;
+  }
+
+  var level = Math.max(1, Math.min(100, mon.level + randomInt(11) - 5));
+  var pool = getWonderTradePool(level).filter(function(id){ return Number(id) !== mon.species; });
+  if (!pool.length){ showError('Offline Wonder Trade has no Pokémon that can exist at Lv' + level + ' in its bundled data.'); return; }
+  var speciesId = Number(randomChoice(pool));
+  var makeShiny = mon.isShiny || randomInt(512) === 0;
+  var received;
+  try{ received = makeWonderTradePokemon(speciesId, level, makeShiny); }
+  catch(err){ showError('Could not create an offline trade Pokémon: ' + err.message); return; }
+
+  if (loc.type === 'party'){
+    writePartyBytes(currentSave, 0x0238 + loc.index*100, received.rawRecord);
+    recomputeChecksum(currentSave, 1);
+    currentSave.party[loc.index] = received;
+  }else{
+    var logicalOffset = 4 + (loc.box*30 + loc.slot)*80;
+    var touched = writeLogicalPCBytes(currentSave, logicalOffset, received.rawRecord.subarray(0, 80));
+    touched.forEach(function(id){ recomputeChecksum(currentSave, id); });
+    currentSave.boxes[loc.box][loc.slot] = decodePokemon(received.rawRecord.subarray(0, 80), false);
+  }
+  markDirty();
+  var saved = await saveChangesToFile();
+  if (IS_ELECTRON && currentSave.filePath && !saved) return;
+  document.getElementById('modal-root').innerHTML = '';
+  renderAll();
+  showNotice('Wonder Trade complete: received ' + speciesName(speciesId) + ' at Lv' + level + (received.isShiny ? ' (shiny)!' : '.') + (IS_ELECTRON ? '' : ' Replace your original .sav with the downloaded updated save to keep it in-game.'));
+}
+function refreshBoxLevels(){
+  if (!currentSave) return;
+  currentSave.boxes.forEach(function(box){
+    box.forEach(function(mon){
+      if (mon && !mon.empty) mon.level = estimateLevelFromExp(mon.experience, speciesGrowthRate(mon.species));
+    });
+  });
 }
 
 /* ============================================================
@@ -771,12 +1108,16 @@ var NAME_DATA = { species: buildDefaultSpecies(), moves:{}, items:{}, abilities:
 var DEFAULT_SPECIES_COUNT = DEFAULT_SPECIES_ARRAY.length;
 
 var USER_DATA = { species:{}, moves:{}, items:{}, abilities:{} };
+var BUNDLED_DATA = { species:{}, moves:{}, movePP:{}, items:{}, abilities:{} };
+var ROUTE_DATA = [];
+var selectedRouteId = null;
+var GAME_SHINY_ODDS = 8;
 
 function rebuildNameData(){
-  NAME_DATA.species = Object.assign({}, buildDefaultSpecies(), USER_DATA.species);
-  NAME_DATA.moves = Object.assign({}, USER_DATA.moves);
-  NAME_DATA.items = Object.assign({}, USER_DATA.items);
-  NAME_DATA.abilities = Object.assign({}, USER_DATA.abilities);
+  NAME_DATA.species = Object.assign({}, buildDefaultSpecies(), BUNDLED_DATA.species, USER_DATA.species);
+  NAME_DATA.moves = Object.assign({}, BUNDLED_DATA.moves, USER_DATA.moves);
+  NAME_DATA.items = Object.assign({}, BUNDLED_DATA.items, USER_DATA.items);
+  NAME_DATA.abilities = Object.assign({}, BUNDLED_DATA.abilities, USER_DATA.abilities);
 }
 
 function loadNameDataFromStorage(){
@@ -795,6 +1136,27 @@ function loadNameDataFromStorage(){
 function saveNameDataToStorage(){
   try{ localStorage.setItem('briskdex_namedata_overrides', JSON.stringify(USER_DATA)); }catch(e){}
 }
+async function loadBundledGameData(){
+  if (!IS_ELECTRON) return;
+  try{
+    var data = await window.briskDexAPI.loadGameData();
+    if (Number.isInteger(data.shinyOdds) && data.shinyOdds > 0) GAME_SHINY_ODDS = data.shinyOdds;
+    BUNDLED_DATA = {
+      species:data.species || {}, moves:data.moves || {},
+      movePP:data.movePP || {}, items:data.items || {}, abilities:data.abilities || {}
+    };
+    ROUTE_DATA = Array.isArray(data.routeEncounters) ? data.routeEncounters : [];
+    rebuildNameData();
+    var icons = await window.briskDexAPI.loadBundledIcons();
+    SPECIES_ICONS = Object.assign({}, SPECIES_ICONS, icons && icons.icons || {});
+    SPECIES_SHINY_ICONS = Object.assign({}, SPECIES_SHINY_ICONS, icons && icons.shinyIcons || {});
+    refreshBoxLevels();
+    updateDataStatus();
+    renderRouteEncounters();
+  }catch(err){
+    showError('Could not load Brisk Emerald data bundled with Brisk Dex: ' + err.message);
+  }
+}
 
 function speciesName(id){
   var entry = NAME_DATA.species[String(id)];
@@ -805,6 +1167,23 @@ function speciesTypes(id){
   var entry = NAME_DATA.species[String(id)];
   if (entry && typeof entry === 'object' && entry.types) return entry.types;
   return null;
+}
+function applyTypeStyle(node, species){
+  var types = speciesTypes(species);
+  if (!types || !types.length) return types;
+  node.style.setProperty('--hero-color', TYPE_COLORS[types[0]] || '#267c5a');
+  node.style.setProperty('--hero-secondary', TYPE_COLORS[types[1]] || TYPE_COLORS[types[0]] || '#267c5a');
+  return types;
+}
+function makeTypePills(types, compact){
+  if (!types || !types.length) return null;
+  var row = el('div', {class:'types-row' + (compact ? ' compact-types' : '')});
+  types.forEach(function(type){
+    var pill = el('span', {class:'type-pill', text:type});
+    pill.style.background = TYPE_COLORS[type] || 'var(--muted-2)';
+    row.appendChild(pill);
+  });
+  return row;
 }
 function speciesAbilityNames(id){
   var entry = NAME_DATA.species[String(id)];
@@ -833,9 +1212,11 @@ function itemName(id){
 }
 
 /* ---- icons: loaded from a local folder (Electron only), keyed by species id ---- */
-var SPECIES_ICONS = {}; // id -> data URL
-function speciesIcon(id){
-  return SPECIES_ICONS[String(id)] || null;
+var SPECIES_ICONS = {}; // id -> normal icon data URL
+var SPECIES_SHINY_ICONS = {}; // id -> sprite sheet with the game's shiny palette
+function speciesIcon(mon){
+  var id = String(mon.species);
+  return mon.isShiny && SPECIES_SHINY_ICONS[id] ? SPECIES_SHINY_ICONS[id] : SPECIES_ICONS[id] || null;
 }
 async function loadIconFolder(){
   if (!IS_ELECTRON){
@@ -845,26 +1226,32 @@ async function loadIconFolder(){
   try{
     var result = await window.briskDexAPI.openIconFolderDialog();
     if (!result) return;
-    var resolved = {};
-    var nameToId = {};
+    var resolved = Object.assign({}, result.icons || {});
+    var resolvedShiny = Object.assign({}, result.shinyIcons || {});
+    var nameToIds = {};
     Object.keys(NAME_DATA.species).forEach(function(id){
-      var entry = NAME_DATA.species[id];
-      var constant = (entry && entry.constant) ? entry.constant : null;
-      if (constant) nameToId[constant.toLowerCase().replace(/_/g,'')] = id;
+      var entry = NAME_DATA.species[id] || {};
+      var sprite = (entry.iconSprite || entry.constant || '').toLowerCase().replace(/[_-]/g,'');
+      if (sprite) (nameToIds[sprite] || (nameToIds[sprite] = [])).push(id);
     });
     var unresolved = 0;
     Object.keys(result.icons).forEach(function(key){
       if (key.indexOf('name:') === 0){
-        var norm = key.slice(5).replace(/_/g,'').replace(/-/g,'');
-        var id = nameToId[norm];
-        if (id) resolved[id] = result.icons[key];
+        var norm = key.slice(5).replace(/[_-]/g,'');
+        var ids = nameToIds[norm] || [];
+        if (ids.length) ids.forEach(function(id){ resolved[id] = result.icons[key]; });
         else unresolved++;
-      } else {
-        resolved[key] = result.icons[key];
+      }
+    });
+    Object.keys(result.shinyIcons || {}).forEach(function(key){
+      if (key.indexOf('name:') === 0){
+        var ids = nameToIds[key.slice(5).replace(/[_-]/g,'')] || [];
+        ids.forEach(function(id){ resolvedShiny[id] = result.shinyIcons[key]; });
       }
     });
     SPECIES_ICONS = Object.assign({}, SPECIES_ICONS, resolved);
-    var msg = 'Loaded ' + Object.keys(resolved).length + ' icons from ' + result.folderPath + '.';
+    SPECIES_SHINY_ICONS = Object.assign({}, SPECIES_SHINY_ICONS, resolvedShiny);
+    var msg = 'Loaded ' + Object.keys(resolved).length + ' normal and ' + Object.keys(resolvedShiny).length + ' shiny icons from ' + result.folderPath + '.';
     if (unresolved) msg += ' (' + unresolved + " couldn't be matched to a species \u2014 load your data JSON first so I know the name-to-ID mapping.)";
     showNotice(msg);
     if (currentSave) renderAll();
@@ -885,57 +1272,102 @@ var IS_ELECTRON = !!(window.briskDexAPI);
    ============================================================ */
 var externalStorage = [];
 var dirty = false;
+var storageQuery = '';
+var storageSort = 'recent';
+var pendingWithdrawals = Object.create(null);
+var saveSessionId = null;
+var storageLoadError = null;
+var storageReady = Promise.resolve();
 
 function genId(){ return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 
 async function loadExternalStorage(){
-  if (IS_ELECTRON){
-    try{ externalStorage = await window.briskDexAPI.loadStorage() || []; }catch(e){ externalStorage = []; }
-  } else {
-    try{
+  try{
+    if (IS_ELECTRON){
+      var loaded = await window.briskDexAPI.loadStorage();
+      if (!Array.isArray(loaded)) throw new Error('The storage file does not contain a Pokémon list.');
+      if (loaded.some(function(entry){ return !validStorageEntry(entry); })) throw new Error('The storage file contains an invalid Pokémon record.');
+      externalStorage = loaded;
+    } else {
       var raw = localStorage.getItem('briskdex_external_storage');
-      externalStorage = raw ? JSON.parse(raw) : [];
-    }catch(e){ externalStorage = []; }
+      var parsed = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(parsed)) throw new Error('Browser storage does not contain a Pokémon list.');
+      if (parsed.some(function(entry){ return !validStorageEntry(entry); })) throw new Error('Browser storage contains an invalid Pokémon record.');
+      externalStorage = parsed;
+    }
+    storageLoadError = null;
+  }catch(err){
+    storageLoadError = err.message || String(err);
+    showError('Could not load external storage. It has been left untouched: ' + storageLoadError);
   }
+  renderStoragePanel();
+}
+function assertStorageReadable(){
+  if (storageLoadError) throw new Error('External storage is unreadable. Import a backup archive before changing it.');
 }
 async function persistExternalStorage(){
+  assertStorageReadable();
   if (IS_ELECTRON){
-    try{ await window.briskDexAPI.saveStorage(externalStorage); }catch(e){ showError('Could not save external storage: ' + e.message); }
+    var result = await window.briskDexAPI.saveStorage(externalStorage);
+    if (!result || !result.ok) throw new Error(result && result.error ? result.error : 'Unknown storage write error.');
   } else {
-    try{ localStorage.setItem('briskdex_external_storage', JSON.stringify(externalStorage)); }catch(e){ showError('Could not save external storage locally: ' + e.message); }
+    localStorage.setItem('briskdex_external_storage', JSON.stringify(externalStorage));
   }
 }
 
-function addToStorage(mon){
+async function addToStorage(mon){
+  await storageReady;
+  assertStorageReadable();
   var raw80 = mon.rawRecord.length >= 80 ? mon.rawRecord.subarray(0,80) : mon.rawRecord;
-  externalStorage.push({
+  var entry = {
     id: genId(),
     raw80: bytesToBase64(raw80),
     depositedAt: Date.now(),
     sourceTrainer: currentSave.trainer.name,
     sourceId: currentSave.trainer.publicId
-  });
-  persistExternalStorage();
+  };
+  externalStorage.push(entry);
+  try{ await persistExternalStorage(); }
+  catch(err){
+    externalStorage = externalStorage.filter(function(item){ return item.id !== entry.id; });
+    throw err;
+  }
+}
+
+async function removeFromStorage(storageId){
+  await storageReady;
+  assertStorageReadable();
+  var index = externalStorage.findIndex(function(entry){ return entry.id === storageId; });
+  if (index < 0) return false;
+  var previous = externalStorage;
+  externalStorage = previous.filter(function(entry){ return entry.id !== storageId; });
+  try{ await persistExternalStorage(); }
+  catch(err){ externalStorage = previous; throw err; }
+  delete pendingWithdrawals[storageId];
+  renderStoragePanel();
+  return true;
 }
 
 function markDirty(){ dirty = true; updateDirtyBanner(); }
 function clearDirty(){ dirty = false; updateDirtyBanner(); }
 
-function depositFromBox(boxIndex, slotIndex){
+async function depositFromBox(boxIndex, slotIndex){
   var mon = currentSave.boxes[boxIndex][slotIndex];
   if (!mon || mon.empty) return;
-  addToStorage(mon);
+  await addToStorage(mon);
   var logicalOffset = 4 + (boxIndex*30 + slotIndex)*80;
   var touched = writeLogicalPCBytes(currentSave, logicalOffset, new Uint8Array(80));
   touched.forEach(function(id){ recomputeChecksum(currentSave, id); });
   currentSave.boxes[boxIndex][slotIndex] = { empty:true };
   markDirty();
+  if (IS_ELECTRON && currentSave.filePath) await saveChangesToFile();
 }
 
-function depositFromParty(partyIndex){
+async function depositFromParty(partyIndex){
   var mon = currentSave.party[partyIndex];
   if (!mon) return;
-  addToStorage(mon);
+  if (currentSave.party.length <= 1) throw new Error('Keep at least one Pokémon in your party.');
+  await addToStorage(mon);
   var oldSize = currentSave.party.length;
   var newParty = currentSave.party.slice();
   newParty.splice(partyIndex, 1);
@@ -951,37 +1383,62 @@ function depositFromParty(partyIndex){
   recomputeChecksum(currentSave, 1);
   currentSave.party = newParty;
   markDirty();
+  if (IS_ELECTRON && currentSave.filePath) await saveChangesToFile();
 }
 
 function withdrawToSlot(storageId, boxIndex, slotIndex){
+  if (storageLoadError){ showError('External storage could not be loaded. Import an archive before withdrawing Pokémon.'); return false; }
   var target = currentSave.boxes[boxIndex][slotIndex];
   if (target && !target.empty){ showError('That box slot is already occupied.'); return false; }
   var idx = externalStorage.findIndex(function(e){ return e.id === storageId; });
   if (idx === -1) return false;
+  if (pendingWithdrawals[storageId] === saveSessionId){ showError('This Pokémon is already queued for the current save.'); return false; }
   var entry = externalStorage[idx];
   var raw80 = base64ToBytes(entry.raw80);
   var logicalOffset = 4 + (boxIndex*30 + slotIndex)*80;
   var touched = writeLogicalPCBytes(currentSave, logicalOffset, raw80);
   touched.forEach(function(id){ recomputeChecksum(currentSave, id); });
   currentSave.boxes[boxIndex][slotIndex] = decodePokemon(raw80, false);
-  externalStorage.splice(idx, 1);
-  persistExternalStorage();
+  // Keep the archive copy until the edited .sav is safely written. A crash or
+  // cancelled download can then never remove the only persisted copy.
+  pendingWithdrawals[storageId] = saveSessionId;
   markDirty();
   return true;
 }
 
+async function finalizeWithdrawalsAfterDiskSave(){
+  var ids = Object.keys(pendingWithdrawals).filter(function(id){ return pendingWithdrawals[id] === saveSessionId; });
+  if (!ids.length) return true;
+  var previous = externalStorage;
+  var moved = new Set(ids);
+  externalStorage = previous.filter(function(entry){ return !moved.has(entry.id); });
+  try{ await persistExternalStorage(); }
+  catch(err){
+    externalStorage = previous;
+    showError('The save file was written, but external storage could not be updated. A safe duplicate remains in the archive: ' + err.message);
+    renderStoragePanel();
+    return false;
+  }
+  ids.forEach(function(id){ delete pendingWithdrawals[id]; });
+  renderStoragePanel();
+  return true;
+}
+
 async function saveChangesToFile(){
-  if (!currentSave) return;
+  if (!currentSave) return false;
   if (IS_ELECTRON && currentSave.filePath){
     try{
       var res = await window.briskDexAPI.writeSav(currentSave.filePath, currentSave._internal.rawBytes);
       if (res && res.ok){
+        var archiveUpdated = await finalizeWithdrawalsAfterDiskSave();
         clearDirty();
-        showNotice('Saved. A backup of the previous file was kept at ' + res.backupPath);
+        if (archiveUpdated) showNotice('Saved. A backup of the previous file was kept at ' + res.backupPath);
+        return true;
       } else {
         showError('Could not write the save file: ' + (res && res.error ? res.error : 'unknown error'));
+        return false;
       }
-    }catch(e){ showError('Could not write the save file: ' + e.message); }
+    }catch(e){ showError('Could not write the save file: ' + e.message); return false; }
   } else {
     var blob = new Blob([currentSave._internal.rawBytes], {type:'application/octet-stream'});
     var url = URL.createObjectURL(blob);
@@ -989,9 +1446,12 @@ async function saveChangesToFile(){
     var fname = (currentSave.trainer.name || 'save').toLowerCase().replace(/[^a-z0-9]/g,'') || 'brisk-emerald';
     a.href = url; a.download = fname + '-updated.sav';
     document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
     clearDirty();
-    showNotice('Downloaded an updated .sav file. Replace your original save file with this one to keep the changes in-game.');
+    var queuedCount = Object.keys(pendingWithdrawals).filter(function(id){ return pendingWithdrawals[id] === saveSessionId; }).length;
+    showNotice('Downloaded an updated .sav file. Replace your original save file with this one to keep the changes in-game.' +
+      (queuedCount ? ' The archive copies are retained; remove them from External Storage after replacing the original save.' : ''));
+    return false;
   }
 }
 
@@ -1000,6 +1460,73 @@ async function saveChangesToFile(){
    ============================================================ */
 var currentSave = null;
 var activeBoxIndex = 0;
+var activePokemonDrag = null;
+var lastPokemonDropAt = 0;
+
+function pokemonDragData(event){
+  if (activePokemonDrag) return activePokemonDrag;
+  try{
+    var raw = event.dataTransfer.getData('application/x-briskdex-pokemon') || event.dataTransfer.getData('text/plain');
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+function wireSavePokemonDrag(node, mon, loc){
+  node.draggable = true;
+  node.addEventListener('dragstart', function(event){
+    activePokemonDrag = {source:'save', loc:loc, species:mon.species, personality:mon.personality, otId:mon.otId};
+    event.dataTransfer.effectAllowed = 'move';
+    var payload = JSON.stringify(activePokemonDrag);
+    event.dataTransfer.setData('application/x-briskdex-pokemon', payload);
+    event.dataTransfer.setData('text/plain', payload);
+    node.classList.add('dragging');
+  });
+  node.addEventListener('dragend', function(){
+    activePokemonDrag = null;
+    node.classList.remove('dragging');
+    document.querySelectorAll('.drag-over').forEach(function(target){ target.classList.remove('drag-over'); });
+  });
+}
+function wireStoragePokemonDrag(node, storageId){
+  node.draggable = true;
+  node.addEventListener('dragstart', function(event){
+    activePokemonDrag = {source:'storage', storageId:storageId};
+    event.dataTransfer.effectAllowed = 'move';
+    var payload = JSON.stringify(activePokemonDrag);
+    event.dataTransfer.setData('application/x-briskdex-pokemon', payload);
+    event.dataTransfer.setData('text/plain', payload);
+    node.classList.add('dragging');
+  });
+  node.addEventListener('dragend', function(){
+    activePokemonDrag = null;
+    node.classList.remove('dragging');
+    document.querySelectorAll('.drag-over').forEach(function(target){ target.classList.remove('drag-over'); });
+  });
+}
+function wireEmptyBoxDrop(node, boxIndex, slotIndex){
+  node.addEventListener('dragover', function(event){
+    var data = pokemonDragData(event);
+    if (!data || data.source !== 'storage') return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    node.classList.add('drag-over');
+  });
+  node.addEventListener('dragleave', function(event){
+    if (!node.contains(event.relatedTarget)) node.classList.remove('drag-over');
+  });
+  node.addEventListener('drop', function(event){
+    var data = pokemonDragData(event);
+    if (!data || data.source !== 'storage') return;
+    event.preventDefault(); event.stopPropagation();
+    node.classList.remove('drag-over');
+    if (currentSave.boxes[boxIndex][slotIndex] && !currentSave.boxes[boxIndex][slotIndex].empty) return;
+    if (withdrawToSlot(data.storageId, boxIndex, slotIndex)){
+      lastPokemonDropAt = Date.now();
+      document.getElementById('modal-root').innerHTML = '';
+      renderAll();
+      showNotice('Moved Pokémon into ' + currentSave.boxNames[boxIndex] + '. Save the updated file to keep the change.');
+    }
+  });
+}
 
 function el(tag, attrs, children){
   var e = document.createElement(tag);
@@ -1037,12 +1564,13 @@ function updateDirtyBanner(){
 
 function updateDataStatus(){
   var panel = document.getElementById('data-status');
-  var customS = Object.keys(USER_DATA.species).length;
-  var customM = Object.keys(USER_DATA.moves).length;
-  var customI = Object.keys(USER_DATA.items).length;
+  var customS = Object.keys(Object.assign({}, BUNDLED_DATA.species, USER_DATA.species)).length;
+  var customM = Object.keys(Object.assign({}, BUNDLED_DATA.moves, USER_DATA.moves)).length;
+  var customI = Object.keys(Object.assign({}, BUNDLED_DATA.items, USER_DATA.items)).length;
   var withAbilities = 0;
-  Object.keys(USER_DATA.species).forEach(function(id){
-    var e = USER_DATA.species[id];
+  var mergedSpecies = Object.assign({}, BUNDLED_DATA.species, USER_DATA.species);
+  Object.keys(mergedSpecies).forEach(function(id){
+    var e = mergedSpecies[id];
     if (e && e.abilities && e.abilities.length) withAbilities++;
   });
   panel.style.display = 'block';
@@ -1051,10 +1579,10 @@ function updateDataStatus(){
     'Built-in baseline: ' + DEFAULT_SPECIES_COUNT + ' vanilla Gen I\u2013III species (names/types only). '
   )]));
   if (customS || customM || customI){
-    var strong = el('strong', {text: 'Your data: ' + customS + ' species (' + withAbilities + ' with abilities), ' + customM + ' moves, ' + customI + ' items overridden/added.'});
+    var strong = el('strong', {text: (IS_ELECTRON ? 'Brisk Emerald data: ' : 'Loaded data: ') + customS + ' species (' + withAbilities + ' with abilities), ' + customM + ' moves, ' + customI + ' items.'});
     panel.appendChild(strong);
   } else {
-    panel.appendChild(el('span', {class:'tag-ok', text:'Load your Brisk Emerald data to override/extend this and add move & item names.'}));
+    panel.appendChild(el('span', {class:'tag-ok', text:'Load your Brisk Emerald data to add the full species, move, and item data.'}));
   }
   var row = el('div', {class:'row'});
   if (customS || customM || customI){
@@ -1084,7 +1612,7 @@ function renderTrainerCard(save){
   c.innerHTML = '';
   var t = save.trainer;
   var idBlock = el('div', {class:'trainer-id'}, [
-    el('div', {class:'trainer-badge'}),
+    el('div', {class:'trainer-badge ' + (t.gender === 'Female' ? 'gender-female' : 'gender-male')}),
     el('div', {}, [
       el('h2', {text: t.name}),
       el('span', {text: t.gender + ' Trainer · ID No. ' + String(t.publicId).padStart(5,'0')})
@@ -1117,26 +1645,26 @@ function hpColor(pct){
   return 'var(--hp-low)';
 }
 
-function makeIconEl(speciesId, className){
-  var url = speciesIcon(speciesId);
+function makeIconEl(mon, className){
+  var wrap = el('span', {class:className});
+  var id = String(mon.species);
+  var url = speciesIcon(mon);
   if (url){
     var img = document.createElement('img');
     img.src = url;
-    img.className = className;
-    img.style.objectFit = 'contain';
-    img.style.background = 'transparent';
-    return img;
+    img.className = 'icon-frame';
+    wrap.appendChild(img);
   }
-  return el('div', {class: className});
+  return wrap;
 }
 
 function renderPartyCard(mon, partyIndex){
-  var card = el('div', {class:'mon-card'});
+  var card = el('div', {class:'mon-card' + (mon.isShiny ? ' shiny' : '')});
   var pct = mon.maxHP ? (mon.currentHP / mon.maxHP) : 1;
   var displayName = mon.nickname && mon.nickname !== speciesName(mon.species).toUpperCase() ? mon.nickname : speciesName(mon.species);
 
   card.appendChild(el('div', {class:'row1'}, [
-    makeIconEl(mon.species, 'card-icon'),
+    makeIconEl(mon, 'card-icon'),
     el('div', {style:'flex:1;'}, [
       el('div', {class:'name', text: displayName}),
       el('div', {class:'species', text: speciesName(mon.species) + (mon.isShiny ? ' ★' : '')})
@@ -1152,23 +1680,17 @@ function renderPartyCard(mon, partyIndex){
     card.appendChild(el('div', {class:'hp-text', text: mon.currentHP + ' / ' + mon.maxHP + ' HP'}));
   }
 
-  var types = speciesTypes(mon.species);
-  if (types){
-    var tr = el('div', {class:'types-row'});
-    types.forEach(function(ty){
-      var pill = el('span', {class:'type-pill', text:ty});
-      pill.style.background = TYPE_COLORS[ty] || 'var(--muted-2)';
-      tr.appendChild(pill);
-    });
-    card.appendChild(tr);
-  }
+  var types = applyTypeStyle(card, mon.species);
+  var typePills = makeTypePills(types);
+  if (typePills) card.appendChild(typePills);
 
   var moveNames = mon.moves.filter(function(m){return m>0;}).map(moveName);
   if (moveNames.length){
     card.appendChild(el('div', {class:'moves-mini', text: moveNames.join(' · ')}));
   }
 
-  card.addEventListener('click', function(){ openModal(mon, {type:'party', index: partyIndex}); });
+  wireSavePokemonDrag(card, mon, {type:'party', index:partyIndex});
+  card.addEventListener('click', function(){ if (Date.now()-lastPokemonDropAt > 800) openModal(mon, {type:'party', index: partyIndex}); });
   return card;
 }
 
@@ -1207,16 +1729,22 @@ function renderBoxGrid(save){
   document.getElementById('box-count').textContent = countBoxed(save) + ' total across 14 boxes';
   box.forEach(function(mon, slotIndex){
     if (!mon || mon.empty){
-      grid.appendChild(el('div', {class:'slot empty'}));
+      var emptySlot = el('div', {class:'slot empty'});
+      wireEmptyBoxDrop(emptySlot, activeBoxIndex, slotIndex);
+      grid.appendChild(emptySlot);
       return;
     }
-    var slot = el('div', {class:'slot'});
-    var icon = makeIconEl(mon.species, 'mini-icon');
+    var slot = el('div', {class:'slot' + (mon.isShiny ? ' shiny' : '')});
+    var types = applyTypeStyle(slot, mon.species);
+    var icon = makeIconEl(mon, 'mini-icon');
     slot.appendChild(icon);
     slot.appendChild(el('div', {class:'mini-name', text: mon.nickname || speciesName(mon.species)}));
+    var typePills = makeTypePills(types, true);
+    if (typePills) slot.appendChild(typePills);
     slot.appendChild(el('div', {class:'mini-lvl', text:'Lv' + mon.level}));
     if (mon.isShiny) slot.appendChild(el('div', {class:'shiny-star', text:'★'}));
-    slot.addEventListener('click', function(){ openModal(mon, {type:'box', box:activeBoxIndex, slot:slotIndex}); });
+    wireSavePokemonDrag(slot, mon, {type:'box', box:activeBoxIndex, slot:slotIndex});
+    slot.addEventListener('click', function(){ if (Date.now()-lastPokemonDropAt > 800) openModal(mon, {type:'box', box:activeBoxIndex, slot:slotIndex}); });
     grid.appendChild(slot);
   });
 }
@@ -1230,17 +1758,23 @@ function openModal(mon, loc){
   var overlay = el('div', {class:'modal-overlay'});
   var modal = el('div', {class:'modal'});
 
+  var header = el('div', {class:'modal-header'});
+  header.appendChild(makeIconEl(mon, 'modal-mon-icon'));
+  var titleBlock = el('div', {class:'modal-heading'});
+  var displayName = mon.nickname || speciesName(mon.species);
+  titleBlock.appendChild(el('h2', {text: displayName + (mon.isShiny ? ' ★' : '')}));
+  titleBlock.appendChild(el('div', {class:'sub', text: speciesName(mon.species) + ' · Lv' + mon.level + ' · ' + mon.nature + ' nature'}));
+  var headerTypes = makeTypePills(speciesTypes(mon.species), true);
+  if (headerTypes) titleBlock.appendChild(headerTypes);
+  header.appendChild(titleBlock);
   var closeBtn = el('button', {class:'ghost modal-close', text:'Close'});
   closeBtn.addEventListener('click', function(){ root.innerHTML=''; });
-  modal.appendChild(closeBtn);
-
-  var displayName = mon.nickname || speciesName(mon.species);
-  modal.appendChild(el('h2', {text: displayName + (mon.isShiny ? ' ★' : '')}));
-  modal.appendChild(el('div', {class:'sub', text: speciesName(mon.species) + ' · Lv' + mon.level + ' · ' + mon.nature + ' nature'}));
+  header.appendChild(closeBtn);
+  modal.appendChild(header);
 
   var dg = el('div', {class:'detail-grid'});
   dg.appendChild(detailBlock('Held Item', itemName(mon.heldItem)));
-  dg.appendChild(detailBlock('Ability', abilityDisplayName(mon.species, mon.abilitySlot) || ('Slot ' + (mon.abilitySlot === 1 ? '2' : '1') + ' (unknown \u2014 load ability data)')));
+  dg.appendChild(detailBlock('Ability', abilityDisplayName(mon.species, mon.abilitySlot) || ('Slot ' + (mon.abilitySlot + 1) + ' (unknown \u2014 load ability data)')));
   dg.appendChild(detailBlock('OT', mon.otName + ' (' + mon.otGender + ')'));
   dg.appendChild(detailBlock('OT ID', String(mon.otId & 0xFFFF).padStart(5,'0')));
   dg.appendChild(detailBlock('Friendship', String(mon.friendship)));
@@ -1298,23 +1832,48 @@ function openModal(mon, loc){
   if (loc && (loc.type === 'party' || loc.type === 'box')){
     var actionRow = el('div', {style:'margin-top:20px; padding-top:16px; border-top:1px solid var(--line-soft);'});
     var depositBtn = el('button', {class:'primary', text:'Move to External Storage'});
-    depositBtn.addEventListener('click', function(){
-      if (loc.type === 'party') depositFromParty(loc.index);
-      else depositFromBox(loc.box, loc.slot);
-      root.innerHTML = '';
-      renderAll();
+    depositBtn.addEventListener('click', async function(){
+      try{
+        if (loc.type === 'party') await depositFromParty(loc.index);
+        else await depositFromBox(loc.box, loc.slot);
+        root.innerHTML = '';
+        renderAll();
+      }catch(err){ showError('Could not update external storage. The Pokémon was left in the save: ' + err.message); }
     });
     actionRow.appendChild(depositBtn);
+    var tradeBtn = el('button', {class:'ghost', text:'Wonder Trade', style:'margin-left:8px;'});
+    tradeBtn.addEventListener('click', function(){ wonderTradeAtLocation(mon, loc); });
+    actionRow.appendChild(tradeBtn);
     modal.appendChild(actionRow);
   }
   if (loc && loc.type === 'storage'){
     var actionRow2 = el('div', {style:'margin-top:20px; padding-top:16px; border-top:1px solid var(--line-soft);'});
-    var withdrawBtn = el('button', {class:'primary', text:'Withdraw to a Box\u2026'});
-    withdrawBtn.addEventListener('click', function(){
-      root.innerHTML = '';
-      openSlotPicker(loc.storageId);
+    if (!currentSave){
+      actionRow2.appendChild(el('div', {class:'notice-banner', text:'Load a Brisk Emerald save file to transfer this Pokémon into the game.'}));
+    }else if (pendingWithdrawals[loc.storageId] === saveSessionId){
+      actionRow2.appendChild(el('div', {class:'notice-banner', text:'Also in the current save. The archive copy is retained until you remove it from External Storage.'}));
+    }else{
+      var withdrawBtn = el('button', {class:'primary', text:'Withdraw to a Box\u2026'});
+      withdrawBtn.addEventListener('click', function(){
+        root.innerHTML = '';
+        openSlotPicker(loc.storageId);
+      });
+      actionRow2.appendChild(withdrawBtn);
+    }
+    var removeBtn = el('button', {class:'ghost', text:'Remove from External Storage', style:'margin-left:8px;'});
+    removeBtn.addEventListener('click', async function(){
+      var queued = pendingWithdrawals[loc.storageId] === saveSessionId;
+      var prompt = queued
+        ? 'Remove the archived copy? The Pokémon is already in the current save, but make sure the updated save file is safely stored first.'
+        : 'Permanently remove this Pokémon from external storage?';
+      if (!window.confirm(prompt)) return;
+      try{
+        await removeFromStorage(loc.storageId);
+        root.innerHTML = '';
+        showNotice('Removed Pokémon from external storage.');
+      }catch(err){ showError('Could not remove this Pokémon from external storage: ' + err.message); }
     });
-    actionRow2.appendChild(withdrawBtn);
+    actionRow2.appendChild(removeBtn);
     modal.appendChild(actionRow2);
   }
 
@@ -1382,31 +1941,113 @@ function openSlotPicker(storageId){
 }
 
 function renderStoragePanel(){
-  var section = document.getElementById('storage-section');
   var grid = document.getElementById('storage-grid');
   grid.innerHTML = '';
-  document.getElementById('storage-count').textContent = externalStorage.length + ' stored';
+  document.getElementById('storage-count').textContent = storageLoadError ? 'unavailable' : externalStorage.length + ' stored';
+  if (storageLoadError){
+    grid.appendChild(el('div', {class:'error-banner', text:'External storage could not be read, so the app has blocked changes to protect the archive. Import a valid backup archive to recover it. Details: ' + storageLoadError}));
+    return;
+  }
   if (externalStorage.length === 0){
     grid.appendChild(el('div', {class:'notice-banner', text:'No Pokémon in external storage yet. Open a Pokémon from your party or a box and choose "Move to External Storage".'}));
     return;
   }
+  var query = storageQuery.trim().toLocaleLowerCase();
+  var visible = [];
   externalStorage.forEach(function(entry){
-    var raw80 = base64ToBytes(entry.raw80);
-    var mon = decodePokemon(raw80, false);
+    try{
+      var raw80 = base64ToBytes(entry.raw80);
+      if (raw80.length !== 80) return;
+      var mon = decodePokemon(raw80, false);
+      if (!mon || mon.empty) return;
+      var searchable = [mon.nickname, speciesName(mon.species), mon.level, mon.nature,
+        itemName(mon.heldItem), entry.sourceTrainer, entry.sourceId,
+        mon.moves.map(moveName).join(' ')].join(' ').toLocaleLowerCase();
+      if (!query || searchable.indexOf(query) !== -1) visible.push({entry:entry, mon:mon});
+    }catch(e){ /* keep malformed legacy records out of the visible grid */ }
+  });
+  visible.sort(function(a,b){
+    if (storageSort === 'name') return speciesName(a.mon.species).localeCompare(speciesName(b.mon.species));
+    if (storageSort === 'level') return b.mon.level - a.mon.level || speciesName(a.mon.species).localeCompare(speciesName(b.mon.species));
+    if (storageSort === 'shiny') return Number(b.mon.isShiny) - Number(a.mon.isShiny) || speciesName(a.mon.species).localeCompare(speciesName(b.mon.species));
+    return (b.entry.depositedAt || 0) - (a.entry.depositedAt || 0);
+  });
+  if (visible.length === 0){
+    grid.appendChild(el('div', {class:'notice-banner', text:'No stored Pokémon match that search.'}));
+    return;
+  }
+  visible.forEach(function(row){
+    var entry = row.entry;
+    var mon = row.mon;
     // storage cards open in 'storage' context and have no HP bar (box-form data)
-    var freshCard = el('div', {class:'mon-card'});
+    var queued = pendingWithdrawals[entry.id] === saveSessionId;
+    var freshCard = el('div', {class:'mon-card' + (queued ? ' pending-transfer' : '') + (mon.isShiny ? ' shiny' : '')});
     freshCard.appendChild(el('div', {class:'row1'}, [
-      makeIconEl(mon.species, 'card-icon'),
+      makeIconEl(mon, 'card-icon'),
       el('div', {style:'flex:1;'}, [
         el('div', {class:'name', text: mon.nickname || speciesName(mon.species)}),
         el('div', {class:'species', text: speciesName(mon.species) + (mon.isShiny ? ' ★' : '')})
       ]),
       el('div', {class:'lvl', text:'Lv' + mon.level})
     ]));
-    freshCard.appendChild(el('div', {class:'moves-mini', text:'From ' + entry.sourceTrainer + ' · ' + new Date(entry.depositedAt).toLocaleDateString()}));
-    freshCard.addEventListener('click', function(){ openModal(mon, {type:'storage', storageId: entry.id}); });
+    var types = applyTypeStyle(freshCard, mon.species);
+    var typePills = makeTypePills(types);
+    if (typePills) freshCard.appendChild(typePills);
+    freshCard.appendChild(el('div', {class:'moves-mini', text:queued ? 'Also in current save · archive copy retained' : 'From ' + entry.sourceTrainer + ' · ' + new Date(entry.depositedAt).toLocaleDateString()}));
+    wireStoragePokemonDrag(freshCard, entry.id);
+    freshCard.addEventListener('click', function(){ if (Date.now()-lastPokemonDropAt > 800) openModal(mon, {type:'storage', storageId: entry.id}); });
     grid.appendChild(freshCard);
   });
+}
+
+function validStorageEntry(entry){
+  if (!entry || typeof entry.raw80 !== 'string') return false;
+  try{ return base64ToBytes(entry.raw80).length === 80; }catch(e){ return false; }
+}
+
+async function exportExternalStorage(){
+  await storageReady;
+  if (storageLoadError){ showError('External storage could not be loaded. Import a backup archive before exporting.'); return; }
+  var payload = {format:'briskdex-storage', version:1, exportedAt:new Date().toISOString(), pokemon:externalStorage};
+  var blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = 'briskdex-storage-' + new Date().toISOString().slice(0,10) + '.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+}
+
+function importExternalStorageFile(file){
+  var reader = new FileReader();
+  reader.onload = async function(e){
+    try{
+      await storageReady;
+      var data = JSON.parse(e.target.result);
+      var incoming = Array.isArray(data) ? data : data && data.format === 'briskdex-storage' && data.version === 1 ? data.pokemon : null;
+      if (!Array.isArray(incoming)) throw new Error('That is not a Brisk Dex storage archive.');
+      var valid = incoming.filter(validStorageEntry);
+      if (valid.length !== incoming.length) throw new Error('The archive contains invalid Pokémon records; nothing was imported.');
+      var recovering = !!storageLoadError;
+      if (recovering && !window.confirm('The current external archive could not be read. Replace it with this imported archive?')) return;
+      var known = new Set(externalStorage.map(function(item){ return item.id; }));
+      valid = valid.map(function(item){
+        var copy = Object.assign({}, item);
+        if (typeof copy.id !== 'string' || known.has(copy.id)) copy.id = genId();
+        known.add(copy.id);
+        return copy;
+      });
+      var previous = externalStorage;
+      var previousError = storageLoadError;
+      externalStorage = recovering ? valid : previous.concat(valid);
+      if (recovering) storageLoadError = null;
+      try{ await persistExternalStorage(); }
+      catch(err){ externalStorage = previous; storageLoadError = previousError; throw err; }
+      renderStoragePanel();
+      showNotice('Imported ' + valid.length + ' Pokémon into external storage.');
+    }catch(err){ showError('Could not import storage archive: ' + err.message); }
+  };
+  reader.onerror = function(){ showError('Could not read the storage archive.'); };
+  reader.readAsText(file);
 }
 
 function renderAll(){
@@ -1419,6 +2060,110 @@ function renderAll(){
   updateDirtyBanner();
 }
 
+function isRouteArea(area){ return area.mapType === 'MAP_TYPE_ROUTE'; }
+function matchesEncounterMethod(method, filter){
+  if (filter === 'all') return true;
+  if (filter === 'old_rod') return method.type === 'fishing_mons' && method.name === 'Old Rod';
+  if (filter === 'good_rod') return method.type === 'fishing_mons' && method.name === 'Good Rod';
+  if (filter === 'super_rod') return method.type === 'fishing_mons' && method.name === 'Super Rod';
+  return method.type === filter;
+}
+function renderRouteEncounters(){
+  var list = document.getElementById('route-list');
+  var detail = document.getElementById('route-detail');
+  if (!list || !detail) return;
+  var query = (document.getElementById('route-search').value || '').trim().toLowerCase();
+  var kind = document.getElementById('route-kind').value;
+  var methodFilter = document.getElementById('encounter-method').value;
+  var locationOrder = document.getElementById('route-order').value;
+  var filtered = ROUTE_DATA.filter(function(area){
+    if (kind === 'route' && !isRouteArea(area)) return false;
+    if (kind === 'area' && isRouteArea(area)) return false;
+    var methods = (area.methods || []).filter(function(method){ return matchesEncounterMethod(method, methodFilter); });
+    if (!methods.length) return false;
+    if (!query) return true;
+    if ((area.name || '').toLowerCase().includes(query) || (area.id || '').toLowerCase().includes(query)) return true;
+    return methods.some(function(method){
+      return method.slots.some(function(slot){
+        return speciesName(slot.species).toLowerCase().includes(query) ||
+          (speciesTypes(slot.species) || []).some(function(type){ return type.toLowerCase().includes(query); });
+      });
+    });
+  });
+  if (locationOrder === 'alphabetical') filtered.sort(function(a,b){
+    return a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+  });
+  document.getElementById('route-count').textContent = ROUTE_DATA.length
+    ? filtered.length + ' of ' + ROUTE_DATA.length + ' locations'
+    : 'No encounter data loaded';
+  list.innerHTML = '';
+  if (!filtered.length){
+    list.appendChild(el('div', {class:'route-empty', text: ROUTE_DATA.length ? 'No locations match these filters.' : 'Load Brisk Emerald game data to view route encounters.'}));
+    detail.innerHTML = '';
+    return;
+  }
+  if (!filtered.some(function(area){ return area.id === selectedRouteId; })) selectedRouteId = filtered[0].id;
+  filtered.forEach(function(area){
+    var methods = area.methods.filter(function(method){ return matchesEncounterMethod(method, methodFilter); });
+    var speciesCount = new Set();
+    methods.forEach(function(method){ method.slots.forEach(function(slot){ speciesCount.add(slot.species); }); });
+    var btn = el('button', {class:'route-location' + (area.id === selectedRouteId ? ' active' : '')});
+    btn.appendChild(el('span', {text:area.name}));
+    btn.appendChild(el('small', {text:speciesCount.size + ' species'}));
+    btn.addEventListener('click', function(){ selectedRouteId = area.id; renderRouteEncounters(); });
+    list.appendChild(btn);
+  });
+
+  var selected = filtered.find(function(area){ return area.id === selectedRouteId; });
+  detail.innerHTML = '';
+  detail.appendChild(el('h2', {text:selected.name}));
+  detail.appendChild(el('div', {class:'route-subtitle', text:(isRouteArea(selected) ? 'Route' : 'Area') + ' · Brisk Emerald wild encounters'}));
+  selected.methods.filter(function(method){ return matchesEncounterMethod(method, methodFilter); }).forEach(function(method){
+    var card = el('section', {class:'encounter-card'});
+    var heading = el('div', {class:'encounter-heading'});
+    heading.appendChild(el('h4', {text:method.name}));
+    var methodNote = method.type === 'static' ? 'Stationary encounter' : method.type === 'gift' ? 'Gift Pokémon' : method.encounterRate + '% encounter rate';
+    heading.appendChild(el('span', {text:methodNote}));
+    card.appendChild(heading);
+    var table = el('table', {class:'encounter-table'});
+    var thead = document.createElement('thead'), headRow = document.createElement('tr');
+    ['Pokémon','Level',method.type === 'static' ? 'Encounter' : method.type === 'gift' ? 'Obtained as' : 'Slot odds'].forEach(function(label){ headRow.appendChild(el('th', {text:label})); });
+    thead.appendChild(headRow); table.appendChild(thead);
+    var tbody = document.createElement('tbody');
+    method.slots.forEach(function(slot){
+      var row = el('tr', {class:'encounter-row'});
+      applyTypeStyle(row, slot.species);
+      var speciesCell = document.createElement('td');
+      var speciesInfo = el('span', {class:'encounter-species-info'});
+      speciesInfo.appendChild(el('span', {text:speciesName(slot.species)}));
+      var types = speciesTypes(slot.species);
+      var pills = makeTypePills(types, true);
+      if (pills) speciesInfo.appendChild(pills);
+      var speciesLabel = el('span', {class:'encounter-species'});
+      applyTypeStyle(speciesLabel, slot.species);
+      speciesLabel.appendChild(makeIconEl({species:slot.species,isShiny:false}, 'encounter-icon'));
+      speciesLabel.appendChild(speciesInfo);
+      speciesCell.appendChild(speciesLabel);
+      row.appendChild(speciesCell);
+      row.appendChild(el('td', {class:'encounter-level', text:slot.minLevel === slot.maxLevel ? 'Lv' + slot.minLevel : 'Lv' + slot.minLevel + '–' + slot.maxLevel}));
+      row.appendChild(el('td', {text:slot.chance === undefined ? (method.type === 'gift' ? 'Gift' : 'Stationary') : String(slot.chance) + '%'}));
+      tbody.appendChild(row);
+    });
+    table.appendChild(tbody); card.appendChild(table); detail.appendChild(card);
+  });
+}
+
+function setMainTab(tabName){
+  var routes = tabName === 'routes';
+  document.getElementById('save-tab-panel').style.display = routes ? 'none' : 'block';
+  document.getElementById('routes-tab-panel').style.display = routes ? 'block' : 'none';
+  document.getElementById('tab-save').classList.toggle('active', !routes);
+  document.getElementById('tab-save').setAttribute('aria-selected', String(!routes));
+  document.getElementById('tab-routes').classList.toggle('active', routes);
+  document.getElementById('tab-routes').setAttribute('aria-selected', String(routes));
+  if (routes) renderRouteEncounters();
+}
+
 /* ============================================================
    File loading
    ============================================================ */
@@ -1429,6 +2174,7 @@ function handleSavFile(file){
     try{
       var save = parseSav(e.target.result);
       currentSave = save;
+      saveSessionId = genId();
       dirty = false;
       document.getElementById('empty-state').style.display = 'none';
       document.getElementById('app-content').style.display = 'block';
@@ -1444,11 +2190,13 @@ function handleSavFile(file){
 async function handleSavFromElectron(){
   clearError();
   try{
+    await gameDataReady;
     var result = await window.briskDexAPI.openSavDialog();
     if (!result) return; // user cancelled
     var save = parseSav(result.buffer.buffer ? result.buffer.buffer : result.buffer);
     save.filePath = result.filePath;
     currentSave = save;
+    saveSessionId = genId();
     dirty = false;
     document.getElementById('empty-state').style.display = 'none';
     document.getElementById('app-content').style.display = 'block';
@@ -1466,9 +2214,12 @@ function handleDataFile(file){
       USER_DATA.species = Object.assign({}, USER_DATA.species, parsed.species || {});
       USER_DATA.moves = Object.assign({}, USER_DATA.moves, parsed.moves || {});
       USER_DATA.items = Object.assign({}, USER_DATA.items, parsed.items || {});
+      if (Array.isArray(parsed.routeEncounters)) ROUTE_DATA = parsed.routeEncounters;
       rebuildNameData();
+      refreshBoxLevels();
       saveNameDataToStorage();
       updateDataStatus();
+      renderRouteEncounters();
       if (currentSave) renderAll();
     }catch(err){
       showError('Could not parse that JSON file: ' + err.message);
@@ -1480,6 +2231,12 @@ function handleDataFile(file){
 /* ============================================================
    Wiring
    ============================================================ */
+document.getElementById('tab-save').addEventListener('click', function(){ setMainTab('save'); });
+document.getElementById('tab-routes').addEventListener('click', function(){ setMainTab('routes'); });
+document.getElementById('route-search').addEventListener('input', renderRouteEncounters);
+document.getElementById('route-kind').addEventListener('change', renderRouteEncounters);
+document.getElementById('route-order').addEventListener('change', renderRouteEncounters);
+document.getElementById('encounter-method').addEventListener('change', renderRouteEncounters);
 document.getElementById('btn-load-sav').addEventListener('click', function(){
   if (IS_ELECTRON) handleSavFromElectron();
   else document.getElementById('file-sav').click();
@@ -1497,11 +2254,61 @@ document.getElementById('btn-load-icons').addEventListener('click', function(){
 document.getElementById('btn-save-changes').addEventListener('click', function(){
   saveChangesToFile();
 });
+document.getElementById('storage-search').addEventListener('input', function(e){
+  storageQuery = e.target.value;
+  renderStoragePanel();
+});
+document.getElementById('storage-sort').addEventListener('change', function(e){
+  storageSort = e.target.value;
+  renderStoragePanel();
+});
+document.getElementById('btn-export-storage').addEventListener('click', exportExternalStorage);
+document.getElementById('btn-import-storage').addEventListener('click', function(){
+  document.getElementById('file-storage').click();
+});
+document.getElementById('file-storage').addEventListener('change', function(e){
+  if (e.target.files[0]) importExternalStorageFile(e.target.files[0]);
+  e.target.value = '';
+});
 document.getElementById('file-sav').addEventListener('change', function(e){
   if (e.target.files[0]) handleSavFile(e.target.files[0]);
 });
 document.getElementById('file-data').addEventListener('change', function(e){
   if (e.target.files[0]) handleDataFile(e.target.files[0]);
+});
+
+var storageDropTarget = document.getElementById('storage-section');
+storageDropTarget.addEventListener('dragover', function(event){
+  var data = pokemonDragData(event);
+  if (!data || data.source !== 'save' || storageLoadError) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  storageDropTarget.classList.add('drag-over');
+});
+storageDropTarget.addEventListener('dragleave', function(event){
+  if (!storageDropTarget.contains(event.relatedTarget)) storageDropTarget.classList.remove('drag-over');
+});
+storageDropTarget.addEventListener('drop', async function(event){
+  var data = pokemonDragData(event);
+  if (!data || data.source !== 'save') return;
+  event.preventDefault(); event.stopPropagation();
+  storageDropTarget.classList.remove('drag-over');
+  if (storageLoadError){ showError('External storage could not be loaded. Import an archive before depositing Pokémon.'); return; }
+  var loc = data.loc;
+  var mon = loc && loc.type === 'party' ? currentSave.party[loc.index]
+    : loc && loc.type === 'box' && currentSave.boxes[loc.box] ? currentSave.boxes[loc.box][loc.slot] : null;
+  if (!mon || mon.empty || mon.species !== data.species || mon.personality !== data.personality || mon.otId !== data.otId){
+    showError('That Pokémon changed before the transfer completed. Try dragging it again.');
+    return;
+  }
+  try{
+    if (loc.type === 'party') await depositFromParty(loc.index);
+    else await depositFromBox(loc.box, loc.slot);
+    lastPokemonDropAt = Date.now();
+    document.getElementById('modal-root').innerHTML = '';
+    renderAll();
+    showNotice('Moved ' + speciesName(mon.species) + ' to External Storage.' + (!IS_ELECTRON || !currentSave.filePath ? ' Save the updated file to keep the change.' : ''));
+  }catch(err){ showError('Could not move Pokémon to External Storage: ' + err.message); }
 });
 
 var dz = document.getElementById('empty-state');
@@ -1525,7 +2332,8 @@ document.body.addEventListener('drop', function(e){
 
 loadNameDataFromStorage();
 updateDataStatus();
-loadExternalStorage();
+var gameDataReady = loadBundledGameData();
+storageReady = loadExternalStorage();
 
 window.__briskDexDebug = function(){
   var party = currentSave ? currentSave.party.map(function(m){ return m.species; }) : [];
