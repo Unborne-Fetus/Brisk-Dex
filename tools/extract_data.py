@@ -1122,7 +1122,7 @@ def main():
         move_details[str(mid)] = {
             "name": display_move_name,
             "constant": "MOVE_" + name,
-            "description": extract_compound_field(block, '.description') if block else None,
+            "description": description,
             "power": extract_numeric_field(block, '.power', 0) if block else 0,
             "accuracy": extract_numeric_field(block, '.accuracy', 0) if block else 0,
             "pp": pp or 0,
@@ -1164,6 +1164,9 @@ def main():
         block = ability_blocks.get(name)
         ab_name = extract_string_field(block, '.name') if block else None
         display_ability_name = ab_name or name.replace('_', ' ').title()
+        description = extract_compound_field(block, '.description') if block else None
+        if (display_ability_name or "").strip() == "-------" or re.fullmatch(r'ABILITY_\d+', "ABILITY_" + name) or (description or "").strip().lower() == "no special ability.":
+            continue
         out_abilities[str(aid)] = display_ability_name
         flags = []
         if block:
