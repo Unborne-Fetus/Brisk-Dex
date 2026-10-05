@@ -3305,8 +3305,15 @@ function renderMoves(){
 function renderAbilities(){
   var list=document.getElementById('ability-list'), detail=document.getElementById('ability-detail');
   if(!list||!detail) return;
-  var all=Object.keys(ABILITY_DETAILS||{}).length ? ABILITY_DETAILS : Object.fromEntries(Object.keys(NAME_DATA.abilities||{}).map(function(id){
+  var rawAbilities=Object.keys(ABILITY_DETAILS||{}).length ? ABILITY_DETAILS : Object.fromEntries(Object.keys(NAME_DATA.abilities||{}).map(function(id){
     return [id,{name:NAME_DATA.abilities[id],constant:'ABILITY_'+id,description:'',flags:[]}];
+  }));
+  var all=Object.fromEntries(Object.entries(rawAbilities).filter(function(entry){
+    var ability=entry[1]||{};
+    var name=String(ability.name||'').trim();
+    var constant=String(ability.constant||'');
+    var description=String(ability.description||'').trim().toLowerCase();
+    return name && name!=='-------' && !/^ABILITY_\d+$/.test(constant) && description!=='no special ability.';
   }));
   var q=(document.getElementById('ability-search').value||'').trim().toLowerCase();
   var ids=Object.keys(all).filter(function(id){
