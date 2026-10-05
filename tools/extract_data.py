@@ -205,6 +205,12 @@ def extract_blocks(text, prefix):
             elif text[i] == '}': depth -= 1
             i += 1
         out[name] = text[start:i-1]
+    # Some species entries use a macro as the entire initializer (e.g. Genesect).
+    macros = extract_macro_definitions(text)
+    macro_entry = re.compile(r'\[\s*' + re.escape(prefix)
+                             + r'([A-Za-z0-9_]+)\s*\]\s*=\s*([A-Za-z_]\w*\([^;\n]*\)),')
+    for match in macro_entry.finditer(text):
+        out.setdefault(match.group(1), add_invoked_species_macros(match.group(2), macros))
     return out
 
 def extract_macro_definitions(text):
@@ -357,7 +363,14 @@ def extract_route_encounters(repo, species_ids):
                     sections = [(method_title, list(range(len(mons))))]
                 for section_name, indices in sections:
                     valid_indices = [i for i in indices if 0 <= i < len(mons)]
-                    total_weight = sum(rates[i] if i < len(rates) else 0 for i in valid_indices)
+                    # Brisk Emerald chooses land/water slots uniformly and skips NONE.
+                    uniform = method_key in ("land_mons", "water_mons")
+                    if uniform:
+                        valid_indices = [i for i in valid_indices
+                                         if mons[i].get("species") != "SPECIES_NONE"]
+                    weights = {i: 1 if uniform else (rates[i] if i < len(rates) else 0)
+                               for i in valid_indices}
+                    total_weight = sum(weights.values())
                     slots = []
                     for i in valid_indices:
                         mon = mons[i]
@@ -365,7 +378,7 @@ def extract_route_encounters(repo, species_ids):
                         species_id = species_ids.get(constant)
                         if not species_id or str(species_id) == "0":
                             continue
-                        weight = rates[i] if i < len(rates) else 0
+                        weight = weights[i]
                         slots.append({
                             "species": species_id,
                             "minLevel": int(mon.get("min_level", 1)),
