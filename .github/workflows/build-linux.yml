@@ -10,6 +10,8 @@ on:
       - "main.js"
       - "preload.js"
       - "index.html"
+      - "battle-server.js"
+      - "brisk-battle-effects.json"
       - "brisk-dex-data.json"
       - "brisk-dex-trainer-teams.json"
       - "brisk-dex-icons/**"
