@@ -39,6 +39,12 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Verify battle effect coverage
+        run: npm run battle:coverage
+
+      - name: Smoke test online battle relay
+        run: npm run battle:smoke
+
       - name: Build Linux packages
         run: npm run dist:linux
 
