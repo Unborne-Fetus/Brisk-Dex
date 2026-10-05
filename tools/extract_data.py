@@ -24,6 +24,10 @@ import shutil
 import struct
 import sys
 import zlib
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
 
 TYPE_NAMES = {
     "NONE": None, "NORMAL": "Normal", "FIGHTING": "Fighting", "FLYING": "Flying",
@@ -96,6 +100,84 @@ def shiny_palette_png(source_png, palette_file, normal_palette_file, target_png)
         return True
     except (OSError, ValueError, IndexError, struct.error):
         return False
+
+def normalize_sprite_png(source_png, target_png, first_frame=False, transparent_bg=False):
+    """Copy a PNG for the companion app, optionally taking frame 1 and clearing flat backgrounds."""
+    if not os.path.isfile(source_png):
+        return False
+    if Image is None:
+        shutil.copyfile(source_png, target_png)
+        return True
+    try:
+        with Image.open(source_png) as source:
+            image = source.convert("RGBA")
+            if first_frame and image.height > image.width and image.height >= image.width * 2:
+                image = image.crop((0, 0, image.width, image.width))
+            elif first_frame and image.width > image.height and image.width >= image.height * 2:
+                image = image.crop((0, 0, image.height, image.height))
+            if transparent_bg:
+                pixels = image.load()
+                corners = [pixels[0,0], pixels[image.width-1,0], pixels[0,image.height-1], pixels[image.width-1,image.height-1]]
+                if corners.count(corners[0]) >= 3:
+                    bg = corners[0][:3]
+                    for y in range(image.height):
+                        for x in range(image.width):
+                            r,g,b,a = pixels[x,y]
+                            if (r,g,b) == bg:
+                                pixels[x,y] = (r,g,b,0)
+            image.save(target_png)
+        return True
+    except (OSError, ValueError):
+        shutil.copyfile(source_png, target_png)
+        return True
+
+def extract_feature_catalog(repo):
+    """Turn Expansion's FEATURES.md into categorized readable entries, then append Brisk-specific changes."""
+    text = read(os.path.join(repo, "FEATURES.md")) or ""
+    categories = []
+    current = None
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line.startswith("## ") and line not in ("## Table of Contents", "## Configuration files"):
+            current = {"category": re.sub(r'^##\s+', '', line).strip(), "changes": []}
+            categories.append(current)
+            continue
+        if current and line.startswith("- "):
+            cleaned = re.sub(r'\[(.*?)\]\([^)]*\)', r'\1', line[2:])
+            cleaned = cleaned.replace("***", "").replace("**", "").replace("*", "")
+            cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+            if cleaned and not cleaned.startswith("["):
+                current["changes"].append(cleaned)
+
+    brisk = [
+        ("Pokémon & Encounters", "All generations through Gen IX are represented, with Brisk-specific encounter tables and expanded land/water slots."),
+        ("Pokémon & Encounters", "Land encounters use 25 slots and water encounters use 11 slots; SPECIES_NONE slots are skipped so valid entries share the available chance."),
+        ("Pokémon & Encounters", "Mirage Island is permanently available."),
+        ("Pokémon & Encounters", "Special static encounters include Kubfu in Meteor Falls and Meloetta in Artisan Cave B1F."),
+        ("Pokédex & Catching", "The National Pokédex is enabled from the start."),
+        ("Pokédex & Catching", "Ball selection can display catch-rate information, and the last-used ball shortcut is enabled."),
+        ("Pokédex & Catching", "Catch-swap HM restrictions are disabled."),
+        ("Battle Mechanics", "Battle gimmick handling supports Mega Evolution, Ultra Burst, Z-Moves, Terastallization, Dynamax and Gigantamax with Brisk-specific priority handling."),
+        ("Battle Mechanics", "The Tera Orb recharges when the party is healed."),
+        ("Battle Mechanics", "Smart wild AI support is enabled for configured encounters."),
+        ("Battle Mechanics", "Shiny odds are configured to Brisk's custom value."),
+        ("Battle Mechanics", "Pokérus spread odds are increased from the standard behavior."),
+        ("Progression & Quality of Life", "Fly can be used from the beginning instead of waiting for the Fortree badge."),
+        ("Progression & Quality of Life", "EXP Share behavior was changed so shared experience does not reduce the calculated award."),
+        ("Progression & Quality of Life", "Battle speed and overworld speed-up options are available."),
+        ("Progression & Quality of Life", "The player can use Poke Rider-style travel support where configured."),
+        ("Trainers & Challenges", "Route 135's Champion Archives contains high-level battles against champions and major trainers including Blue, Red, Wallace, Cynthia, Iris, Diantha, Leon, Nemona and Volo."),
+        ("Trainers & Challenges", "A custom Unborne Champion battle uses an omniscient AI configuration and a custom reward."),
+        ("Maps & Events", "Slateport includes a custom stone-selling clerk."),
+        ("Maps & Events", "Rayquaza-related progression can award the Mystic Ticket."),
+        ("Storage & Systems", "Brisk expands and modifies internal systems beyond vanilla Emerald, including save-backed Pokémon data and modern species/forms from pokeemerald-expansion.")
+    ]
+    brisk_map = {}
+    for category, change in brisk:
+        brisk_map.setdefault(category, []).append(change)
+    out = [{"category": "Brisk-specific · " + category, "changes": changes} for category, changes in brisk_map.items()]
+    out.extend({"category": "Expansion · " + row["category"], "changes": row["changes"]} for row in categories if row["changes"])
+    return out
 
 def read(path):
     if not os.path.isfile(path):
@@ -977,10 +1059,12 @@ def main():
 
     route_encounters = extract_route_encounters(repo, species_ids)
     trainer_teams = extract_trainer_teams(repo)
+    change_catalog = extract_feature_catalog(repo)
     for trainer in trainer_teams:
         trainer["locations"] = trainer_locations.get(trainer["constant"], [])
     data = {"species": out_species, "moves": out_moves, "movePP": out_move_pp, "abilities": out_abilities,
-            "items": out_items, "itemDetails": item_details, "routeEncounters": route_encounters, "shinyOdds": shiny_odds}
+            "items": out_items, "itemDetails": item_details, "routeEncounters": route_encounters,
+            "changes": change_catalog, "shinyOdds": shiny_odds}
     with open("brisk-dex-data.json", "w", encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
     with open("brisk-dex-trainer-teams.json", "w", encoding='utf-8') as f:
@@ -1111,8 +1195,62 @@ def main():
         source = os.path.join(repo, rel)
         if os.path.isfile(source):
             target = iid + ".png"
-            shutil.copyfile(source, os.path.join(items_out, target))
+            normalize_sprite_png(source, os.path.join(items_out, target), transparent_bg=True)
             details["icon"] = items_out + "/" + target
+
+    # Export front/back and shiny front/back species artwork for the Pokédex.
+    sprites_out = "brisk-dex-sprites"
+    os.makedirs(sprites_out, exist_ok=True)
+    for filename in os.listdir(sprites_out):
+        if filename.endswith(".png"):
+            os.remove(os.path.join(sprites_out, filename))
+    for sid, species in out_species.items():
+        sprite_name = species.get("iconSprite") or species.get("constant", "").replace("_", "").title()
+        sprite_key = re.sub(r'[_-]', '', sprite_name).lower()
+        folder = by_sprite.get(sprite_key)
+        if not folder:
+            parts = re.findall(r'[A-Z]?[a-z0-9]+|[A-Z]+(?=[A-Z]|$)', sprite_name)
+            while len(parts) > 1 and not folder:
+                parts.pop()
+                folder = by_sprite.get(''.join(parts).lower())
+        if not folder:
+            continue
+        front_source = next((os.path.join(folder, fn) for fn in ("front.png", "anim_front.png") if os.path.isfile(os.path.join(folder, fn))), None)
+        back_source = next((os.path.join(folder, fn) for fn in ("back.png", "anim_back.png") if os.path.isfile(os.path.join(folder, fn))), None)
+        if front_source:
+            front_target = os.path.join(sprites_out, sid + "_front.png")
+            if normalize_sprite_png(front_source, front_target, first_frame=True, transparent_bg=True):
+                species["frontSprite"] = sprites_out + "/" + sid + "_front.png"
+        if back_source:
+            back_target = os.path.join(sprites_out, sid + "_back.png")
+            if normalize_sprite_png(back_source, back_target, first_frame=True, transparent_bg=True):
+                species["backSprite"] = sprites_out + "/" + sid + "_back.png"
+
+        current = folder
+        shiny_palette = normal_palette = None
+        while True:
+            if shiny_palette is None and os.path.isfile(os.path.join(current, "shiny.pal")):
+                shiny_palette = os.path.join(current, "shiny.pal")
+            if normal_palette is None and os.path.isfile(os.path.join(current, "normal.pal")):
+                normal_palette = os.path.join(current, "normal.pal")
+            if shiny_palette and normal_palette:
+                break
+            if os.path.abspath(current) == os.path.abspath(gfx_dir):
+                break
+            current = os.path.dirname(current)
+
+        for side, source in (("front", front_source), ("back", back_source)):
+            if not source or not shiny_palette or not normal_palette:
+                continue
+            temporary = os.path.join(sprites_out, sid + "_" + side + "_shiny_sheet.png")
+            final = os.path.join(sprites_out, sid + "_" + side + "_shiny.png")
+            if shiny_palette_png(source, shiny_palette, normal_palette, temporary):
+                normalize_sprite_png(temporary, final, first_frame=True, transparent_bg=True)
+                try:
+                    os.remove(temporary)
+                except OSError:
+                    pass
+                species[side + "ShinySprite"] = sprites_out + "/" + sid + "_" + side + "_shiny.png"
 
     # Export every trainer battle portrait referenced by trainers.party.
     trainer_front_dir = os.path.join(repo, "graphics", "trainers", "front_pics")
