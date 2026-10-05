@@ -504,7 +504,9 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==='POST'&&match[2]==='action'){
       const body=await readBody(req), pi=playerIndex(room,body.playerId); if(pi<0) return json(res,403,{error:'Invalid player token.'});
       const p=room.players[pi];
-      if(body.type==='ready'&&room.phase==='lobby'){
+      if(body.type==='forfeit'&&room.phase==='battle'){
+        room.phase='finished';room.winner=other(pi);log(room,p.name+' forfeited. '+room.players[other(pi)].name+' won the battle!');room.players.forEach(x=>x.choice=null);
+      }else if(body.type==='ready'&&room.phase==='lobby'){
         p.ready=!!body.ready; if(room.players.length===2&&room.players.every(x=>x.ready)) beginBattle(room);
       }else if(body.type==='move'&&room.phase==='battle'){
         if(p.choice) return json(res,409,{error:'You already selected an action this turn.'});
