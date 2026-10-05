@@ -1341,8 +1341,19 @@ def main():
     data = {"species": out_species, "moves": out_moves, "movePP": out_move_pp, "moveDetails": move_details,
             "abilities": out_abilities, "abilityDetails": ability_details, "items": out_items, "itemDetails": item_details, "routeEncounters": route_encounters,
             "changes": change_catalog, "shinyOdds": shiny_odds}
+    primary_effects = sorted({m.get("effect") for m in move_details.values() if m.get("effect")})
+    secondary_effects = sorted({e.get("effect") for m in move_details.values() for e in m.get("moveEffects", []) if e.get("effect")})
+    battle_manifest = {
+        "source": "Pokemon-Brisk-Emerald/src/data/moves_info.h",
+        "moveCount": len(move_details),
+        "primaryEffects": primary_effects,
+        "secondaryEffects": secondary_effects,
+        "flags": sorted({flag for m in move_details.values() for flag in m.get("flags", [])}),
+    }
     with open("brisk-dex-data.json", "w", encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
+    with open("brisk-battle-effects.json", "w", encoding='utf-8') as f:
+        json.dump(battle_manifest, f, ensure_ascii=False, indent=2)
     with open("brisk-dex-trainer-teams.json", "w", encoding='utf-8') as f:
         json.dump({"source": "Pokemon-Brisk-Emerald/src/data/trainers.party", "trainers": trainer_teams},
                   f, ensure_ascii=False, separators=(',', ':'))
