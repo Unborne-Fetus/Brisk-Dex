@@ -1,0 +1,45 @@
+name: Refresh Brisk Dex Data
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "tools/extract_data.py"
+      - ".github/workflows/refresh-brisk-data.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Brisk Dex
+        uses: actions/checkout@v4
+        with:
+          path: brisk-dex
+
+      - name: Check out Brisk Emerald
+        uses: actions/checkout@v4
+        with:
+          repository: Unborne-Fetus/Pokemon-Brisk-Emerald
+          ref: master
+          path: brisk-emerald
+
+      - name: Regenerate source-backed data
+        working-directory: brisk-dex
+        run: python3 tools/extract_data.py "$GITHUB_WORKSPACE/brisk-emerald"
+
+      - name: Commit refreshed JSON
+        working-directory: brisk-dex
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add brisk-dex-data.json brisk-dex-trainer-teams.json
+          if git diff --cached --quiet; then
+            echo "Brisk Dex data is already current."
+            exit 0
+          fi
+          git commit -m "Refresh Brisk Emerald reference data"
+          git push
