@@ -15,7 +15,7 @@
     "dist": "electron-builder",
     "dist:win": "electron-builder --win",
     "dist:mac": "electron-builder --mac",
-    "dist:linux": "electron-builder --linux",
+    "dist:linux": "electron-builder --linux --publish never",
     "android:prepare": "node tools/prepare_android.mjs",
     "android:add": "npm run android:prepare && npx cap add android && node tools/patch_android.mjs",
     "android:sync": "npm run android:prepare && npx cap sync android && node tools/patch_android.mjs",
