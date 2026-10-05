@@ -1,4 +1,4 @@
-# Latest Brisk Dex Android build - evolution lines and movepools
+# Latest Brisk Dex Android build - trainer/location cleanup
 name: Build Android APK
 
 on:
