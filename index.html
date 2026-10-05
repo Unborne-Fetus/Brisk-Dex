@@ -437,7 +437,6 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
   .change-group ul{margin:0;padding-left:20px;display:grid;gap:7px;color:var(--text);}
   .list-more{width:calc(100% - 12px);margin:8px 6px 12px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);color:var(--text);cursor:pointer;}
   @media (max-width:760px){.dex-sprite-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.dex-sprite-card img{width:96px;height:96px;}}
-  body.android-lite .dex-entry, body.android-lite .item-entry, body.android-lite .trainer-entry{content-visibility:auto;contain-intrinsic-size:64px;}
 
 </style>
 </head>
@@ -1497,6 +1496,14 @@ async function loadIconFolder(){
    ============================================================ */
 var IS_ELECTRON = !!(window.briskDexAPI);
 var IS_ANDROID = !!(window.briskAndroidAPI && window.briskAndroidAPI.isAndroid);
+if (IS_ANDROID){
+  var androidSaveInput = document.getElementById('file-sav');
+  if (androidSaveInput) androidSaveInput.setAttribute('accept', '*/*');
+  var loadButton = document.getElementById('btn-load-sav');
+  var loadButton2 = document.getElementById('btn-load-sav-2');
+  if (loadButton) loadButton.textContent = 'Open save file';
+  if (loadButton2) loadButton2.textContent = 'Browse device files';
+}
 
 /* ============================================================
    External storage — Pokémon kept outside any single save file.
@@ -2582,12 +2589,23 @@ function renderPokedex(){
     var dexNum=Number(entry.nationalDex||0);
     textWrap.appendChild(el('small', {text:(dexNum ? '#'+String(dexNum).padStart(4,'0')+' · ' : '') + ((entry.types || []).join(' / ') || 'Type data unavailable')}));
     btn.appendChild(textWrap);
-    btn.addEventListener('click', function(){ selectedDexSpeciesId = Number(id); renderPokedex(); });
+    btn.addEventListener('click', function(){
+      if (Number(id) === Number(selectedDexSpeciesId)) return;
+      selectedDexSpeciesId = Number(id);
+      var active=list.querySelector('.dex-entry.active');
+      if(active) active.classList.remove('active');
+      btn.classList.add('active');
+      renderPokedexDetail(allSpecies, id, detail);
+    });
     return btn;
   }, IS_ANDROID ? 80 : ids.length);
 
-  var id = String(selectedDexSpeciesId);
-  var species = allSpecies[id];
+  renderPokedexDetail(allSpecies, String(selectedDexSpeciesId), detail);
+}
+
+function renderPokedexDetail(allSpecies, id, detail){
+  detail.innerHTML = '';
+  var species = allSpecies[String(id)];
   if (!species) return;
   var hero = el('section', {class:'dex-hero'});
   applyTypeStyle(hero, Number(id));
@@ -2969,6 +2987,29 @@ function handleSavFile(file){
   reader.readAsArrayBuffer(file);
 }
 
+async function handleSavFromAndroid(){
+  clearError();
+  try{
+    await gameDataReady;
+    var result = await window.briskAndroidAPI.openSaveFile();
+    if (!result || !result.data) return;
+    var bytes = base64ToBytes(result.data);
+    var save = parseSav(bytes.buffer);
+    var extMatch = String(result.name || '').match(/\.(sav|srm)$/i);
+    save.fileExtension = extMatch ? extMatch[1].toLowerCase() : 'sav';
+    currentSave = save;
+    saveSessionId = genId();
+    dirty = false;
+    document.getElementById('empty-state').style.display = 'none';
+    document.getElementById('app-content').style.display = 'block';
+    renderAll();
+  }catch(err){
+    // The native picker reports cancellation as an error; don't turn that into a scary app error.
+    var message = err && err.message ? err.message : String(err || '');
+    if (!/cancel/i.test(message)) showError(message || 'Could not open that save file.');
+  }
+}
+
 async function handleSavFromElectron(){
   clearError();
   try{
@@ -3052,10 +3093,12 @@ document.getElementById('encounter-method').addEventListener('change', renderRou
 document.getElementById('change-search').addEventListener('input', renderChangesDebounced);
 document.getElementById('btn-load-sav').addEventListener('click', function(){
   if (IS_ELECTRON) handleSavFromElectron();
+  else if (IS_ANDROID && window.briskAndroidAPI && window.briskAndroidAPI.openSaveFile) handleSavFromAndroid();
   else document.getElementById('file-sav').click();
 });
 document.getElementById('btn-load-sav-2').addEventListener('click', function(){
   if (IS_ELECTRON) handleSavFromElectron();
+  else if (IS_ANDROID && window.briskAndroidAPI && window.briskAndroidAPI.openSaveFile) handleSavFromAndroid();
   else document.getElementById('file-sav').click();
 });
 document.getElementById('btn-load-data').addEventListener('click', function(){
