@@ -440,8 +440,8 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
     <div class="top-actions">
       <button class="ghost" id="btn-load-data">Load species/move data</button>
       <button class="ghost" id="btn-load-icons">Load icon folder</button>
-      <button class="primary" id="btn-load-sav">Load .sav file</button>
-      <input type="file" id="file-sav" accept=".sav">
+      <button class="primary" id="btn-load-sav">Load .sav / .srm file</button>
+      <input type="file" id="file-sav" accept=".sav,.srm">
       <input type="file" id="file-data" accept=".json">
     </div>
   </header>
@@ -457,7 +457,7 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
   <div id="save-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-save">
 
   <div id="dirty-bar" class="loader-panel" style="display:none; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; border-color:var(--accent-soft);">
-    <span>Transfers are staged in Brisk Dex. The .sav on disk still has the original until you save changes.</span>
+    <span>Transfers are staged in Brisk Dex. The save file on disk still has the original until you save changes.</span>
     <button class="primary" id="btn-save-changes">Save changes</button>
   </div>
 
@@ -467,8 +467,8 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
   <div id="empty-state" class="dropzone">
     <div class="icon">&#128190;</div>
     <h2>Drop in a save file</h2>
-    <p>Drag a Brisk Emerald <code>.sav</code> file here, or use &ldquo;Load .sav file&rdquo; above. Nothing leaves your browser &mdash; the file is read and parsed locally.</p>
-    <button class="primary" id="btn-load-sav-2">Choose .sav file</button>
+    <p>Drag a Brisk Emerald <code>.sav</code> or <code>.srm</code> file here, or use the load button above. Nothing leaves your browser &mdash; the file is read and parsed locally.</p>
+    <button class="primary" id="btn-load-sav-2">Choose .sav / .srm file</button>
     <div class="hint">Standard Gen III save format (pokeemerald / pokeemerald-expansion)</div>
   </div>
 
@@ -789,7 +789,7 @@ function parseSav(arrayBuffer){
   var blockB = readBlock(bytes, 0xE000);
 
   if (!blockA.valid && !blockB.valid){
-    throw new Error("Could not find a valid Generation III save block in this file. Is it a Gen III .sav (Ruby/Sapphire/Emerald/FireRed/LeafGreen) file?");
+    throw new Error("Could not find a valid Generation III save block in this file. Is it a compatible Gen III .sav/.srm (Ruby/Sapphire/Emerald/FireRed/LeafGreen) save file?");
   }
   var block;
   if (blockA.valid && blockB.valid){
@@ -1247,7 +1247,7 @@ async function wonderTradeAtLocation(mon, loc){
   if (IS_ELECTRON && currentSave.filePath && !saved) return;
   document.getElementById('modal-root').innerHTML = '';
   renderAll();
-  showNotice('Wonder Trade complete: received ' + speciesName(speciesId) + ' at Lv' + level + (received.isShiny ? ' (shiny)!' : '.') + (IS_ELECTRON ? '' : ' Replace your original .sav with the downloaded updated save to keep it in-game.'));
+  showNotice('Wonder Trade complete: received ' + speciesName(speciesId) + ' at Lv' + level + (received.isShiny ? ' (shiny)!' : '.') + (IS_ELECTRON ? '' : ' Replace your original save file with the downloaded updated save to keep it in-game.'));
 }
 function refreshBoxLevels(){
   if (!currentSave) return;
@@ -1641,12 +1641,13 @@ async function saveChangesToFile(){
     }catch(e){ showError('Could not write the save file: ' + e.message); return false; }
   } else {
     var fname = (currentSave.trainer.name || 'save').toLowerCase().replace(/[^a-z0-9]/g,'') || 'brisk-emerald';
+    var saveExt = currentSave.fileExtension === 'srm' ? 'srm' : 'sav';
     if (IS_ANDROID && window.briskAndroidAPI){
       try{
-        await window.briskAndroidAPI.saveBytes(currentSave._internal.rawBytes, fname + '-updated.sav', 'application/octet-stream');
+        await window.briskAndroidAPI.saveBytes(currentSave._internal.rawBytes, fname + '-updated.' + saveExt, 'application/octet-stream');
         clearDirty();
         var androidQueuedCount = Object.keys(pendingWithdrawals).filter(function(id){ return pendingWithdrawals[id] === saveSessionId; }).length;
-        showNotice('Opened Android sharing so you can save the updated .sav file.' +
+        showNotice('Opened Android sharing so you can save the updated .' + saveExt + ' file.' +
           (androidQueuedCount ? ' Archive copies are retained until you confirm the new save works.' : ''));
         return false;
       }catch(e){
@@ -1657,12 +1658,12 @@ async function saveChangesToFile(){
     var blob = new Blob([currentSave._internal.rawBytes], {type:'application/octet-stream'});
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
-    a.href = url; a.download = fname + '-updated.sav';
+    a.href = url; a.download = fname + '-updated.' + saveExt;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
     clearDirty();
     var queuedCount = Object.keys(pendingWithdrawals).filter(function(id){ return pendingWithdrawals[id] === saveSessionId; }).length;
-    showNotice('Downloaded an updated .sav file. Replace your original save file with this one to keep the changes in-game.' +
+    showNotice('Downloaded an updated .' + saveExt + ' file. Replace your original save file with this one to keep the changes in-game.' +
       (queuedCount ? ' The archive copies are retained; remove them from External Storage after replacing the original save.' : ''));
     return false;
   }
@@ -2800,6 +2801,8 @@ function handleSavFile(file){
   reader.onload = function(e){
     try{
       var save = parseSav(e.target.result);
+      var extMatch = String(file && file.name || '').match(/\.(sav|srm)$/i);
+      save.fileExtension = extMatch ? extMatch[1].toLowerCase() : 'sav';
       currentSave = save;
       saveSessionId = genId();
       dirty = false;
@@ -2822,6 +2825,8 @@ async function handleSavFromElectron(){
     if (!result) return; // user cancelled
     var save = parseSav(result.buffer.buffer ? result.buffer.buffer : result.buffer);
     save.filePath = result.filePath;
+    var extMatch = String(result.filePath || '').match(/\.(sav|srm)$/i);
+    save.fileExtension = extMatch ? extMatch[1].toLowerCase() : 'sav';
     currentSave = save;
     saveSessionId = genId();
     dirty = false;
