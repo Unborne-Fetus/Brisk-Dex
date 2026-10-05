@@ -757,6 +757,7 @@ def main():
     abilities_const_text = find_source(repo, "include/constants/abilities.h")
     items_const_text = find_source(repo, "include/constants/items.h")
     pokemon_const_text = find_source(repo, "include/constants/pokemon.h")
+    pokedex_const_text = find_source(repo, "include/constants/pokedex.h")
     shiny_odds_match = re.search(r'^\s*#define\s+SHINY_ODDS\s+(\d+)', pokemon_const_text, re.MULTILINE)
     shiny_odds = int(shiny_odds_match.group(1)) if shiny_odds_match else 8
 
@@ -764,6 +765,7 @@ def main():
     move_ids = parse_constants(moves_const_text, "MOVE_")
     ability_ids = parse_constants(abilities_const_text, "ABILITY_")
     item_ids = parse_constants(items_const_text, "ITEM_")
+    national_dex_ids = parse_constants(pokedex_const_text, "NATIONAL_DEX_")
 
     print("  species constants:", len(species_ids))
     print("  move constants:", len(move_ids))
@@ -822,7 +824,21 @@ def main():
             ab_name = extract_string_field(ab_block, '.name') if ab_block else None
             ability_names.append(ab_name or a.replace('_', ' ').title())
         growth = re.search(r'\.growthRate\s*=\s*GROWTH_([A-Za-z0-9_]+)', data_block)
-        icon_sprite = re.search(r'\.iconSprite\s*=\s*gMonIcon_([A-Za-z0-9_]+)', block)
+        icon_sprite = re.search(r'\.iconSprite\s*=\s*gMonIcon_([A-Za-z0-9_]+)', data_block)
+        nat_dex_match = re.search(r'\.natDexNum\s*=\s*NATIONAL_DEX_([A-Za-z0-9_]+)', data_block)
+        nat_dex_name = nat_dex_match.group(1) if nat_dex_match else None
+        national_dex = national_dex_ids.get(nat_dex_name, 0) if nat_dex_name else 0
+        is_mega = bool(re.search(r'(^|_)MEGA(?:_|$)', name))
+        form_label = None
+        if is_mega:
+            if name.endswith('_MEGA_X'):
+                form_label = 'Mega X'
+            elif name.endswith('_MEGA_Y'):
+                form_label = 'Mega Y'
+            else:
+                form_label = 'Mega'
+        elif nat_dex_name and name != nat_dex_name and name.startswith(nat_dex_name + '_'):
+            form_label = name[len(nat_dex_name) + 1:].replace('_', ' ').title()
         base_stats = []
         for stat_field in ('.baseHP', '.baseAttack', '.baseDefense', '.baseSpeed', '.baseSpAttack', '.baseSpDefense'):
             stat_match = re.search(re.escape(stat_field) + r'\s*=\s*(\d+)', data_block)
@@ -853,6 +869,9 @@ def main():
             "genderRatio": gender_ratio,
             "iconSprite": icon_sprite.group(1) if icon_sprite else name.title(),
             "constant": name,
+            "nationalDex": national_dex,
+            "formLabel": form_label,
+            "isMega": is_mega,
             "pokedexEntry": pokedex_entry
         }
 
@@ -947,11 +966,13 @@ def main():
         item_name = extract_string_field(block, '.name') if block else None
         display_item_name = item_name or name.replace('_', ' ').title()
         out_items[str(iid)] = display_item_name
+        icon_match = re.search(r'\.iconPic\s*=\s*gItemIcon_([A-Za-z0-9_]+)', block or "")
         item_details[str(iid)] = {
             "name": display_item_name,
             "constant": "ITEM_" + name,
             "description": extract_compound_field(block, '.description') if block else None,
-            "locations": item_locations.get("ITEM_" + name, [])
+            "locations": item_locations.get("ITEM_" + name, []),
+            "iconKey": icon_match.group(1) if icon_match else None
         }
 
     route_encounters = extract_route_encounters(repo, species_ids)
@@ -1072,6 +1093,46 @@ def main():
     else:
         print()
         print("No graphics/pokemon folder found at", gfx_dir, "-- skipping icon export.")
+
+    # Export item icons using the exact graphics symbol referenced by each item.
+    item_graphics_text = find_source(repo, "src/data/graphics/items.h")
+    item_icon_sources = {}
+    for match in re.finditer(r'const\s+u32\s+gItemIcon_([A-Za-z0-9_]+)\[\]\s*=\s*INCGFX_U32\("([^"]+\.png)"', item_graphics_text or ""):
+        item_icon_sources[match.group(1)] = match.group(2)
+    items_out = "brisk-dex-items"
+    os.makedirs(items_out, exist_ok=True)
+    for filename in os.listdir(items_out):
+        if filename.endswith(".png"):
+            os.remove(os.path.join(items_out, filename))
+    for iid, details in item_details.items():
+        rel = item_icon_sources.get(details.get("iconKey"))
+        if not rel:
+            continue
+        source = os.path.join(repo, rel)
+        if os.path.isfile(source):
+            target = iid + ".png"
+            shutil.copyfile(source, os.path.join(items_out, target))
+            details["icon"] = items_out + "/" + target
+
+    # Export every trainer battle portrait referenced by trainers.party.
+    trainer_front_dir = os.path.join(repo, "graphics", "trainers", "front_pics")
+    trainer_pics_out = "brisk-dex-trainer-pics"
+    os.makedirs(trainer_pics_out, exist_ok=True)
+    for filename in os.listdir(trainer_pics_out):
+        if filename.endswith(".png"):
+            os.remove(os.path.join(trainer_pics_out, filename))
+    if os.path.isdir(trainer_front_dir):
+        available = {os.path.splitext(fn)[0].lower(): fn for fn in os.listdir(trainer_front_dir) if fn.lower().endswith(".png")}
+        for trainer in trainer_teams:
+            pic = (trainer.get("pic") or "").strip()
+            key = re.sub(r'^TRAINER_PIC_(?:FRONT_)?', '', pic, flags=re.I).lower()
+            key = key.replace(" ", "_")
+            candidates = [key, key.replace("pkmn_", "pokemon_")]
+            source_name = next((available[k] for k in candidates if k in available), None)
+            if source_name:
+                target = re.sub(r'[^a-z0-9_]+', '_', key) + ".png"
+                shutil.copyfile(os.path.join(trainer_front_dir, source_name), os.path.join(trainer_pics_out, target))
+                trainer["portrait"] = trainer_pics_out + "/" + target
 
     # The save stores the protagonist's gender. Bundle the matching Ruby/Sapphire
     # player sprite sheets for the trainer portrait in the app header.
