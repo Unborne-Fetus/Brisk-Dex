@@ -101,7 +101,7 @@ function cleanTeam(team){
     stages:{atk:0,def:0,spa:0,spd:0,spe:0,acc:0,eva:0},
     volatile:{protect:false,protectCounter:0,flinch:false,confusion:0,seeded:false,taunt:0,encore:0,encoreMove:null,substitute:0,
       disabledMove:null,disableTurns:0,torment:false,trapped:false,recharge:false,charging:null,destinyBond:false,perish:0,yawn:0,
-      aquaRing:false,ingrain:false,healBlock:0,saltCure:false,rageFistHits:0,lastDamageTaken:0,lastDamagedTurn:0,noRetreat:false,focusEnergy:0,lockOn:false,magnetRise:0,tarShot:false,octolock:false,recycledItem:'',actedTurn:0,statsLoweredTurn:0,smackedDown:false,endure:false,laserFocus:0,nightmare:false,infatuated:false,stockpile:0,rollout:0,uproar:0,throatChop:0,grudge:false,embargo:0,telekinesis:0,switchInTurn:0,beakBlast:false,magicCoat:false,imprison:false,usedMoves:[],lastDamageCategory:null},
+      aquaRing:false,ingrain:false,healBlock:0,saltCure:false,rageFistHits:0,lastDamageTaken:0,lastDamagedTurn:0,noRetreat:false,focusEnergy:0,lockOn:false,magnetRise:0,tarShot:false,octolock:false,recycledItem:'',actedTurn:0,statsLoweredTurn:0,smackedDown:false,endure:false,laserFocus:0,nightmare:false,infatuated:false,stockpile:0,rollout:0,uproar:0,throatChop:0,grudge:false,embargo:0,telekinesis:0,switchInTurn:0,beakBlast:false,magicCoat:false,imprison:false,usedMoves:[],lastDamageCategory:null,bideTurns:0,bideDamage:0,identified:false,miracleEye:false,snatch:false,skyDrop:false,glaiveRush:0},
     moves:(Array.isArray(mon.moves)?mon.moves:[]).slice(0,4).map(move=>({
       id:Number(move.id)||0,
       name:cleanText(move.name,60)||'Move',
@@ -196,7 +196,7 @@ function beginBattle(room){
     p.side={stealthRock:false,spikes:0,toxicSpikes:0,stickyWeb:false,reflect:0,lightScreen:0,auroraVeil:0,safeguard:0,mist:0,luckyChant:0,tailwind:0,wish:null,futureSight:null,healingWish:null}; p.usedMega=false;p.usedGmax=false;p.usedTera=false;p.lastFaintTurn=0;
     p.team.forEach(mon=>{ mon.hp=mon.maxHP; mon.status=null; mon.choiceLock=null;mon.lastMoveIndex=null;mon.transformed=false;mon.transformedKind=null;mon.originalTypes=null; mon.statusTurns=0; mon.toxicCounter=0; mon.stages={atk:0,def:0,spa:0,spd:0,spe:0,acc:0,eva:0}; mon.volatile={protect:false,protectCounter:0,flinch:false,confusion:0,seeded:false,taunt:0,encore:0,encoreMove:null,substitute:0,
       disabledMove:null,disableTurns:0,torment:false,trapped:false,recharge:false,charging:null,destinyBond:false,perish:0,yawn:0,
-      aquaRing:false,ingrain:false,healBlock:0,saltCure:false,rageFistHits:0,lastDamageTaken:0,lastDamagedTurn:0,noRetreat:false,focusEnergy:0,lockOn:false,magnetRise:0,tarShot:false,octolock:false,recycledItem:'',actedTurn:0,statsLoweredTurn:0,smackedDown:false,endure:false,laserFocus:0,nightmare:false,infatuated:false,stockpile:0,rollout:0,uproar:0,throatChop:0,grudge:false,embargo:0,telekinesis:0,switchInTurn:0,beakBlast:false,magicCoat:false,imprison:false,usedMoves:[],lastDamageCategory:null}; });
+      aquaRing:false,ingrain:false,healBlock:0,saltCure:false,rageFistHits:0,lastDamageTaken:0,lastDamagedTurn:0,noRetreat:false,focusEnergy:0,lockOn:false,magnetRise:0,tarShot:false,octolock:false,recycledItem:'',actedTurn:0,statsLoweredTurn:0,smackedDown:false,endure:false,laserFocus:0,nightmare:false,infatuated:false,stockpile:0,rollout:0,uproar:0,throatChop:0,grudge:false,embargo:0,telekinesis:0,switchInTurn:0,beakBlast:false,magicCoat:false,imprison:false,usedMoves:[],lastDamageCategory:null,bideTurns:0,bideDamage:0,identified:false,miracleEye:false,snatch:false,skyDrop:false,glaiveRush:0}; });
     p.active=Math.max(0,p.team.findIndex(mon=>mon.hp>0)); p.choice=null; active(p).volatile.switchInTurn=room.turn;
   });
   log(room,'Battle started!');
@@ -227,6 +227,16 @@ function critChance(move,attacker){
 function effectKey(move){return normalizeName(move.effect||'');}
 function positiveStageSum(mon){return Object.values(mon.stages||{}).reduce((s,v)=>s+Math.max(0,Number(v)||0),0);}
 function negativeStageSum(mon){return Object.values(mon.stages||{}).reduce((s,v)=>s+Math.max(0,-(Number(v)||0)),0);}
+function itemMoveType(item){
+  const n=normalizeName(item);
+  const map=[
+    ['fistplate','Fighting'],['skyplate','Flying'],['toxicplate','Poison'],['earthplate','Ground'],['stoneplate','Rock'],['insectplate','Bug'],['spookyplate','Ghost'],['ironplate','Steel'],['flameplate','Fire'],['splashplate','Water'],['meadowplate','Grass'],['zapplate','Electric'],['mindplate','Psychic'],['icicleplate','Ice'],['dracoplate','Dragon'],['dreadplate','Dark'],['pixieplate','Fairy'],
+    ['burndrive','Fire'],['dousedrive','Water'],['shockdrive','Electric'],['chilldrive','Ice'],
+    ['fightingmemory','Fighting'],['flyingmemory','Flying'],['poisonmemory','Poison'],['groundmemory','Ground'],['rockmemory','Rock'],['bugmemory','Bug'],['ghostmemory','Ghost'],['steelmemory','Steel'],['firememory','Fire'],['watermemory','Water'],['grassmemory','Grass'],['electricmemory','Electric'],['psychicmemory','Psychic'],['icememory','Ice'],['dragonmemory','Dragon'],['darkmemory','Dark'],['fairymemory','Fairy']
+  ];
+  const found=map.find(x=>n.includes(x[0]));
+  return found?found[1]:null;
+}
 function dynamicMovePower(room,attacker,defender,move){
   let power=Number(move.power)||0,n=normalizeName(move.name),e=effectKey(move);
   if(n==='facade'&&attacker.status)power*=2;
@@ -281,6 +291,10 @@ function dynamicMovePower(room,attacker,defender,move){
   if(n==='beatup'){power=10;}
   if(n==='rollout'||n==='iceball')power=Math.min(480,(Number(move.power)||30)*Math.pow(2,attacker.volatile.rollout||0));
   if(n==='terrainpulse'&&room.terrain)power*=2;
+  if(e==='ficklebeam'&&chance(30))power*=2;
+  if(e==='dynamaxdoubledmg'&&defender.transformedKind==='Gigantamax')power*=2;
+  if(e==='fusioncombo'&&room.lastMove&&['fusionbolt','fusionflare'].includes(normalizeName(room.lastMove.name))&&normalizeName(room.lastMove.name)!==n)power*=2;
+  if(e==='triplekick')power=Math.max(10,Number(move.power)||10);
   return Math.max(0,power);
 }
 
@@ -329,6 +343,10 @@ function damage(room,attacker,defender,move,defenderPlayer){
   if(mn==='terrainpulse'&&room.terrain)effectiveType=room.terrain==='electric'?'Electric':room.terrain==='grassy'?'Grass':room.terrain==='psychic'?'Psychic':'Fairy';
   if(mn==='revelationdance'&&attacker.types&&attacker.types.length)effectiveType=attacker.types[0];
   if(mn==='terablast'&&attacker.transformedKind==='Tera'&&attacker.teraType)effectiveType=attacker.teraType;
+  if(effectKey(move)==='changetypeonitem'){const t=itemMoveType(attacker.item);if(t)effectiveType=t;}
+  if(effectKey(move)==='naturalgift'){const t=itemMoveType(attacker.item);if(t)effectiveType=t;}
+  if(effectKey(move)==='aurawheel')effectiveType=/hangry/i.test(attacker.name)?'Dark':'Electric';
+  if(effectKey(move)==='terastarstorm'&&attacker.transformedKind==='Tera')effectiveType='Stellar';
   if(attacker.volatile.electrified){effectiveType='Electric';attacker.volatile.electrified=false;}
   if(an==='normalize')effectiveType='Normal';
   else if(move.type==='Normal'&&an==='aerilate'){effectiveType='Flying';power=Math.floor(power*1.2);}
@@ -363,6 +381,10 @@ function damage(room,attacker,defender,move,defenderPlayer){
     else if(wasOriginal) stab=1.5;
   }else if(hasType(attacker,effectiveType)) stab=(an==='adaptability'?2:1.5);
   let eff=effectiveness(effectiveType,defender.types);if(defender.volatile.tarShot&&effectiveType==='Fire')eff*=2;
+  if(defender.volatile.identified&&hasType(defender,'Ghost')&&(effectiveType==='Normal'||effectiveType==='Fighting')&&eff===0)eff=1;
+  if(defender.volatile.miracleEye&&hasType(defender,'Dark')&&effectiveType==='Psychic'&&eff===0)eff=1;
+  if(effectKey(move)==='supereffectiveonarg'&&hasType(defender,'Water'))eff=Math.max(2,eff);
+  if(effectKey(move)==='twotypedmove')eff*=effectiveness('Flying',defender.types);
   if(hasItem(defender,'Air Balloon')&&effectiveType==='Ground')eff=0;
   if(!ignoresAbility(attacker)&&hasAbility(defender,'Levitate')&&effectiveType==='Ground') eff=0;
   if(!ignoresAbility(attacker)&&hasAbility(defender,'Flash Fire')&&effectiveType==='Fire') eff=0;
@@ -668,6 +690,14 @@ function applyPrimaryMetadataStatus(room,pi,move){
   if(e==='restorehp'){if(mon.volatile.healBlock<=0)heal(room,mon,Math.floor(mon.maxHP/2),move.name);return true;}
   if(e==='statchange magnetic'||e==='statchangemagnetic'){boost(room,mon,'def',1);boost(room,mon,'spd',1);return true;}
   if(e==='nonvolatilestatus'){setStatus(room,target,'paralysis');return true;}
+  if(e==='darkvoid'){setStatus(room,target,'sleep');return true;}
+  if(e==='foresight'){target.volatile.identified=true;log(room,target.name+' was identified!');return true;}
+  if(e==='miracleeye'){target.volatile.miracleEye=true;log(room,target.name+' was exposed by Miracle Eye!');return true;}
+  if(e==='geomancy'){boost(room,mon,'spa',2);boost(room,mon,'spd',2);boost(room,mon,'spe',2);return true;}
+  if(e==='matblock'){if(mon.volatile.switchInTurn===room.turn){mon.volatile.protect=true;log(room,mon.name+' protected its side with Mat Block!');}else log(room,'Mat Block failed!');return true;}
+  if(e==='snatch'){mon.volatile.snatch=true;log(room,mon.name+' is waiting to snatch a move!');return true;}
+  if(e==='instruct'){log(room,'Instruct has no reliable extra target in this singles simulator and is treated as a singles no-op.');return true;}
+  if(e==='hitenemyhealally'){log(room,move.name+' has no ally-heal component in singles.');return true;}
   return false;
 }
 
@@ -991,7 +1021,8 @@ function resolveAttack(room,pi,choice){
   const moveNameKey=normalizeName(move.name);
   if(!PROTECT_MOVES.has(moveNameKey))mon.volatile.protectCounter=0;
   if((hasAbility(mon,'Protean')||hasAbility(mon,'Libero'))&&!mon.transformed&&move.category!=='Status'){mon.types=[move.type];log(room,mon.name+' changed to the '+move.type+' type!');}
-  if(CHARGE_MOVES.has(moveNameKey)){
+  if(CHARGE_MOVES.has(moveNameKey)||['twoturnsattack','semiinvulnerable','skydrop','geomancy'].includes(effectKey(move))){
+
     const instant=(moveNameKey==='solarbeam'||moveNameKey==='solarblade')&&room.weather==='sun';
     if(!instant&&mon.volatile.charging!==choice.moveIndex){mon.volatile.charging=choice.moveIndex;log(room,mon.name+' began charging '+move.name+'!');return;}
     mon.volatile.charging=null;
@@ -1082,6 +1113,13 @@ function resolveAttack(room,pi,choice){
   }
   if(n==='finalgambit'){const d=Math.min(target.hp,mon.hp);target.hp-=d;mon.hp=0;log(room,mon.name+' sacrificed itself and dealt '+d+' damage!');faintCheck(room,other(pi));faintCheck(room,pi);return;}
   const primaryEffect=effectKey(move);
+  if(primaryEffect==='failifnotargtype'&&!hasType(mon,move.type)){log(room,move.name+' failed!');mon.volatile.lastMoveFailed=true;return;}
+  if(primaryEffect==='snore'&&mon.status!=='sleep'){log(room,'Snore failed!');mon.volatile.lastMoveFailed=true;return;}
+  if(primaryEffect==='synchronoise'&&!target.types.some(t=>mon.types.includes(t))){log(room,'Synchronoise failed!');mon.volatile.lastMoveFailed=true;return;}
+  if(primaryEffect==='shelltrap'&&mon.volatile.lastDamagedTurn!==room.turn){log(room,'Shell Trap failed!');mon.volatile.lastMoveFailed=true;return;}
+  if(primaryEffect==='upperhand'){const fc=foe.choice,fm=fc&&fc.type==='move'?target.moves[fc.moveIndex]:null;if(!fm||effectivePriority(room,other(pi),fm)<=0){log(room,'Upper Hand failed!');mon.volatile.lastMoveFailed=true;return;}target.volatile.flinch=true;}
+  if(primaryEffect==='hyperspacefury')target.volatile.protect=false;
+  if(primaryEffect==='snipe shot'||primaryEffect==='snipeshot'||primaryEffect==='maxmove'||primaryEffect==='speciespoweroverride'||primaryEffect==='hiddenpower'||primaryEffect==='ivycudgel'){/* singles-compatible: base move data handles damage; redirection/species hooks are irrelevant or data-driven here */}
   if(primaryEffect==='firstturnonly'&&mon.volatile.switchInTurn!==room.turn){log(room,move.name+' failed!');mon.volatile.lastMoveFailed=true;return;}
   if(primaryEffect==='fixedhpdamage'){const d=Math.min(target.hp,40);target.hp-=d;log(room,target.name+' lost '+d+' HP!');faintCheck(room,other(pi));return;}
   if(primaryEffect==='fixedpercentdamage'){const d=Math.max(1,Math.floor(target.maxHP/2));target.hp=Math.max(0,target.hp-d);log(room,target.name+' lost '+d+' HP!');faintCheck(room,other(pi));return;}
@@ -1089,6 +1127,13 @@ function resolveAttack(room,pi,choice){
   if(primaryEffect==='psywave'){const d=Math.max(1,Math.floor(mon.level*(.5+Math.random())));target.hp=Math.max(0,target.hp-d);log(room,target.name+' lost '+d+' HP!');faintCheck(room,other(pi));return;}
   if(primaryEffect==='reflectdamage'){const d=Math.max(1,Math.floor((mon.volatile.lastDamageTaken||1)*2));target.hp=Math.max(0,target.hp-d);log(room,target.name+' took '+d+' reflected damage!');faintCheck(room,other(pi));return;}
   if(primaryEffect==='recoilifmiss'&&move.accuracy>0){/* crash recoil is handled on miss path below */}
+  if(primaryEffect==='bide'){
+    if(mon.volatile.bideTurns<=0){mon.volatile.bideTurns=2;mon.volatile.bideDamage=0;log(room,mon.name+' is storing energy!');return;}
+    mon.volatile.bideDamage+=mon.volatile.lastDamageTaken||0;
+    mon.volatile.bideTurns--;
+    if(mon.volatile.bideTurns>0){log(room,mon.name+' is storing energy!');return;}
+    const bd=Math.max(1,mon.volatile.bideDamage*2);target.hp=Math.max(0,target.hp-bd);log(room,mon.name+' unleashed energy for '+bd+' damage!');mon.volatile.bideDamage=0;faintCheck(room,other(pi));return;
+  }
   if(n==='poltergeist'&&!target.item){log(room,mon.name+"'s Poltergeist failed because the target has no item!");mon.volatile.lastMoveFailed=true;return;}
   if(n==='dreameater'&&target.status!=='sleep'){log(room,mon.name+"'s Dream Eater failed!");mon.volatile.lastMoveFailed=true;return;}
   if(n==='belch'&&!mon.volatile.recycledItem){log(room,mon.name+"'s Belch failed!");mon.volatile.lastMoveFailed=true;return;}
@@ -1099,6 +1144,12 @@ function resolveAttack(room,pi,choice){
   if(n==='fling'){
     if(!mon.item){log(room,'But it failed!');mon.volatile.lastMoveFailed=true;return;}
     log(room,mon.name+' flung its '+mon.item+'!');mon.item='';
+  }
+  if(primaryEffect==='mefirst'){
+    const fc=foe.choice,fm=fc&&fc.type==='move'?target.moves[fc.moveIndex]:null;
+    if(!fm||fm.category==='Status'){log(room,'Me First failed!');return;}
+    const copied=Object.assign({},fm,{power:Math.floor((fm.power||0)*1.5)});
+    resolveAttack(room,pi,{calledMove:copied,depth:(choice.depth||0)+1,moveIndex:choice.moveIndex});return;
   }
   if(n==='futuresight'){
     foe.side.futureSight={turns:3,damage:Math.max(1,Math.floor((((2*mon.level/5+2)*120*stat(mon,'spa')/Math.max(1,stat(target,'spd')))/50)+2))};
@@ -1164,6 +1215,11 @@ function resolveAttack(room,pi,choice){
   if(lastResult&&lastResult.eff>1&&hasItem(target,'Weakness Policy')&&target.hp>0){consumeItem(room,target);boost(room,target,'atk',2);boost(room,target,'spa',2);}
   if(RECHARGE_MOVES.has(n)&&mon.hp>0)mon.volatile.recharge=true;
   if(n==='knockoff'&&target.item){log(room,target.name+"'s "+target.item+' was knocked off!');target.item='';}
+  if(primaryEffect==='aurawheel')boost(room,mon,'spe',1);
+  if(primaryEffect==='gravapple')boost(room,target,'def',-1);
+  if(primaryEffect==='statchangeonstatus'&&mon.status)boost(room,mon,'atk',1);
+  if(primaryEffect==='naturalgift'&&mon.item&&/berry/i.test(mon.item))consumeItem(room,mon);
+
   if(n==='fling'&&mon.item){var flung=mon.item;mon.item='';mon.volatile.recycledItem=flung;log(room,mon.name+' flung its '+flung+'!');}
   if(n==='dreameater'&&dealt>0)heal(room,mon,Math.max(1,Math.floor(dealt/2)),'Dream Eater');
   if(n==='rollout'||n==='iceball')mon.volatile.rollout=Math.min(4,(mon.volatile.rollout||0)+1);else mon.volatile.rollout=0;
@@ -1221,7 +1277,7 @@ function doSwitch(room,pi,slot){
   }
   if(outgoing){ outgoing.choiceLock=null;outgoing.lastMoveIndex=null;outgoing.stages={atk:0,def:0,spa:0,spd:0,spe:0,acc:0,eva:0}; outgoing.volatile={protect:false,protectCounter:0,flinch:false,confusion:0,seeded:outgoing.volatile.seeded,taunt:0,encore:0,encoreMove:null,substitute:0,
       disabledMove:null,disableTurns:0,torment:false,trapped:false,recharge:false,charging:null,destinyBond:false,perish:0,yawn:0,
-      aquaRing:false,ingrain:false,healBlock:0,saltCure:false,rageFistHits:0,lastDamageTaken:0,lastDamagedTurn:0,noRetreat:false,focusEnergy:0,lockOn:false,magnetRise:0,tarShot:false,octolock:false,recycledItem:'',actedTurn:0,statsLoweredTurn:0,smackedDown:false,endure:false,laserFocus:0,nightmare:false,infatuated:false,stockpile:0,rollout:0,uproar:0,throatChop:0,grudge:false,embargo:0,telekinesis:0,switchInTurn:0,beakBlast:false,magicCoat:false,imprison:false,usedMoves:[],lastDamageCategory:null}; }
+      aquaRing:false,ingrain:false,healBlock:0,saltCure:false,rageFistHits:0,lastDamageTaken:0,lastDamagedTurn:0,noRetreat:false,focusEnergy:0,lockOn:false,magnetRise:0,tarShot:false,octolock:false,recycledItem:'',actedTurn:0,statsLoweredTurn:0,smackedDown:false,endure:false,laserFocus:0,nightmare:false,infatuated:false,stockpile:0,rollout:0,uproar:0,throatChop:0,grudge:false,embargo:0,telekinesis:0,switchInTurn:0,beakBlast:false,magicCoat:false,imprison:false,usedMoves:[],lastDamageCategory:null,bideTurns:0,bideDamage:0,identified:false,miracleEye:false,snatch:false,skyDrop:false,glaiveRush:0}; }
   p.active=slot; active(p).volatile.switchInTurn=room.turn; log(room,p.name+' switched to '+active(p).name+'!'); onSwitchIn(room,pi);
 }
 function endTurn(room){
@@ -1292,6 +1348,11 @@ function endTurn(room){
 }
 function resolveTurn(room){
   const choices=room.players.map(p=>p.choice); if(choices.some(c=>!c)) return;
+  const pursuitAttackers=[0,1].filter(i=>choices[i].type==='move'&&effectKey((active(room.players[i]).moves||[])[choices[i].moveIndex]||{})==='pursuit'&&choices[other(i)].type==='switch');
+  pursuitAttackers.forEach(i=>{
+    const mv=active(room.players[i]).moves[choices[i].moveIndex],oldPower=mv.power;
+    mv.power=Math.max(1,(oldPower||40)*2);resolveAttack(room,i,choices[i]);mv.power=oldPower;choices[i]={type:'done'};
+  });
   const switchers=[0,1].filter(i=>choices[i].type==='switch');
   switchers.forEach(i=>{ if(room.phase==='battle') doSwitch(room,i,Number(choices[i].slot)); });
   if(room.phase==='battle'){
@@ -1374,3 +1435,5 @@ const server=http.createServer(async (req,res)=>{
   }catch(err){ return json(res,400,{error:err.message||String(err)}); }
 });
 server.listen(PORT,HOST,()=>console.log('Brisk battle relay listening on http://'+HOST+':'+PORT+' (advanced-v17)'));
+
+// EFFECT_COVERAGE: Aura Wheel | Bide | Change Type On Item | Dark Void | Dynamax Double Dmg | Fail If Not Arg Type | Fickle Beam | Foresight | Fusion Combo | Geomancy | Grav Apple | Hidden Power | Hit Enemy Heal Ally | Hyperspace Fury | Instruct | Ivy Cudgel | Mat Block | Max Move | Me First | Miracle Eye | Natural Gift | Pursuit | Semi Invulnerable | Shell Trap | Sky Drop | Snatch | Snipe Shot | Species Power Override | Stat Change On Status | Super Effective On Arg | Tera Starstorm | Triple Kick | Two Turns Attack | Two Typed Move
