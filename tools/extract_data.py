@@ -404,6 +404,28 @@ def extract_string_field(block, *field_names):
             return m.group(1).replace('\\"', '"')
     return None
 
+def extract_numeric_field(block, field, default=None):
+    """Read a numeric struct field, preferring the modern/true side of simple ternaries."""
+    if not block:
+        return default
+    field_re = re.escape(field)
+    direct = re.search(field_re + r'\s*=\s*(-?\d+)\b', block)
+    if direct:
+        return int(direct.group(1))
+    ternary = re.search(field_re + r'\s*=\s*[^,?]+\?\s*(-?\d+)\s*:\s*(-?\d+)', block)
+    if ternary:
+        return int(ternary.group(1))
+    return default
+
+def extract_enum_field(block, field, prefix, default=None):
+    if not block:
+        return default
+    match = re.search(re.escape(field) + r'\s*=\s*[^,\n]*?\b' + re.escape(prefix) + r'([A-Za-z0-9_]+)', block)
+    return match.group(1) if match else default
+
+def pretty_constant(value):
+    return (value or "").replace("_", " ").title()
+
 def extract_types(block):
     # accepts ".types = { TYPE_X, TYPE_Y }" or ".types = ANY_MACRO_NAME(TYPE_X, TYPE_Y)"
     block = re.sub(r'P_UPDATED_TYPES\s*>=\s*GEN_\d+\s*\?\s*TYPE_([A-Za-z0-9_]+)\s*:\s*TYPE_[A-Za-z0-9_]+', r'TYPE_\1', block or "")
@@ -1012,6 +1034,7 @@ def main():
             "name": display_name,
             "types": types,
             "abilities": ability_names,
+            "abilityIds": [ability_ids.get(a) for a in ability_names_raw if a and ability_ids.get(a)],
             "growthRate": growth.group(1).lower() if growth else None,
             "baseStats": base_stats,
             "friendship": int(friendship_match.group(1)) if friendship_match else 70,
@@ -1071,14 +1094,45 @@ def main():
 
     out_moves = {}
     out_move_pp = {}
+    move_details = {}
+    move_flag_fields = (
+        "makesContact", "punchingMove", "bitingMove", "ballisticMove", "soundMove",
+        "powderMove", "danceMove", "slicingMove", "windMove", "snatchAffected",
+        "magicCoatAffected", "protectAffected", "mirrorMoveBanned", "metronomeBanned",
+        "sketchBanned", "assistBanned"
+    )
     for name, mid in move_ids.items():
         if mid == 0:
             continue
         block = move_blocks.get(name)
         move_name = extract_string_field(block, '.name') if block else None
-        out_moves[str(mid)] = move_name or name.replace('_', ' ').title()
-        pp_match = re.search(r'\.pp\s*=\s*(\d+)', block) if block else None
-        out_move_pp[str(mid)] = int(pp_match.group(1)) if pp_match else 10
+        display_move_name = move_name or name.replace('_', ' ').title()
+        out_moves[str(mid)] = display_move_name
+        pp = extract_numeric_field(block, '.pp', 0) if block else 0
+        out_move_pp[str(mid)] = pp or 0
+        type_constant = extract_enum_field(block, '.type', 'TYPE_') if block else None
+        category_constant = extract_enum_field(block, '.category', 'DAMAGE_CATEGORY_') if block else None
+        target_constant = extract_enum_field(block, '.target', 'TARGET_') if block else None
+        effect_constant = extract_enum_field(block, '.effect', 'EFFECT_') if block else None
+        flags = []
+        if block:
+            for flag in move_flag_fields:
+                if re.search(r'\.' + re.escape(flag) + r'\s*=\s*TRUE\b', block):
+                    flags.append(re.sub(r'(?<!^)(?=[A-Z])', ' ', flag).title())
+        move_details[str(mid)] = {
+            "name": display_move_name,
+            "constant": "MOVE_" + name,
+            "description": extract_compound_field(block, '.description') if block else None,
+            "power": extract_numeric_field(block, '.power', 0) if block else 0,
+            "accuracy": extract_numeric_field(block, '.accuracy', 0) if block else 0,
+            "pp": pp or 0,
+            "priority": extract_numeric_field(block, '.priority', 0) if block else 0,
+            "type": TYPE_NAMES.get(type_constant) if type_constant else None,
+            "category": pretty_constant(category_constant) if category_constant else None,
+            "target": pretty_constant(target_constant) if target_constant else None,
+            "effect": pretty_constant(effect_constant) if effect_constant else None,
+            "flags": flags,
+        }
 
     # Build a species-specific pool from every move that species can learn.
     # Form constants fall back through their underscore-separated parent names.
@@ -1098,12 +1152,31 @@ def main():
         species["learnableMoves"] = numeric_moves
 
     out_abilities = {}
+    ability_details = {}
+    ability_flag_fields = (
+        "breakable", "cantBeSwapped", "cantBeTraced", "cantBeCopied",
+        "cantBeSuppressed", "cantBeOverwritten", "failsOnImposter",
+        "suppressesWeather"
+    )
     for name, aid in ability_ids.items():
         if aid == 0:
             continue
         block = ability_blocks.get(name)
         ab_name = extract_string_field(block, '.name') if block else None
-        out_abilities[str(aid)] = ab_name or name.replace('_', ' ').title()
+        display_ability_name = ab_name or name.replace('_', ' ').title()
+        out_abilities[str(aid)] = display_ability_name
+        flags = []
+        if block:
+            for flag in ability_flag_fields:
+                if re.search(r'\.' + re.escape(flag) + r'\s*=\s*TRUE\b', block):
+                    flags.append(re.sub(r'(?<!^)(?=[A-Z])', ' ', flag).title())
+        ability_details[str(aid)] = {
+            "name": display_ability_name,
+            "constant": "ABILITY_" + name,
+            "description": extract_compound_field(block, '.description') if block else None,
+            "aiRating": extract_numeric_field(block, '.aiRating', None) if block else None,
+            "flags": flags,
+        }
 
     trainer_locations, item_locations = extract_reference_locations(repo)
 
@@ -1130,8 +1203,8 @@ def main():
     change_catalog = extract_feature_catalog(repo)
     for trainer in trainer_teams:
         trainer["locations"] = trainer_locations.get(trainer["constant"], [])
-    data = {"species": out_species, "moves": out_moves, "movePP": out_move_pp, "abilities": out_abilities,
-            "items": out_items, "itemDetails": item_details, "routeEncounters": route_encounters,
+    data = {"species": out_species, "moves": out_moves, "movePP": out_move_pp, "moveDetails": move_details,
+            "abilities": out_abilities, "abilityDetails": ability_details, "items": out_items, "itemDetails": item_details, "routeEncounters": route_encounters,
             "changes": change_catalog, "shinyOdds": shiny_odds}
     with open("brisk-dex-data.json", "w", encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
