@@ -1055,6 +1055,7 @@ def main():
         if first_block_sample is None:
             first_block_sample = (name, block)
         display_name = extract_string_field(block, '.speciesName') or name.replace('_', ' ').title()
+        category_name = extract_string_field(data_block, '.categoryName')
         types = extract_types(data_block)
         ability_names_raw = extract_abilities(data_block)
         ability_names = []
@@ -1106,6 +1107,7 @@ def main():
         pokedex_entry = inline_description or (pokedex_texts.get(description_symbol.group(1)) if description_symbol else None)
         out_species[str(sid)] = {
             "name": display_name,
+            "categoryName": category_name,
             "types": types,
             "abilities": ability_names,
             "abilityIds": [ability_ids.get(a) for a in ability_names_raw if a and ability_ids.get(a)],
