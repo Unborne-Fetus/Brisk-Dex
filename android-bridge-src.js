@@ -1,6 +1,8 @@
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
+
+const SaveFilePicker = registerPlugin('SaveFilePicker');
 
 function bytesToBase64(bytes) {
   const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
@@ -40,6 +42,9 @@ async function shareBase64(data, fileName, mimeType) {
 
 window.briskAndroidAPI = {
   isAndroid: Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android',
+  async openSaveFile() {
+    return SaveFilePicker.openSaveFile();
+  },
   saveBytes(bytes, fileName, mimeType) {
     return shareBase64(bytesToBase64(bytes), fileName, mimeType || 'application/octet-stream');
   },
