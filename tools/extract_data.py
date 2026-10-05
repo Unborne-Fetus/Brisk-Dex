@@ -296,6 +296,78 @@ def extract_abilities(block):
     return ids
 
 
+
+def decode_c_strings(text):
+    parts = re.findall(r'"((?:\\.|[^"\\])*)"', text or "")
+    out = "".join(parts)
+    return (out.replace("\\n", " ").replace("\\p", " ")
+               .replace("\\\"", '"').replace("\\\\", "\\").strip())
+
+def extract_compound_field(block, field):
+    if not block:
+        return None
+    m = re.search(re.escape(field) + r'\s*=\s*(?:COMPOUND_STRING|_|ITEM_NAME)\s*\((.*?)\)\s*,', block, re.S)
+    if m:
+        return re.sub(r'\s+', ' ', decode_c_strings(m.group(1))).strip()
+    return None
+
+def build_pokedex_text_table(repo, species_text):
+    text = find_source(repo, "src/data/pokemon/species_info/shared_dex_text.h",
+                       "src/data/pokemon/pokedex_text.h")
+    table = {}
+    for m in re.finditer(r'const\s+u8\s+(g[A-Za-z0-9_]+PokedexText)\[\]\s*=\s*_\s*\((.*?)\)\s*;', text, re.S):
+        table[m.group(1)] = re.sub(r'\s+', ' ', decode_c_strings(m.group(2))).strip()
+    return table
+
+def extract_reference_locations(repo):
+    trainer_locations = {}
+    item_locations = {}
+    maps_dir = os.path.join(repo, "data/maps")
+    if not os.path.isdir(maps_dir):
+        return trainer_locations, item_locations
+
+    def pretty(raw):
+        raw = (raw or "").replace("_", " ")
+        raw = re.sub(r'(?<=[a-z0-9])(?=[A-Z])', ' ', raw)
+        raw = re.sub(r'(?<=[A-Za-z])(?=\d)', ' ', raw)
+        return re.sub(r'\s+', ' ', raw).strip()
+
+    def add(bucket, key, location, method):
+        if not key:
+            return
+        row = {"location": location, "method": method}
+        rows = bucket.setdefault(key, [])
+        if row not in rows:
+            rows.append(row)
+
+    for folder in sorted(os.listdir(maps_dir)):
+        root = os.path.join(maps_dir, folder)
+        if not os.path.isdir(root):
+            continue
+        info = {}
+        map_json = read(os.path.join(root, "map.json"))
+        if map_json:
+            try:
+                info = json.loads(map_json)
+            except ValueError:
+                info = {}
+        location = pretty(info.get("name") or folder)
+
+        for bg in info.get("bg_events", []) if isinstance(info, dict) else []:
+            if bg.get("type") == "hidden_item":
+                add(item_locations, bg.get("item"), location, "Hidden item")
+
+        scripts = read(os.path.join(root, "scripts.inc")) or ""
+        for constant in set(re.findall(r'\b(TRAINER_[A-Z0-9_]+)\b', scripts)):
+            add(trainer_locations, constant, location, "Trainer battle")
+        for m in re.finditer(r'\b(giveitem(?:_msg)?|additem)\b[^\n]*\b(ITEM_[A-Z0-9_]+)\b', scripts):
+            add(item_locations, m.group(2), location, "Gift / reward")
+        if re.search(r'\bpokemart\b', scripts):
+            for item in set(re.findall(r'\.2byte\s+(ITEM_[A-Z0-9_]+)', scripts)):
+                add(item_locations, item, location, "Shop")
+
+    return trainer_locations, item_locations
+
 def extract_trainer_teams(repo):
     """Parse Brisk Emerald's trainers.party into JSON-friendly trainer/team records."""
     path = os.path.join(repo, "src/data/trainers.party")
@@ -713,6 +785,7 @@ def main():
 
     species_blocks = extract_blocks(species_text, "SPECIES_")
     species_macros = extract_macro_definitions(species_text)
+    pokedex_texts = build_pokedex_text_table(repo, species_text)
     move_blocks = extract_blocks(moves_text, "MOVE_")
     ability_blocks = extract_blocks(abilities_text, "ABILITY_")
     item_blocks = extract_blocks(items_text, "ITEM_")
@@ -767,6 +840,9 @@ def main():
             gender_ratio = 0
         if types: with_types += 1
         if ability_names: with_abilities += 1
+        inline_description = extract_compound_field(data_block, '.description')
+        description_symbol = re.search(r'\.description\s*=\s*(g[A-Za-z0-9_]+PokedexText)\b', data_block)
+        pokedex_entry = inline_description or (pokedex_texts.get(description_symbol.group(1)) if description_symbol else None)
         out_species[str(sid)] = {
             "name": display_name,
             "types": types,
@@ -776,7 +852,8 @@ def main():
             "friendship": int(friendship_match.group(1)) if friendship_match else 70,
             "genderRatio": gender_ratio,
             "iconSprite": icon_sprite.group(1) if icon_sprite else name.title(),
-            "constant": name
+            "constant": name,
+            "pokedexEntry": pokedex_entry
         }
 
     # Calculate the lowest level at which each species can exist by following
@@ -859,18 +936,30 @@ def main():
         ab_name = extract_string_field(block, '.name') if block else None
         out_abilities[str(aid)] = ab_name or name.replace('_', ' ').title()
 
+    trainer_locations, item_locations = extract_reference_locations(repo)
+
     out_items = {}
+    item_details = {}
     for name, iid in item_ids.items():
         if iid == 0:
             continue
         block = item_blocks.get(name)
         item_name = extract_string_field(block, '.name') if block else None
-        out_items[str(iid)] = item_name or name.replace('_', ' ').title()
+        display_item_name = item_name or name.replace('_', ' ').title()
+        out_items[str(iid)] = display_item_name
+        item_details[str(iid)] = {
+            "name": display_item_name,
+            "constant": "ITEM_" + name,
+            "description": extract_compound_field(block, '.description') if block else None,
+            "locations": item_locations.get("ITEM_" + name, [])
+        }
 
     route_encounters = extract_route_encounters(repo, species_ids)
     trainer_teams = extract_trainer_teams(repo)
+    for trainer in trainer_teams:
+        trainer["locations"] = trainer_locations.get(trainer["constant"], [])
     data = {"species": out_species, "moves": out_moves, "movePP": out_move_pp, "abilities": out_abilities,
-            "items": out_items, "routeEncounters": route_encounters, "shinyOdds": shiny_odds}
+            "items": out_items, "itemDetails": item_details, "routeEncounters": route_encounters, "shinyOdds": shiny_odds}
     with open("brisk-dex-data.json", "w", encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
     with open("brisk-dex-trainer-teams.json", "w", encoding='utf-8') as f:
