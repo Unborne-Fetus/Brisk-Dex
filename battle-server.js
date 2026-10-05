@@ -92,7 +92,7 @@ function cleanTeam(team){
       accuracy:clamp(Number(move.accuracy)||100,0,100),
       priority:clamp(Number(move.priority)||0,-7,7),
       pp:Math.max(1,Number(move.pp)||16),
-      maxPP:Math.max(1,Number(move.pp)||16),effect:cleanText(move.effect,80),target:cleanText(move.target,50),flags:(Array.isArray(move.flags)?move.flags:[]).slice(0,32).map(x=>cleanText(x,50))
+      maxPP:Math.max(1,Number(move.pp)||16),effect:cleanText(move.effect,80),target:cleanText(move.target,50),flags:(Array.isArray(move.flags)?move.flags:[]).slice(0,32).map(x=>cleanText(x,50)),criticalHitStage:clamp(Number(move.criticalHitStage)||0,0,4),multiHit:!!move.multiHit,moveEffects:(Array.isArray(move.moveEffects)?move.moveEffects:[]).slice(0,12).map(x=>({effect:cleanText(x.effect,60),chance:clamp(Number(x.chance)||100,0,100),self:!!x.self}))
     }))
   })).filter(mon=>mon.species>0);
 }
@@ -147,7 +147,7 @@ function publicMon(mon){
     species:mon.species,name:mon.name,level:mon.level,types:mon.types,maxHP:mon.maxHP,hp:mon.hp,
     ability:mon.ability,item:mon.item,teraType:mon.teraType,status:mon.status,stages:mon.stages,volatile:mon.volatile,friendship:mon.friendship,weight:mon.weight,
     transformed:mon.transformed,transformedKind:mon.transformedKind,choiceLock:mon.choiceLock,lastMoveIndex:mon.lastMoveIndex,transformations:mon.transformations,
-    moves:mon.moves.map(m=>({id:m.id,name:m.name,type:m.type,category:m.category,power:m.power,accuracy:m.accuracy,priority:m.priority,pp:m.pp,maxPP:m.maxPP,effect:m.effect,target:m.target,flags:m.flags}))
+    moves:mon.moves.map(m=>({id:m.id,name:m.name,type:m.type,category:m.category,power:m.power,accuracy:m.accuracy,priority:m.priority,pp:m.pp,maxPP:m.maxPP,effect:m.effect,target:m.target,flags:m.flags,criticalHitStage:m.criticalHitStage,multiHit:m.multiHit,moveEffects:m.moveEffects}))
   };
 }
 function publicRoom(room){
@@ -196,8 +196,8 @@ function terrainBoost(room,attacker,move){
   return 1;
 }
 function critChance(move,attacker){
-  const n=normalizeName(move.name);
-  let base=['slash','nightslash','leafblade','stoneedge','crosschop','aircutter','crabhammer','razorleaf','psychocut'].includes(n)?12.5:4.167;
+  const n=normalizeName(move.name),stage=clamp(Number(move.criticalHitStage)||0,0,4);
+  let base=stage>=3?100:stage===2?50:stage===1?12.5:['slash','nightslash','leafblade','stoneedge','crosschop','aircutter','crabhammer','razorleaf','psychocut'].includes(n)?12.5:4.167;
   if(attacker&&attacker.volatile.focusEnergy>0)base=base<12.5?12.5:50;
   return base;
 }
@@ -645,8 +645,42 @@ function applyStatusMove(room,pi,move){
   if(drops[n]){boost(room,target,drops[n][0],drops[n][1]);return;}
   log(room,mon.name+' used '+move.name+'. Its special effect is not implemented yet.');
 }
+function applyExtractedMoveEffects(room,attacker,defender,move){
+  (move.moveEffects||[]).forEach(function(entry){
+    if(!chance(Number(entry.chance)||100))return;
+    const target=entry.self?attacker:defender,key=normalizeName(entry.effect);
+    if(key==='sleep')setStatus(room,target,'sleep');
+    else if(key==='poison')setStatus(room,target,'poison');
+    else if(key==='burn')setStatus(room,target,'burn');
+    else if(key==='freeze'||key==='freezeorfrostbite')setStatus(room,target,'freeze');
+    else if(key==='paralysis')setStatus(room,target,'paralysis');
+    else if(key==='toxic')setStatus(room,target,'toxic');
+    else if(key==='confusion'){target.volatile.confusion=2+Math.floor(Math.random()*4);log(room,target.name+' became confused!');}
+    else if(key==='flinch')target.volatile.flinch=true;
+    else if(key==='absorb'&&entry.self){const amount=Math.max(1,Math.floor(target.maxHP/8));heal(room,target,amount,move.name);}
+    else if(key==='recharge'&&entry.self)target.volatile.recharge=true;
+    else if(key==='preventescape'){target.volatile.trapped=true;log(room,target.name+' was trapped!');}
+    else if(key==='leechseed'){target.volatile.seeded=true;log(room,target.name+' was seeded!');}
+    else if(key==='saltcure'){target.volatile.saltCure=true;log(room,target.name+' was salt cured!');}
+    else if(key==='haze'){room.players.forEach(p=>active(p)&&(active(p).stages={atk:0,def:0,spa:0,spd:0,spe:0,acc:0,eva:0}));}
+    else if(key==='sun'){room.weather='sun';room.weatherTurns=5;}
+    else if(key==='rain'){room.weather='rain';room.weatherTurns=5;}
+    else if(key==='sandstorm'){room.weather='sand';room.weatherTurns=5;}
+    else if(key==='hail'){room.weather='snow';room.weatherTurns=5;}
+    else if(key==='mistyterrain'){room.terrain='misty';room.terrainTurns=5;}
+    else if(key==='grassyterrain'){room.terrain='grassy';room.terrainTurns=5;}
+    else if(key==='electricterrain'){room.terrain='electric';room.terrainTurns=5;}
+    else if(key==='psychicterrain'){room.terrain='psychic';room.terrainTurns=5;}
+    else if(key==='gravity'){room.gravity=true;room.gravityTurns=5;}
+    else if(key==='auroraveil'){const p=room.players.find(p=>p.team.includes(attacker));if(p)p.side.auroraVeil=5;}
+    else if(key==='defog'){room.players.forEach(p=>clearHazards(p.side));}
+    else if(key==='aromatherapy'||key==='healteam'){const p=room.players.find(p=>p.team.includes(attacker));if(p)p.team.forEach(m=>m.status=null);}
+  });
+}
 function secondaryEffect(room,attacker,defender,move){
+  applyExtractedMoveEffects(room,attacker,defender,move);
   const n=normalizeName(move.name);
+  if((move.moveEffects||[]).length)return;
   if(n==='flamethrower'&&chance(10)) setStatus(room,defender,'burn');
   else if(n==='thunderbolt'&&chance(10)) setStatus(room,defender,'paralysis');
   else if(n==='icebeam'&&chance(10)) setStatus(room,defender,'freeze');
@@ -697,12 +731,12 @@ function pivotSwitch(room,pi,preserveStages){
   doSwitch(room,pi,slot);
   if(preserveStages) active(p).stages=savedStages;
 }
-function moveHitCount(name){
+function moveHitCount(name,move){
   const n=normalizeName(name);
   if(['doublekick','bonemerang','doublehit','twineedle','dualwingbeat','doubleironbash'].includes(n)) return 2;
   if(['tripleaxel','tripledive'].includes(n)) return 3;
   if(['populationbomb'].includes(n)) return 10;
-  if(['bulletseed','rockblast','iciclespear','furyattack','furryswipes','armthrust','pinmissile','watershuriken','tailslap','scaleshot'].includes(n)){
+  if((move&&move.multiHit)||['bulletseed','rockblast','iciclespear','furyattack','furryswipes','armthrust','pinmissile','watershuriken','tailslap','scaleshot','doubleslap','cometpunch'].includes(n)){
     const r=Math.random(); return r<.375?2:r<.75?3:r<.875?4:5;
   }
   return 1;
@@ -786,7 +820,7 @@ function resolveAttack(room,pi,choice){
   if(n==='seismictoss'||n==='nightshade'){const d=Math.min(target.hp,mon.level);target.hp-=d;log(room,mon.name+' used '+move.name+'! '+target.name+' lost '+d+' HP.');faintCheck(room,other(pi));return;}
   if(n==='superfang'||n==='naturesmadness'||n==='ruination'){const d=Math.max(1,Math.floor(target.hp/2));target.hp-=d;log(room,mon.name+' used '+move.name+'! '+target.name+' lost '+d+' HP.');faintCheck(room,other(pi));return;}
   if(n==='endeavor'&&target.hp>mon.hp){const d=target.hp-mon.hp;target.hp=mon.hp;log(room,mon.name+' used Endeavor! '+target.name+' lost '+d+' HP.');}
-  const hits=moveHitCount(move.name);
+  const hits=moveHitCount(move.name,move);
   let dealt=0,lastResult=null,landed=0;
   for(let hitNo=0;hitNo<hits&&target.hp>0;hitNo++){
     const result=damage(room,mon,target,move,foe);lastResult=result;
@@ -960,7 +994,7 @@ const server=http.createServer(async (req,res)=>{
   if(req.method==='OPTIONS') return json(res,204,{});
   const url=new URL(req.url,'http://localhost');
   try{
-    if(req.method==='GET'&&url.pathname==='/health') return json(res,200,{ok:true,rooms:rooms.size,engine:'advanced-v10'});
+    if(req.method==='GET'&&url.pathname==='/health') return json(res,200,{ok:true,rooms:rooms.size,engine:'advanced-v11'});
     if(req.method==='POST'&&url.pathname==='/rooms'){
       const body=await readBody(req), code=roomCode(), playerId=id(), team=cleanTeam(body.team);
       if(!team.length) return json(res,400,{error:'Load a save with at least one party Pokémon first.'});
@@ -1015,4 +1049,4 @@ const server=http.createServer(async (req,res)=>{
     return json(res,405,{error:'Method not allowed'});
   }catch(err){ return json(res,400,{error:err.message||String(err)}); }
 });
-server.listen(PORT,HOST,()=>console.log('Brisk battle relay listening on http://'+HOST+':'+PORT+' (advanced-v10)'));
+server.listen(PORT,HOST,()=>console.log('Brisk battle relay listening on http://'+HOST+':'+PORT+' (advanced-v11)'));
