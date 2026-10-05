@@ -953,6 +953,17 @@ function readBlock(bytes, blockOffset){
 
 /* ---- checksum + write-back helpers (used by deposit/withdraw) ---- */
 var SECTION_CHECKSUM_SIZE = {0:3884,1:3968,2:3968,3:3968,4:3848,5:3968,6:3968,7:3968,8:3968,9:3968,10:3968,11:3968,12:3968,13:2000};
+var LEGACY_BOX_COUNT = 14;
+var BRISK_BOX_COUNT = 20;
+var BOX_SLOTS = 30;
+var BOX_MON_SIZE = 80;
+var PC_MAIN_SECTION_IDS = [5,6,7,8,9,10,11,12,13];
+var PC_MAIN_SECTION_SIZE = 3968;
+var PC_MAIN_LENGTH = PC_MAIN_SECTION_IDS.length * PC_MAIN_SECTION_SIZE;
+var PC_EXTENSION_PHYSICAL_SECTORS = [28,29,30,31];
+var PC_EXTENSION_IDS = [0x100,0x101,0x102,0x103];
+var PC_EXTENSION_SIZES = [3968,3968,3968,988];
+var PC_STORAGE_20_BOX_SIZE = 48604;
 
 function computeSectionChecksum(view, size){
   var sum = 0;
@@ -964,44 +975,96 @@ function computeSectionChecksum(view, size){
   return ((sum >>> 16) + (sum & 0xFFFF)) & 0xFFFF;
 }
 
+function readStorageExtension(bytes){
+  var result = {present:false, views:[], parts:[], fileOffsets:[]};
+  if (bytes.length < 32 * SECTION_SIZE) return result;
+
+  for (var i=0; i<PC_EXTENSION_PHYSICAL_SECTORS.length; i++){
+    var off = PC_EXTENSION_PHYSICAL_SECTORS[i] * SECTION_SIZE;
+    var fullView = new DataView(bytes.buffer, bytes.byteOffset + off, SECTION_SIZE);
+    var id = u16(fullView, 0xFF4);
+    var checksum = u16(fullView, 0xFF6);
+    var signature = u32(fullView, 0xFF8);
+    if (i === 0 && (signature !== SIGNATURE || id !== PC_EXTENSION_IDS[0])) return result;
+
+    var dataView = bytes.subarray(off, off + PC_MAIN_SECTION_SIZE);
+    var valid = signature === SIGNATURE
+      && id === PC_EXTENSION_IDS[i]
+      && checksum === computeSectionChecksum(new DataView(dataView.buffer, dataView.byteOffset, dataView.byteLength), PC_EXTENSION_SIZES[i]);
+
+    result.views.push(dataView);
+    result.parts.push(valid ? dataView.subarray(0, PC_EXTENSION_SIZES[i]) : new Uint8Array(PC_EXTENSION_SIZES[i]));
+    result.fileOffsets.push(off);
+  }
+  result.present = true;
+  return result;
+}
+
 function recomputeChecksum(save, sectionId){
+  var masterDV = new DataView(save._internal.rawBytes.buffer, save._internal.rawBytes.byteOffset, save._internal.rawBytes.byteLength);
+
+  if (typeof sectionId === 'string' && sectionId.indexOf('ext') === 0){
+    var extIndex = Number(sectionId.slice(3));
+    var extView = save._internal.storageExtensionViews[extIndex];
+    var extSize = PC_EXTENSION_SIZES[extIndex];
+    var extChecksum = computeSectionChecksum(new DataView(extView.buffer, extView.byteOffset, extView.byteLength), extSize);
+    var extOff = save._internal.storageExtensionFileOffsets[extIndex];
+    masterDV.setUint16(extOff + 0xFF4, PC_EXTENSION_IDS[extIndex], true);
+    masterDV.setUint16(extOff + 0xFF6, extChecksum, true);
+    masterDV.setUint32(extOff + 0xFF8, SIGNATURE, true);
+    masterDV.setUint32(extOff + 0xFFC, save._internal.saveIndex >>> 0, true);
+    return;
+  }
+
   var view = save._internal.sectionView[sectionId];
-  var size = SECTION_CHECKSUM_SIZE[sectionId];
+  var size = (save._internal.hasStorageExtension && sectionId >= 5 && sectionId <= 13)
+    ? PC_MAIN_SECTION_SIZE
+    : SECTION_CHECKSUM_SIZE[sectionId];
   var dv = new DataView(view.buffer, view.byteOffset, view.length);
   var checksum = computeSectionChecksum(dv, size);
   var fileOff = save._internal.sectionFileOffset[sectionId];
-  var masterDV = new DataView(save._internal.rawBytes.buffer, save._internal.rawBytes.byteOffset, save._internal.rawBytes.byteLength);
   masterDV.setUint16(fileOff + 0xFF6, checksum, true);
 }
 
-/* logical offset (within the 33744-byte PC buffer, where byte 0-3 is "current box")
-   maps across sections 5-13. This writer splits a byte range across section
-   boundaries as needed and returns which section ids were touched. */
-var PC_SEC_IDS = [5,6,7,8,9,10,11,12,13];
-var PC_SEC_SIZES = [3968,3968,3968,3968,3968,3968,3968,3968,2000];
-var PC_SEC_STARTS = (function(){ var arr=[0]; for (var i=0;i<PC_SEC_SIZES.length;i++) arr.push(arr[i]+PC_SEC_SIZES[i]); return arr; })();
-
+/* Logical PokemonStorage offsets map first across save sections 5-13, then,
+   in Brisk Emerald's 20-box format, continue through physical sectors 28-31. */
 function writeLogicalPCBytes(save, logicalOffset, bytes){
   var touched = {};
   var remaining = bytes.length;
   var srcPos = 0;
   var pos = logicalOffset;
+
   while (remaining > 0){
-    var idx = -1;
-    for (var i=0;i<PC_SEC_IDS.length;i++){
-      if (pos >= PC_SEC_STARTS[i] && pos < PC_SEC_STARTS[i+1]){ idx = i; break; }
+    var view, offsetInSection, availableInSection, touchedId;
+
+    if (pos < PC_MAIN_LENGTH){
+      var mainIndex = Math.floor(pos / PC_MAIN_SECTION_SIZE);
+      var sectionId = PC_MAIN_SECTION_IDS[mainIndex];
+      view = save._internal.sectionView[sectionId];
+      offsetInSection = pos % PC_MAIN_SECTION_SIZE;
+      availableInSection = PC_MAIN_SECTION_SIZE - offsetInSection;
+      touchedId = sectionId;
+    }else if (save._internal.hasStorageExtension){
+      var extPos = pos - PC_MAIN_LENGTH;
+      var extIndex = Math.floor(extPos / PC_MAIN_SECTION_SIZE);
+      if (extIndex < 0 || extIndex >= PC_EXTENSION_SIZES.length) throw new Error('PC storage offset out of range.');
+      view = save._internal.storageExtensionViews[extIndex];
+      offsetInSection = extPos % PC_MAIN_SECTION_SIZE;
+      availableInSection = PC_EXTENSION_SIZES[extIndex] - offsetInSection;
+      touchedId = 'ext' + extIndex;
+    }else{
+      throw new Error('This save uses the legacy 14-box layout and has no 20-box storage extension.');
     }
-    if (idx === -1) throw new Error('PC storage offset out of range.');
-    var sectionId = PC_SEC_IDS[idx];
-    var offsetInSection = pos - PC_SEC_STARTS[idx];
-    var availableInSection = PC_SEC_SIZES[idx] - offsetInSection;
+
+    if (availableInSection <= 0) throw new Error('PC storage offset out of range.');
     var chunkLen = Math.min(availableInSection, remaining);
-    var view = save._internal.sectionView[sectionId];
-    view.set(bytes.subarray(srcPos, srcPos+chunkLen), offsetInSection);
-    touched[sectionId] = true;
-    pos += chunkLen; srcPos += chunkLen; remaining -= chunkLen;
+    view.set(bytes.subarray(srcPos, srcPos + chunkLen), offsetInSection);
+    touched[touchedId] = true;
+    pos += chunkLen;
+    srcPos += chunkLen;
+    remaining -= chunkLen;
   }
-  return Object.keys(touched).map(Number);
+  return Object.keys(touched).map(function(id){ return id.indexOf('ext') === 0 ? id : Number(id); });
 }
 
 function writePartyBytes(save, offsetInSection1, bytes){
@@ -1063,38 +1126,41 @@ function parseSav(arrayBuffer){
   var moneyRaw = u32(v1, 0x0490);
   var money = moneyRaw ^ securityKey;
 
-  // PC buffer: sections 5-12 (3968 bytes each) + section 13 (2000 bytes)
+  // PC storage. Legacy saves use 14 boxes in sections 5-13. Brisk Emerald's
+  // 20-box saves continue PokemonStorage through fixed physical sectors 28-31.
+  var storageExtension = readStorageExtension(bytes);
   var pcParts = [];
-  for (var pid=5; pid<=12; pid++){
+  for (var pid=5; pid<=13; pid++){
     if (!sections[pid]) throw new Error("Save file is missing PC storage section " + pid + ".");
-    pcParts.push(sections[pid]);
+    pcParts.push(storageExtension.present ? sections[pid] : (pid === 13 ? sections[pid].subarray(0,2000) : sections[pid]));
   }
-  if (!sections[13]) throw new Error("Save file is missing PC storage section 13.");
-  pcParts.push(sections[13].subarray(0,2000));
+  if (storageExtension.present) storageExtension.parts.forEach(function(part){ pcParts.push(part); });
+
   var totalLen = 0;
   pcParts.forEach(function(p){ totalLen += p.length; });
   var pcBuffer = new Uint8Array(totalLen);
   var pos = 0;
   pcParts.forEach(function(p){ pcBuffer.set(p, pos); pos += p.length; });
 
-  var currentBoxView = new DataView(pcBuffer.buffer, pcBuffer.byteOffset, 4);
-  var currentBox = currentBoxView.getUint32(0, true);
+  var boxCount = storageExtension.present ? BRISK_BOX_COUNT : LEGACY_BOX_COUNT;
+  var currentBox = pcBuffer[0];
+  if (currentBox >= boxCount) currentBox = 0;
 
   var boxes = [];
-  for (var b=0;b<14;b++){
+  for (var b=0; b<boxCount; b++){
     var monsInBox = [];
-    for (var slot=0; slot<30; slot++){
-      var recOff = 4 + (b*30 + slot)*80;
-      var rec = pcBuffer.subarray(recOff, recOff+80);
+    for (var slot=0; slot<BOX_SLOTS; slot++){
+      var recOff = 4 + (b*BOX_SLOTS + slot)*BOX_MON_SIZE;
+      var rec = pcBuffer.subarray(recOff, recOff + BOX_MON_SIZE);
       var mon = decodePokemon(rec, false);
       monsInBox.push(mon);
     }
     boxes.push(monsInBox);
   }
 
-  var boxNamesOff = 4 + 33600;
+  var boxNamesOff = 4 + boxCount * BOX_SLOTS * BOX_MON_SIZE;
   var boxNames = [];
-  for (var b2=0; b2<14; b2++){
+  for (var b2=0; b2<boxCount; b2++){
     var nOff = boxNamesOff + b2*9;
     var nameBytes = pcBuffer.subarray(nOff, nOff+9);
     var name = decodeGen3String(nameBytes);
@@ -1127,7 +1193,11 @@ function parseSav(arrayBuffer){
     _internal: {
       rawBytes: bytes,
       sectionView: block.sections,
-      sectionFileOffset: block.fileOffsets
+      sectionFileOffset: block.fileOffsets,
+      saveIndex: block.saveIndex,
+      hasStorageExtension: storageExtension.present,
+      storageExtensionViews: storageExtension.views,
+      storageExtensionFileOffsets: storageExtension.fileOffsets
     }
   };
 }
@@ -2307,7 +2377,7 @@ function renderBoxGrid(save){
   grid.innerHTML = '';
   var box = save.boxes[activeBoxIndex];
   var boxed = box.filter(function(m){return m && !m.empty;}).length;
-  document.getElementById('box-count').textContent = countBoxed(save) + ' total across 14 boxes';
+  document.getElementById('box-count').textContent = countBoxed(save) + ' total across ' + save.boxes.length + ' boxes';
   box.forEach(function(mon, slotIndex){
     if (!mon || mon.empty){
       var emptySlot = el('div', {class:'slot empty'});
