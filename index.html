@@ -1696,7 +1696,7 @@ var ONLINE_STATE = {
   roomCode: sessionStorage.getItem('briskdex_room_code') || '',
   playerId: sessionStorage.getItem('briskdex_player_id') || '',
   playerIndex: Number(sessionStorage.getItem('briskdex_player_index') || -1),
-  room: null, polling: null, busy: false
+  room: null, polling: null, busy: false, gimmickChoice:null
 };
 function persistOnlineSession(){
   if(ONLINE_STATE.roomCode&&ONLINE_STATE.playerId){
@@ -4266,10 +4266,25 @@ function battlePartySnapshot(){
     var species=NAME_DATA.species[String(mon.species)]||{};
     var abilityList=Array.isArray(species.abilities)?species.abilities.filter(Boolean):[];
     var ability=abilityList[Math.min(Number(mon.abilitySlot)||0,Math.max(0,abilityList.length-1))]||abilityList[0]||'';
+    var level=Number(mon.level)||50, baseStats=species.baseStats||[];
+    var transformations=dexTransformationForms(Number(mon.species),NAME_DATA.species).map(function(formId){
+      var form=NAME_DATA.species[String(formId)]||{}, fb=form.baseStats||[], kind=form.isGmax?'Gigantamax':'Mega';
+      function adjusted(current,index){
+        var delta=(Number(fb[index])||0)-(Number(baseStats[index])||0);
+        return Math.max(1,Math.floor(Number(current||1)+(2*delta*level/100)));
+      }
+      var formAbilities=Array.isArray(form.abilities)?form.abilities.filter(Boolean):[];
+      return {
+        kind:kind,species:Number(formId),name:dexSpeciesDisplayName(form),
+        types:(form.types||[]).filter(Boolean).slice(0,2),ability:formAbilities[0]||ability,
+        maxHP:adjusted(mon.maxHP,0),atk:adjusted(mon.atk,1),def:adjusted(mon.def,2),
+        speed:adjusted(mon.speed,3),spAtk:adjusted(mon.spAtk,4),spDef:adjusted(mon.spDef,5)
+      };
+    });
     return {
-      species:Number(mon.species), name:mon.nickname||speciesName(mon.species), level:Number(mon.level)||50,
+      species:Number(mon.species), name:mon.nickname||speciesName(mon.species), level:level,
       types:(species.types||[]).filter(Boolean).slice(0,2), ability:ability,
-      item:itemName(mon.heldItem||0),
+      item:itemName(mon.heldItem||0), teraType:teraTypeName(Number(mon.teraType)||0), transformations:transformations,
       maxHP:Number(mon.maxHP)||1, atk:Number(mon.atk)||1, def:Number(mon.def)||1,
       speed:Number(mon.speed)||1, spAtk:Number(mon.spAtk)||1, spDef:Number(mon.spDef)||1,
       isShiny:!!mon.isShiny,
@@ -4357,7 +4372,7 @@ async function battleAction(type,payload){
 }
 function leaveOnlineBattle(){
   stopBattlePolling();
-  ONLINE_STATE.roomCode='';ONLINE_STATE.playerId='';ONLINE_STATE.playerIndex=-1;ONLINE_STATE.room=null;persistOnlineSession();
+  ONLINE_STATE.roomCode='';ONLINE_STATE.playerId='';ONLINE_STATE.playerIndex=-1;ONLINE_STATE.room=null;ONLINE_STATE.gimmickChoice=null;persistOnlineSession();
   renderOnlineBattle();
 }
 function appendOnlineTeam(parent,team){
@@ -4400,7 +4415,7 @@ function renderOnlineBattle(){
   var room=ONLINE_STATE.room, me=room.players[ONLINE_STATE.playerIndex], foe=room.players[ONLINE_STATE.playerIndex===0?1:0];
   var top=el('section',{class:'online-card'});
   top.appendChild(el('div',{class:'dex-muted',text:'Room code'}));top.appendChild(el('div',{class:'online-code',text:room.code}));
-  var fieldBits=[];if(room.weather)fieldBits.push('Weather: '+room.weather);if(room.terrain)fieldBits.push('Terrain: '+room.terrain);top.appendChild(el('div',{id:'online-live-status',class:'online-status',text:room.phase==='lobby'?(foe?'Opponent connected. Ready up when your team is set.':'Waiting for opponent to join…'):room.phase==='finished'?'Battle finished.':'Turn '+room.turn+(fieldBits.length?' · '+fieldBits.join(' · '):'')}));
+  var fieldBits=[];if(room.weather)fieldBits.push('Weather: '+room.weather);if(room.terrain)fieldBits.push('Terrain: '+room.terrain);if(room.trickRoom)fieldBits.push('Trick Room: '+room.trickRoomTurns);top.appendChild(el('div',{id:'online-live-status',class:'online-status',text:room.phase==='lobby'?(foe?'Opponent connected. Ready up when your team is set.':'Waiting for opponent to join…'):room.phase==='finished'?'Battle finished.':'Turn '+room.turn+(fieldBits.length?' · '+fieldBits.join(' · '):'')}));
   var topActions=el('div',{class:'online-actions',style:'margin-top:10px;'});
   if(room.phase==='lobby'){
     var ready=el('button',{class:me&&me.ready?'':'primary',text:me&&me.ready?'Not Ready':'Ready'});
@@ -4422,7 +4437,7 @@ function renderOnlineBattle(){
     var mon=player.team[player.active], card=el('section',{class:'online-side'});applyTypeStyle(card,mon.species);
     var head=el('div',{class:'online-side-head'});head.appendChild(makeIconEl({species:mon.species,isShiny:false},'dex-hero-icon'));
     var info=el('div',{style:'flex:1;'});info.appendChild(el('strong',{text:label+' · '+mon.name+' · Lv'+mon.level}));
-    info.appendChild(el('div',{class:'dex-muted',text:'HP '+mon.hp+' / '+mon.maxHP+(mon.status?' · '+String(mon.status).toUpperCase():'')}));
+    info.appendChild(el('div',{class:'dex-muted',text:'HP '+mon.hp+' / '+mon.maxHP+(mon.status?' · '+String(mon.status).toUpperCase():'')+(mon.transformedKind?' · '+mon.transformedKind:'')}));
     var hp=el('div',{class:'online-hp'}),fill=el('span');fill.style.width=Math.max(0,Math.min(100,100*mon.hp/mon.maxHP))+'%';hp.appendChild(fill);info.appendChild(hp);head.appendChild(info);card.appendChild(head);return card;
   }
   field.appendChild(side(foe,foe.name));field.appendChild(side(me,me.name));
@@ -4430,11 +4445,34 @@ function renderOnlineBattle(){
     var active=me.team[me.active], controls=el('section',{class:'online-card'});controls.appendChild(el('h4',{text:me.hasChoice?'Action locked — waiting for opponent':'Choose your action'}));
     var stageText=Object.keys(active.stages||{}).filter(function(k){return active.stages[k];}).map(function(k){return k.toUpperCase()+' '+(active.stages[k]>0?'+':'')+active.stages[k];}).join(' · ');
     if(stageText) controls.appendChild(el('div',{class:'online-status',text:'Stat stages: '+stageText}));
+    var gimmicks=el('div',{class:'online-actions',style:'margin-top:9px;'});
+    function gimmickButton(label,kind,formIndex,disabled){
+      var selected=ONLINE_STATE.gimmickChoice&&ONLINE_STATE.gimmickChoice.kind===kind&&Number(ONLINE_STATE.gimmickChoice.formIndex||0)===Number(formIndex||0);
+      var btn=el('button',{class:selected?'primary':'ghost',text:label});
+      btn.disabled=!!me.hasChoice||!!active.transformed||!!disabled;
+      btn.addEventListener('click',function(){
+        if(selected) ONLINE_STATE.gimmickChoice=null;
+        else ONLINE_STATE.gimmickChoice={kind:kind,formIndex:Number(formIndex)||0};
+        renderOnlineBattle();
+      });
+      gimmicks.appendChild(btn);
+    }
+    (active.transformations||[]).forEach(function(form,index){
+      if(form.kind==='Mega')gimmickButton(form.name||'Mega Evolve','Mega',index,me.usedMega);
+      else if(form.kind==='Gigantamax')gimmickButton(form.name||'Gigantamax','Gigantamax',index,me.usedGmax);
+    });
+    if(active.teraType&&active.teraType!=='None'&&active.teraType!=='Mystery')gimmickButton('Terastallize · '+active.teraType,'Tera',0,me.usedTera);
+    if(gimmicks.childNodes.length)controls.appendChild(gimmicks);
     var sideBits=[];var side=me.side||{};if(side.stealthRock)sideBits.push('Stealth Rock');if(side.spikes)sideBits.push('Spikes x'+side.spikes);if(side.toxicSpikes)sideBits.push('Toxic Spikes x'+side.toxicSpikes);if(side.stickyWeb)sideBits.push('Sticky Web');if(side.reflect)sideBits.push('Reflect '+side.reflect);if(side.lightScreen)sideBits.push('Light Screen '+side.lightScreen);if(side.tailwind)sideBits.push('Tailwind '+side.tailwind);if(sideBits.length)controls.appendChild(el('div',{class:'online-status',text:'Your field: '+sideBits.join(' · ')}));
     var moves=el('div',{class:'online-moves'});
     (active.moves||[]).forEach(function(move,index){
       var btn=el('button',{class:'online-move',text:move.name+' · '+move.type+(move.power?' · '+move.power:'')+' · PP '+move.pp+'/'+move.maxPP});
-      btn.disabled=!!me.hasChoice||move.pp<=0;btn.addEventListener('click',function(){battleAction('move',{moveIndex:index});});moves.appendChild(btn);
+      var locked=active.choiceLock!==null&&active.choiceLock!==undefined&&Number(active.choiceLock)!==index;
+      btn.disabled=!!me.hasChoice||move.pp<=0||locked;btn.addEventListener('click',function(){
+        var gimmick=ONLINE_STATE.gimmickChoice;
+        battleAction('move',{moveIndex:index,gimmick:gimmick&&gimmick.kind,formIndex:gimmick&&gimmick.formIndex});
+        ONLINE_STATE.gimmickChoice=null;
+      });moves.appendChild(btn);
     });controls.appendChild(moves);
     var roster=el('div',{class:'online-roster'});
     me.team.forEach(function(mon,index){
