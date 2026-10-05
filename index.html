@@ -2729,13 +2729,12 @@ function dexEvolutionFamilies(id, allSpecies){
     });
   });
 
-  var roots=[];
-  var seenUp={};
+  var roots=[], seenUp={};
   function walkUp(node){
     if(seenUp[node]) return;
     seenUp[node]=true;
     var incoming=parents[node]||[];
-    if(!incoming.length){ roots.push(node); return; }
+    if(!incoming.length){roots.push(node);return;}
     incoming.forEach(function(edge){walkUp(edge.source);});
   }
   walkUp(core);
@@ -2743,7 +2742,7 @@ function dexEvolutionFamilies(id, allSpecies){
 
   var paths=[];
   function walkDown(node,path,edges,visited){
-    if(visited[node]){paths.push({nodes:path.slice(),edges:edges.slice()});return;}
+    if(visited[node]) return;
     var nextVisited=Object.assign({},visited); nextVisited[node]=true;
     var species=allSpecies[String(node)]||{};
     var outgoing=(species.evolutions||[]).filter(function(evo){
@@ -2760,32 +2759,8 @@ function dexEvolutionFamilies(id, allSpecies){
   }
   roots.forEach(function(root){walkDown(root,[],[],{});});
 
-  // Add Mega/G-Max forms as terminal branches from whichever stage owns them.
-  var expanded=[];
-  paths.forEach(function(path){
-    var transformed=false;
-    path.nodes.forEach(function(node,index){
-      var forms=dexTransformationForms(node,allSpecies);
-      forms.forEach(function(formId){
-        transformed=true;
-        var transform=allSpecies[String(formId)]||{};
-        expanded.push({
-          nodes:path.nodes.slice(0,index+1).concat(formId),
-          edges:path.edges.slice(0,index).concat([{transform:true,kind:transform.isGmax?'Gigantamax':'Mega Evolution'}])
-        });
-      });
-    });
-    expanded.push(path);
-  });
-
-  // Put the ordinary evolutionary line first, then transformation branches.
-  expanded.sort(function(a,b){
-    var at=a.edges.some(function(e){return e.transform;})?1:0;
-    var bt=b.edges.some(function(e){return e.transform;})?1:0;
-    return at-bt || a.nodes.length-b.nodes.length;
-  });
   var unique=[],keys={};
-  expanded.forEach(function(path){
+  paths.forEach(function(path){
     var key=path.nodes.join('>');
     if(!keys[key]){keys[key]=true;unique.push(path);}
   });
@@ -2817,6 +2792,39 @@ function makeDexEvolutionStage(species,id,label){
   return stage;
 }
 
+function makeDexTransformationGroup(allSpecies,node){
+  var forms=dexTransformationForms(node,allSpecies);
+  if(!forms.length) return null;
+  var group=el('div',{class:'dex-transform-group'});
+  var svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('class','dex-transform-lines');
+  svg.setAttribute('viewBox','0 0 100 30');
+  svg.setAttribute('preserveAspectRatio','none');
+  forms.forEach(function(formId,index){
+    var x=((index+0.5)/forms.length)*100;
+    var line=document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1','50'); line.setAttribute('y1','0');
+    line.setAttribute('x2',String(x)); line.setAttribute('y2','30');
+    svg.appendChild(line);
+  });
+  group.appendChild(svg);
+  forms.forEach(function(formId){
+    var species=allSpecies[String(formId)]||{};
+    var branch=el('div',{class:'dex-transform-card'});
+    branch.appendChild(el('div',{class:'dex-transform-kind',text:species.isGmax?'Gigantamax':'Mega Evolution'}));
+    var ring=el('div',{class:'dex-evo-sprite-ring'+(species.isMega?' mega':'')+(species.isGmax?' gmax':'')});
+    var url=species.frontSprite||SPECIES_ICONS[String(formId)]||null;
+    if(url){var img=el('img',{src:url,alt:dexSpeciesDisplayName(species)});img.loading='lazy';img.decoding='async';ring.appendChild(img);}
+    branch.appendChild(ring);
+    var card=el('div',{class:'dex-evo-name-card'});
+    card.appendChild(el('strong',{text:dexSpeciesDisplayName(species)}));
+    var types=makeTypePills(species.types,true); if(types) card.appendChild(types);
+    branch.appendChild(card);
+    group.appendChild(branch);
+  });
+  return group;
+}
+
 function renderDexEvolutionLines(allSpecies,id){
   var wrap=el('div',{class:'dex-evolution-wrap'});
   var paths=dexEvolutionFamilies(Number(id),allSpecies);
@@ -2831,11 +2839,15 @@ function renderDexEvolutionLines(allSpecies,id){
         var edge=path.edges[index-1]||{};
         var arrow=el('div',{class:'dex-evo-arrow'});
         arrow.appendChild(el('strong',{text:'→'}));
-        arrow.appendChild(el('span',{text:edge.transform?edge.kind:formatEvolutionMethod(edge)}));
+        arrow.appendChild(el('span',{text:formatEvolutionMethod(edge)}));
         row.appendChild(arrow);
       }
       var species=allSpecies[String(node)]||{};
-      row.appendChild(makeDexEvolutionStage(species,node,dexEvolutionStageLabel(index,path.nodes.length,species,path.edges[index-1])));
+      var stageWrap=el('div',{class:'dex-evo-stage-wrap'});
+      stageWrap.appendChild(makeDexEvolutionStage(species,node,dexEvolutionStageLabel(index,path.nodes.length,species,path.edges[index-1])));
+      var transforms=makeDexTransformationGroup(allSpecies,node);
+      if(transforms) stageWrap.appendChild(transforms);
+      row.appendChild(stageWrap);
     });
     wrap.appendChild(row);
   });
