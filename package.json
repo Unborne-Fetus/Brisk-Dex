@@ -24,7 +24,8 @@
     "ios:add": "npm run ios:prepare && npx cap add ios",
     "ios:sync": "npm run ios:prepare && npx cap sync ios",
     "ios:build": "npm run ios:prepare && npx cap sync ios",
-    "battle-server": "node battle-server.js"
+    "battle-server": "node battle-server.js",
+    "battle:coverage": "node tools/check_battle_coverage.js"
   },
   "devDependencies": {
     "electron": "^31.3.0",
