@@ -195,6 +195,80 @@ def normalize_sprite_png(source_png, target_png, first_frame=False, transparent_
         return True
 
 
+def save_animation_gif(source_png, target_gif):
+    """Convert a horizontal/vertical square-frame battle sprite sheet into a one-shot transparent GIF."""
+    if Image is None or not source_png or not os.path.isfile(source_png):
+        return False
+    try:
+        with Image.open(source_png) as source:
+            sheet = source.convert("RGBA")
+        frame_size = min(sheet.width, sheet.height)
+        if frame_size <= 0:
+            return False
+        if sheet.height >= sheet.width * 2:
+            count = sheet.height // frame_size
+            frames = [sheet.crop((0, i * frame_size, frame_size, (i + 1) * frame_size)) for i in range(count)]
+        elif sheet.width >= sheet.height * 2:
+            count = sheet.width // frame_size
+            frames = [sheet.crop((i * frame_size, 0, (i + 1) * frame_size, frame_size)) for i in range(count)]
+        else:
+            return False
+
+        cleaned = []
+        for frame in frames:
+            image = frame.copy()
+            pixels = image.load()
+            border = []
+            for x in range(image.width):
+                border.extend((pixels[x, 0], pixels[x, image.height - 1]))
+            for y in range(image.height):
+                border.extend((pixels[0, y], pixels[image.width - 1, y]))
+            opaque_border = [px for px in border if px[3] > 16]
+            if opaque_border:
+                counts = {}
+                for px in opaque_border:
+                    counts[px[:3]] = counts.get(px[:3], 0) + 1
+                bg = max(counts, key=counts.get)
+
+                def near_bg(px):
+                    if px[3] <= 16:
+                        return True
+                    return sum(abs(px[channel] - bg[channel]) for channel in range(3)) <= 30
+
+                stack = []
+                seen = set()
+                for x in range(image.width):
+                    stack.extend(((x, 0), (x, image.height - 1)))
+                for y in range(image.height):
+                    stack.extend(((0, y), (image.width - 1, y)))
+                while stack:
+                    x, y = stack.pop()
+                    if (x, y) in seen or x < 0 or y < 0 or x >= image.width or y >= image.height:
+                        continue
+                    seen.add((x, y))
+                    px = pixels[x, y]
+                    if not near_bg(px):
+                        continue
+                    pixels[x, y] = (px[0], px[1], px[2], 0)
+                    stack.extend(((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)))
+            cleaned.append(image)
+
+        if len(cleaned) < 2:
+            return False
+        cleaned[0].save(
+            target_gif,
+            save_all=True,
+            append_images=cleaned[1:],
+            duration=140,
+            loop=1,
+            disposal=2,
+            optimize=False,
+        )
+        return True
+    except (OSError, ValueError, IndexError):
+        return False
+
+
 def extract_feature_catalog(repo):
     """Turn Expansion's FEATURES.md into categorized readable entries, then append Brisk-specific changes."""
     text = read(os.path.join(repo, "FEATURES.md")) or ""
@@ -1346,7 +1420,7 @@ def main():
     sprites_out = "brisk-dex-sprites"
     os.makedirs(sprites_out, exist_ok=True)
     for filename in os.listdir(sprites_out):
-        if filename.endswith(".png"):
+        if filename.endswith(".png") or filename.endswith(".gif"):
             os.remove(os.path.join(sprites_out, filename))
     for sid, species in out_species.items():
         sprite_name = species.get("iconSprite") or species.get("constant", "").replace("_", "").title()
@@ -1361,6 +1435,8 @@ def main():
             continue
         front_source = next((os.path.join(folder, fn) for fn in ("front.png", "anim_front.png") if os.path.isfile(os.path.join(folder, fn))), None)
         back_source = next((os.path.join(folder, fn) for fn in ("back.png", "anim_back.png") if os.path.isfile(os.path.join(folder, fn))), None)
+        front_anim_source = os.path.join(folder, "anim_front.png") if os.path.isfile(os.path.join(folder, "anim_front.png")) else None
+        back_anim_source = os.path.join(folder, "anim_back.png") if os.path.isfile(os.path.join(folder, "anim_back.png")) else None
         current = folder
         shiny_palette = normal_palette = None
         while True:
@@ -1397,6 +1473,72 @@ def main():
                     rendered = True
                 if rendered or os.path.isfile(final):
                     species[field] = sprites_out + "/" + sid + "_" + side + suffix + ".png"
+
+        # Preserve animated battle sheets as one-shot GIFs. The UI restarts these
+        # every five seconds instead of looping them continuously.
+        for side, anim_source in (("front", front_anim_source), ("back", back_anim_source)):
+            if not anim_source:
+                continue
+            for want_shiny, suffix, field in (
+                (False, "", side + "Animation"),
+                (True, "_shiny", side + "ShinyAnimation"),
+            ):
+                gif_path = os.path.join(sprites_out, sid + "_" + side + suffix + "_anim.gif")
+                sheet_path = anim_source
+                temporary = None
+                if shiny_palette and normal_palette:
+                    temporary = os.path.join(sprites_out, sid + "_" + side + suffix + "_anim_sheet.png")
+                    if palette_variant_png(anim_source, normal_palette, shiny_palette, want_shiny, temporary):
+                        sheet_path = temporary
+                    elif want_shiny:
+                        sheet_path = None
+                elif want_shiny:
+                    sheet_path = None
+                if sheet_path and save_animation_gif(sheet_path, gif_path):
+                    species[field] = sprites_out + "/" + os.path.basename(gif_path)
+                if temporary:
+                    try:
+                        os.remove(temporary)
+                    except OSError:
+                        pass
+
+    # Export cries directly from Brisk Emerald's source audio. Match constants
+    # by normalized name so regional/special forms pick their own cry when one exists.
+    cries_source = os.path.join(repo, "sound", "direct_sound_samples", "cries")
+    cries_out = "brisk-dex-cries"
+    os.makedirs(cries_out, exist_ok=True)
+    for filename in os.listdir(cries_out):
+        if filename.lower().endswith((".wav", ".aif", ".mp3", ".ogg")):
+            os.remove(os.path.join(cries_out, filename))
+    if os.path.isdir(cries_source):
+        available_cries = {}
+        for filename in os.listdir(cries_source):
+            stem, ext = os.path.splitext(filename)
+            if ext.lower() not in (".wav", ".aif", ".mp3", ".ogg"):
+                continue
+            available_cries[re.sub(r"[^a-z0-9]", "", stem.lower())] = filename
+        for sid, species in out_species.items():
+            candidates = [
+                species.get("constant", ""),
+                species.get("iconSprite", ""),
+                species.get("name", ""),
+            ]
+            source_name = None
+            for candidate in candidates:
+                key = re.sub(r"[^a-z0-9]", "", str(candidate).lower())
+                if key in available_cries:
+                    source_name = available_cries[key]
+                    break
+            if not source_name:
+                constant = str(species.get("constant", ""))
+                base = re.sub(r"_(?:MEGA(?:_[XY])?|GMAX|GIGANTAMAX|ALOLA|GALAR|HISUI|PALDEA).*$", "", constant)
+                key = re.sub(r"[^a-z0-9]", "", base.lower())
+                source_name = available_cries.get(key)
+            if source_name:
+                ext = os.path.splitext(source_name)[1].lower()
+                target = sid + ext
+                shutil.copyfile(os.path.join(cries_source, source_name), os.path.join(cries_out, target))
+                species["cry"] = cries_out + "/" + target
 
     # Export every trainer battle portrait referenced by trainers.party.
     trainer_front_dir = os.path.join(repo, "graphics", "trainers", "front_pics")
