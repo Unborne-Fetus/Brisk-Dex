@@ -2626,7 +2626,7 @@ function dexBaseFormId(id, allSpecies){
   var species=allSpecies[String(id)]||{};
   if(!species.isMega && !species.isGmax) return Number(id);
   var constant=String(species.constant||'');
-  var baseConstant=constant.replace(/_(?:MEGA(?:_[XY])?|GMAX)$/,'');
+  var baseConstant=constant.replace(/_(?:MEGA(?:_[XY])?|GMAX|GIGANTAMAX)$/,'');
   var exact=Object.keys(allSpecies).find(function(sid){
     return String((allSpecies[sid]||{}).constant||'')===baseConstant;
   });
@@ -2647,7 +2647,7 @@ function dexTransformationForms(id, allSpecies){
     var s=allSpecies[sid]||{};
     if(!s.isMega && !s.isGmax) return false;
     var constant=String(s.constant||'');
-    var direct=constant.replace(/_(?:MEGA(?:_[XY])?|GMAX)$/,'')===baseConstant;
+    var direct=constant.replace(/_(?:MEGA(?:_[XY])?|GMAX|GIGANTAMAX)$/,'')===baseConstant;
     return direct || (nat && Number(s.nationalDex||0)===nat && constant.indexOf(baseConstant+'_')===0);
   }).map(Number);
 }
