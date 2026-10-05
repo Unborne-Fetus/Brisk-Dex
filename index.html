@@ -2799,7 +2799,7 @@ function makeDexSpriteCard(url,label,animationUrl){
         if(!img.isConnected) return;
         img.src=animationUrl+(animationUrl.indexOf('?')>=0?'&':'?')+'replay='+Date.now();
       };
-      dexAnimationTimers.push(setInterval(replay,5000));
+      dexAnimationTimers.push(setInterval(replay,3000));
     }
   }else{
     card.appendChild(el('div',{class:'dex-muted',style:'height:112px;display:grid;place-items:center;',text:'Sprite unavailable'}));
