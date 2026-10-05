@@ -244,6 +244,7 @@ function damage(room,attacker,defender,move,defenderPlayer){
     else if(wasOriginal) stab=1.5;
   }else if(hasType(attacker,effectiveType)) stab=(an==='adaptability'?2:1.5);
   let eff=effectiveness(effectiveType,defender.types);
+  if(hasItem(defender,'Air Balloon')&&effectiveType==='Ground')eff=0;
   if(!ignoresAbility(attacker)&&hasAbility(defender,'Levitate')&&effectiveType==='Ground') eff=0;
   if(!ignoresAbility(attacker)&&hasAbility(defender,'Flash Fire')&&effectiveType==='Fire') eff=0;
   if(!ignoresAbility(attacker)&&(hasAbility(defender,'Water Absorb')||hasAbility(defender,'Storm Drain'))&&effectiveType==='Water') eff=0;
@@ -356,6 +357,7 @@ function consumeItem(room,mon,reason){if(mon.item){const item=mon.item;mon.item=
 function checkConsumable(room,mon){
   if(!mon||mon.hp<=0||!mon.item)return;
   const item=normalizeName(mon.item);
+  if(item==='whiteherb'&&Object.keys(mon.stages||{}).some(k=>mon.stages[k]<0)){consumeItem(room,mon);Object.keys(mon.stages).forEach(k=>{if(mon.stages[k]<0)mon.stages[k]=0;});log(room,mon.name+"'s lowered stats were restored!");return;}
   if(item==='sitrusberry'&&mon.hp<=mon.maxHP/2){consumeItem(room,mon);heal(room,mon,Math.max(1,Math.floor(mon.maxHP/4)),'Sitrus Berry');}
   else if(item==='oranberry'&&mon.hp<=mon.maxHP/2){consumeItem(room,mon);heal(room,mon,10,'Oran Berry');}
   else if(item==='lumberry'&&(mon.status||mon.volatile.confusion>0)){consumeItem(room,mon);mon.status=null;mon.volatile.confusion=0;log(room,mon.name+' was cured!');}
@@ -365,10 +367,12 @@ function checkConsumable(room,mon){
   else if(item==='rawstberry'&&mon.status==='burn'){consumeItem(room,mon);mon.status=null;log(room,mon.name+' was cured of its burn!');}
   else if(item==='aspearberry'&&mon.status==='freeze'){consumeItem(room,mon);mon.status=null;log(room,mon.name+' thawed out!');}
   else if(item==='persimberry'&&mon.volatile.confusion>0){consumeItem(room,mon);mon.volatile.confusion=0;log(room,mon.name+' snapped out of confusion!');}
+  else if(item==='mentalherb'&&(mon.volatile.taunt>0||mon.volatile.encore>0||mon.volatile.disableTurns>0)){consumeItem(room,mon);mon.volatile.taunt=0;mon.volatile.encore=0;mon.volatile.encoreMove=null;mon.volatile.disableTurns=0;mon.volatile.disabledMove=null;log(room,mon.name+' recovered from its move restriction!');}
 }
 function switchBlocked(room,pi){
   const p=room.players[pi], mon=active(p), foe=active(room.players[other(pi)]);
   if(!mon||!foe)return false;
+  if(hasItem(mon,'Shed Shell'))return false;
   if(mon.volatile.trapped||mon.volatile.ingrain)return true;
   if(hasAbility(foe,'Shadow Tag')&&!hasAbility(mon,'Shadow Tag'))return true;
   if(hasAbility(foe,'Arena Trap')&&isGrounded(mon))return true;
@@ -688,6 +692,7 @@ function resolveAttack(room,pi,choice){
   }
   log(room,mon.name+' used '+move.name+'! '+target.name+' lost '+dealt+' HP.'+(landed>1?' Hit '+landed+' times!':''));
   if(lastResult&&lastResult.eff>1)log(room,"It's super effective!");else if(lastResult&&lastResult.eff<1)log(room,"It's not very effective...");
+  if(dealt>0&&hasItem(target,'Air Balloon')){target.item='';log(room,target.name+"'s Air Balloon popped!");}
   if(target.hp>0)secondaryEffect(room,mon,target,move);
   contactReaction(room,mon,target,move,dealt);
   if(dealt>0&&target.hp>0){
@@ -713,6 +718,7 @@ function resolveAttack(room,pi,choice){
   if(dealt>0&&(n.includes('drain')||['gigadrain','megadrain','leechlife','drainingkiss','hornleech'].includes(n))) heal(room,mon,Math.max(1,Math.floor(dealt/2)),move.name);
   if(dealt>0&&RECOIL_MOVES.has(n)&&!hasAbility(mon,'Rock Head')&&!hasAbility(mon,'Magic Guard')) hurt(room,mon,Math.max(1,Math.floor(dealt/3)),'recoil');
   if(hasItem(mon,'Life Orb')&&dealt>0&&mon.hp>0&&!hasAbility(mon,'Magic Guard')) hurt(room,mon,Math.max(1,Math.floor(mon.maxHP/10)),'Life Orb');
+  if(hasItem(mon,'Shell Bell')&&dealt>0&&mon.hp>0&&mon.volatile.healBlock<=0)heal(room,mon,Math.max(1,Math.floor(dealt/8)),'Shell Bell');
   if(n==='closecombat'){boost(room,mon,'def',-1);boost(room,mon,'spd',-1);}
   if(n==='superpower'){boost(room,mon,'atk',-1);boost(room,mon,'def',-1);}
   if(n==='overheat'||n==='dracometeor'||n==='leafstorm') boost(room,mon,'spa',-2);
@@ -764,6 +770,8 @@ function endTurn(room){
     if(mon.volatile.ingrain&&mon.volatile.healBlock<=0)heal(room,mon,Math.max(1,Math.floor(mon.maxHP/16)),'Ingrain');
     if(hasItem(mon,'Leftovers')&&mon.volatile.healBlock<=0) heal(room,mon,Math.max(1,Math.floor(mon.maxHP/16)),'Leftovers');
     if(hasItem(mon,'Black Sludge')) hasType(mon,'Poison')?heal(room,mon,Math.max(1,Math.floor(mon.maxHP/16)),'Black Sludge'):hurt(room,mon,Math.max(1,Math.floor(mon.maxHP/8)),'Black Sludge');
+    if(hasItem(mon,'Flame Orb')&&!mon.status)setStatus(room,mon,'burn');
+    if(hasItem(mon,'Toxic Orb')&&!mon.status)setStatus(room,mon,'toxic');
     if(room.terrain==='grassy') heal(room,mon,Math.max(1,Math.floor(mon.maxHP/16)),'Grassy Terrain');
     if(room.weather==='sand'&&!hasType(mon,'Rock')&&!hasType(mon,'Ground')&&!hasType(mon,'Steel')&&!hasAbility(mon,'Magic Guard')&&!hasAbility(mon,'Overcoat')&&!hasAbility(mon,'Sand Force')&&!hasAbility(mon,'Sand Rush')&&!hasAbility(mon,'Sand Veil')) hurt(room,mon,Math.max(1,Math.floor(mon.maxHP/16)),'the sandstorm');
     if(room.weather==='rain'&&hasAbility(mon,'Rain Dish')&&mon.volatile.healBlock<=0)heal(room,mon,Math.max(1,Math.floor(mon.maxHP/16)),'Rain Dish');
@@ -822,7 +830,7 @@ const server=http.createServer(async (req,res)=>{
   if(req.method==='OPTIONS') return json(res,204,{});
   const url=new URL(req.url,'http://localhost');
   try{
-    if(req.method==='GET'&&url.pathname==='/health') return json(res,200,{ok:true,rooms:rooms.size,engine:'advanced-v7'});
+    if(req.method==='GET'&&url.pathname==='/health') return json(res,200,{ok:true,rooms:rooms.size,engine:'advanced-v8'});
     if(req.method==='POST'&&url.pathname==='/rooms'){
       const body=await readBody(req), code=roomCode(), playerId=id(), team=cleanTeam(body.team);
       if(!team.length) return json(res,400,{error:'Load a save with at least one party Pokémon first.'});
@@ -877,4 +885,4 @@ const server=http.createServer(async (req,res)=>{
     return json(res,405,{error:'Method not allowed'});
   }catch(err){ return json(res,400,{error:err.message||String(err)}); }
 });
-server.listen(PORT,HOST,()=>console.log('Brisk battle relay listening on http://'+HOST+':'+PORT+' (advanced-v7)'));
+server.listen(PORT,HOST,()=>console.log('Brisk battle relay listening on http://'+HOST+':'+PORT+' (advanced-v8)'));
