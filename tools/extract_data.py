@@ -975,7 +975,7 @@ def main():
         nat_dex_name = nat_dex_match.group(1) if nat_dex_match else None
         national_dex = national_dex_ids.get(nat_dex_name, 0) if nat_dex_name else 0
         is_mega = bool(re.search(r'(^|_)MEGA(?:_|$)', name))
-        is_gmax = bool(re.search(r'(^|_)GMAX(?:_|$)', name))
+        is_gmax = bool(re.search(r'(^|_)(?:GMAX|GIGANTAMAX)(?:_|$)', name))
         form_label = None
         if is_mega:
             if name.endswith('_MEGA_X'):
