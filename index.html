@@ -483,6 +483,9 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
 .dex-transform-card .dex-evo-sprite-ring{width:78px;height:78px}.dex-transform-card .dex-evo-sprite-ring img{width:70px;height:70px}.dex-transform-card .dex-evo-name-card{min-height:55px;padding:7px 6px}.dex-transform-card .dex-evo-name-card strong{font-size:11px}.dex-transform-kind{font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
 @media(max-width:760px){.dex-transform-card{width:108px}.dex-transform-card .dex-evo-sprite-ring{width:68px;height:68px}.dex-transform-card .dex-evo-sprite-ring img{width:61px;height:61px}}
 
+
+.dex-evolution-path{align-items:flex-start;}
+.dex-evolution-path>.dex-evo-arrow{margin-top:62px;}
 </style>
 </head>
 <body>
@@ -1395,6 +1398,8 @@ var MOVE_DETAILS = {};
 var selectedMoveReferenceId = null;
 var ABILITY_DETAILS = {};
 var selectedAbilityReferenceId = null;
+var MOVE_LEARNERS_INDEX = null;
+var ABILITY_USERS_INDEX = null;
 var CHANGE_DATA = [];
 var currentMainTab = 'save';
 var GAME_SHINY_ODDS = 8;
@@ -1457,6 +1462,7 @@ async function loadBundledGameData(){
     MOVE_DETAILS = Object.assign({}, BUNDLED_DATA.moveDetails || {}, USER_DATA.moveDetails || {});
     ABILITY_DETAILS = Object.assign({}, BUNDLED_DATA.abilityDetails || {}, USER_DATA.abilityDetails || {});
     ROUTE_DATA = Array.isArray(data.routeEncounters) ? data.routeEncounters : [];
+    MOVE_LEARNERS_INDEX = null; ABILITY_USERS_INDEX = null;
     rebuildNameData();
     SPECIES_ICONS = Object.assign({}, SPECIES_ICONS, icons && icons.icons || {});
     SPECIES_SHINY_ICONS = Object.assign({}, SPECIES_SHINY_ICONS, icons && icons.shinyIcons || {});
@@ -3147,28 +3153,50 @@ function referenceSpeciesCard(speciesId){
   return card;
 }
 
-function moveLearners(moveId){
+function buildReferenceIndexes(){
   var all=dexSpeciesData();
-  return Object.keys(all).filter(function(speciesId){
-    return (all[speciesId].learnableMoves||[]).map(Number).includes(Number(moveId));
-  }).map(Number).sort(function(a,b){
-    var sa=all[String(a)]||{}, sb=all[String(b)]||{};
-    return Number(sa.nationalDex||99999)-Number(sb.nationalDex||99999)
-      || dexSpeciesDisplayName(sa).localeCompare(dexSpeciesDisplayName(sb));
+  MOVE_LEARNERS_INDEX=Object.create(null);
+  ABILITY_USERS_INDEX=Object.create(null);
+  Object.keys(all).forEach(function(speciesId){
+    var species=all[speciesId]||{}, sid=Number(speciesId);
+    (species.learnableMoves||[]).forEach(function(moveId){
+      var key=String(Number(moveId));
+      (MOVE_LEARNERS_INDEX[key]||(MOVE_LEARNERS_INDEX[key]=[])).push(sid);
+    });
+    (species.abilityIds||[]).forEach(function(abilityId){
+      var key=String(Number(abilityId));
+      (ABILITY_USERS_INDEX[key]||(ABILITY_USERS_INDEX[key]=[])).push(sid);
+    });
+  });
+  function sortIds(ids){
+    ids.sort(function(a,b){
+      var sa=all[String(a)]||{}, sb=all[String(b)]||{};
+      return Number(sa.nationalDex||99999)-Number(sb.nationalDex||99999)
+        || dexSpeciesDisplayName(sa).localeCompare(dexSpeciesDisplayName(sb));
+    });
+  }
+  Object.keys(MOVE_LEARNERS_INDEX).forEach(function(key){sortIds(MOVE_LEARNERS_INDEX[key]);});
+  Object.keys(ABILITY_USERS_INDEX).forEach(function(key){sortIds(ABILITY_USERS_INDEX[key]);});
+
+  // Backward compatibility for older uploaded data that lacks numeric ability IDs.
+  Object.keys(ABILITY_DETAILS||{}).forEach(function(abilityId){
+    var key=String(Number(abilityId));
+    if((ABILITY_USERS_INDEX[key]||[]).length) return;
+    var detail=ABILITY_DETAILS[key]||{};
+    var ids=Object.keys(all).filter(function(speciesId){
+      return (all[speciesId].abilities||[]).includes(detail.name);
+    }).map(Number);
+    sortIds(ids);
+    ABILITY_USERS_INDEX[key]=ids;
   });
 }
-
+function moveLearners(moveId){
+  if(!MOVE_LEARNERS_INDEX) buildReferenceIndexes();
+  return MOVE_LEARNERS_INDEX[String(Number(moveId))]||[];
+}
 function abilityUsers(abilityId){
-  var all=dexSpeciesData(), detail=ABILITY_DETAILS[String(abilityId)]||{};
-  return Object.keys(all).filter(function(speciesId){
-    var species=all[speciesId]||{};
-    if((species.abilityIds||[]).map(Number).includes(Number(abilityId))) return true;
-    return !(species.abilityIds||[]).length && (species.abilities||[]).includes(detail.name);
-  }).map(Number).sort(function(a,b){
-    var sa=all[String(a)]||{}, sb=all[String(b)]||{};
-    return Number(sa.nationalDex||99999)-Number(sb.nationalDex||99999)
-      || dexSpeciesDisplayName(sa).localeCompare(dexSpeciesDisplayName(sb));
-  });
+  if(!ABILITY_USERS_INDEX) buildReferenceIndexes();
+  return ABILITY_USERS_INDEX[String(Number(abilityId))]||[];
 }
 
 function renderMoveTypeOptions(details){
@@ -3474,6 +3502,7 @@ function handleDataFile(file){
       ABILITY_DETAILS = Object.assign({}, BUNDLED_DATA.abilityDetails || {}, USER_DATA.abilityDetails || {});
       if (Array.isArray(parsed.routeEncounters)) ROUTE_DATA = parsed.routeEncounters;
       if (Array.isArray(parsed.changes)) CHANGE_DATA = parsed.changes;
+      MOVE_LEARNERS_INDEX = null; ABILITY_USERS_INDEX = null;
       rebuildNameData();
       refreshBoxLevels();
       saveNameDataToStorage();
