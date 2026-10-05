@@ -49,11 +49,11 @@ async function writeFileAtomically(filePath, data){
   }
 }
 
-/* ---- Open a .sav file via native dialog, return its path + raw bytes ---- */
+/* ---- Open a .sav or .srm file via native dialog, return its path + raw bytes ---- */
 ipcMain.handle('open-sav', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     title: 'Open a Brisk Emerald save file',
-    filters: [{ name: 'Game Boy Advance Save', extensions: ['sav'] }],
+    filters: [{ name: 'Game Boy Advance Save', extensions: ['sav', 'srm'] }],
     properties: ['openFile']
   });
   if (result.canceled || result.filePaths.length === 0) return null;
@@ -68,7 +68,8 @@ ipcMain.handle('write-sav', async (event, filePath, bytes) => {
     const dir = path.dirname(filePath);
     const base = path.basename(filePath, path.extname(filePath));
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const backupPath = path.join(dir, `${base}.backup-${stamp}.sav`);
+    const ext = path.extname(filePath) || '.sav';
+    const backupPath = path.join(dir, `${base}.backup-${stamp}${ext}`);
     if (fsSync.existsSync(filePath)){
       await fs.copyFile(filePath, backupPath);
     }
