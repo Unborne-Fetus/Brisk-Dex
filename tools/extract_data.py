@@ -1231,8 +1231,8 @@ def main():
                     if os.path.abspath(current) == os.path.abspath(gfx_dir):
                         break
                     current = os.path.dirname(current)
-                if front_path and palette_path and normal_palette_path and shiny_palette_png(
-                        front_path, palette_path, normal_palette_path,
+                if front_path and palette_path and normal_palette_path and palette_variant_png(
+                        front_path, normal_palette_path, palette_path, True,
                         os.path.join(icons_out, sid + "_shiny.png")):
                     shiny_found += 1
             found += 1
