@@ -4320,7 +4320,8 @@ function battleCandidateFromMon(mon,key,sourceLabel){
   });
   return {
     key:key,sourceLabel:sourceLabel,personality:Number(mon.personality)||0,otId:Number(mon.otId)||0,
-    species:Number(mon.species),name:mon.nickname||speciesName(mon.species),level:stats.level,
+    species:Number(mon.species),name:mon.nickname||speciesName(mon.species),level:stats.level,friendship:Number(mon.friendship)||0,
+    weight:Number(species.weight||species.weightHg||0),
     types:(species.types||[]).filter(Boolean).slice(0,2),ability:ability,item:itemName(mon.heldItem||0),
     teraType:teraTypeName(Number(mon.teraType)||0),transformations:transformations,
     maxHP:stats.maxHP,atk:stats.atk,def:stats.def,speed:stats.speed,spAtk:stats.spAtk,spDef:stats.spDef,isShiny:!!mon.isShiny,
