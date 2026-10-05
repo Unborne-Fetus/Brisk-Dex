@@ -666,7 +666,7 @@ function applyStatusMove(room,pi,move){
 function applyExtractedMoveEffects(room,attacker,defender,move){
   (move.moveEffects||[]).forEach(function(entry){
     if(!chance(Number(entry.chance)||100))return;
-    const target=entry.self?attacker:defender,key=normalizeName(entry.effect);
+    const target=entry.self?attacker:defender,key=normalizeName(entry.effect).replace(/^moveeffect/,'');
     if(key==='sleep')setStatus(room,target,'sleep');
     else if(key==='poison')setStatus(room,target,'poison');
     else if(key==='burn')setStatus(room,target,'burn');
@@ -676,6 +676,26 @@ function applyExtractedMoveEffects(room,attacker,defender,move){
     else if(key==='confusion'){target.volatile.confusion=2+Math.floor(Math.random()*4);log(room,target.name+' became confused!');}
     else if(key==='flinch')target.volatile.flinch=true;
     else if(key==='absorb'&&entry.self){const amount=Math.max(1,Math.floor(target.maxHP/8));heal(room,target,amount,move.name);}
+    else if(key==='clear smog'||key==='clearsmog'){target.stages={atk:0,def:0,spa:0,spd:0,spe:0,acc:0,eva:0};log(room,target.name+"'s stat changes were eliminated!");}
+    else if(key==='removestatus'){target.status=null;log(room,target.name+"'s status was cured!");}
+    else if(key==='wrap'||key==='firespinside'||key==='trapboth'){target.volatile.trapped=true;log(room,target.name+' was trapped!');}
+    else if(key==='spite'){var used=target.lastMoveIndex;if(used!==null&&target.moves[used]){target.moves[used].pp=Math.max(0,target.moves[used].pp-4);log(room,target.moves[used].name+' lost PP!');}}
+    else if(key==='throatchop'){target.volatile.throatChop=2;log(room,target.name+' was prevented from using sound moves!');}
+    else if(key==='incinerate'&&target.item&&/berry/i.test(target.item)){log(room,target.name+"'s "+target.item+' was incinerated!');target.item='';}
+    else if(key==='bugbite'&&target.item&&/berry/i.test(target.item)){log(room,attacker.name+' ate '+target.name+"'s "+target.item+'!');target.item='';}
+    else if(key==='breakscreen'){const owner=room.players.find(p=>p.team.includes(target));if(owner){owner.side.reflect=0;owner.side.lightScreen=0;owner.side.auroraVeil=0;log(room,'The protective screens were shattered!');}}
+    else if(key==='reflect'){const owner=room.players.find(p=>p.team.includes(attacker));if(owner)owner.side.reflect=5;}
+    else if(key==='lightscreen'){const owner=room.players.find(p=>p.team.includes(attacker));if(owner)owner.side.lightScreen=5;}
+    else if(key==='stealthrock'){const owner=room.players.find(p=>p.team.includes(target));if(owner)owner.side.stealthRock=true;}
+    else if(key==='yawnfoe'){target.volatile.yawn=2;log(room,target.name+' grew drowsy!');}
+    else if(key==='tormentside'){target.volatile.torment=true;log(room,target.name+' was subjected to torment!');}
+    else if(key==='preventescapeside'){target.volatile.trapped=true;log(room,target.name+' can no longer escape!');}
+    else if(key==='paralyzeside')setStatus(room,target,'paralysis');
+    else if(key==='poisonside')setStatus(room,target,'poison');
+    else if(key==='poisonparalyzeside')setStatus(room,target,chance(50)?'poison':'paralysis');
+    else if(key==='confuseside'||key==='confusepaydayside'){target.volatile.confusion=2+Math.floor(Math.random()*4);log(room,target.name+' became confused!');}
+    else if(key==='critplusside'){target.volatile.focusEnergy=Math.min(2,(target.volatile.focusEnergy||0)+1);}
+    else if(key==='recoilhp25'&&entry.self&&!hasAbility(target,'Rock Head')&&!hasAbility(target,'Magic Guard'))hurt(room,target,Math.max(1,Math.floor(target.maxHP/4)),'recoil');
     else if(key==='recharge'&&entry.self)target.volatile.recharge=true;
     else if(key==='preventescape'){target.volatile.trapped=true;log(room,target.name+' was trapped!');}
     else if(key==='leechseed'){target.volatile.seeded=true;log(room,target.name+' was seeded!');}
@@ -1038,7 +1058,7 @@ const server=http.createServer(async (req,res)=>{
   if(req.method==='OPTIONS') return json(res,204,{});
   const url=new URL(req.url,'http://localhost');
   try{
-    if(req.method==='GET'&&url.pathname==='/health') return json(res,200,{ok:true,rooms:rooms.size,engine:'advanced-v12'});
+    if(req.method==='GET'&&url.pathname==='/health') return json(res,200,{ok:true,rooms:rooms.size,engine:'advanced-v13'});
     if(req.method==='POST'&&url.pathname==='/rooms'){
       const body=await readBody(req), code=roomCode(), playerId=id(), team=cleanTeam(body.team);
       if(!team.length) return json(res,400,{error:'Load a save with at least one party Pokémon first.'});
@@ -1093,4 +1113,4 @@ const server=http.createServer(async (req,res)=>{
     return json(res,405,{error:'Method not allowed'});
   }catch(err){ return json(res,400,{error:err.message||String(err)}); }
 });
-server.listen(PORT,HOST,()=>console.log('Brisk battle relay listening on http://'+HOST+':'+PORT+' (advanced-v12)'));
+server.listen(PORT,HOST,()=>console.log('Brisk battle relay listening on http://'+HOST+':'+PORT+' (advanced-v13)'));
