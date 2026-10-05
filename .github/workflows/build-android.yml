@@ -49,6 +49,9 @@ jobs:
       - name: Create Android project
         run: npx cap add android
 
+      - name: Patch native Android file picker
+        run: node tools/patch_android.mjs
+
       - name: Sync Capacitor plugins and assets
         run: npx cap sync android
 
