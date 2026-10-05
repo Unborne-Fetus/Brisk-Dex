@@ -1314,10 +1314,26 @@ function saveNameDataToStorage(){
   try{ localStorage.setItem('briskdex_namedata_overrides', JSON.stringify(USER_DATA)); }catch(e){}
 }
 async function loadBundledGameData(){
-  if (!IS_ELECTRON) return;
+  if (!IS_ELECTRON && !IS_ANDROID) return;
   try{
-    var data = await window.briskDexAPI.loadGameData();
-    var trainerData = await window.briskDexAPI.loadTrainerData();
+    var data, trainerData, icons;
+    if (IS_ELECTRON){
+      data = await window.briskDexAPI.loadGameData();
+      trainerData = await window.briskDexAPI.loadTrainerData();
+      icons = await window.briskDexAPI.loadBundledIcons();
+    } else {
+      var responses = await Promise.all([
+        fetch('brisk-dex-data.json'),
+        fetch('brisk-dex-trainer-teams.json'),
+        fetch('brisk-dex-icon-manifest.json')
+      ]);
+      responses.forEach(function(response){
+        if (!response.ok) throw new Error('Bundled Android data could not be loaded (' + response.status + ').');
+      });
+      data = await responses[0].json();
+      trainerData = await responses[1].json();
+      icons = await responses[2].json();
+    }
     TRAINER_DATA = Array.isArray(trainerData && trainerData.trainers) ? trainerData.trainers : [];
     if (Number.isInteger(data.shinyOdds) && data.shinyOdds > 0) GAME_SHINY_ODDS = data.shinyOdds;
     BUNDLED_DATA = {
@@ -1328,7 +1344,6 @@ async function loadBundledGameData(){
     ITEM_DETAILS = Object.assign({}, BUNDLED_DATA.itemDetails || {}, USER_DATA.itemDetails || {});
     ROUTE_DATA = Array.isArray(data.routeEncounters) ? data.routeEncounters : [];
     rebuildNameData();
-    var icons = await window.briskDexAPI.loadBundledIcons();
     SPECIES_ICONS = Object.assign({}, SPECIES_ICONS, icons && icons.icons || {});
     SPECIES_SHINY_ICONS = Object.assign({}, SPECIES_SHINY_ICONS, icons && icons.shinyIcons || {});
     refreshBoxLevels();
@@ -1448,6 +1463,7 @@ async function loadIconFolder(){
    Environment detection (plain browser vs. the Electron desktop app)
    ============================================================ */
 var IS_ELECTRON = !!(window.briskDexAPI);
+var IS_ANDROID = !!(window.briskAndroidAPI && window.briskAndroidAPI.isAndroid);
 
 /* ============================================================
    External storage — Pokémon kept outside any single save file.
@@ -1624,10 +1640,23 @@ async function saveChangesToFile(){
       }
     }catch(e){ showError('Could not write the save file: ' + e.message); return false; }
   } else {
+    var fname = (currentSave.trainer.name || 'save').toLowerCase().replace(/[^a-z0-9]/g,'') || 'brisk-emerald';
+    if (IS_ANDROID && window.briskAndroidAPI){
+      try{
+        await window.briskAndroidAPI.saveBytes(currentSave._internal.rawBytes, fname + '-updated.sav', 'application/octet-stream');
+        clearDirty();
+        var androidQueuedCount = Object.keys(pendingWithdrawals).filter(function(id){ return pendingWithdrawals[id] === saveSessionId; }).length;
+        showNotice('Opened Android sharing so you can save the updated .sav file.' +
+          (androidQueuedCount ? ' Archive copies are retained until you confirm the new save works.' : ''));
+        return false;
+      }catch(e){
+        showError('Could not export the updated save on Android: ' + e.message);
+        return false;
+      }
+    }
     var blob = new Blob([currentSave._internal.rawBytes], {type:'application/octet-stream'});
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
-    var fname = (currentSave.trainer.name || 'save').toLowerCase().replace(/[^a-z0-9]/g,'') || 'brisk-emerald';
     a.href = url; a.download = fname + '-updated.sav';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
@@ -2193,10 +2222,19 @@ async function exportExternalStorage(){
   await storageReady;
   if (storageLoadError){ showError('External storage could not be loaded. Import a backup archive before exporting.'); return; }
   var payload = {format:'briskdex-storage', version:1, exportedAt:new Date().toISOString(), pokemon:externalStorage};
-  var blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  var text = JSON.stringify(payload, null, 2);
+  var fileName = 'briskdex-storage-' + new Date().toISOString().slice(0,10) + '.json';
+  if (IS_ANDROID && window.briskAndroidAPI){
+    try{
+      await window.briskAndroidAPI.saveText(text, fileName, 'application/json');
+      showNotice('Opened Android sharing so you can save the storage archive.');
+    }catch(err){ showError('Could not export storage on Android: ' + err.message); }
+    return;
+  }
+  var blob = new Blob([text], {type:'application/json'});
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
-  a.href = url; a.download = 'briskdex-storage-' + new Date().toISOString().slice(0,10) + '.json';
+  a.href = url; a.download = fileName;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
 }
