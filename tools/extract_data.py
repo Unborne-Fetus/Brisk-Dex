@@ -707,6 +707,11 @@ def main():
                 level_match = re.search(r'\b(\d+)\b', parameter)
                 threshold = int(level_match.group(1)) if level_match else 1
             evolution_edges.append((source_id, target_id, threshold))
+            out_species[str(source_id)].setdefault("evolutions", []).append({
+                "target": target_id,
+                "method": method,
+                "parameter": parameter.strip(),
+            })
             incoming_evolutions.add(target_id)
 
     minimum_levels = {sid: (1 if sid not in incoming_evolutions else None) for sid in species_ids.values()
