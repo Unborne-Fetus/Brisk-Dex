@@ -228,8 +228,8 @@ input[type=file]{ display:none; }
 }
 .box-tabs button.active{ color:var(--leaf-bright); border-bottom-color:var(--leaf-bright); background:#12251d; }
 .box-tabs button:hover{ color:var(--text); }
-.main-tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin:0 0 22px;}
-.main-tabs button{border:0;border-radius:0;background:transparent;padding:12px 16px;color:var(--muted);border-bottom:2px solid transparent;font-size:14px;}
+.main-tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin:0 0 22px;overflow-x:auto;scrollbar-width:thin;}
+.main-tabs button{border:0;border-radius:0;background:transparent;padding:12px 16px;color:var(--muted);border-bottom:2px solid transparent;font-size:14px;flex:none;}
 .main-tabs button.active{color:var(--leaf-bright);border-bottom-color:var(--leaf-bright);}
 .main-tabs button:hover{color:var(--text);}
 .route-intro{margin:-5px 0 16px;color:var(--muted);font-size:13px;}
@@ -1442,7 +1442,7 @@ async function loadBundledGameData(){
         fetch('brisk-dex-icon-manifest.json')
       ]);
       responses.forEach(function(response){
-        if (!response.ok) throw new Error('Bundled Android data could not be loaded (' + response.status + ').');
+        if (!response.ok) throw new Error('Bundled mobile data could not be loaded (' + response.status + ').');
       });
       data = await responses[0].json();
       trainerData = await responses[1].json();
@@ -1468,7 +1468,7 @@ async function loadBundledGameData(){
     SPECIES_SHINY_ICONS = Object.assign({}, SPECIES_SHINY_ICONS, icons && icons.shinyIcons || {});
     refreshBoxLevels();
     updateDataStatus();
-    if (IS_ANDROID) document.body.classList.add('android-lite');
+    if (IS_ANDROID || IS_IOS) document.body.classList.add('android-lite');
     renderCurrentReferenceTab();
   }catch(err){
     showError('Could not load Brisk Emerald data bundled with Brisk Dex: ' + err.message);
@@ -2686,7 +2686,7 @@ function renderPokedex(){
       renderPokedexDetail(allSpecies, id, detail);
     });
     return btn;
-  }, IS_ANDROID ? 80 : ids.length);
+  }, (IS_ANDROID || IS_IOS) ? 80 : ids.length);
 
   renderPokedexDetail(allSpecies, String(selectedDexSpeciesId), detail);
 }
@@ -3117,7 +3117,7 @@ function renderItems(){
     btn.appendChild(el('small',{text:it.constant||('Item #'+id)}));
     btn.addEventListener('click',function(){selectedItemId=Number(id);renderItems();});
     return btn;
-  }, IS_ANDROID ? 100 : ids.length);
+  }, (IS_ANDROID || IS_IOS) ? 100 : ids.length);
   var it=all[String(selectedItemId)]||{};
   var head=el('section',{class:'item-detail-head'});
   if(it.icon){ var heroShell=el('span',{class:'asset-icon-shell',style:'width:80px;height:80px;float:right;margin-left:18px;'}); var heroIcon=el('img',{src:it.icon,alt:(it.name||'Item')+' icon',style:'width:80px;height:80px;'}); heroIcon.decoding='async'; heroShell.appendChild(heroIcon); head.appendChild(heroShell); }
