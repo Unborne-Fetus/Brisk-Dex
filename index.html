@@ -267,6 +267,15 @@ input[type=file]{ display:none; }
 .dex-tools input,.dex-tools select{min-height:38px;color:var(--text);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:8px 11px;font:inherit;}
 .dex-tools input{flex:1 1 280px;min-width:190px;}
 .dex-tools select{flex:0 1 175px;}
+.dex-status-pill{display:inline-flex;align-items:center;justify-content:center;min-width:52px;padding:3px 7px;border-radius:999px;font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;border:1px solid var(--line);color:var(--muted);}
+.dex-status-pill.seen{color:#9dd8ff;border-color:#315a71;background:#102632;}
+.dex-status-pill.caught{color:#bdebc9;border-color:#366d49;background:#11291a;}
+.dex-status-pill.shiny{color:#ffe296;border-color:#806d43;background:#302812;}
+.dex-entry-status{margin-left:auto;flex:none;}
+.dex-status-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:9px;}
+.dex-status-controls label{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-2);}
+.dex-status-controls select{min-height:34px;color:var(--text);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:6px 9px;font:inherit;}
+.dex-cry-button{min-height:34px;padding:6px 11px;}
 .dex-layout{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:14px;align-items:start;}
 .dex-list{display:flex;flex-direction:column;gap:5px;max-height:calc(100vh - 245px);min-height:280px;overflow:auto;padding:4px;border:1px solid var(--line);background:var(--panel-2);}
 .dex-entry{width:100%;text-align:left;border:1px solid transparent;background:transparent;display:flex;align-items:center;gap:10px;padding:8px 9px;border-radius:4px;}
@@ -614,6 +623,13 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
       <input id="dex-search" type="search" placeholder="Search Pok&eacute;mon, type, or ability…" aria-label="Search the Brisk Pokédex">
       <select id="dex-type" aria-label="Filter Pokédex by type">
         <option value="all">All types</option>
+      </select>
+      <select id="dex-status" aria-label="Filter Pokédex by status">
+        <option value="all">All statuses</option>
+        <option value="none">None</option>
+        <option value="seen">Seen</option>
+        <option value="caught">Caught</option>
+        <option value="shiny">Shiny</option>
       </select>
       <select id="dex-order" aria-label="Sort Pokédex">
         <option value="national">National Dex order</option>
@@ -969,9 +985,24 @@ function parseSav(arrayBuffer){
     boxNames.push(name || ("BOX " + (b2+1)));
   }
 
+  // Brisk Emerald stores Gen IX Pokédex flags in SaveBlock1 after Mystery Gift.
+  // SaveBlock1 is split across save sections 1-4; rebuild its logical byte stream.
+  var saveBlock1Parts=[];
+  for(var sb1id=1;sb1id<=4;sb1id++){
+    if(!sections[sb1id]) throw new Error("Save file is missing SaveBlock1 section "+sb1id+".");
+    saveBlock1Parts.push(sections[sb1id]);
+  }
+  var saveBlock1Length=saveBlock1Parts.reduce(function(total,part){return total+part.length;},0);
+  var saveBlock1Bytes=new Uint8Array(saveBlock1Length), saveBlock1Pos=0;
+  saveBlock1Parts.forEach(function(part){saveBlock1Bytes.set(part,saveBlock1Pos);saveBlock1Pos+=part.length;});
+  var dexSeen=saveBlock1Bytes.slice(DEX_SEEN_OFFSET,DEX_SEEN_OFFSET+DEX_FLAG_BYTES);
+  var dexCaught=saveBlock1Bytes.slice(DEX_SEEN_OFFSET+DEX_FLAG_BYTES,DEX_SEEN_OFFSET+(DEX_FLAG_BYTES*2));
+
   return {
     trainer: trainer,
     money: money,
+    dexSeen: dexSeen,
+    dexCaught: dexCaught,
     party: party,
     boxes: boxes,
     boxNames: boxNames,
@@ -1409,6 +1440,11 @@ var ABILITY_USERS_INDEX = null;
 var CHANGE_DATA = [];
 var currentMainTab = 'save';
 var GAME_SHINY_ODDS = 8;
+var DEX_FLAG_BYTES = 129; // Gen IX National Dex (1025 entries + slot 0) in current Brisk Emerald.
+var DEX_SEEN_OFFSET = 0x3598; // SaveBlock1.dexSeen for Brisk Emerald's current save.h configuration.
+var DEX_STATUS_OVERRIDES = {};
+var dexAnimationTimers = [];
+var dexCryAudio = null;
 
 function rebuildNameData(){
   NAME_DATA.species = Object.assign({}, buildDefaultSpecies(), BUNDLED_DATA.species, USER_DATA.species);
@@ -2684,12 +2720,86 @@ function appendChunkedButtons(list, ids, renderer, initialCount){
     list.appendChild(more);
   }
 }
-function makeDexSpriteCard(url,label){
+function dexStatusStorageKey(save){
+  if(!save || !save.trainer) return 'briskdex_pokedex_status_manual';
+  return 'briskdex_pokedex_status_' + save.trainer.publicId + '_' + save.trainer.secretId;
+}
+function loadDexStatusOverrides(save){
+  DEX_STATUS_OVERRIDES = {};
+  try{
+    var raw=localStorage.getItem(dexStatusStorageKey(save));
+    var parsed=raw ? JSON.parse(raw) : {};
+    if(parsed && typeof parsed==='object') DEX_STATUS_OVERRIDES=parsed;
+  }catch(e){}
+}
+function persistDexStatusOverrides(){
+  try{ localStorage.setItem(dexStatusStorageKey(currentSave),JSON.stringify(DEX_STATUS_OVERRIDES)); }catch(e){}
+}
+function dexFlagIsSet(bytes,nationalDex){
+  var dex=Number(nationalDex||0);
+  if(!bytes || dex<=0) return false;
+  var index=dex>>3, mask=1<<(dex&7);
+  return index<bytes.length && (bytes[index]&mask)!==0;
+}
+function automaticDexStatus(allSpecies,id){
+  var entry=allSpecies[String(id)]||{};
+  if(!currentSave) return 'none';
+  var exactId=Number(id);
+  var shiny=false, ownedExact=false;
+  (currentSave.party||[]).forEach(function(mon){
+    if(mon && !mon.empty && Number(mon.species)===exactId){ownedExact=true;if(mon.isShiny) shiny=true;}
+  });
+  (currentSave.boxes||[]).forEach(function(box){
+    (box||[]).forEach(function(mon){
+      if(mon && !mon.empty && Number(mon.species)===exactId){ownedExact=true;if(mon.isShiny) shiny=true;}
+    });
+  });
+  if(shiny) return 'shiny';
+  var nat=Number(entry.nationalDex||0);
+  if(dexFlagIsSet(currentSave.dexCaught,nat) || ownedExact) return 'caught';
+  if(dexFlagIsSet(currentSave.dexSeen,nat)) return 'seen';
+  return 'none';
+}
+function dexStatusFor(allSpecies,id){
+  var override=DEX_STATUS_OVERRIDES[String(id)];
+  return /^(none|seen|caught|shiny)$/.test(override||'') ? override : automaticDexStatus(allSpecies,id);
+}
+function setDexStatus(id,status){
+  if(!/^(none|seen|caught|shiny)$/.test(status)) return;
+  DEX_STATUS_OVERRIDES[String(id)]=status;
+  persistDexStatusOverrides();
+  renderPokedex();
+}
+function makeDexStatusPill(status,extraClass){
+  var label=status==='none'?'None':status.charAt(0).toUpperCase()+status.slice(1);
+  return el('span',{class:'dex-status-pill '+status+(extraClass?' '+extraClass:''),text:label});
+}
+function clearDexAnimationTimers(){
+  dexAnimationTimers.forEach(function(timer){clearInterval(timer);});
+  dexAnimationTimers=[];
+}
+function playDexCry(url){
+  if(!url) return;
+  try{
+    if(dexCryAudio){dexCryAudio.pause();dexCryAudio.currentTime=0;}
+    dexCryAudio=new Audio(url);
+    var promise=dexCryAudio.play();
+    if(promise && promise.catch) promise.catch(function(err){showError('Could not play this Pokémon cry: '+err.message);});
+  }catch(err){showError('Could not play this Pokémon cry: '+err.message);}
+}
+function makeDexSpriteCard(url,label,animationUrl){
   var card=el('div',{class:'dex-sprite-card'});
-  if(url){
-    var img=el('img',{src:url,alt:label});
+  if(url || animationUrl){
+    var img=el('img',{src:animationUrl||url,alt:label});
     img.loading='lazy'; img.decoding='async';
     card.appendChild(img);
+    if(animationUrl){
+      var replay=function(){
+        if(!img.isConnected) return;
+        img.src=animationUrl+(animationUrl.indexOf('?')>=0?'&':'?')+'replay='+Date.now();
+      };
+      dexAnimationTimers.push(setInterval(replay,5000));
+    }
   }else{
     card.appendChild(el('div',{class:'dex-muted',style:'height:112px;display:grid;place-items:center;',text:'Sprite unavailable'}));
   }
@@ -2706,10 +2816,12 @@ function renderPokedex(){
   var ids = Object.keys(allSpecies).filter(function(id){ return Number(id) > 0; });
   var query = (document.getElementById('dex-search').value || '').trim().toLowerCase();
   var typeFilter = document.getElementById('dex-type').value;
+  var statusFilter = document.getElementById('dex-status').value;
   var order = document.getElementById('dex-order').value;
   ids = ids.filter(function(id){
     var entry = allSpecies[id] || {};
     if (typeFilter !== 'all' && !(entry.types || []).includes(typeFilter)) return false;
+    if (statusFilter !== 'all' && dexStatusFor(allSpecies,id) !== statusFilter) return false;
     if (!query) return true;
     return String(entry.name || '').toLowerCase().includes(query)
       || String(entry.formLabel || '').toLowerCase().includes(query)
@@ -2746,6 +2858,7 @@ function renderPokedex(){
     var dexNum=Number(entry.nationalDex||0);
     textWrap.appendChild(el('small', {text:(dexNum ? '#'+String(dexNum).padStart(4,'0')+' · ' : '') + ((entry.types || []).join(' / ') || 'Type data unavailable')}));
     btn.appendChild(textWrap);
+    btn.appendChild(makeDexStatusPill(dexStatusFor(allSpecies,id),'dex-entry-status'));
     btn.addEventListener('click', function(){
       if (Number(id) === Number(selectedDexSpeciesId)) return;
       selectedDexSpeciesId = Number(id);
@@ -2930,6 +3043,7 @@ function renderDexEvolutionLines(allSpecies,id){
 }
 
 function renderPokedexDetail(allSpecies, id, detail){
+  clearDexAnimationTimers();
   detail.innerHTML = '';
   var species = allSpecies[String(id)];
   if (!species) return;
@@ -2945,14 +3059,31 @@ function renderPokedexDetail(allSpecies, id, detail){
   heroText.appendChild(nameRow);
   var heroTypes = makeTypePills(species.types, true); if (heroTypes) heroText.appendChild(heroTypes);
   var heroBadge=dexFormBadge(species); if(heroBadge) heroText.appendChild(heroBadge);
+  var statusControls=el('div',{class:'dex-status-controls'});
+  statusControls.appendChild(el('label',{text:'Status'}));
+  var statusSelect=el('select',{'aria-label':'Pokédex status for '+dexSpeciesDisplayName(species)});
+  ['none','seen','caught','shiny'].forEach(function(status){
+    var option=el('option',{value:status,text:status.charAt(0).toUpperCase()+status.slice(1)});
+    if(dexStatusFor(allSpecies,id)===status) option.selected=true;
+    statusSelect.appendChild(option);
+  });
+  statusSelect.addEventListener('change',function(){setDexStatus(id,statusSelect.value);});
+  statusControls.appendChild(statusSelect);
+  statusControls.appendChild(makeDexStatusPill(dexStatusFor(allSpecies,id)));
+  if(species.cry){
+    var cryButton=el('button',{class:'ghost dex-cry-button',type:'button',text:'🔊 Cry'});
+    cryButton.addEventListener('click',function(){playDexCry(species.cry);});
+    statusControls.appendChild(cryButton);
+  }
+  heroText.appendChild(statusControls);
   hero.appendChild(heroText);
   detail.appendChild(hero);
 
   var spriteGrid=el('section',{class:'dex-sprite-grid'});
-  spriteGrid.appendChild(makeDexSpriteCard(species.frontSprite,'Front'));
-  spriteGrid.appendChild(makeDexSpriteCard(species.backSprite,'Back'));
-  spriteGrid.appendChild(makeDexSpriteCard(species.frontShinySprite,'Shiny Front'));
-  spriteGrid.appendChild(makeDexSpriteCard(species.backShinySprite,'Shiny Back'));
+  spriteGrid.appendChild(makeDexSpriteCard(species.frontSprite,'Front',species.frontAnimation));
+  spriteGrid.appendChild(makeDexSpriteCard(species.backSprite,'Back',species.backAnimation));
+  spriteGrid.appendChild(makeDexSpriteCard(species.frontShinySprite,'Shiny Front',species.frontShinyAnimation));
+  spriteGrid.appendChild(makeDexSpriteCard(species.backShinySprite,'Shiny Back',species.backShinyAnimation));
   detail.appendChild(spriteGrid);
 
   var grid = el('div', {class:'dex-grid'});
@@ -3526,6 +3657,7 @@ function handleSavFile(file){
       var extMatch = String(file && file.name || '').match(/\.(sav|srm)$/i);
       save.fileExtension = extMatch ? extMatch[1].toLowerCase() : 'sav';
       currentSave = save;
+      loadDexStatusOverrides(save);
       saveSessionId = genId();
       dirty = false;
       document.getElementById('empty-state').style.display = 'none';
@@ -3550,6 +3682,7 @@ async function handleSavFromAndroid(){
     var extMatch = String(result.name || '').match(/\.(sav|srm)$/i);
     save.fileExtension = extMatch ? extMatch[1].toLowerCase() : 'sav';
     currentSave = save;
+    loadDexStatusOverrides(save);
     saveSessionId = genId();
     dirty = false;
     document.getElementById('empty-state').style.display = 'none';
@@ -3573,6 +3706,7 @@ async function handleSavFromElectron(){
     var extMatch = String(result.filePath || '').match(/\.(sav|srm)$/i);
     save.fileExtension = extMatch ? extMatch[1].toLowerCase() : 'sav';
     currentSave = save;
+    loadDexStatusOverrides(save);
     saveSessionId = genId();
     dirty = false;
     document.getElementById('empty-state').style.display = 'none';
@@ -3650,6 +3784,7 @@ document.getElementById('trainer-class').addEventListener('change', renderTraine
 document.getElementById('trainer-size').addEventListener('change', renderTrainerTeams);
 document.getElementById('dex-search').addEventListener('input', renderPokedexDebounced);
 document.getElementById('dex-type').addEventListener('change', renderPokedex);
+document.getElementById('dex-status').addEventListener('change', renderPokedex);
 document.getElementById('dex-order').addEventListener('change', renderPokedex);
 document.getElementById('route-search').addEventListener('input', renderRouteEncountersDebounced);
 document.getElementById('route-kind').addEventListener('change', renderRouteEncounters);
