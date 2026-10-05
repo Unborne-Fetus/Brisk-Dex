@@ -220,6 +220,14 @@ function damage(room,attacker,defender,move,defenderPlayer){
   if((an==='hugepower'||an==='purepower')&&move.category==='Physical') attack*=2;
   if(an==='guts'&&attacker.status&&move.category==='Physical') attack=Math.floor(attack*1.5);
   if(an==='technician'&&power<=60) power=Math.floor(power*1.5);
+  if(an==='ironfist'&&PUNCH_MOVES.has(mn))power=Math.floor(power*1.2);
+  if(an==='strongjaw'&&BITE_MOVES.has(mn))power=Math.floor(power*1.5);
+  if(an==='sharpness'&&SLICING_MOVES.has(mn))power=Math.floor(power*1.5);
+  if(an==='megalauncher'&&PULSE_MOVES.has(mn))power=Math.floor(power*1.5);
+  if(an==='punkrock'&&SOUND_MOVES.has(mn))power=Math.floor(power*1.3);
+  if(an==='toughclaws'&&CONTACT_MOVES.has(mn))power=Math.floor(power*1.3);
+  if(an==='reckless'&&RECOIL_MOVES.has(mn))power=Math.floor(power*1.2);
+  if((an==='blaze'&&effectiveType==='Fire'||an==='torrent'&&effectiveType==='Water'||an==='overgrow'&&effectiveType==='Grass'||an==='swarm'&&effectiveType==='Bug')&&attacker.hp<=attacker.maxHP/3)power=Math.floor(power*1.5);
   if(an==='sheerforce' && SECONDARY_MOVES.has(mn)) power=Math.floor(power*1.3);
   if(item==='choiceband'&&move.category==='Physical') attack=Math.floor(attack*1.5);
   if(item==='choicespecs'&&move.category==='Special') attack=Math.floor(attack*1.5);
@@ -241,6 +249,10 @@ function damage(room,attacker,defender,move,defenderPlayer){
   if(!ignoresAbility(attacker)&&(hasAbility(defender,'Water Absorb')||hasAbility(defender,'Storm Drain'))&&effectiveType==='Water') eff=0;
   if(!ignoresAbility(attacker)&&(hasAbility(defender,'Volt Absorb')||hasAbility(defender,'Lightning Rod'))&&effectiveType==='Electric') eff=0;
   if(!ignoresAbility(attacker)&&hasAbility(defender,'Sap Sipper')&&effectiveType==='Grass') eff=0;
+  if(!ignoresAbility(attacker)&&hasAbility(defender,'Earth Eater')&&effectiveType==='Ground')eff=0;
+  if(!ignoresAbility(attacker)&&hasAbility(defender,'Well-Baked Body')&&effectiveType==='Fire')eff=0;
+  if(!ignoresAbility(attacker)&&hasAbility(defender,'Bulletproof')&&BALL_BOMB_MOVES.has(mn))eff=0;
+  if(!ignoresAbility(attacker)&&hasAbility(defender,'Soundproof')&&SOUND_MOVES.has(mn))eff=0;
   if(!ignoresAbility(attacker)&&hasAbility(defender,'Wonder Guard')&&eff<=1) eff=0;
   if(hasAbility(attacker,'Tinted Lens')&&eff>0&&eff<1) eff*=2;
   const crit=chance(critChance(move));
@@ -251,6 +263,7 @@ function damage(room,attacker,defender,move,defenderPlayer){
   if(!crit && ((move.category==='Physical'&&side.reflect>0)||(move.category==='Special'&&side.lightScreen>0))) modifier*=.5;
   if(!ignoresAbility(attacker)&&hasAbility(defender,'Multiscale')&&defender.hp===defender.maxHP) modifier*=.5;
   if(!ignoresAbility(attacker)&&hasAbility(defender,'Thick Fat')&&(effectiveType==='Fire'||effectiveType==='Ice'))modifier*=.5;
+  if(!ignoresAbility(attacker)&&hasAbility(defender,'Punk Rock')&&SOUND_MOVES.has(mn))modifier*=.5;
   if(!ignoresAbility(attacker)&&(hasAbility(defender,'Filter')||hasAbility(defender,'Solid Rock')||hasAbility(defender,'Prism Armor'))) if(eff>1) modifier*=.75;
   let amount=Math.max(eff===0?0:1,Math.floor(base*modifier));
   if(hasItem(defender,'Focus Sash')&&defender.hp===defender.maxHP&&amount>=defender.hp){amount=defender.hp-1;defender.item='';}
@@ -317,6 +330,15 @@ function faintCheck(room,pi){
 const CONTACT_MOVES=new Set(['tackle','bodyslam','doubleedge','quickattack','extremespeed','machpunch','bulletpunch','fakeout','closecombat','drainpunch','firepunch','icepunch','thunderpunch','poisonjab','ironhead','zenheadbutt','headbutt','waterfall','aquajet','bravebird','flareblitz','wildcharge','woodhammer','uturn','flipturn','knockoff','crunch','bite','playrough','leafblade','nightslash','suckerpunch','shadowclaw','dragonclaw','outrage','earthquake','highhorsepower','iciclecrash','rockslide','stoneedge']);
 const RECHARGE_MOVES=new Set(['hyperbeam','gigaimpact','blastburn','hydrocannon','frenzyplant','rockwrecker','roaroftime','meteorassault','eternabeam']);
 const CHARGE_MOVES=new Set(['fly','dig','bounce','phantomforce','shadowforce','skullbash','razorwind','skyattack','solarblade','solarbeam','meteorbeam','electroshot']);
+const PUNCH_MOVES=new Set(['bulletpunch','cometpunch','dizzypunch','drainpunch','dynamicpunch','firepunch','focuspunch','hammerarm','icehammer','icepunch','machpunch','megapunch','meteormash','plasmafists','poweruppunch','shadowpunch','skyuppercut','surgingstrikes','thunderpunch','wickedblow']);
+const BITE_MOVES=new Set(['bite','crunch','firefang','fishiousrend','hyperfang','icefang','jawlock','poisonfang','psychicfangs','thunderfang']);
+const SLICING_MOVES=new Set(['aerialace','aircutter','airslash','bitterblade','ceaselessedge','crosspoison','cut','falseswipe','furycutter','kowtowcleave','leafblade','nightslash','populationbomb','psychocut','razorshell','sacredsword','slash','solarblade','stoneaxe','xscissor']);
+const PULSE_MOVES=new Set(['aurasphere','darkpulse','dragonpulse','healpulse','originpulse','terrainpulse','waterpulse']);
+const SOUND_MOVES=new Set(['boomburst','bugbuzz','clangingscales','disarmingvoice','echoedvoice','hypervoice','overdrive','partingshot','perishsong','round','snarl','sparklingaria','uproar']);
+const BALL_BOMB_MOVES=new Set(['acid spray','aerosol','aurasphere','bulletseed','eggbomb','electroball','energyball','focusblast','gyroball','iceball','magnetbomb','mistball','mudbomb','octazooka','pollenpuff','rockblast','searing shot','seedbomb','shadowball','sludgebomb','weatherball','zapcannon'].map(normalizeName));
+const POWDER_MOVES=new Set(['cottonspore','poisonpowder','powder','ragepowder','sleeppowder','spore','stunspore']);
+const RECOIL_MOVES=new Set(['doubleedge','bravebird','flareblitz','wildcharge','headsmash','woodhammer','volt tackle','wavecrash','chloroblast'].map(normalizeName));
+const BOUNCEABLE_MOVES=new Set(['toxic','willowisp','thunderwave','spore','sleeppowder','hypnosis','sing','confuseray','supersonic','taunt','disable','torment','yawn','healblock','meanlook','block','spiderweb','stealthrock','spikes','toxicspikes','stickyweb','leechseed','charm','growl','leer','screech','tailwhip','metalsound','faketears','scaryface','stringshot']);
 function ignoresAbility(attacker){return hasAbility(attacker,'Mold Breaker')||hasAbility(attacker,'Teravolt')||hasAbility(attacker,'Turboblaze');}
 function isGrounded(mon){return !hasType(mon,'Flying')&&!hasAbility(mon,'Levitate')&&!hasItem(mon,'Air Balloon');}
 function consumeItem(room,mon,reason){if(mon.item){const item=mon.item;mon.item='';log(room,mon.name+' consumed its '+item+(reason?' '+reason:'')+'!');return item;}return '';}
@@ -355,12 +377,13 @@ function priorityBlocked(attacker,defender,priority,room){
   return hasAbility(defender,'Dazzling')||hasAbility(defender,'Queenly Majesty')||hasAbility(defender,'Armor Tail');
 }
 function contactReaction(room,attacker,defender,move,dealt){
-  if(!CONTACT_MOVES.has(normalizeName(move.name))||dealt<=0)return;
+  if(hasAbility(attacker,'Long Reach')||!CONTACT_MOVES.has(normalizeName(move.name))||dealt<=0)return;
   if(hasAbility(defender,'Rough Skin')||hasAbility(defender,'Iron Barbs'))hurt(room,attacker,Math.max(1,Math.floor(attacker.maxHP/8)),defender.ability);
   if(hasItem(defender,'Rocky Helmet'))hurt(room,attacker,Math.max(1,Math.floor(attacker.maxHP/6)),'Rocky Helmet');
   if(hasAbility(defender,'Static')&&chance(30))setStatus(room,attacker,'paralysis');
   if(hasAbility(defender,'Flame Body')&&chance(30))setStatus(room,attacker,'burn');
   if(hasAbility(defender,'Poison Point')&&chance(30))setStatus(room,attacker,'poison');
+  if(hasAbility(defender,'Effect Spore')&&chance(30)){const st=choose(['paralysis','poison','sleep']);setStatus(room,attacker,st);}
   if(hasAbility(defender,'Cute Charm')&&chance(30)){attacker.volatile.confusion=Math.max(attacker.volatile.confusion,2);log(room,attacker.name+' became infatuated/confused by Cute Charm!');}
 }
 function onKnockout(room,killer){
@@ -590,7 +613,11 @@ function resolveAttack(room,pi,choice){
   }
   if(move.category==='Status'||move.power<=0){
     log(room,mon.name+' used '+move.name+'!');
-    if(hasAbility(target,'Magic Bounce')&&!ignoresAbility(mon)&&!['haze','trickroom','raindance','sunnyday','sandstorm','snowscape','hail','electricterrain','grassyterrain','psychicterrain','mistyterrain'].includes(normalizeName(move.name))){
+    const statusKey=normalizeName(move.name);
+    if(POWDER_MOVES.has(statusKey)&&(hasType(target,'Grass')||hasAbility(target,'Overcoat')||hasItem(target,'Safety Goggles'))){log(room,target.name+' is immune to powder moves!');return;}
+    if(hasAbility(target,'Good as Gold')&&!ignoresAbility(mon)&&!['haze','trickroom','raindance','sunnyday','sandstorm','snowscape','hail','electricterrain','grassyterrain','psychicterrain','mistyterrain'].includes(statusKey)){log(room,target.name+" is protected by Good as Gold!");return;}
+    if(hasAbility(mon,'Prankster')&&hasType(target,'Dark')&&effectivePriority(room,pi,move)>0){log(room,target.name+' is immune to the Prankster move!');return;}
+    if(hasAbility(target,'Magic Bounce')&&!ignoresAbility(mon)&&BOUNCEABLE_MOVES.has(normalizeName(move.name))){
       log(room,target.name+' bounced the move back with Magic Bounce!');
       const originalActive=p.active, originalFoe=foe.active;
       applyStatusMove(room,other(pi),move);
@@ -630,8 +657,14 @@ function resolveAttack(room,pi,choice){
     if(result.eff===0){
       if(hitNo===0){log(room,mon.name+' used '+move.name+'!');log(room,"It doesn't affect "+target.name+'...');
         if(hasAbility(target,'Water Absorb')&&move.type==='Water')heal(room,target,target.maxHP/4,'Water Absorb');
+        if(hasAbility(target,'Dry Skin')&&move.type==='Water')heal(room,target,target.maxHP/4,'Dry Skin');
         if(hasAbility(target,'Volt Absorb')&&move.type==='Electric')heal(room,target,target.maxHP/4,'Volt Absorb');
-        if(hasAbility(target,'Sap Sipper')&&move.type==='Grass')boost(room,target,'atk',1);}
+        if(hasAbility(target,'Motor Drive')&&move.type==='Electric')boost(room,target,'spe',1);
+        if(hasAbility(target,'Lightning Rod')&&move.type==='Electric')boost(room,target,'spa',1);
+        if(hasAbility(target,'Storm Drain')&&move.type==='Water')boost(room,target,'spa',1);
+        if(hasAbility(target,'Sap Sipper')&&move.type==='Grass')boost(room,target,'atk',1);
+        if(hasAbility(target,'Earth Eater')&&move.type==='Ground')heal(room,target,target.maxHP/4,'Earth Eater');
+        if(hasAbility(target,'Well-Baked Body')&&move.type==='Fire')boost(room,target,'def',2);}
       return;
     }
     let hitDamage=result.amount;
@@ -646,6 +679,15 @@ function resolveAttack(room,pi,choice){
   if(lastResult&&lastResult.eff>1)log(room,"It's super effective!");else if(lastResult&&lastResult.eff<1)log(room,"It's not very effective...");
   if(target.hp>0)secondaryEffect(room,mon,target,move);
   contactReaction(room,mon,target,move,dealt);
+  if(dealt>0&&target.hp>0){
+    if(hasAbility(target,'Stamina'))boost(room,target,'def',1);
+    if(hasAbility(target,'Weak Armor')&&move.category==='Physical'){boost(room,target,'def',-1);boost(room,target,'spe',2);}
+    if(hasAbility(target,'Water Compaction')&&move.type==='Water')boost(room,target,'def',2);
+    if(hasAbility(target,'Steam Engine')&&(move.type==='Water'||move.type==='Fire'))boost(room,target,'spe',6);
+    if(lastResult&&lastResult.crit&&hasAbility(target,'Anger Point')){target.stages.atk=6;log(room,target.name+"'s Anger Point maximized its Attack!");}
+    if(hasAbility(target,'Berserk')&&target.hp<=target.maxHP/2&&target.hp+dealt>target.maxHP/2)boost(room,target,'spa',1);
+    if(hasAbility(mon,'Poison Touch')&&CONTACT_MOVES.has(n)&&chance(30))setStatus(room,target,'poison');
+  }
   checkConsumable(room,target);checkConsumable(room,mon);
   if(lastResult&&lastResult.eff>1&&hasItem(target,'Weakness Policy')&&target.hp>0){consumeItem(room,target);boost(room,target,'atk',2);boost(room,target,'spa',2);}
   if(RECHARGE_MOVES.has(n)&&mon.hp>0)mon.volatile.recharge=true;
@@ -658,8 +700,8 @@ function resolveAttack(room,pi,choice){
   if(n==='uturn'||n==='voltswitch'||n==='flipturn')pivotSwitch(room,pi,false);
   if(n==='dragontail'||n==='circlethrow'){const slot=randomBenchSlot(foe);if(slot>=0&&target.hp>0)doSwitch(room,other(pi),slot);}
   if(dealt>0&&(n.includes('drain')||['gigadrain','megadrain','leechlife','drainingkiss','hornleech'].includes(n))) heal(room,mon,Math.max(1,Math.floor(dealt/2)),move.name);
-  if(dealt>0&&['doubleedge','bravebird','flareblitz','wildcharge','headsmash','woodhammer'].includes(n)) hurt(room,mon,Math.max(1,Math.floor(dealt/3)),'recoil');
-  if(hasItem(mon,'Life Orb')&&dealt>0&&mon.hp>0) hurt(room,mon,Math.max(1,Math.floor(mon.maxHP/10)),'Life Orb');
+  if(dealt>0&&RECOIL_MOVES.has(n)&&!hasAbility(mon,'Rock Head')&&!hasAbility(mon,'Magic Guard')) hurt(room,mon,Math.max(1,Math.floor(dealt/3)),'recoil');
+  if(hasItem(mon,'Life Orb')&&dealt>0&&mon.hp>0&&!hasAbility(mon,'Magic Guard')) hurt(room,mon,Math.max(1,Math.floor(mon.maxHP/10)),'Life Orb');
   if(n==='closecombat'){boost(room,mon,'def',-1);boost(room,mon,'spd',-1);}
   if(n==='superpower'){boost(room,mon,'atk',-1);boost(room,mon,'def',-1);}
   if(n==='overheat'||n==='dracometeor'||n==='leafstorm') boost(room,mon,'spa',-2);
@@ -769,7 +811,7 @@ const server=http.createServer(async (req,res)=>{
   if(req.method==='OPTIONS') return json(res,204,{});
   const url=new URL(req.url,'http://localhost');
   try{
-    if(req.method==='GET'&&url.pathname==='/health') return json(res,200,{ok:true,rooms:rooms.size,engine:'advanced-v5'});
+    if(req.method==='GET'&&url.pathname==='/health') return json(res,200,{ok:true,rooms:rooms.size,engine:'advanced-v6'});
     if(req.method==='POST'&&url.pathname==='/rooms'){
       const body=await readBody(req), code=roomCode(), playerId=id(), team=cleanTeam(body.team);
       if(!team.length) return json(res,400,{error:'Load a save with at least one party Pokémon first.'});
@@ -824,4 +866,4 @@ const server=http.createServer(async (req,res)=>{
     return json(res,405,{error:'Method not allowed'});
   }catch(err){ return json(res,400,{error:err.message||String(err)}); }
 });
-server.listen(PORT,HOST,()=>console.log('Brisk battle relay listening on http://'+HOST+':'+PORT+' (advanced-v5)'));
+server.listen(PORT,HOST,()=>console.log('Brisk battle relay listening on http://'+HOST+':'+PORT+' (advanced-v6)'));
