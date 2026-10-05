@@ -1197,6 +1197,20 @@ def main():
             for flag in move_flag_fields:
                 if re.search(r'\.' + re.escape(flag) + r'\s*=\s*TRUE\b', block):
                     flags.append(re.sub(r'(?<!^)(?=[A-Z])', ' ', flag).title())
+        move_effects = []
+        if block:
+            # MoveInfo.additionalEffects can contain one or more MOVE_EFFECT_* entries.
+            # Keep the effect name, chance, and whether it targets the user so the
+            # Brisk Dex simulator can consume the ROM hack's own move metadata.
+            for effect_match in re.finditer(r'\.moveEffect\s*=\s*(MOVE_EFFECT_[A-Z0-9_]+)', block):
+                tail = block[effect_match.end():effect_match.end() + 260]
+                chance_match = re.search(r'\.chance\s*=\s*(\d+)', tail)
+                self_match = re.search(r'\.self\s*=\s*TRUE\b', tail)
+                move_effects.append({
+                    "effect": pretty_constant(effect_match.group(1)),
+                    "chance": int(chance_match.group(1)) if chance_match else 100,
+                    "self": bool(self_match),
+                })
         move_details[str(mid)] = {
             "name": display_move_name,
             "constant": "MOVE_" + name,
@@ -1205,11 +1219,14 @@ def main():
             "accuracy": extract_numeric_field(block, '.accuracy', 0) if block else 0,
             "pp": pp or 0,
             "priority": extract_numeric_field(block, '.priority', 0) if block else 0,
+            "criticalHitStage": extract_numeric_field(block, '.criticalHitStage', 0) if block else 0,
+            "multiHit": bool(block and re.search(r'\.multiHit\s*=\s*TRUE\b', block)),
             "type": TYPE_NAMES.get(type_constant) if type_constant else None,
             "category": pretty_constant(category_constant) if category_constant else None,
             "target": pretty_constant(target_constant) if target_constant else None,
             "effect": pretty_constant(effect_constant) if effect_constant else None,
             "flags": flags,
+            "moveEffects": move_effects,
         }
 
     # Z-Moves are generated in battle rather than appearing in all_learnables.json.
