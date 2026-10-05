@@ -1019,6 +1019,8 @@ def main():
     moves_text = find_source(repo, "src/data/moves_info.h", "src/data/moves_info")
     abilities_text = find_source(repo, "src/data/abilities.h", "src/data/abilities")
     items_text = find_source(repo, "src/data/items.h", "src/data/items")
+    types_info_text = find_source(repo, "src/data/types_info.h")
+    z_move_text = find_source(repo, "src/battle_z_move.c")
     all_learnables = {}
     learnables_path = os.path.join(repo, "src/data/pokemon/all_learnables.json")
     if os.path.isfile(learnables_path):
@@ -1210,6 +1212,29 @@ def main():
             "flags": flags,
         }
 
+    # Z-Moves are generated in battle rather than appearing in all_learnables.json.
+    # Add generic Z-Crystal moves for species that know at least one move of the
+    # matching type, and add signature Z-Moves from sSignatureZMoves.
+    generic_z_moves = {}
+    for match in re.finditer(r'\\[TYPE_([A-Z0-9_]+)\\]\\s*=\\s*\\{(.*?)\\n\\s*\\},', types_info_text or "", re.DOTALL):
+        type_constant, type_block = match.groups()
+        z_match = re.search(r'\\.zMove\\s*=\\s*MOVE_([A-Z0-9_]+)', type_block)
+        if not z_match:
+            continue
+        z_id = move_ids.get(z_match.group(1))
+        type_name = TYPE_NAMES.get("TYPE_" + type_constant)
+        if z_id and type_name:
+            generic_z_moves[type_name] = z_id
+
+    signature_z_moves = {}
+    for match in re.finditer(
+            r'\\{\\s*SPECIES_([A-Z0-9_]+)\\s*,\\s*ITEM_[A-Z0-9_]+\\s*,\\s*MOVE_[A-Z0-9_]+\\s*,\\s*MOVE_([A-Z0-9_]+)\\s*\\}',
+            z_move_text or ""):
+        species_constant, z_move_constant = match.groups()
+        z_id = move_ids.get(z_move_constant)
+        if z_id:
+            signature_z_moves.setdefault(species_constant, []).append(z_id)
+
     # Build a species-specific pool from every move that species can learn.
     # Form constants fall back through their underscore-separated parent names.
     for species in out_species.values():
@@ -1225,6 +1250,20 @@ def main():
             move_id = move_ids.get(move_name)
             if move_id and move_id < 2048 and str(move_id) in out_moves and move_id not in numeric_moves:
                 numeric_moves.append(move_id)
+
+        learned_types = {
+            move_details.get(str(move_id), {}).get("type")
+            for move_id in numeric_moves
+            if move_details.get(str(move_id), {}).get("type")
+        }
+        for type_name in learned_types:
+            z_id = generic_z_moves.get(type_name)
+            if z_id and str(z_id) in out_moves and z_id not in numeric_moves:
+                numeric_moves.append(z_id)
+        for z_id in signature_z_moves.get(constant, []):
+            if str(z_id) in out_moves and z_id not in numeric_moves:
+                numeric_moves.append(z_id)
+
         species["learnableMoves"] = numeric_moves
 
     out_abilities = {}
