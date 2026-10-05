@@ -860,6 +860,15 @@ var TYPE_COLORS = { "Normal":"#a3a48a","Fire":"#e2734f","Water":"#5f9bdc","Elect
   "Psychic":"#e26b9a","Bug":"#a9bc42","Rock":"#c6a477","Ghost":"#6c5f9c","Dragon":"#6f5fd6",
   "Dark":"#6e6155","Steel":"#9aa4ad","Fairy":"#e0a0c4" };
 
+var TERA_TYPES = [
+  [1,"Normal"],[2,"Fighting"],[3,"Flying"],[4,"Poison"],[5,"Ground"],[6,"Rock"],[7,"Bug"],[8,"Ghost"],[9,"Steel"],
+  [11,"Fire"],[12,"Water"],[13,"Grass"],[14,"Electric"],[15,"Psychic"],[16,"Ice"],[17,"Dragon"],[18,"Dark"],[19,"Fairy"],[20,"Stellar"]
+];
+function teraTypeName(type){
+  var match = TERA_TYPES.find(function(entry){ return entry[0] === type; });
+  return match ? match[1] : (type === 10 ? "Mystery" : "None");
+}
+
 /* ============================================================
    Substructure order table (personality % 24)
    ============================================================ */
@@ -1143,7 +1152,9 @@ function decodePokemon(rec, isPartySlot){
 
   var gOff = subOffsets['G'], aOff = subOffsets['A'], eOff = subOffsets['E'], mOff = subOffsets['M'];
 
-  var species = dataView.getUint16(gOff+0, true) & 0x07FF;
+  var speciesAndTera = dataView.getUint16(gOff+0, true);
+  var species = speciesAndTera & 0x07FF;
+  var teraType = (speciesAndTera >>> 11) & 0x1F;
   var heldItem = dataView.getUint16(gOff+2, true) & 0x03FF;
   var experience = dataView.getUint32(gOff+4, true) & 0x001FFFFF;
   var ppBonuses = dataView.getUint8(gOff+8);
@@ -1201,7 +1212,7 @@ function decodePokemon(rec, isPartySlot){
     personality: personality, otId: otId,
     nickname: nickname, otName: otName, otGender: otGender === 1 ? "Female":"Male",
     language: language, markings: markings,
-    species: species, heldItem: heldItem, experience: experience,
+    species: species, teraType: teraType, heldItem: heldItem, experience: experience,
     friendship: friendship, moves: moves, pp: pp, ppBonuses: ppBonuses,
     evs: evs, ivs: ivs, isEgg: isEgg, abilitySlot: abilitySlot,
     nature: nature, isShiny: isShiny,
@@ -1464,6 +1475,69 @@ async function wonderTradeAtLocation(mon, loc){
   renderAll();
   showNotice('Wonder Trade complete: received ' + speciesName(speciesId) + ' at Lv' + level + (received.isShiny ? ' (shiny)!' : '.') + (IS_ELECTRON ? '' : ' Replace your original save file with the downloaded updated save to keep it in-game.'));
 }
+function setTeraTypeInRecord(rawRecord, newType){
+  if (!rawRecord || rawRecord.length < 80) throw new Error('Pokémon record is incomplete.');
+  if (!TERA_TYPES.some(function(entry){ return entry[0] === newType; })) throw new Error('Invalid Tera Type.');
+
+  var record = rawRecord.slice();
+  var view = new DataView(record.buffer, record.byteOffset, record.length);
+  var personality = view.getUint32(0x00, true);
+  var otId = view.getUint32(0x04, true);
+  var key = (otId ^ personality) >>> 0;
+
+  var dataBytes = new Uint8Array(48);
+  dataBytes.set(record.subarray(0x20, 0x50));
+  var dataView = new DataView(dataBytes.buffer);
+  for (var w=0; w<12; w++)
+    dataView.setUint32(w*4, (dataView.getUint32(w*4, true) ^ key) >>> 0, true);
+
+  var order = SUB_ORDERS[personality % 24];
+  var gIndex = order.indexOf('G');
+  if (gIndex < 0) throw new Error('Could not locate Pokémon growth data.');
+  var gOff = gIndex * 12;
+  var speciesAndTera = dataView.getUint16(gOff, true);
+  dataView.setUint16(gOff, (speciesAndTera & 0x07FF) | ((newType & 0x1F) << 11), true);
+
+  var checksum = 0;
+  for (var h=0; h<24; h++) checksum = (checksum + dataView.getUint16(h*2, true)) & 0xFFFF;
+  view.setUint16(0x1C, checksum, true);
+
+  for (var e=0; e<12; e++)
+    dataView.setUint32(e*4, (dataView.getUint32(e*4, true) ^ key) >>> 0, true);
+  record.set(dataBytes, 0x20);
+  return record;
+}
+
+async function changePokemonTeraType(mon, loc, newType){
+  if (!loc) return;
+  var updatedRecord = setTeraTypeInRecord(mon.rawRecord, newType);
+
+  if (loc.type === 'party'){
+    writePartyBytes(currentSave, 0x0238 + loc.index*100, updatedRecord);
+    recomputeChecksum(currentSave, 1);
+    currentSave.party[loc.index] = decodePokemon(updatedRecord, true);
+  }else if (loc.type === 'box'){
+    var logicalOffset = 4 + (loc.box*30 + loc.slot)*80;
+    var touched = writeLogicalPCBytes(currentSave, logicalOffset, updatedRecord.subarray(0,80));
+    touched.forEach(function(id){ recomputeChecksum(currentSave, id); });
+    currentSave.boxes[loc.box][loc.slot] = decodePokemon(updatedRecord.subarray(0,80), false);
+  }else if (loc.type === 'storage'){
+    await storageReady;
+    assertStorageReadable();
+    var storageIndex = externalStorage.findIndex(function(entry){ return entry.id === loc.storageId; });
+    if (storageIndex < 0) throw new Error('External Storage entry no longer exists.');
+    externalStorage[storageIndex].raw80 = bytesToBase64(updatedRecord.subarray(0,80));
+    await persistExternalStorage();
+    renderStoragePanel();
+    return;
+  }else{
+    return;
+  }
+
+  markDirty();
+  await saveChangesToFile();
+}
+
 function refreshBoxLevels(){
   if (!currentSave) return;
   currentSave.boxes.forEach(function(box){
@@ -2241,6 +2315,7 @@ function openModal(mon, loc){
 
   var dg = el('div', {class:'detail-grid'});
   dg.appendChild(detailBlock('Held Item', itemName(mon.heldItem)));
+  dg.appendChild(detailBlock('Tera Type', teraTypeName(mon.teraType)));
   dg.appendChild(detailBlock('Ability', abilityDisplayName(mon.species, mon.abilitySlot) || ('Slot ' + (mon.abilitySlot + 1) + ' (unknown \u2014 load ability data)')));
   dg.appendChild(detailBlock('OT', mon.otName + ' (' + mon.otGender + ')'));
   dg.appendChild(detailBlock('OT ID', String(mon.otId & 0xFFFF).padStart(5,'0')));
@@ -2294,6 +2369,36 @@ function openModal(mon, loc){
     modal.appendChild(el('div', {class:'k', text:'Pokérus', style:'margin-top:14px;'}));
     var strain = mon.pokerus >> 4, days = mon.pokerus & 0x0F;
     modal.appendChild(el('div', {class:'v', text: strain > 0 ? ('Infected, strain ' + strain + ', ' + days + ' days left') : 'Cured'}));
+  }
+
+  if (loc && (loc.type === 'party' || loc.type === 'box' || loc.type === 'storage')){
+    var teraEditor = el('div', {style:'margin-top:18px; padding-top:16px; border-top:1px solid var(--line-soft);'});
+    teraEditor.appendChild(el('div', {class:'k', text:'Change Tera Type'}));
+    var teraControls = el('div', {style:'display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:7px;'});
+    var teraSelect = el('select', {style:'min-height:36px; color:var(--text); background:var(--panel-2); border:1px solid var(--line); border-radius:6px; padding:7px 10px;'});
+    TERA_TYPES.forEach(function(entry){
+      var option = el('option', {value:String(entry[0]), text:entry[1]});
+      if (entry[0] === mon.teraType) option.selected = true;
+      teraSelect.appendChild(option);
+    });
+    var teraApply = el('button', {class:'primary', text:'Apply Tera Type'});
+    teraApply.addEventListener('click', async function(){
+      teraApply.disabled = true;
+      try{
+        var newType = Number(teraSelect.value);
+        await changePokemonTeraType(mon, loc, newType);
+        root.innerHTML = '';
+        renderAll();
+        showNotice('Tera Type changed to ' + teraTypeName(newType) + (loc.type === 'storage' ? ' in External Storage.' : '. Save updated.'));
+      }catch(err){
+        showError('Could not change Tera Type: ' + err.message);
+        teraApply.disabled = false;
+      }
+    });
+    teraControls.appendChild(teraSelect);
+    teraControls.appendChild(teraApply);
+    teraEditor.appendChild(teraControls);
+    modal.appendChild(teraEditor);
   }
 
   if (loc && (loc.type === 'party' || loc.type === 'box')){
