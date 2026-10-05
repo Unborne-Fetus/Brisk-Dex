@@ -38,6 +38,10 @@ jobs:
         working-directory: brisk-dex
         run: python3 tools/extract_data.py "$GITHUB_WORKSPACE/brisk-emerald"
 
+      - name: Verify online battle effect coverage
+        working-directory: brisk-dex
+        run: npm run battle:coverage
+
       - name: Commit refreshed JSON
         working-directory: brisk-dex
         run: |
