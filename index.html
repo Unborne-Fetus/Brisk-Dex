@@ -2915,7 +2915,11 @@ function renderPokedexDetail(allSpecies, id, detail){
   movepool.appendChild(el('h4',{text:'Movepool'+(learnable.length?' · '+learnable.length+' moves':'')}));
   if(learnable.length){
     var moveGrid=el('div',{class:'dex-movepool'});
-    learnable.forEach(function(move){moveGrid.appendChild(el('div',{class:'dex-move-chip',text:move.name}));});
+    learnable.forEach(function(move){
+      var chip=el('button',{class:'dex-move-chip',text:move.name});
+      chip.addEventListener('click',function(){selectedMoveReferenceId=move.id;setMainTab('moves');});
+      moveGrid.appendChild(chip);
+    });
     movepool.appendChild(moveGrid);
   }else{
     movepool.appendChild(el('div',{class:'dex-muted',text:'No learnable-move data is available for this species in the currently loaded Brisk data.'}));
@@ -3128,6 +3132,190 @@ function renderItems(){
   detail.appendChild(locations);
 }
 
+function referenceSpeciesCard(speciesId){
+  var all=dexSpeciesData(), species=all[String(speciesId)]||{};
+  var card=el('button',{class:'reference-user'});
+  card.appendChild(makeIconEl({species:Number(speciesId),isShiny:false},'encounter-icon'));
+  var text=el('span',{style:'display:flex;flex-direction:column;min-width:0;text-align:left;'});
+  text.appendChild(el('strong',{text:dexSpeciesDisplayName(species)}));
+  if(species.formLabel) text.appendChild(el('small',{text:species.formLabel}));
+  card.appendChild(text);
+  card.addEventListener('click',function(){
+    selectedDexSpeciesId=Number(speciesId);
+    setMainTab('dex');
+  });
+  return card;
+}
+
+function moveLearners(moveId){
+  var all=dexSpeciesData();
+  return Object.keys(all).filter(function(speciesId){
+    return (all[speciesId].learnableMoves||[]).map(Number).includes(Number(moveId));
+  }).map(Number).sort(function(a,b){
+    var sa=all[String(a)]||{}, sb=all[String(b)]||{};
+    return Number(sa.nationalDex||99999)-Number(sb.nationalDex||99999)
+      || dexSpeciesDisplayName(sa).localeCompare(dexSpeciesDisplayName(sb));
+  });
+}
+
+function abilityUsers(abilityId){
+  var all=dexSpeciesData(), detail=ABILITY_DETAILS[String(abilityId)]||{};
+  return Object.keys(all).filter(function(speciesId){
+    var species=all[speciesId]||{};
+    if((species.abilityIds||[]).map(Number).includes(Number(abilityId))) return true;
+    return !(species.abilityIds||[]).length && (species.abilities||[]).includes(detail.name);
+  }).map(Number).sort(function(a,b){
+    var sa=all[String(a)]||{}, sb=all[String(b)]||{};
+    return Number(sa.nationalDex||99999)-Number(sb.nationalDex||99999)
+      || dexSpeciesDisplayName(sa).localeCompare(dexSpeciesDisplayName(sb));
+  });
+}
+
+function renderMoveTypeOptions(details){
+  var select=document.getElementById('move-type');
+  if(!select) return;
+  var previous=select.value||'all';
+  var types=[...new Set(Object.keys(details).map(function(id){return details[id]&&details[id].type;}).filter(Boolean))].sort();
+  select.innerHTML='';
+  select.appendChild(el('option',{value:'all',text:'All types'}));
+  types.forEach(function(type){select.appendChild(el('option',{value:type,text:type}));});
+  select.value=types.includes(previous)?previous:'all';
+}
+
+function renderMoves(){
+  var list=document.getElementById('move-list'), detail=document.getElementById('move-detail');
+  if(!list||!detail) return;
+  var all=Object.keys(MOVE_DETAILS||{}).length ? MOVE_DETAILS : Object.fromEntries(Object.keys(NAME_DATA.moves||{}).map(function(id){
+    return [id,{name:NAME_DATA.moves[id],constant:'MOVE_'+id,description:'',pp:(BUNDLED_DATA.movePP||{})[id]||0,flags:[]}];
+  }));
+  renderMoveTypeOptions(all);
+  var q=(document.getElementById('move-search').value||'').trim().toLowerCase();
+  var type=document.getElementById('move-type').value;
+  var category=document.getElementById('move-category').value;
+  var ids=Object.keys(all).filter(function(id){
+    var move=all[id]||{};
+    if(type!=='all'&&move.type!==type) return false;
+    if(category!=='all'&&move.category!==category) return false;
+    if(!q) return true;
+    var learnerNames=moveLearners(Number(id)).slice(0,80).map(speciesName);
+    var hay=[move.name,move.constant,move.description,move.type,move.category,move.target,move.effect].concat(move.flags||[],learnerNames);
+    return hay.filter(Boolean).join(' ').toLowerCase().includes(q);
+  }).sort(function(a,b){return String((all[a]||{}).name||'').localeCompare(String((all[b]||{}).name||''));});
+  document.getElementById('move-count').textContent=ids.length+' of '+Object.keys(all).length+' moves';
+  list.innerHTML=''; detail.innerHTML='';
+  if(!ids.length){list.appendChild(el('div',{class:'route-empty',text:Object.keys(all).length?'No moves match these filters.':'No move data is loaded.'}));return;}
+  if(!ids.includes(String(selectedMoveReferenceId))) selectedMoveReferenceId=Number(ids[0]);
+
+  appendChunkedButtons(list,ids,function(id){
+    var move=all[id]||{};
+    var btn=el('button',{class:'reference-entry'+(Number(id)===Number(selectedMoveReferenceId)?' active':'')});
+    btn.appendChild(el('strong',{text:move.name||moveName(Number(id))}));
+    btn.appendChild(el('small',{text:[move.type,move.category,move.power?('Power '+move.power):'Status'].filter(Boolean).join(' · ')}));
+    btn.addEventListener('click',function(){selectedMoveReferenceId=Number(id);renderMoves();});
+    return btn;
+  },(IS_ANDROID||IS_IOS)?100:ids.length);
+
+  var move=all[String(selectedMoveReferenceId)]||{};
+  var hero=el('section',{class:'reference-hero'});
+  hero.appendChild(el('div',{class:'dex-id',text:move.constant||('Move #'+selectedMoveReferenceId)}));
+  hero.appendChild(el('h2',{text:move.name||moveName(selectedMoveReferenceId)}));
+  if(move.type){
+    var typeRow=makeTypePills([move.type],true); if(typeRow) hero.appendChild(typeRow);
+  }
+  hero.appendChild(el('div',{class:move.description?'reference-description':'dex-muted',text:move.description||'No move description is present in the currently loaded Brisk data.'}));
+  detail.appendChild(hero);
+
+  var stats=el('section',{class:'reference-stats'});
+  [
+    ['Power',move.power>0?String(move.power):'—'],
+    ['Accuracy',move.accuracy>0?move.accuracy+'%':'—'],
+    ['PP',move.pp>0?String(move.pp):'—'],
+    ['Category',move.category||'Unknown'],
+    ['Priority',String(move.priority||0)],
+    ['Target',move.target||'Unknown'],
+    ['Effect',move.effect||'Unknown']
+  ].forEach(function(pair){
+    var box=el('div',{class:'reference-stat'});
+    box.appendChild(el('div',{class:'k',text:pair[0]}));
+    box.appendChild(el('div',{class:'v',text:pair[1]}));
+    stats.appendChild(box);
+  });
+  detail.appendChild(stats);
+  if((move.flags||[]).length){
+    var flags=el('div',{class:'reference-flags'});
+    (move.flags||[]).forEach(function(flag){flags.appendChild(el('span',{class:'reference-flag',text:flag}));});
+    detail.appendChild(flags);
+  }
+
+  var learners=moveLearners(selectedMoveReferenceId);
+  var users=el('section',{class:'dex-card',style:'margin-top:12px;'});
+  users.appendChild(el('h4',{text:'Pokémon That Learn It · '+learners.length}));
+  if(learners.length){
+    var grid=el('div',{class:'reference-users'});
+    learners.forEach(function(speciesId){grid.appendChild(referenceSpeciesCard(speciesId));});
+    users.appendChild(grid);
+  }else users.appendChild(el('div',{class:'dex-muted',text:'No Brisk species is listed as learning this move.'}));
+  detail.appendChild(users);
+}
+
+function renderAbilities(){
+  var list=document.getElementById('ability-list'), detail=document.getElementById('ability-detail');
+  if(!list||!detail) return;
+  var all=Object.keys(ABILITY_DETAILS||{}).length ? ABILITY_DETAILS : Object.fromEntries(Object.keys(NAME_DATA.abilities||{}).map(function(id){
+    return [id,{name:NAME_DATA.abilities[id],constant:'ABILITY_'+id,description:'',flags:[]}];
+  }));
+  var q=(document.getElementById('ability-search').value||'').trim().toLowerCase();
+  var ids=Object.keys(all).filter(function(id){
+    var ability=all[id]||{};
+    if(!q) return true;
+    var userNames=abilityUsers(Number(id)).slice(0,80).map(speciesName);
+    return [ability.name,ability.constant,ability.description].concat(ability.flags||[],userNames).filter(Boolean).join(' ').toLowerCase().includes(q);
+  }).sort(function(a,b){return String((all[a]||{}).name||'').localeCompare(String((all[b]||{}).name||''));});
+  document.getElementById('ability-count').textContent=ids.length+' of '+Object.keys(all).length+' abilities';
+  list.innerHTML=''; detail.innerHTML='';
+  if(!ids.length){list.appendChild(el('div',{class:'route-empty',text:Object.keys(all).length?'No abilities match this search.':'No ability data is loaded.'}));return;}
+  if(!ids.includes(String(selectedAbilityReferenceId))) selectedAbilityReferenceId=Number(ids[0]);
+
+  appendChunkedButtons(list,ids,function(id){
+    var ability=all[id]||{};
+    var users=abilityUsers(Number(id));
+    var btn=el('button',{class:'reference-entry'+(Number(id)===Number(selectedAbilityReferenceId)?' active':'')});
+    btn.appendChild(el('strong',{text:ability.name||('Ability #'+id)}));
+    btn.appendChild(el('small',{text:users.length+' Pokémon · '+(ability.constant||'')}));
+    btn.addEventListener('click',function(){selectedAbilityReferenceId=Number(id);renderAbilities();});
+    return btn;
+  },(IS_ANDROID||IS_IOS)?100:ids.length);
+
+  var ability=all[String(selectedAbilityReferenceId)]||{};
+  var hero=el('section',{class:'reference-hero'});
+  hero.appendChild(el('div',{class:'dex-id',text:ability.constant||('Ability #'+selectedAbilityReferenceId)}));
+  hero.appendChild(el('h2',{text:ability.name||('Ability #'+selectedAbilityReferenceId)}));
+  hero.appendChild(el('div',{class:ability.description?'reference-description':'dex-muted',text:ability.description||'No ability description is present in the currently loaded Brisk data.'}));
+  detail.appendChild(hero);
+
+  var stats=el('section',{class:'reference-stats'});
+  var rating=el('div',{class:'reference-stat'});
+  rating.appendChild(el('div',{class:'k',text:'AI Rating'}));
+  rating.appendChild(el('div',{class:'v',text:ability.aiRating==null?'—':String(ability.aiRating)}));
+  stats.appendChild(rating);
+  detail.appendChild(stats);
+  if((ability.flags||[]).length){
+    var flags=el('div',{class:'reference-flags'});
+    (ability.flags||[]).forEach(function(flag){flags.appendChild(el('span',{class:'reference-flag',text:flag}));});
+    detail.appendChild(flags);
+  }
+
+  var species=abilityUsers(selectedAbilityReferenceId);
+  var users=el('section',{class:'dex-card',style:'margin-top:12px;'});
+  users.appendChild(el('h4',{text:'Pokémon With This Ability · '+species.length}));
+  if(species.length){
+    var grid=el('div',{class:'reference-users'});
+    species.forEach(function(speciesId){grid.appendChild(referenceSpeciesCard(speciesId));});
+    users.appendChild(grid);
+  }else users.appendChild(el('div',{class:'dex-muted',text:'No Brisk species is listed with this ability.'}));
+  detail.appendChild(users);
+}
+
 function renderChanges(){
   var root=document.getElementById('changes-grid');
   if(!root) return;
@@ -3158,6 +3346,8 @@ function renderCurrentReferenceTab(){
   if(currentMainTab==='routes') renderRouteEncounters();
   else if(currentMainTab==='dex') renderPokedex();
   else if(currentMainTab==='trainers') renderTrainerTeams();
+  else if(currentMainTab==='moves') renderMoves();
+  else if(currentMainTab==='abilities') renderAbilities();
   else if(currentMainTab==='items') renderItems();
   else if(currentMainTab==='changes') renderChanges();
 }
@@ -3167,13 +3357,17 @@ function setMainTab(tabName){
   var routes = tabName === 'routes';
   var dex = tabName === 'dex';
   var trainers = tabName === 'trainers';
+  var moves = tabName === 'moves';
+  var abilities = tabName === 'abilities';
   var items = tabName === 'items';
   var changes = tabName === 'changes';
-  var save = !routes && !dex && !trainers && !items && !changes;
+  var save = !routes && !dex && !trainers && !moves && !abilities && !items && !changes;
   document.getElementById('save-tab-panel').style.display = save ? 'block' : 'none';
   document.getElementById('routes-tab-panel').style.display = routes ? 'block' : 'none';
   document.getElementById('dex-tab-panel').style.display = dex ? 'block' : 'none';
   document.getElementById('trainers-tab-panel').style.display = trainers ? 'block' : 'none';
+  document.getElementById('moves-tab-panel').style.display = moves ? 'block' : 'none';
+  document.getElementById('abilities-tab-panel').style.display = abilities ? 'block' : 'none';
   document.getElementById('items-tab-panel').style.display = items ? 'block' : 'none';
   document.getElementById('changes-tab-panel').style.display = changes ? 'block' : 'none';
   document.getElementById('tab-save').classList.toggle('active', save);
@@ -3184,6 +3378,10 @@ function setMainTab(tabName){
   document.getElementById('tab-dex').setAttribute('aria-selected', String(dex));
   document.getElementById('tab-trainers').classList.toggle('active', trainers);
   document.getElementById('tab-trainers').setAttribute('aria-selected', String(trainers));
+  document.getElementById('tab-moves').classList.toggle('active', moves);
+  document.getElementById('tab-moves').setAttribute('aria-selected', String(moves));
+  document.getElementById('tab-abilities').classList.toggle('active', abilities);
+  document.getElementById('tab-abilities').setAttribute('aria-selected', String(abilities));
   document.getElementById('tab-items').classList.toggle('active', items);
   document.getElementById('tab-items').setAttribute('aria-selected', String(items));
   document.getElementById('tab-changes').classList.toggle('active', changes);
@@ -3299,6 +3497,8 @@ function debounce(fn,wait){
 }
 var renderPokedexDebounced=debounce(renderPokedex,120);
 var renderItemsDebounced=debounce(renderItems,120);
+var renderMovesDebounced=debounce(renderMoves,120);
+var renderAbilitiesDebounced=debounce(renderAbilities,120);
 var renderTrainerTeamsDebounced=debounce(renderTrainerTeams,120);
 var renderRouteEncountersDebounced=debounce(renderRouteEncounters,120);
 var renderChangesDebounced=debounce(renderChanges,120);
@@ -3310,8 +3510,14 @@ document.getElementById('tab-save').addEventListener('click', function(){ setMai
 document.getElementById('tab-routes').addEventListener('click', function(){ setMainTab('routes'); });
 document.getElementById('tab-dex').addEventListener('click', function(){ setMainTab('dex'); });
 document.getElementById('tab-trainers').addEventListener('click', function(){ setMainTab('trainers'); });
+document.getElementById('tab-moves').addEventListener('click', function(){ setMainTab('moves'); });
+document.getElementById('tab-abilities').addEventListener('click', function(){ setMainTab('abilities'); });
 document.getElementById('tab-items').addEventListener('click', function(){ setMainTab('items'); });
 document.getElementById('tab-changes').addEventListener('click', function(){ setMainTab('changes'); });
+document.getElementById('move-search').addEventListener('input', renderMovesDebounced);
+document.getElementById('move-type').addEventListener('change', renderMoves);
+document.getElementById('move-category').addEventListener('change', renderMoves);
+document.getElementById('ability-search').addEventListener('input', renderAbilitiesDebounced);
 document.getElementById('item-search').addEventListener('input', renderItemsDebounced);
 document.getElementById('trainer-search').addEventListener('input', renderTrainerTeamsDebounced);
 document.getElementById('trainer-class').addEventListener('change', renderTrainerTeams);
