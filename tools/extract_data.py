@@ -24,6 +24,10 @@ import shutil
 import struct
 import sys
 import zlib
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
 
 TYPE_NAMES = {
     "NONE": None, "NORMAL": "Normal", "FIGHTING": "Fighting", "FLYING": "Flying",
@@ -45,18 +49,52 @@ def read_jasc_palette(palette_file):
         return None
     return colors
 
-def shiny_palette_png(source_png, palette_file, normal_palette_file, target_png):
-    """Write a sprite sheet with Brisk Emerald's exact species shiny palette."""
-    if not os.path.isfile(source_png) or not os.path.isfile(palette_file):
-        return False
+def png_palette(source_png):
     try:
-        colors = read_jasc_palette(palette_file)
-        normal_colors = read_jasc_palette(normal_palette_file)
-        if not colors or not normal_colors or len(colors) != len(normal_colors):
-            return False
         png = open(source_png, 'rb').read()
         if not png.startswith(b'\x89PNG\r\n\x1a\n'):
+            return None
+        pos = 8
+        while pos < len(png):
+            size = struct.unpack('>I', png[pos:pos + 4])[0]
+            kind = png[pos + 4:pos + 8]
+            data = png[pos + 8:pos + 8 + size]
+            if kind == b'PLTE' and size % 3 == 0:
+                return [tuple(data[i:i + 3]) for i in range(0, size, 3)]
+            pos += size + 12
+    except (OSError, ValueError, struct.error):
+        pass
+    return None
+
+def palette_variant_png(source_png, normal_palette_file, shiny_palette_file, want_shiny, target_png):
+    """Render a source sprite with the requested Brisk normal/shiny palette.
+
+    Some Expansion back PNGs are stored with their shiny palette embedded while
+    fronts are stored normal. Detect which palette the source most closely uses
+    before remapping so normal and shiny exports are always distinct/correct.
+    """
+    if not os.path.isfile(source_png):
+        return False
+    try:
+        normal_colors = read_jasc_palette(normal_palette_file)
+        shiny_colors = read_jasc_palette(shiny_palette_file)
+        source_colors = png_palette(source_png)
+        if not normal_colors or not shiny_colors or not source_colors:
             return False
+
+        def palette_distance(reference):
+            limit = min(len(source_colors), len(reference))
+            if not limit:
+                return float('inf')
+            return sum(
+                sum((source_colors[i][channel] - reference[i][channel]) ** 2 for channel in range(3))
+                for i in range(limit)
+            ) / limit
+
+        reference = shiny_colors if palette_distance(shiny_colors) < palette_distance(normal_colors) else normal_colors
+        target = shiny_colors if want_shiny else normal_colors
+
+        png = open(source_png, 'rb').read()
         chunks = []
         pos = 8
         replaced = False
@@ -65,25 +103,15 @@ def shiny_palette_png(source_png, palette_file, normal_palette_file, target_png)
             kind = png[pos + 4:pos + 8]
             data = png[pos + 8:pos + 8 + size]
             if kind == b'PLTE':
-                source_colors = [tuple(data[i:i + 3]) for i in range(0, size, 3)]
-                if size % 3:
-                    return False
-                if len(source_colors) <= len(colors):
-                    # Standard indexed sheets use the same palette order, but
-                    # may omit unused entries from the end of the palette.
-                    remapped = colors[:len(source_colors)]
-                else:
-                    # Some modern static front sprites are expanded to 256
-                    # palette entries. Match each shade to its nearest base
-                    # color, then carry its shade offset into the shiny color.
-                    remapped = []
-                    for source_color in source_colors:
-                        nearest = min(range(len(normal_colors)), key=lambda i: sum(
-                            (source_color[channel] - normal_colors[i][channel]) ** 2
-                            for channel in range(3)))
-                        remapped.append(tuple(max(0, min(255,
-                            colors[nearest][channel] + source_color[channel] - normal_colors[nearest][channel]))
-                            for channel in range(3)))
+                embedded = [tuple(data[i:i + 3]) for i in range(0, size, 3)]
+                remapped = []
+                for source_color in embedded:
+                    nearest = min(range(len(reference)), key=lambda i: sum(
+                        (source_color[channel] - reference[i][channel]) ** 2
+                        for channel in range(3)))
+                    remapped.append(tuple(max(0, min(255,
+                        target[nearest][channel] + source_color[channel] - reference[nearest][channel]))
+                        for channel in range(3)))
                 data = bytes(channel for color in remapped for channel in color)
                 replaced = True
             crc = zlib.crc32(kind + data) & 0xFFFFFFFF
@@ -96,6 +124,124 @@ def shiny_palette_png(source_png, palette_file, normal_palette_file, target_png)
         return True
     except (OSError, ValueError, IndexError, struct.error):
         return False
+
+def normalize_sprite_png(source_png, target_png, first_frame=False, transparent_bg=False):
+    """Copy a PNG for the companion app, optionally taking frame 1 and clearing connected border backgrounds."""
+    if not os.path.isfile(source_png):
+        return False
+    if Image is None:
+        shutil.copyfile(source_png, target_png)
+        return True
+    try:
+        with Image.open(source_png) as source:
+            image = source.convert("RGBA")
+            if first_frame and image.height > image.width and image.height >= image.width * 2:
+                image = image.crop((0, 0, image.width, image.width))
+            elif first_frame and image.width > image.height and image.width >= image.height * 2:
+                image = image.crop((0, 0, image.height, image.height))
+
+            if transparent_bg and image.width and image.height:
+                pixels = image.load()
+                border = []
+                for x in range(image.width):
+                    border.append(pixels[x, 0])
+                    border.append(pixels[x, image.height - 1])
+                for y in range(image.height):
+                    border.append(pixels[0, y])
+                    border.append(pixels[image.width - 1, y])
+
+                opaque_border = [px for px in border if px[3] > 16]
+                if opaque_border:
+                    # Item art is palette-based. The most common border color is
+                    # the canvas color, even when one corner contains stray pixels.
+                    counts = {}
+                    for px in opaque_border:
+                        rgb = px[:3]
+                        counts[rgb] = counts.get(rgb, 0) + 1
+                    bg = max(counts, key=counts.get)
+
+                    def near_bg(px):
+                        if px[3] <= 16:
+                            return True
+                        r, g, b = px[:3]
+                        return abs(r - bg[0]) + abs(g - bg[1]) + abs(b - bg[2]) <= 30
+
+                    # Only remove pixels connected to the outer edge. This avoids
+                    # deleting same-colored highlights/details inside the icon.
+                    stack = []
+                    seen = set()
+                    for x in range(image.width):
+                        stack.append((x, 0))
+                        stack.append((x, image.height - 1))
+                    for y in range(image.height):
+                        stack.append((0, y))
+                        stack.append((image.width - 1, y))
+
+                    while stack:
+                        x, y = stack.pop()
+                        if (x, y) in seen or x < 0 or y < 0 or x >= image.width or y >= image.height:
+                            continue
+                        seen.add((x, y))
+                        px = pixels[x, y]
+                        if not near_bg(px):
+                            continue
+                        pixels[x, y] = (px[0], px[1], px[2], 0)
+                        stack.extend(((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)))
+
+            image.save(target_png)
+        return True
+    except (OSError, ValueError):
+        shutil.copyfile(source_png, target_png)
+        return True
+
+
+def extract_feature_catalog(repo):
+    """Turn Expansion's FEATURES.md into categorized readable entries, then append Brisk-specific changes."""
+    text = read(os.path.join(repo, "FEATURES.md")) or ""
+    categories = []
+    current = None
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line.startswith("## ") and line not in ("## Table of Contents", "## Configuration files"):
+            current = {"category": re.sub(r'^##\s+', '', line).strip(), "changes": []}
+            categories.append(current)
+            continue
+        if current and line.startswith("- "):
+            cleaned = re.sub(r'\[(.*?)\]\([^)]*\)', r'\1', line[2:])
+            cleaned = cleaned.replace("***", "").replace("**", "").replace("*", "")
+            cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+            if cleaned and not cleaned.startswith("["):
+                current["changes"].append(cleaned)
+
+    brisk = [
+        ("Pokémon & Encounters", "All generations through Gen IX are represented, with Brisk-specific encounter tables and expanded land/water slots."),
+        ("Pokémon & Encounters", "Land encounters use 25 slots and water encounters use 11 slots; SPECIES_NONE slots are skipped so valid entries share the available chance."),
+        ("Pokémon & Encounters", "Mirage Island is permanently available."),
+        ("Pokémon & Encounters", "Special static encounters include Kubfu in Meteor Falls and Meloetta in Artisan Cave B1F."),
+        ("Pokédex & Catching", "The National Pokédex is enabled from the start."),
+        ("Pokédex & Catching", "Ball selection can display catch-rate information, and the last-used ball shortcut is enabled."),
+        ("Pokédex & Catching", "Catch-swap HM restrictions are disabled."),
+        ("Battle Mechanics", "Battle gimmick handling supports Mega Evolution, Ultra Burst, Z-Moves, Terastallization, Dynamax and Gigantamax with Brisk-specific priority handling."),
+        ("Battle Mechanics", "The Tera Orb recharges when the party is healed."),
+        ("Battle Mechanics", "Smart wild AI support is enabled for configured encounters."),
+        ("Battle Mechanics", "Shiny odds are configured to Brisk's custom value."),
+        ("Battle Mechanics", "Pokérus spread odds are increased from the standard behavior."),
+        ("Progression & Quality of Life", "Fly can be used from the beginning instead of waiting for the Fortree badge."),
+        ("Progression & Quality of Life", "EXP Share behavior was changed so shared experience does not reduce the calculated award."),
+        ("Progression & Quality of Life", "Battle speed and overworld speed-up options are available."),
+        ("Progression & Quality of Life", "The player can use Poke Rider-style travel support where configured."),
+        ("Trainers & Challenges", "Route 135's Champion Archives contains high-level battles against champions and major trainers including Blue, Red, Wallace, Cynthia, Iris, Diantha, Leon, Nemona and Volo."),
+        ("Trainers & Challenges", "A custom Unborne Champion battle uses an omniscient AI configuration and a custom reward."),
+        ("Maps & Events", "Slateport includes a custom stone-selling clerk."),
+        ("Maps & Events", "Rayquaza-related progression can award the Mystic Ticket."),
+        ("Storage & Systems", "Brisk expands and modifies internal systems beyond vanilla Emerald, including save-backed Pokémon data and modern species/forms from pokeemerald-expansion.")
+    ]
+    brisk_map = {}
+    for category, change in brisk:
+        brisk_map.setdefault(category, []).append(change)
+    out = [{"category": "Brisk-specific · " + category, "changes": changes} for category, changes in brisk_map.items()]
+    out.extend({"category": "Expansion · " + row["category"], "changes": row["changes"]} for row in categories if row["changes"])
+    return out
 
 def read(path):
     if not os.path.isfile(path):
@@ -257,6 +403,28 @@ def extract_string_field(block, *field_names):
         if m:
             return m.group(1).replace('\\"', '"')
     return None
+
+def extract_numeric_field(block, field, default=None):
+    """Read a numeric struct field, preferring the modern/true side of simple ternaries."""
+    if not block:
+        return default
+    field_re = re.escape(field)
+    direct = re.search(field_re + r'\s*=\s*(-?\d+)\b', block)
+    if direct:
+        return int(direct.group(1))
+    ternary = re.search(field_re + r'\s*=\s*[^,?]+\?\s*(-?\d+)\s*:\s*(-?\d+)', block)
+    if ternary:
+        return int(ternary.group(1))
+    return default
+
+def extract_enum_field(block, field, prefix, default=None):
+    if not block:
+        return default
+    match = re.search(re.escape(field) + r'\s*=\s*[^,\n]*?\b' + re.escape(prefix) + r'([A-Za-z0-9_]+)', block)
+    return match.group(1) if match else default
+
+def pretty_constant(value):
+    return (value or "").replace("_", " ").title()
 
 def extract_types(block):
     # accepts ".types = { TYPE_X, TYPE_Y }" or ".types = ANY_MACRO_NAME(TYPE_X, TYPE_Y)"
@@ -757,6 +925,7 @@ def main():
     abilities_const_text = find_source(repo, "include/constants/abilities.h")
     items_const_text = find_source(repo, "include/constants/items.h")
     pokemon_const_text = find_source(repo, "include/constants/pokemon.h")
+    pokedex_const_text = find_source(repo, "include/constants/pokedex.h")
     shiny_odds_match = re.search(r'^\s*#define\s+SHINY_ODDS\s+(\d+)', pokemon_const_text, re.MULTILINE)
     shiny_odds = int(shiny_odds_match.group(1)) if shiny_odds_match else 8
 
@@ -764,6 +933,7 @@ def main():
     move_ids = parse_constants(moves_const_text, "MOVE_")
     ability_ids = parse_constants(abilities_const_text, "ABILITY_")
     item_ids = parse_constants(items_const_text, "ITEM_")
+    national_dex_ids = parse_constants(pokedex_const_text, "NATIONAL_DEX_")
 
     print("  species constants:", len(species_ids))
     print("  move constants:", len(move_ids))
@@ -822,7 +992,24 @@ def main():
             ab_name = extract_string_field(ab_block, '.name') if ab_block else None
             ability_names.append(ab_name or a.replace('_', ' ').title())
         growth = re.search(r'\.growthRate\s*=\s*GROWTH_([A-Za-z0-9_]+)', data_block)
-        icon_sprite = re.search(r'\.iconSprite\s*=\s*gMonIcon_([A-Za-z0-9_]+)', block)
+        icon_sprite = re.search(r'\.iconSprite\s*=\s*gMonIcon_([A-Za-z0-9_]+)', data_block)
+        nat_dex_match = re.search(r'\.natDexNum\s*=\s*NATIONAL_DEX_([A-Za-z0-9_]+)', data_block)
+        nat_dex_name = nat_dex_match.group(1) if nat_dex_match else None
+        national_dex = national_dex_ids.get(nat_dex_name, 0) if nat_dex_name else 0
+        is_mega = bool(re.search(r'(^|_)MEGA(?:_|$)', name))
+        is_gmax = bool(re.search(r'(^|_)(?:GMAX|GIGANTAMAX)(?:_|$)', name))
+        form_label = None
+        if is_mega:
+            if name.endswith('_MEGA_X'):
+                form_label = 'Mega X'
+            elif name.endswith('_MEGA_Y'):
+                form_label = 'Mega Y'
+            else:
+                form_label = 'Mega'
+        elif is_gmax:
+            form_label = 'Gigantamax'
+        elif nat_dex_name and name != nat_dex_name and name.startswith(nat_dex_name + '_'):
+            form_label = name[len(nat_dex_name) + 1:].replace('_', ' ').title()
         base_stats = []
         for stat_field in ('.baseHP', '.baseAttack', '.baseDefense', '.baseSpeed', '.baseSpAttack', '.baseSpDefense'):
             stat_match = re.search(re.escape(stat_field) + r'\s*=\s*(\d+)', data_block)
@@ -847,12 +1034,17 @@ def main():
             "name": display_name,
             "types": types,
             "abilities": ability_names,
+            "abilityIds": [ability_ids.get(a) for a in ability_names_raw if a and ability_ids.get(a)],
             "growthRate": growth.group(1).lower() if growth else None,
             "baseStats": base_stats,
             "friendship": int(friendship_match.group(1)) if friendship_match else 70,
             "genderRatio": gender_ratio,
             "iconSprite": icon_sprite.group(1) if icon_sprite else name.title(),
             "constant": name,
+            "nationalDex": national_dex,
+            "formLabel": form_label,
+            "isMega": is_mega,
+            "isGmax": is_gmax,
             "pokedexEntry": pokedex_entry
         }
 
@@ -902,14 +1094,45 @@ def main():
 
     out_moves = {}
     out_move_pp = {}
+    move_details = {}
+    move_flag_fields = (
+        "makesContact", "punchingMove", "bitingMove", "ballisticMove", "soundMove",
+        "powderMove", "danceMove", "slicingMove", "windMove", "snatchAffected",
+        "magicCoatAffected", "protectAffected", "mirrorMoveBanned", "metronomeBanned",
+        "sketchBanned", "assistBanned"
+    )
     for name, mid in move_ids.items():
         if mid == 0:
             continue
         block = move_blocks.get(name)
         move_name = extract_string_field(block, '.name') if block else None
-        out_moves[str(mid)] = move_name or name.replace('_', ' ').title()
-        pp_match = re.search(r'\.pp\s*=\s*(\d+)', block) if block else None
-        out_move_pp[str(mid)] = int(pp_match.group(1)) if pp_match else 10
+        display_move_name = move_name or name.replace('_', ' ').title()
+        out_moves[str(mid)] = display_move_name
+        pp = extract_numeric_field(block, '.pp', 0) if block else 0
+        out_move_pp[str(mid)] = pp or 0
+        type_constant = extract_enum_field(block, '.type', 'TYPE_') if block else None
+        category_constant = extract_enum_field(block, '.category', 'DAMAGE_CATEGORY_') if block else None
+        target_constant = extract_enum_field(block, '.target', 'TARGET_') if block else None
+        effect_constant = extract_enum_field(block, '.effect', 'EFFECT_') if block else None
+        flags = []
+        if block:
+            for flag in move_flag_fields:
+                if re.search(r'\.' + re.escape(flag) + r'\s*=\s*TRUE\b', block):
+                    flags.append(re.sub(r'(?<!^)(?=[A-Z])', ' ', flag).title())
+        move_details[str(mid)] = {
+            "name": display_move_name,
+            "constant": "MOVE_" + name,
+            "description": extract_compound_field(block, '.description') if block else None,
+            "power": extract_numeric_field(block, '.power', 0) if block else 0,
+            "accuracy": extract_numeric_field(block, '.accuracy', 0) if block else 0,
+            "pp": pp or 0,
+            "priority": extract_numeric_field(block, '.priority', 0) if block else 0,
+            "type": TYPE_NAMES.get(type_constant) if type_constant else None,
+            "category": pretty_constant(category_constant) if category_constant else None,
+            "target": pretty_constant(target_constant) if target_constant else None,
+            "effect": pretty_constant(effect_constant) if effect_constant else None,
+            "flags": flags,
+        }
 
     # Build a species-specific pool from every move that species can learn.
     # Form constants fall back through their underscore-separated parent names.
@@ -929,12 +1152,34 @@ def main():
         species["learnableMoves"] = numeric_moves
 
     out_abilities = {}
+    ability_details = {}
+    ability_flag_fields = (
+        "breakable", "cantBeSwapped", "cantBeTraced", "cantBeCopied",
+        "cantBeSuppressed", "cantBeOverwritten", "failsOnImposter",
+        "suppressesWeather"
+    )
     for name, aid in ability_ids.items():
         if aid == 0:
             continue
         block = ability_blocks.get(name)
         ab_name = extract_string_field(block, '.name') if block else None
-        out_abilities[str(aid)] = ab_name or name.replace('_', ' ').title()
+        display_ability_name = ab_name or name.replace('_', ' ').title()
+        description = extract_compound_field(block, '.description') if block else None
+        if (display_ability_name or "").strip() == "-------" or re.fullmatch(r'ABILITY_\d+', "ABILITY_" + name) or (description or "").strip().lower() == "no special ability.":
+            continue
+        out_abilities[str(aid)] = display_ability_name
+        flags = []
+        if block:
+            for flag in ability_flag_fields:
+                if re.search(r'\.' + re.escape(flag) + r'\s*=\s*TRUE\b', block):
+                    flags.append(re.sub(r'(?<!^)(?=[A-Z])', ' ', flag).title())
+        ability_details[str(aid)] = {
+            "name": display_ability_name,
+            "constant": "ABILITY_" + name,
+            "description": extract_compound_field(block, '.description') if block else None,
+            "aiRating": extract_numeric_field(block, '.aiRating', None) if block else None,
+            "flags": flags,
+        }
 
     trainer_locations, item_locations = extract_reference_locations(repo)
 
@@ -947,19 +1192,23 @@ def main():
         item_name = extract_string_field(block, '.name') if block else None
         display_item_name = item_name or name.replace('_', ' ').title()
         out_items[str(iid)] = display_item_name
+        icon_match = re.search(r'\.iconPic\s*=\s*gItemIcon_([A-Za-z0-9_]+)', block or "")
         item_details[str(iid)] = {
             "name": display_item_name,
             "constant": "ITEM_" + name,
             "description": extract_compound_field(block, '.description') if block else None,
-            "locations": item_locations.get("ITEM_" + name, [])
+            "locations": item_locations.get("ITEM_" + name, []),
+            "iconKey": icon_match.group(1) if icon_match else None
         }
 
     route_encounters = extract_route_encounters(repo, species_ids)
     trainer_teams = extract_trainer_teams(repo)
+    change_catalog = extract_feature_catalog(repo)
     for trainer in trainer_teams:
         trainer["locations"] = trainer_locations.get(trainer["constant"], [])
-    data = {"species": out_species, "moves": out_moves, "movePP": out_move_pp, "abilities": out_abilities,
-            "items": out_items, "itemDetails": item_details, "routeEncounters": route_encounters, "shinyOdds": shiny_odds}
+    data = {"species": out_species, "moves": out_moves, "movePP": out_move_pp, "moveDetails": move_details,
+            "abilities": out_abilities, "abilityDetails": ability_details, "items": out_items, "itemDetails": item_details, "routeEncounters": route_encounters,
+            "changes": change_catalog, "shinyOdds": shiny_odds}
     with open("brisk-dex-data.json", "w", encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
     with open("brisk-dex-trainer-teams.json", "w", encoding='utf-8') as f:
@@ -1058,8 +1307,8 @@ def main():
                     if os.path.abspath(current) == os.path.abspath(gfx_dir):
                         break
                     current = os.path.dirname(current)
-                if front_path and palette_path and normal_palette_path and shiny_palette_png(
-                        front_path, palette_path, normal_palette_path,
+                if front_path and palette_path and normal_palette_path and palette_variant_png(
+                        front_path, normal_palette_path, palette_path, True,
                         os.path.join(icons_out, sid + "_shiny.png")):
                     shiny_found += 1
             found += 1
@@ -1072,6 +1321,110 @@ def main():
     else:
         print()
         print("No graphics/pokemon folder found at", gfx_dir, "-- skipping icon export.")
+
+    # Export item icons using the exact graphics symbol referenced by each item.
+    item_graphics_text = find_source(repo, "src/data/graphics/items.h")
+    item_icon_sources = {}
+    for match in re.finditer(r'const\s+u32\s+gItemIcon_([A-Za-z0-9_]+)\[\]\s*=\s*INCGFX_U32\("([^"]+\.png)"', item_graphics_text or ""):
+        item_icon_sources[match.group(1)] = match.group(2)
+    items_out = "brisk-dex-items"
+    os.makedirs(items_out, exist_ok=True)
+    for filename in os.listdir(items_out):
+        if filename.endswith(".png"):
+            os.remove(os.path.join(items_out, filename))
+    for iid, details in item_details.items():
+        rel = item_icon_sources.get(details.get("iconKey"))
+        if not rel:
+            continue
+        source = os.path.join(repo, rel)
+        if os.path.isfile(source):
+            target = iid + ".png"
+            normalize_sprite_png(source, os.path.join(items_out, target), transparent_bg=True)
+            details["icon"] = items_out + "/" + target
+
+    # Export front/back and shiny front/back species artwork for the Pokédex.
+    sprites_out = "brisk-dex-sprites"
+    os.makedirs(sprites_out, exist_ok=True)
+    for filename in os.listdir(sprites_out):
+        if filename.endswith(".png"):
+            os.remove(os.path.join(sprites_out, filename))
+    for sid, species in out_species.items():
+        sprite_name = species.get("iconSprite") or species.get("constant", "").replace("_", "").title()
+        sprite_key = re.sub(r'[_-]', '', sprite_name).lower()
+        folder = by_sprite.get(sprite_key)
+        if not folder:
+            parts = re.findall(r'[A-Z]?[a-z0-9]+|[A-Z]+(?=[A-Z]|$)', sprite_name)
+            while len(parts) > 1 and not folder:
+                parts.pop()
+                folder = by_sprite.get(''.join(parts).lower())
+        if not folder:
+            continue
+        front_source = next((os.path.join(folder, fn) for fn in ("front.png", "anim_front.png") if os.path.isfile(os.path.join(folder, fn))), None)
+        back_source = next((os.path.join(folder, fn) for fn in ("back.png", "anim_back.png") if os.path.isfile(os.path.join(folder, fn))), None)
+        current = folder
+        shiny_palette = normal_palette = None
+        while True:
+            if shiny_palette is None and os.path.isfile(os.path.join(current, "shiny.pal")):
+                shiny_palette = os.path.join(current, "shiny.pal")
+            if normal_palette is None and os.path.isfile(os.path.join(current, "normal.pal")):
+                normal_palette = os.path.join(current, "normal.pal")
+            if shiny_palette and normal_palette:
+                break
+            if os.path.abspath(current) == os.path.abspath(gfx_dir):
+                break
+            current = os.path.dirname(current)
+
+        for side, source in (("front", front_source), ("back", back_source)):
+            if not source:
+                continue
+            for want_shiny, suffix, field in (
+                (False, "", side + "Sprite"),
+                (True, "_shiny", side + "ShinySprite"),
+            ):
+                final = os.path.join(sprites_out, sid + "_" + side + suffix + ".png")
+                temporary = os.path.join(sprites_out, sid + "_" + side + suffix + "_sheet.png")
+                rendered = False
+                if shiny_palette and normal_palette:
+                    rendered = palette_variant_png(source, normal_palette, shiny_palette, want_shiny, temporary)
+                if rendered:
+                    normalize_sprite_png(temporary, final, first_frame=True, transparent_bg=True)
+                    try:
+                        os.remove(temporary)
+                    except OSError:
+                        pass
+                elif not want_shiny:
+                    normalize_sprite_png(source, final, first_frame=True, transparent_bg=True)
+                    rendered = True
+                if rendered or os.path.isfile(final):
+                    species[field] = sprites_out + "/" + sid + "_" + side + suffix + ".png"
+
+    # Export every trainer battle portrait referenced by trainers.party.
+    trainer_front_dir = os.path.join(repo, "graphics", "trainers", "front_pics")
+    trainer_pics_out = "brisk-dex-trainer-pics"
+    os.makedirs(trainer_pics_out, exist_ok=True)
+    for filename in os.listdir(trainer_pics_out):
+        if filename.endswith(".png"):
+            os.remove(os.path.join(trainer_pics_out, filename))
+    if os.path.isdir(trainer_front_dir):
+        available = {os.path.splitext(fn)[0].lower(): fn for fn in os.listdir(trainer_front_dir) if fn.lower().endswith(".png")}
+        for trainer in trainer_teams:
+            pic = (trainer.get("pic") or "").strip()
+            key = re.sub(r'^TRAINER_PIC_(?:FRONT_)?', '', pic, flags=re.I).lower()
+            key = key.replace(" ", "_")
+            candidates = [key, key.replace("pkmn_", "pokemon_")]
+            source_name = next((available[k] for k in candidates if k in available), None)
+            if source_name:
+                target = re.sub(r'[^a-z0-9_]+', '_', key) + ".png"
+                shutil.copyfile(os.path.join(trainer_front_dir, source_name), os.path.join(trainer_pics_out, target))
+                trainer["portrait"] = trainer_pics_out + "/" + target
+
+    # Asset paths are added after the first JSON pass, so rewrite the generated
+    # data files with item icon and trainer portrait references included.
+    with open("brisk-dex-data.json", "w", encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
+    with open("brisk-dex-trainer-teams.json", "w", encoding='utf-8') as f:
+        json.dump({"source": "Pokemon-Brisk-Emerald/src/data/trainers.party", "trainers": trainer_teams},
+                  f, ensure_ascii=False, separators=(',', ':'))
 
     # The save stores the protagonist's gender. Bundle the matching Ruby/Sapphire
     # player sprite sheets for the trainer portrait in the app header.
