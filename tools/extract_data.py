@@ -1122,7 +1122,7 @@ def main():
         move_details[str(mid)] = {
             "name": display_move_name,
             "constant": "MOVE_" + name,
-            "description": description,
+            "description": extract_compound_field(block, '.description') if block else None,
             "power": extract_numeric_field(block, '.power', 0) if block else 0,
             "accuracy": extract_numeric_field(block, '.accuracy', 0) if block else 0,
             "pp": pp or 0,
