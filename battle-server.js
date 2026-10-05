@@ -757,6 +757,14 @@ function applyStatusMove(room,pi,move){
     }else log(room,'But it failed!');
     return;
   }
+  if(n==='sketch'){
+    if(target.lastMoveIndex!==null&&target.moves[target.lastMoveIndex]){
+      const slot=mon.lastMoveIndex!==null?mon.lastMoveIndex:0;
+      mon.moves[slot]=Object.assign({},target.moves[target.lastMoveIndex]);
+      log(room,mon.name+' sketched '+target.moves[target.lastMoveIndex].name+'!');
+    }else log(room,'But it failed!');
+    return;
+  }
   if(n==='laserfocus'){mon.volatile.laserFocus=2;log(room,mon.name+' concentrated intensely!');return;}
   if(n==='endure'){mon.volatile.endure=true;log(room,mon.name+' braced itself!');return;}
   if(n==='acupressure'){const stats=['atk','def','spa','spd','spe','acc','eva'];boost(room,mon,choose(stats),2);return;}
