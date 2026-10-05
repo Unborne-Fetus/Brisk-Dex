@@ -4468,7 +4468,8 @@ function renderOnlineBattle(){
     (active.moves||[]).forEach(function(move,index){
       var btn=el('button',{class:'online-move',text:move.name+' · '+move.type+(move.power?' · '+move.power:'')+' · PP '+move.pp+'/'+move.maxPP});
       var locked=active.choiceLock!==null&&active.choiceLock!==undefined&&Number(active.choiceLock)!==index;
-      btn.disabled=!!me.hasChoice||move.pp<=0||locked;btn.addEventListener('click',function(){
+      var encored=active.volatile&&active.volatile.encore>0&&active.volatile.encoreMove!==null&&active.volatile.encoreMove!==undefined&&Number(active.volatile.encoreMove)!==index;
+      btn.disabled=!!me.hasChoice||move.pp<=0||locked||encored;btn.addEventListener('click',function(){
         var gimmick=ONLINE_STATE.gimmickChoice;
         battleAction('move',{moveIndex:index,gimmick:gimmick&&gimmick.kind,formIndex:gimmick&&gimmick.formIndex});
         ONLINE_STATE.gimmickChoice=null;
