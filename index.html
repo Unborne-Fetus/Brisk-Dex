@@ -310,6 +310,19 @@ input[type=file]{ display:none; }
 @media (max-width:760px){.dex-layout{grid-template-columns:1fr}.dex-list{max-height:245px;min-height:0}.dex-grid{grid-template-columns:1fr}.dex-card.full{grid-column:auto}.dex-facts{grid-template-columns:1fr 1fr}}
 @media (max-width:480px){.dex-facts{grid-template-columns:1fr}.dex-hero{align-items:flex-start}.dex-hero-icon{width:68px;height:68px}.dex-hero h2{font-size:20px}}
 
+/* ---------- competitive sets ---------- */
+.comp-layout{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:14px;align-items:start;}
+.comp-list{display:flex;flex-direction:column;gap:5px;max-height:calc(100vh - 245px);min-height:280px;overflow:auto;padding:4px;border:1px solid var(--line);background:var(--panel-2);}
+.comp-set-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(265px,1fr));gap:12px;}
+.comp-set{--hero-color:#267c5a;--hero-secondary:var(--hero-color);background:linear-gradient(105deg,color-mix(in srgb,var(--hero-color) 32%,#111),color-mix(in srgb,var(--hero-secondary) 22%,#111));border:1px solid var(--line);padding:14px;min-width:0;}
+.comp-set h4{margin:0 0 10px;color:var(--leaf-bright);font-size:15px;}
+.comp-meta{display:grid;grid-template-columns:92px 1fr;gap:6px 9px;font-size:12px;margin-bottom:10px;}
+.comp-meta .k{color:var(--muted-2);font-size:9px;text-transform:uppercase;letter-spacing:.05em;}
+.comp-moves{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;}
+.comp-move{padding:7px 8px;background:#101010;border:1px solid var(--line-soft);font-size:11px;border-radius:3px;}
+.comp-note{margin:0 0 14px;color:var(--muted);font-size:12px;}
+@media (max-width:760px){.comp-layout{grid-template-columns:1fr}.comp-list{max-height:245px;min-height:0}.comp-moves{grid-template-columns:1fr}}
+
 /* ---------- trainer dex ---------- */
 .trainer-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
 .trainer-tools input,.trainer-tools select{min-height:38px;color:var(--text);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:8px 11px;font:inherit;}
@@ -527,6 +540,7 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
     <button id="tab-routes" role="tab" aria-selected="false" aria-controls="routes-tab-panel">Route Encounters</button>
     <button id="tab-dex" role="tab" aria-selected="false" aria-controls="dex-tab-panel">Pok&eacute;dex</button>
     <button id="tab-trainers" role="tab" aria-selected="false" aria-controls="trainers-tab-panel">Trainer Teams</button>
+    <button id="tab-competitive" role="tab" aria-selected="false" aria-controls="competitive-tab-panel">Competitive Sets</button>
     <button id="tab-moves" role="tab" aria-selected="false" aria-controls="moves-tab-panel">Moves</button>
     <button id="tab-abilities" role="tab" aria-selected="false" aria-controls="abilities-tab-panel">Abilities</button>
     <button id="tab-items" role="tab" aria-selected="false" aria-controls="items-tab-panel">Items</button>
@@ -661,6 +675,24 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
     <div class="trainer-layout">
       <aside class="trainer-list" id="trainer-list" aria-label="Brisk trainers"></aside>
       <div class="trainer-detail" id="trainer-detail" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section id="competitive-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-competitive" style="display:none;">
+    <div class="section-heading"><h3>Competitive Sets</h3><span class="count" id="competitive-count"></span></div>
+    <p class="route-intro">Suggested builds are generated from Brisk Emerald's current species stats, abilities, typing, and legal movepools, so Brisk-specific buffs and movepool changes are reflected automatically.</p>
+    <div class="dex-tools">
+      <input id="competitive-search" type="search" placeholder="Search Pokémon, type, ability, move, or role…" aria-label="Search competitive Pokémon sets">
+      <select id="competitive-type" aria-label="Filter competitive sets by type"><option value="all">All types</option></select>
+      <select id="competitive-order" aria-label="Sort competitive sets">
+        <option value="national">National Dex order</option>
+        <option value="alphabetical">Alphabetical</option>
+        <option value="bst">Highest BST</option>
+      </select>
+    </div>
+    <div class="comp-layout">
+      <aside class="comp-list" id="competitive-list" aria-label="Pokémon with competitive sets"></aside>
+      <div id="competitive-detail" aria-live="polite"></div>
     </div>
   </section>
 
@@ -3642,10 +3674,237 @@ function renderChanges(){
   root.appendChild(fragment);
 }
 
+var selectedCompetitiveSpeciesId = null;
+
+function competitiveMoveData(species){
+  return (species.learnableMoves||[]).map(function(id){
+    id=Number(id);
+    var detail=MOVE_DETAILS[String(id)]||MOVE_DETAILS[id]||{};
+    return {
+      id:id,
+      name:detail.name||moveName(id)||('Move #'+id),
+      type:detail.type||'Normal',
+      category:detail.category||'Status',
+      power:Number(detail.power||0),
+      accuracy:Number(detail.accuracy||0),
+      priority:Number(detail.priority||0)
+    };
+  }).filter(function(move){return move.id>0 && move.name && !/^Move #/.test(move.name);});
+}
+
+function competitiveBestAbility(species){
+  var abilities=(species.abilities||[]).filter(Boolean);
+  if(!abilities.length) return '—';
+  var premium=['Wonder Guard','Huge Power','Pure Power','Speed Boost','Magic Guard','Regenerator','Intimidate','Unaware','Prankster','Contrary','Adaptability','Sheer Force','Technician','Poison Heal','Multiscale','Protean','Libero','Moxie','Protosynthesis','Quark Drive','Good as Gold','Supreme Overlord','Beast Boost','Magic Bounce'];
+  for(var i=0;i<premium.length;i++) if(abilities.includes(premium[i])) return premium[i];
+  return abilities[0];
+}
+
+function competitiveStatusMove(moves,names){
+  for(var i=0;i<names.length;i++){
+    var found=moves.find(function(move){return move.name===names[i];});
+    if(found) return found;
+  }
+  return null;
+}
+
+function competitiveAttackScore(move,preferredCategory,types){
+  if(move.category!==preferredCategory || move.power<=0) return -9999;
+  var score=move.power;
+  if(types.includes(move.type)) score+=42;
+  if(move.accuracy>=100) score+=7;
+  else if(move.accuracy>0) score+=(move.accuracy-80)*0.25;
+  if(move.priority>0) score+=8*move.priority;
+  var utilityBoost={'Knock Off':26,'U-turn':22,'Volt Switch':22,'Flip Turn':22,'Scald':20,'Freeze-Dry':18,'Earthquake':14,'Close Combat':14,'Moonblast':12};
+  score+=utilityBoost[move.name]||0;
+  return score;
+}
+
+function competitivePickAttacks(moves,category,types,count,exclude){
+  var used=new Set((exclude||[]).map(function(move){return move&&move.name;}));
+  var typeUsed=new Set();
+  return moves.slice().sort(function(a,b){
+    return competitiveAttackScore(b,category,types)-competitiveAttackScore(a,category,types);
+  }).filter(function(move){
+    if(used.has(move.name) || move.category!==category || move.power<=0) return false;
+    if(typeUsed.has(move.type) && !types.includes(move.type)) return false;
+    typeUsed.add(move.type); used.add(move.name); return true;
+  }).slice(0,count);
+}
+
+function competitiveNature(stats,kind){
+  var atk=Number(stats[1]||0), def=Number(stats[2]||0), spe=Number(stats[3]||0), spa=Number(stats[4]||0), spd=Number(stats[5]||0);
+  if(kind==='physical') return spe>=85?'Jolly':'Adamant';
+  if(kind==='special') return spe>=85?'Timid':'Modest';
+  if(kind==='mixed') return spe>=85?'Naive':'Rash';
+  if(def>=spd) return spa>=atk?'Bold':'Impish';
+  return spa>=atk?'Calm':'Careful';
+}
+
+function competitiveItem(species,kind,hasSetup){
+  var stats=Array.isArray(species.baseStats)?species.baseStats:[];
+  var hp=Number(stats[0]||0), def=Number(stats[2]||0), spd=Number(stats[5]||0), spe=Number(stats[3]||0);
+  if((species.evolutions||[]).length) return 'Eviolite';
+  if(kind==='bulky') return 'Leftovers';
+  if(hp+def+spd<190 && spe>=80) return 'Focus Sash';
+  if(hasSetup) return 'Life Orb';
+  return kind==='physical'?'Choice Band':kind==='special'?'Choice Specs':'Life Orb';
+}
+
+function competitiveBuilds(species){
+  var stats=Array.isArray(species.baseStats)?species.baseStats.map(Number):[0,0,0,0,0,0];
+  var atk=stats[1]||0, spa=stats[4]||0, def=stats[2]||0, spd=stats[5]||0;
+  var types=(species.types||[]).filter(Boolean);
+  var moves=competitiveMoveData(species);
+  var ability=competitiveBestAbility(species);
+  var setupPhysical=competitiveStatusMove(moves,['Shell Smash','Dragon Dance','Swords Dance','Shift Gear','Bulk Up','Coil']);
+  var setupSpecial=competitiveStatusMove(moves,['Shell Smash','Quiver Dance','Nasty Plot','Calm Mind','Tail Glow','Geomancy']);
+  var recovery=competitiveStatusMove(moves,['Recover','Roost','Slack Off','Soft-Boiled','Milk Drink','Shore Up','Strength Sap','Moonlight','Synthesis','Morning Sun','Wish']);
+  var utilityNames=['Stealth Rock','Spikes','Toxic Spikes','Sticky Web','Defog','Rapid Spin','Toxic','Will-O-Wisp','Thunder Wave','Glare','Encore','Taunt','Knock Off','U-turn','Volt Switch','Parting Shot','Protect'];
+  var utility=[];
+  utilityNames.forEach(function(name){var m=moves.find(function(x){return x.name===name;});if(m&&!utility.some(function(x){return x.name===m.name;})) utility.push(m);});
+
+  function offensive(kind){
+    var setup=kind==='physical'?setupPhysical:setupSpecial;
+    var chosen=[];
+    if(setup) chosen.push(setup);
+    chosen=chosen.concat(competitivePickAttacks(moves,kind==='physical'?'Physical':'Special',types,4-chosen.length,chosen));
+    if(chosen.length<4){
+      var other=competitivePickAttacks(moves,kind==='physical'?'Special':'Physical',types,4-chosen.length,chosen);
+      chosen=chosen.concat(other);
+    }
+    if(chosen.length<4){
+      utility.forEach(function(m){if(chosen.length<4&&!chosen.some(function(x){return x.name===m.name;})) chosen.push(m);});
+    }
+    return {
+      role:kind==='physical'?'Physical Attacker':'Special Attacker',
+      ability:ability,
+      item:competitiveItem(species,kind,!!setup),
+      nature:competitiveNature(stats,kind),
+      evs:kind==='physical'?'252 Atk / 4 SpD / 252 Spe':'252 SpA / 4 SpD / 252 Spe',
+      tera:types[0]||'Normal',
+      moves:chosen.slice(0,4)
+    };
+  }
+
+  function bulky(){
+    var chosen=[];
+    if(recovery) chosen.push(recovery);
+    utility.forEach(function(m){if(chosen.length<3&&!chosen.some(function(x){return x.name===m.name;})) chosen.push(m);});
+    var attackCategory=atk>=spa?'Physical':'Special';
+    chosen=chosen.concat(competitivePickAttacks(moves,attackCategory,types,4-chosen.length,chosen));
+    if(chosen.length<4) chosen=chosen.concat(competitivePickAttacks(moves,attackCategory==='Physical'?'Special':'Physical',types,4-chosen.length,chosen));
+    return {
+      role:'Bulky Utility',
+      ability:ability,
+      item:competitiveItem(species,'bulky',false),
+      nature:competitiveNature(stats,'bulky'),
+      evs:def>=spd?'252 HP / 252 Def / 4 SpD':'252 HP / 4 Def / 252 SpD',
+      tera:types[0]||'Normal',
+      moves:chosen.slice(0,4)
+    };
+  }
+
+  var primary=atk>=spa?offensive('physical'):offensive('special');
+  var alternate=Math.abs(atk-spa)<=20 && Math.min(atk,spa)>=70 ? offensive(atk>=spa?'special':'physical') : bulky();
+  var builds=[primary,alternate];
+  if(Math.abs(atk-spa)<=15 && atk>=85 && spa>=85){
+    var mixedMoves=competitivePickAttacks(moves,'Physical',types,2,[]).concat(competitivePickAttacks(moves,'Special',types,2,[]));
+    builds.push({role:'Mixed Attacker',ability:ability,item:'Life Orb',nature:competitiveNature(stats,'mixed'),evs:'128 Atk / 128 SpA / 252 Spe',tera:types[0]||'Normal',moves:mixedMoves.slice(0,4)});
+  }
+  return builds;
+}
+
+function renderCompetitiveTypeOptions(speciesMap){
+  var select=document.getElementById('competitive-type');
+  if(!select) return;
+  var prev=select.value||'all', types=new Set();
+  Object.keys(speciesMap).forEach(function(id){(speciesMap[id].types||[]).filter(Boolean).forEach(function(type){types.add(type);});});
+  select.innerHTML='';
+  select.appendChild(el('option',{value:'all',text:'All types'}));
+  Array.from(types).sort().forEach(function(type){select.appendChild(el('option',{value:type,text:type}));});
+  select.value=Array.from(select.options).some(function(o){return o.value===prev;})?prev:'all';
+}
+
+function renderCompetitiveSets(){
+  var list=document.getElementById('competitive-list'), detail=document.getElementById('competitive-detail');
+  if(!list||!detail) return;
+  var all=dexSpeciesData();
+  renderCompetitiveTypeOptions(all);
+  var q=(document.getElementById('competitive-search').value||'').trim().toLowerCase();
+  var typeFilter=document.getElementById('competitive-type').value;
+  var order=document.getElementById('competitive-order').value;
+  var ids=Object.keys(all).filter(function(id){
+    var species=all[id]||{};
+    if(typeFilter!=='all' && !(species.types||[]).includes(typeFilter)) return false;
+    if(!q) return true;
+    var builds=competitiveBuilds(species);
+    var hay=[dexSpeciesDisplayName(species)].concat(species.types||[],species.abilities||[],(species.learnableMoves||[]).map(function(mid){return moveName(Number(mid));}),builds.map(function(b){return b.role;}));
+    return hay.filter(Boolean).join(' ').toLowerCase().includes(q);
+  });
+  ids.sort(function(a,b){
+    var A=all[a]||{},B=all[b]||{};
+    if(order==='alphabetical') return dexSpeciesDisplayName(A).localeCompare(dexSpeciesDisplayName(B));
+    if(order==='bst'){
+      var bstA=(A.baseStats||[]).reduce(function(sum,x){return sum+Number(x||0);},0), bstB=(B.baseStats||[]).reduce(function(sum,x){return sum+Number(x||0);},0);
+      return bstB-bstA || dexSpeciesDisplayName(A).localeCompare(dexSpeciesDisplayName(B));
+    }
+    return Number(A.nationalDex||99999)-Number(B.nationalDex||99999) || Number(a)-Number(b);
+  });
+  document.getElementById('competitive-count').textContent=ids.length+' of '+Object.keys(all).length+' Pokémon';
+  list.innerHTML=''; detail.innerHTML='';
+  if(!ids.length){list.appendChild(el('div',{class:'route-empty',text:Object.keys(all).length?'No Pokémon match these filters.':'No Brisk species data is loaded.'}));return;}
+  if(!ids.includes(String(selectedCompetitiveSpeciesId))) selectedCompetitiveSpeciesId=Number(ids[0]);
+
+  appendChunkedButtons(list,ids,function(id){
+    var species=all[id]||{}, btn=el('button',{class:'dex-entry'+(Number(id)===Number(selectedCompetitiveSpeciesId)?' active':'')});
+    btn.appendChild(makeIconEl({species:Number(id),isShiny:false},'encounter-icon'));
+    var textWrap=el('span',{class:'dex-entry-text'});
+    textWrap.appendChild(el('strong',{text:dexSpeciesDisplayName(species)}));
+    var bst=(species.baseStats||[]).reduce(function(sum,x){return sum+Number(x||0);},0);
+    textWrap.appendChild(el('small',{text:(species.types||[]).filter(Boolean).join(' / ')+' · BST '+bst}));
+    btn.appendChild(textWrap);
+    btn.addEventListener('click',function(){selectedCompetitiveSpeciesId=Number(id);renderCompetitiveSets();});
+    return btn;
+  },(IS_ANDROID||IS_IOS)?120:ids.length);
+
+  var species=all[String(selectedCompetitiveSpeciesId)]||{};
+  var hero=el('section',{class:'dex-hero'}); applyTypeStyle(hero,selectedCompetitiveSpeciesId);
+  hero.appendChild(makeIconEl({species:selectedCompetitiveSpeciesId,isShiny:false},'dex-hero-icon'));
+  var heroText=el('div',{style:'flex:1;min-width:0;'});
+  heroText.appendChild(el('h2',{text:dexSpeciesDisplayName(species)}));
+  var typeRow=makeTypePills(species.types,true); if(typeRow) heroText.appendChild(typeRow);
+  heroText.appendChild(el('div',{class:'dex-muted',style:'margin-top:8px;',text:'Suggested Brisk builds · generated from this Pokémon’s current legal data'}));
+  hero.appendChild(heroText); detail.appendChild(hero);
+  detail.appendChild(el('p',{class:'comp-note',text:'These are practical starting points rather than tier-specific tournament prescriptions. They update automatically when Brisk stats, abilities, or movepools change.'}));
+
+  var grid=el('div',{class:'comp-set-grid'});
+  competitiveBuilds(species).forEach(function(build){
+    var card=el('article',{class:'comp-set'}); applyTypeStyle(card,selectedCompetitiveSpeciesId);
+    card.appendChild(el('h4',{text:build.role}));
+    var meta=el('div',{class:'comp-meta'});
+    [['Ability',build.ability],['Item',build.item],['Nature',build.nature],['EVs',build.evs],['Tera Type',build.tera]].forEach(function(pair){
+      meta.appendChild(el('span',{class:'k',text:pair[0]})); meta.appendChild(el('span',{text:pair[1]}));
+    });
+    card.appendChild(meta);
+    var moves=el('div',{class:'comp-moves'});
+    if(build.moves.length){
+      build.moves.forEach(function(move){
+        var moveBox=el('button',{class:'comp-move',text:move.name});
+        moveBox.addEventListener('click',function(){selectedMoveReferenceId=move.id;setMainTab('moves');});
+        moves.appendChild(moveBox);
+      });
+    }else moves.appendChild(el('div',{class:'dex-muted',text:'No learnable moves are present in the loaded Brisk data.'}));
+    card.appendChild(moves); grid.appendChild(card);
+  });
+  detail.appendChild(grid);
+}
+
 function renderCurrentReferenceTab(){
   if(currentMainTab==='routes') renderRouteEncounters();
   else if(currentMainTab==='dex') renderPokedex();
   else if(currentMainTab==='trainers') renderTrainerTeams();
+  else if(currentMainTab==='competitive') renderCompetitiveSets();
   else if(currentMainTab==='moves') renderMoves();
   else if(currentMainTab==='abilities') renderAbilities();
   else if(currentMainTab==='items') renderItems();
@@ -3657,15 +3916,17 @@ function setMainTab(tabName){
   var routes = tabName === 'routes';
   var dex = tabName === 'dex';
   var trainers = tabName === 'trainers';
+  var competitive = tabName === 'competitive';
   var moves = tabName === 'moves';
   var abilities = tabName === 'abilities';
   var items = tabName === 'items';
   var changes = tabName === 'changes';
-  var save = !routes && !dex && !trainers && !moves && !abilities && !items && !changes;
+  var save = !routes && !dex && !trainers && !competitive && !moves && !abilities && !items && !changes;
   document.getElementById('save-tab-panel').style.display = save ? 'block' : 'none';
   document.getElementById('routes-tab-panel').style.display = routes ? 'block' : 'none';
   document.getElementById('dex-tab-panel').style.display = dex ? 'block' : 'none';
   document.getElementById('trainers-tab-panel').style.display = trainers ? 'block' : 'none';
+  document.getElementById('competitive-tab-panel').style.display = competitive ? 'block' : 'none';
   document.getElementById('moves-tab-panel').style.display = moves ? 'block' : 'none';
   document.getElementById('abilities-tab-panel').style.display = abilities ? 'block' : 'none';
   document.getElementById('items-tab-panel').style.display = items ? 'block' : 'none';
@@ -3678,6 +3939,8 @@ function setMainTab(tabName){
   document.getElementById('tab-dex').setAttribute('aria-selected', String(dex));
   document.getElementById('tab-trainers').classList.toggle('active', trainers);
   document.getElementById('tab-trainers').setAttribute('aria-selected', String(trainers));
+  document.getElementById('tab-competitive').classList.toggle('active', competitive);
+  document.getElementById('tab-competitive').setAttribute('aria-selected', String(competitive));
   document.getElementById('tab-moves').classList.toggle('active', moves);
   document.getElementById('tab-moves').setAttribute('aria-selected', String(moves));
   document.getElementById('tab-abilities').classList.toggle('active', abilities);
@@ -3804,6 +4067,7 @@ var renderItemsDebounced=debounce(renderItems,120);
 var renderMovesDebounced=debounce(renderMoves,120);
 var renderAbilitiesDebounced=debounce(renderAbilities,120);
 var renderTrainerTeamsDebounced=debounce(renderTrainerTeams,120);
+var renderCompetitiveSetsDebounced=debounce(renderCompetitiveSets,120);
 var renderRouteEncountersDebounced=debounce(renderRouteEncounters,120);
 var renderChangesDebounced=debounce(renderChanges,120);
 
@@ -3814,6 +4078,7 @@ document.getElementById('tab-save').addEventListener('click', function(){ setMai
 document.getElementById('tab-routes').addEventListener('click', function(){ setMainTab('routes'); });
 document.getElementById('tab-dex').addEventListener('click', function(){ setMainTab('dex'); });
 document.getElementById('tab-trainers').addEventListener('click', function(){ setMainTab('trainers'); });
+document.getElementById('tab-competitive').addEventListener('click', function(){ setMainTab('competitive'); });
 document.getElementById('tab-moves').addEventListener('click', function(){ setMainTab('moves'); });
 document.getElementById('tab-abilities').addEventListener('click', function(){ setMainTab('abilities'); });
 document.getElementById('tab-items').addEventListener('click', function(){ setMainTab('items'); });
@@ -3826,6 +4091,9 @@ document.getElementById('item-search').addEventListener('input', renderItemsDebo
 document.getElementById('trainer-search').addEventListener('input', renderTrainerTeamsDebounced);
 document.getElementById('trainer-class').addEventListener('change', renderTrainerTeams);
 document.getElementById('trainer-size').addEventListener('change', renderTrainerTeams);
+document.getElementById('competitive-search').addEventListener('input', renderCompetitiveSetsDebounced);
+document.getElementById('competitive-type').addEventListener('change', renderCompetitiveSets);
+document.getElementById('competitive-order').addEventListener('change', renderCompetitiveSets);
 document.getElementById('dex-search').addEventListener('input', renderPokedexDebounced);
 document.getElementById('dex-type').addEventListener('change', renderPokedex);
 document.getElementById('dex-status').addEventListener('change', renderPokedex);
