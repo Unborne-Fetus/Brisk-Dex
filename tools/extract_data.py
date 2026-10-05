@@ -1233,9 +1233,9 @@ def main():
     # Add generic Z-Crystal moves for species that know at least one move of the
     # matching type, and add signature Z-Moves from sSignatureZMoves.
     generic_z_moves = {}
-    for match in re.finditer(r'\\[TYPE_([A-Z0-9_]+)\\]\\s*=\\s*\\{(.*?)\\n\\s*\\},', types_info_text or "", re.DOTALL):
+    for match in re.finditer(r'\[TYPE_([A-Z0-9_]+)\]\s*=\s*\{(.*?)\n\s*\},', types_info_text or "", re.DOTALL):
         type_constant, type_block = match.groups()
-        z_match = re.search(r'\\.zMove\\s*=\\s*MOVE_([A-Z0-9_]+)', type_block)
+        z_match = re.search(r'\.zMove\s*=\s*MOVE_([A-Z0-9_]+)', type_block)
         if not z_match:
             continue
         z_id = move_ids.get(z_match.group(1))
@@ -1245,7 +1245,7 @@ def main():
 
     signature_z_moves = {}
     for match in re.finditer(
-            r'\\{\\s*SPECIES_([A-Z0-9_]+)\\s*,\\s*ITEM_[A-Z0-9_]+\\s*,\\s*MOVE_[A-Z0-9_]+\\s*,\\s*MOVE_([A-Z0-9_]+)\\s*\\}',
+            r'\{\s*SPECIES_([A-Z0-9_]+)\s*,\s*ITEM_[A-Z0-9_]+\s*,\s*MOVE_[A-Z0-9_]+\s*,\s*MOVE_([A-Z0-9_]+)\s*\}',
             z_move_text or ""):
         species_constant, z_move_constant = match.groups()
         z_id = move_ids.get(z_move_constant)
