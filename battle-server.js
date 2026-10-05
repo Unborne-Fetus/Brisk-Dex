@@ -157,7 +157,7 @@ function other(i){ return i===0?1:0; }
 function playerIndex(room,playerId){ return room.players.findIndex(p=>p.id===playerId); }
 function hasType(mon,type){ return (mon.types||[]).includes(type); }
 function hasAbility(mon,name){ return normalizeName(mon.ability)===normalizeName(name); }
-function hasItem(mon,name){ return normalizeName(mon.item)===normalizeName(name); }
+function hasItem(mon,name){ return !(mon.volatile&&mon.volatile.embargo>0) && normalizeName(mon.item)===normalizeName(name); }
 function log(room,msg){ room.log.push(msg); if(room.log.length>250) room.log.splice(0,room.log.length-250); }
 
 function publicMon(mon){
@@ -186,7 +186,7 @@ function publicRoom(room){
 function resetTurnVolatiles(room){
   room.players.forEach(p=>{
     const mon=active(p);
-    if(mon){ mon.volatile.protect=false; mon.volatile.flinch=false; }
+    if(mon){ mon.volatile.protect=false; mon.volatile.flinch=false; mon.volatile.endure=false; }
   });
 }
 function beginBattle(room){
@@ -256,6 +256,10 @@ function dynamicMovePower(room,attacker,defender,move){
   if(n==='heavyslam'||n==='heatcrash'){
     const r=(attacker.weight||1)/Math.max(1,defender.weight||1);power=r>=5?120:r>=4?100:r>=3?80:r>=2?60:40;
   }
+  if(n==='magnitude'){
+    const roll=Math.random(),mag=roll<.05?4:roll<.15?5:roll<.35?6:roll<.65?7:roll<.85?8:roll<.95?9:10;
+    power={4:10,5:30,6:50,7:70,8:90,9:110,10:150}[mag];log(room,'Magnitude '+mag+'!');
+  }
   if(n==='stompingtantrum'&&attacker.volatile.lastMoveFailed)power*=2;
   const owner=room.players.find(p=>p.team.includes(attacker)),foe=room.players.find(p=>p.team.includes(defender));
   const targetActed=defender.volatile.actedTurn===room.turn;
@@ -307,6 +311,7 @@ function damage(room,attacker,defender,move,defenderPlayer){
   if(mn==='terrainpulse'&&room.terrain)effectiveType=room.terrain==='electric'?'Electric':room.terrain==='grassy'?'Grass':room.terrain==='psychic'?'Psychic':'Fairy';
   if(mn==='revelationdance'&&attacker.types&&attacker.types.length)effectiveType=attacker.types[0];
   if(mn==='terablast'&&attacker.transformedKind==='Tera'&&attacker.teraType)effectiveType=attacker.teraType;
+  if(attacker.volatile.electrified){effectiveType='Electric';attacker.volatile.electrified=false;}
   if(an==='normalize')effectiveType='Normal';
   else if(move.type==='Normal'&&an==='aerilate'){effectiveType='Flying';power=Math.floor(power*1.2);}
   else if(move.type==='Normal'&&an==='pixilate'){effectiveType='Fairy';power=Math.floor(power*1.2);}
@@ -323,6 +328,7 @@ function damage(room,attacker,defender,move,defenderPlayer){
   if(an==='toughclaws'&&isContactMove(move))power=Math.floor(power*1.3);
   if(an==='reckless'&&RECOIL_MOVES.has(mn))power=Math.floor(power*1.2);
   if((an==='blaze'&&effectiveType==='Fire'||an==='torrent'&&effectiveType==='Water'||an==='overgrow'&&effectiveType==='Grass'||an==='swarm'&&effectiveType==='Bug')&&attacker.hp<=attacker.maxHP/3)power=Math.floor(power*1.5);
+  if(attacker.volatile.charged&&effectiveType==='Electric'){power*=2;attacker.volatile.charged=false;}
   if(an==='sheerforce' && SECONDARY_MOVES.has(mn)) power=Math.floor(power*1.3);
   if(item==='choiceband'&&effectiveCategory==='Physical') attack=Math.floor(attack*1.5);
   if(item==='choicespecs'&&effectiveCategory==='Special') attack=Math.floor(attack*1.5);
@@ -367,6 +373,7 @@ function damage(room,attacker,defender,move,defenderPlayer){
   let amount=Math.max(eff===0?0:1,Math.floor(base*modifier));
   if(hasItem(defender,'Focus Sash')&&defender.hp===defender.maxHP&&amount>=defender.hp){amount=defender.hp-1;defender.item='';}
   if(!ignoresAbility(attacker)&&hasAbility(defender,'Sturdy')&&defender.hp===defender.maxHP&&amount>=defender.hp)amount=defender.hp-1;
+  if(defender.volatile.endure&&amount>=defender.hp)amount=Math.max(0,defender.hp-1);
   if(defender.volatile.endure&&amount>=defender.hp)amount=Math.max(0,defender.hp-1);
   return {amount,eff,crit};
 }
@@ -605,6 +612,7 @@ function transformInto(room,mon,target){
 }
 function applyStatusMove(room,pi,move){
   const p=room.players[pi], foe=room.players[other(pi)], mon=active(p), target=active(foe), n=normalizeName(move.name);
+  if(n==='endure'){mon.volatile.endure=true;log(room,mon.name+' braced itself!');return;}
   if(PROTECT_MOVES.has(n)){
     const success=mon.volatile.protectCounter===0||chance(100/Math.pow(3,mon.volatile.protectCounter));
     if(success){mon.volatile.protect=true;mon.volatile.protectCounter++;log(room,mon.name+' protected itself!');}
@@ -618,6 +626,15 @@ function applyStatusMove(room,pi,move){
   }
   if(n==='shoreup'){var frac2=room.weather==='sand'?2/3:1/2;if(mon.volatile.healBlock<=0)heal(room,mon,Math.floor(mon.maxHP*frac2),'Shore Up');return;}
   if(SETUP[n]){ SETUP[n].forEach(x=>boost(room,mon,x[0],x[1])); return; }
+  if(n==='defensecurl'){boost(room,mon,'def',1);return;}
+  if(n==='minimize'){boost(room,mon,'eva',2);return;}
+  if(n==='autotomize'){boost(room,mon,'spe',2);return;}
+  if(n==='swagger'){boost(room,target,'atk',2);target.volatile.confusion=2+Math.floor(Math.random()*4);log(room,target.name+' became confused!');return;}
+  if(n==='curse'){
+    if(hasType(mon,'Ghost')){if(mon.hp>mon.maxHP/2){hurt(room,mon,Math.floor(mon.maxHP/2),'Curse');target.volatile.cursed=true;log(room,target.name+' was afflicted by a curse!');}}else{boost(room,mon,'atk',1);boost(room,mon,'def',1);boost(room,mon,'spe',-1);}return;
+  }
+  if(n==='conversion'){var first=mon.moves.find(m=>m.type);if(first){mon.types=[first.type];log(room,mon.name+' transformed into the '+first.type+' type!');}return;}
+  if(n==='conversion2'){var options=['Normal','Fire','Water','Electric','Grass','Ice','Fighting','Poison','Ground','Flying','Psychic','Bug','Rock','Ghost','Dragon','Dark','Steel','Fairy'].filter(t=>effectiveness(target.moves[target.lastMoveIndex]&&target.moves[target.lastMoveIndex].type||'Normal',[t])<1);if(options.length){mon.types=[choose(options)];log(room,mon.name+' changed type!');}return;}
   if(n==='bellydrum'){ if(mon.hp>mon.maxHP/2){ hurt(room,mon,Math.floor(mon.maxHP/2),'Belly Drum');mon.stages.atk=6;log(room,mon.name+' maximized its Attack!'); } return; }
   if(n==='rest'){ mon.status='sleep';mon.statusTurns=0;heal(room,mon,mon.maxHP,'Rest');log(room,mon.name+' went to sleep!');return; }
   if(n==='substitute'){ const cost=Math.floor(mon.maxHP/4); if(mon.hp>cost){hurt(room,mon,cost,'Substitute');mon.volatile.substitute=cost;log(room,mon.name+' put in a substitute!');}return; }
@@ -660,6 +677,7 @@ function applyStatusMove(room,pi,move){
   if(n==='mist'){p.side.mist=5;log(room,p.name+"'s team became shrouded in mist!");return;}
   if(n==='safeguard'){p.side.safeguard=5;log(room,p.name+"'s team became cloaked in a mystical veil!");return;}
   if(n==='auroraveil'){if(room.weather==='snow'){p.side.auroraVeil=5;log(room,'Aurora Veil protected the team!');}else log(room,'Aurora Veil failed!');return;}
+  if(n==='spite'&&target.lastMoveIndex!==null&&target.moves[target.lastMoveIndex]){var sm=target.moves[target.lastMoveIndex];sm.pp=Math.max(0,sm.pp-4);log(room,sm.name+' lost 4 PP!');return;}
   if(n==='disable'&&target.lastMoveIndex!==null){target.volatile.disabledMove=target.lastMoveIndex;target.volatile.disableTurns=4;log(room,target.name+"'s last move was disabled!");return;}
   if(n==='torment'){target.volatile.torment=true;log(room,target.name+' was subjected to torment!');return;}
   if(n==='yawn'){target.volatile.yawn=2;log(room,target.name+' grew drowsy!');return;}
@@ -688,7 +706,15 @@ function applyStatusMove(room,pi,move){
   if(n==='noretreat'&&!mon.volatile.noRetreat){['atk','def','spa','spd','spe'].forEach(k=>boost(room,mon,k,1));mon.volatile.noRetreat=true;mon.volatile.trapped=true;log(room,mon.name+' can no longer escape!');return;}
   if(n==='clangoroussoul'){const cost=Math.floor(mon.maxHP/3);if(mon.hp>cost){hurt(room,mon,cost,'Clangorous Soul');['atk','def','spa','spd','spe'].forEach(k=>boost(room,mon,k,1));}return;}
   if(n==='tidyup'){clearHazards(p.side);clearHazards(foe.side);mon.volatile.substitute=0;target.volatile.substitute=0;boost(room,mon,'atk',1);boost(room,mon,'spe',1);log(room,'The battlefield was tidied up!');return;}
+  if(n==='psychoshift'&&mon.status&&!target.status){var shifted=mon.status;mon.status=null;setStatus(room,target,shifted);log(room,mon.name+' transferred its status condition!');return;}
+  if(n==='stockpile'){if(mon.volatile.stockpile<3){mon.volatile.stockpile++;boost(room,mon,'def',1);boost(room,mon,'spd',1);log(room,mon.name+' stockpiled '+mon.volatile.stockpile+'!');}return;}
+  if(n==='swallow'){if(mon.volatile.stockpile>0&&mon.volatile.healBlock<=0){var fractions=[0,.25,.5,1];heal(room,mon,Math.floor(mon.maxHP*fractions[mon.volatile.stockpile]),'Swallow');mon.volatile.stockpile=0;}return;}
+  if(n==='charge'){mon.volatile.charged=true;boost(room,mon,'spd',1);log(room,mon.name+' began charging power!');return;}
+  if(n==='electrify'){target.volatile.electrified=true;log(room,target.name+"'s next move was electrified!");return;}
+  if(n==='embargo'){target.volatile.embargo=5;log(room,target.name+' can no longer use its held item!');return;}
+  if(n==='nightmare'&&target.status==='sleep'){target.volatile.nightmare=true;log(room,target.name+' began having a nightmare!');return;}
   if(n==='painsplit'){const avg=Math.floor((mon.hp+target.hp)/2);mon.hp=Math.min(mon.maxHP,avg);target.hp=Math.min(target.maxHP,avg);log(room,'The battlers shared their pain!');return;}
+  if(n==='bestow'&&mon.item&&!target.item){target.item=mon.item;mon.item='';log(room,mon.name+' bestowed its item on '+target.name+'!');return;}
   if(n==='trick'||n==='switcheroo'){const tmp=mon.item;mon.item=target.item;target.item=tmp;mon.choiceLock=null;target.choiceLock=null;log(room,'The Pokémon swapped held items!');return;}
   if(n==='recycle'&&!mon.item&&mon.volatile.recycledItem){mon.item=mon.volatile.recycledItem;mon.volatile.recycledItem='';log(room,mon.name+' recycled its '+mon.item+'!');return;}
   if(n==='corrosivegas'&&target.item){log(room,target.name+"'s "+target.item+' was corroded away!');target.item='';return;}
@@ -962,6 +988,14 @@ function resolveAttack(room,pi,choice){
   if(n==='poltergeist'&&!target.item){log(room,mon.name+"'s Poltergeist failed because the target has no item!");mon.volatile.lastMoveFailed=true;return;}
   if(n==='dreameater'&&target.status!=='sleep'){log(room,mon.name+"'s Dream Eater failed!");mon.volatile.lastMoveFailed=true;return;}
   if(n==='belch'&&!mon.volatile.recycledItem){log(room,mon.name+"'s Belch failed!");mon.volatile.lastMoveFailed=true;return;}
+  if(n==='spitup'){
+    if(mon.volatile.stockpile<=0){log(room,'But it failed!');mon.volatile.lastMoveFailed=true;return;}
+    move.power=100*mon.volatile.stockpile;mon.volatile.stockpile=0;
+  }
+  if(n==='fling'){
+    if(!mon.item){log(room,'But it failed!');mon.volatile.lastMoveFailed=true;return;}
+    log(room,mon.name+' flung its '+mon.item+'!');mon.item='';
+  }
   if(n==='futuresight'){
     foe.side.futureSight={turns:3,damage:Math.max(1,Math.floor((((2*mon.level/5+2)*120*stat(mon,'spa')/Math.max(1,stat(target,'spd')))/50)+2))};
     log(room,mon.name+' foresaw an attack!');return;
@@ -1081,6 +1115,9 @@ function endTurn(room){
     if(mon.volatile.yawn>0&&--mon.volatile.yawn===0)setStatus(room,mon,'sleep');
     if(mon.volatile.perish>0){mon.volatile.perish--;log(room,mon.name+"'s perish count fell to "+mon.volatile.perish+'!');if(mon.volatile.perish===0)mon.hp=0;}
     if(mon.volatile.saltCure&&!hasAbility(mon,'Magic Guard'))hurt(room,mon,Math.max(1,Math.floor(mon.maxHP*(hasType(mon,'Water')||hasType(mon,'Steel')?1/4:1/8))),'Salt Cure');
+    if(mon.volatile.cursed&&!hasAbility(mon,'Magic Guard'))hurt(room,mon,Math.max(1,Math.floor(mon.maxHP/4)),'the curse');
+    if(mon.volatile.nightmare&&mon.status==='sleep'&&!hasAbility(mon,'Magic Guard'))hurt(room,mon,Math.max(1,Math.floor(mon.maxHP/4)),'Nightmare');
+    if(mon.status!=='sleep')mon.volatile.nightmare=false;
     if(mon.volatile.nightmare&&mon.status==='sleep'&&!hasAbility(mon,'Magic Guard'))hurt(room,mon,Math.max(1,Math.floor(mon.maxHP/4)),'Nightmare');
     if(mon.volatile.cursed&&!hasAbility(mon,'Magic Guard'))hurt(room,mon,Math.max(1,Math.floor(mon.maxHP/4)),'Curse');
     if(mon.volatile.seeded&&!hasAbility(mon,'Magic Guard')){
@@ -1109,6 +1146,7 @@ function endTurn(room){
     if(mon.volatile.taunt>0) mon.volatile.taunt--;
     if(mon.volatile.disableTurns>0&&--mon.volatile.disableTurns===0)mon.volatile.disabledMove=null;
     if(mon.volatile.healBlock>0)mon.volatile.healBlock--;
+    if(mon.volatile.embargo>0)mon.volatile.embargo--;
     if(mon.volatile.laserFocus>0)mon.volatile.laserFocus--;
     if(mon.volatile.embargo>0)mon.volatile.embargo--;
     if(mon.volatile.telekinesis>0)mon.volatile.telekinesis--;
@@ -1164,7 +1202,7 @@ const server=http.createServer(async (req,res)=>{
   if(req.method==='OPTIONS') return json(res,204,{});
   const url=new URL(req.url,'http://localhost');
   try{
-    if(req.method==='GET'&&url.pathname==='/health') return json(res,200,{ok:true,rooms:rooms.size,engine:'advanced-v14'});
+    if(req.method==='GET'&&url.pathname==='/health') return json(res,200,{ok:true,rooms:rooms.size,engine:'advanced-v15'});
     if(req.method==='POST'&&url.pathname==='/rooms'){
       const body=await readBody(req), code=roomCode(), playerId=id(), team=cleanTeam(body.team);
       if(!team.length) return json(res,400,{error:'Load a save with at least one party Pokémon first.'});
@@ -1219,4 +1257,4 @@ const server=http.createServer(async (req,res)=>{
     return json(res,405,{error:'Method not allowed'});
   }catch(err){ return json(res,400,{error:err.message||String(err)}); }
 });
-server.listen(PORT,HOST,()=>console.log('Brisk battle relay listening on http://'+HOST+':'+PORT+' (advanced-v14)'));
+server.listen(PORT,HOST,()=>console.log('Brisk battle relay listening on http://'+HOST+':'+PORT+' (advanced-v15)'));
