@@ -1,0 +1,72 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - android-apk
+    paths:
+      - "index.html"
+      - "package.json"
+      - "capacitor.config.json"
+      - "android-bridge-src.js"
+      - "brisk-dex-data.json"
+      - "brisk-dex-trainer-teams.json"
+      - "brisk-dex-icons/**"
+      - "brisk-dex-trainers/**"
+      - "tools/prepare_android.mjs"
+      - ".github/workflows/build-android.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 36
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Prepare Brisk Dex web bundle
+        run: npm run android:prepare
+
+      - name: Create Android project
+        run: npx cap add android
+
+      - name: Sync Capacitor plugins and assets
+        run: npx cap sync android
+
+      - name: Build debug APK
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew assembleDebug
+
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk Brisk-Dex-Android.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Brisk-Dex-Android
+          path: Brisk-Dex-Android.apk
+          if-no-files-found: error
