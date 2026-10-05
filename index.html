@@ -264,6 +264,45 @@ input[type=file]{ display:none; }
 .route-empty{padding:20px;color:var(--muted);background:var(--panel-2);border:1px solid var(--line);}
 @media (max-width:720px){.route-layout{grid-template-columns:1fr}.route-list{max-height:230px;min-height:0}.route-tools select{flex:1 1 135px}.main-tabs button{padding:11px 10px;font-size:12px}}
 
+/* ---------- Brisk Pokédex ---------- */
+.dex-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+.dex-tools input,.dex-tools select{min-height:38px;color:var(--text);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:8px 11px;font:inherit;}
+.dex-tools input{flex:1 1 280px;min-width:190px;}
+.dex-tools select{flex:0 1 175px;}
+.dex-layout{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:14px;align-items:start;}
+.dex-list{display:flex;flex-direction:column;gap:5px;max-height:calc(100vh - 245px);min-height:280px;overflow:auto;padding:4px;border:1px solid var(--line);background:var(--panel-2);}
+.dex-entry{width:100%;text-align:left;border:1px solid transparent;background:transparent;display:flex;align-items:center;gap:10px;padding:8px 9px;border-radius:4px;}
+.dex-entry.active{border-color:#285448;background:#142721;color:var(--leaf-bright);}
+.dex-entry .encounter-icon{width:36px;height:36px;}
+.dex-entry-text{min-width:0;display:flex;flex-direction:column;}
+.dex-entry-text strong{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dex-entry-text small{font-size:10px;color:var(--muted-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dex-detail{min-width:0;}
+.dex-hero{--hero-color:#267c5a;--hero-secondary:var(--hero-color);display:flex;gap:16px;align-items:center;padding:18px;border:1px solid var(--line);background:linear-gradient(105deg,color-mix(in srgb,var(--hero-color) 38%,#111),color-mix(in srgb,var(--hero-secondary) 28%,#111));margin-bottom:12px;}
+.dex-hero-icon{width:86px;height:86px;position:relative;display:block;overflow:hidden;flex:none;border-radius:8px;background:#132922;image-rendering:pixelated;}
+.dex-hero h2{font-size:25px;margin:0 0 7px;}
+.dex-id{font-size:11px;color:var(--muted-2);margin-bottom:5px;}
+.dex-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:12px;}
+.dex-card{background:var(--panel);border:1px solid var(--line);padding:14px;min-width:0;}
+.dex-card.full{grid-column:1/-1;}
+.dex-card h4{margin:0 0 10px;font-size:14px;color:var(--leaf-bright);}
+.dex-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 14px;}
+.dex-fact .k{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-2);}
+.dex-fact .v{font-size:13px;font-weight:600;overflow-wrap:anywhere;}
+.dex-stat-row{display:grid;grid-template-columns:72px 1fr 36px;gap:8px;align-items:center;margin:7px 0;font-size:11px;}
+.dex-stat-bar{height:7px;background:#202020;overflow:hidden;border-radius:6px;}
+.dex-stat-bar>span{display:block;height:100%;background:var(--leaf);border-radius:6px;}
+.dex-chain{display:flex;flex-direction:column;gap:7px;}
+.dex-evo{display:flex;align-items:center;gap:9px;padding:8px;background:var(--panel-2);border:1px solid var(--line-soft);}
+.dex-evo .encounter-icon{width:34px;height:34px;}
+.dex-muted{color:var(--muted);font-size:12px;}
+.dex-location-table,.dex-iv-table{width:100%;border-collapse:collapse;font-size:12px;}
+.dex-location-table th,.dex-location-table td,.dex-iv-table th,.dex-iv-table td{padding:7px 8px;border-bottom:1px solid var(--line-soft);text-align:left;}
+.dex-location-table th,.dex-iv-table th{font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-2);}
+.dex-location-table tr:last-child td,.dex-iv-table tr:last-child td{border-bottom:0;}
+@media (max-width:760px){.dex-layout{grid-template-columns:1fr}.dex-list{max-height:245px;min-height:0}.dex-grid{grid-template-columns:1fr}.dex-card.full{grid-column:auto}.dex-facts{grid-template-columns:1fr 1fr}}
+@media (max-width:480px){.dex-facts{grid-template-columns:1fr}.dex-hero{align-items:flex-start}.dex-hero-icon{width:68px;height:68px}.dex-hero h2{font-size:20px}}
+
 .box-grid{
   display:grid; grid-template-columns:repeat(6, 1fr); gap:8px;
   padding:18px;
@@ -363,6 +402,7 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
   <nav class="main-tabs" role="tablist" aria-label="Brisk Dex sections">
     <button class="active" id="tab-save" role="tab" aria-selected="true" aria-controls="save-tab-panel">Pok&eacute;mon &amp; Storage</button>
     <button id="tab-routes" role="tab" aria-selected="false" aria-controls="routes-tab-panel">Route Encounters</button>
+    <button id="tab-dex" role="tab" aria-selected="false" aria-controls="dex-tab-panel">Pok&eacute;dex</button>
   </nav>
 
   <div id="save-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-save">
@@ -445,6 +485,21 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
     <div class="route-layout">
       <aside class="route-list" id="route-list" aria-label="Encounter locations"></aside>
       <div class="route-detail" id="route-detail" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section id="dex-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-dex" style="display:none;">
+    <div class="section-heading"><h3>Brisk Pok&eacute;dex</h3><span class="count" id="dex-count"></span></div>
+    <p class="route-intro">Species information is read from Brisk Emerald's extracted game data. No National Pok&eacute;dex database is used for species stats, abilities, evolutions, or locations.</p>
+    <div class="dex-tools">
+      <input id="dex-search" type="search" placeholder="Search Pok&eacute;mon, type, or ability…" aria-label="Search the Brisk Pokédex">
+      <select id="dex-type" aria-label="Filter Pokédex by type">
+        <option value="all">All types</option>
+      </select>
+    </div>
+    <div class="dex-layout">
+      <aside class="dex-list" id="dex-list" aria-label="Brisk Pokédex species"></aside>
+      <div class="dex-detail" id="dex-detail" aria-live="polite"></div>
     </div>
   </section>
 
@@ -1145,6 +1200,7 @@ var USER_DATA = { species:{}, moves:{}, items:{}, abilities:{} };
 var BUNDLED_DATA = { species:{}, moves:{}, movePP:{}, items:{}, abilities:{} };
 var ROUTE_DATA = [];
 var selectedRouteId = null;
+var selectedDexSpeciesId = null;
 var GAME_SHINY_ODDS = 8;
 
 function rebuildNameData(){
@@ -1187,6 +1243,7 @@ async function loadBundledGameData(){
     refreshBoxLevels();
     updateDataStatus();
     renderRouteEncounters();
+    renderPokedex();
   }catch(err){
     showError('Could not load Brisk Emerald data bundled with Brisk Dex: ' + err.message);
   }
@@ -2092,6 +2149,7 @@ function renderAll(){
   renderBoxGrid(currentSave);
   renderStoragePanel();
   updateDirtyBanner();
+  renderPokedex();
 }
 
 function isRouteArea(area){ return area.mapType === 'MAP_TYPE_ROUTE'; }
@@ -2187,15 +2245,230 @@ function renderRouteEncounters(){
   });
 }
 
+function dexSpeciesData(){
+  return Object.assign({}, BUNDLED_DATA.species || {}, USER_DATA.species || {});
+}
+function dexTitleCase(value){
+  return String(value || '').replace(/^(EVO|ITEM|MOVE|TYPE|MAPSEC)_/, '').toLowerCase().replace(/(^|_)([a-z])/g, function(_,space,ch){ return (space ? ' ' : '') + ch.toUpperCase(); });
+}
+function formatEvolutionMethod(evo){
+  var method = String(evo.method || '').replace(/^EVO_/, '');
+  var parameter = String(evo.parameter || '').trim();
+  if (method === 'LEVEL') return 'Level ' + (parameter.match(/\d+/) || ['?'])[0];
+  if (method.indexOf('LEVEL_') === 0){
+    var level = (parameter.match(/\d+/) || ['?'])[0];
+    return 'Level ' + level + ' · ' + dexTitleCase(method.slice(6));
+  }
+  if (method.indexOf('ITEM') >= 0) return dexTitleCase(parameter) + (method === 'ITEM' ? '' : ' · ' + dexTitleCase(method));
+  if (method.indexOf('FRIENDSHIP') >= 0) return 'Friendship' + (method === 'FRIENDSHIP' ? '' : ' · ' + dexTitleCase(method.replace('FRIENDSHIP_', '')));
+  if (method.indexOf('MOVE') >= 0) return 'Know ' + dexTitleCase(parameter);
+  if (method.indexOf('TRADE') >= 0) return 'Trade' + (parameter && parameter !== '0' ? ' · ' + dexTitleCase(parameter) : '');
+  return dexTitleCase(method) + (parameter && parameter !== '0' ? ' · ' + dexTitleCase(parameter) : '');
+}
+function dexLocationsForSpecies(speciesId){
+  var rows = [];
+  ROUTE_DATA.forEach(function(area){
+    (area.methods || []).forEach(function(method){
+      (method.slots || []).forEach(function(slot){
+        if (Number(slot.species) !== Number(speciesId)) return;
+        rows.push({
+          location:area.name,
+          method:method.name,
+          level:slot.minLevel === slot.maxLevel ? 'Lv' + slot.minLevel : 'Lv' + slot.minLevel + '–' + slot.maxLevel,
+          chance:slot.chance === undefined ? (method.type === 'gift' ? 'Gift' : 'Stationary') : String(slot.chance) + '%'
+        });
+      });
+    });
+  });
+  return rows;
+}
+function dexOwnedForSpecies(speciesId){
+  var found = [];
+  function add(mon, where){
+    if (!mon || mon.empty || Number(mon.species) !== Number(speciesId)) return;
+    found.push({mon:mon, where:where});
+  }
+  if (currentSave){
+    currentSave.party.forEach(function(mon,i){ add(mon, 'Party ' + (i+1)); });
+    currentSave.boxes.forEach(function(box,b){ box.forEach(function(mon,s){ add(mon, 'Box ' + (b+1) + ' · Slot ' + (s+1)); }); });
+  }
+  (externalStorage || []).forEach(function(entry,i){ add(entry.mon || entry, 'External Storage ' + (i+1)); });
+  return found;
+}
+function dexReverseEvolutions(speciesId, allSpecies){
+  var from = [];
+  Object.keys(allSpecies).forEach(function(sourceId){
+    var entry = allSpecies[sourceId] || {};
+    (entry.evolutions || []).forEach(function(evo){
+      if (Number(evo.target) === Number(speciesId)) from.push({source:Number(sourceId), evo:evo});
+    });
+  });
+  return from;
+}
+function renderDexTypeOptions(allSpecies){
+  var select = document.getElementById('dex-type');
+  if (!select) return;
+  var previous = select.value || 'all';
+  var types = new Set();
+  Object.keys(allSpecies).forEach(function(id){ (allSpecies[id].types || []).forEach(function(type){ if (type) types.add(type); }); });
+  select.innerHTML = '';
+  select.appendChild(el('option', {value:'all', text:'All types'}));
+  Array.from(types).sort().forEach(function(type){ select.appendChild(el('option', {value:type, text:type})); });
+  select.value = Array.from(select.options).some(function(o){ return o.value === previous; }) ? previous : 'all';
+}
+function renderPokedex(){
+  var list = document.getElementById('dex-list');
+  var detail = document.getElementById('dex-detail');
+  if (!list || !detail) return;
+  var allSpecies = dexSpeciesData();
+  renderDexTypeOptions(allSpecies);
+  var ids = Object.keys(allSpecies).filter(function(id){ return Number(id) > 0; });
+  var query = (document.getElementById('dex-search').value || '').trim().toLowerCase();
+  var typeFilter = document.getElementById('dex-type').value;
+  ids = ids.filter(function(id){
+    var entry = allSpecies[id] || {};
+    if (typeFilter !== 'all' && !(entry.types || []).includes(typeFilter)) return false;
+    if (!query) return true;
+    return String(entry.name || '').toLowerCase().includes(query)
+      || String(entry.constant || '').toLowerCase().includes(query)
+      || (entry.types || []).some(function(t){ return String(t).toLowerCase().includes(query); })
+      || (entry.abilities || []).some(function(a){ return String(a || '').toLowerCase().includes(query); });
+  }).sort(function(a,b){
+    var an = (allSpecies[a].name || '').localeCompare(allSpecies[b].name || '');
+    return an || Number(a)-Number(b);
+  });
+  document.getElementById('dex-count').textContent = ids.length + ' of ' + Object.keys(allSpecies).length + ' Brisk species';
+  list.innerHTML = '';
+  detail.innerHTML = '';
+  if (!ids.length){
+    list.appendChild(el('div', {class:'route-empty', text:Object.keys(allSpecies).length ? 'No Brisk species match these filters.' : 'No Brisk Emerald species data is loaded.'}));
+    return;
+  }
+  if (!ids.includes(String(selectedDexSpeciesId))) selectedDexSpeciesId = Number(ids[0]);
+  ids.forEach(function(id){
+    var entry = allSpecies[id];
+    var btn = el('button', {class:'dex-entry' + (Number(id) === Number(selectedDexSpeciesId) ? ' active' : '')});
+    btn.appendChild(makeIconEl({species:Number(id),isShiny:false}, 'encounter-icon'));
+    var textWrap = el('span', {class:'dex-entry-text'});
+    textWrap.appendChild(el('strong', {text:entry.name || ('Species #' + id)}));
+    textWrap.appendChild(el('small', {text:(entry.types || []).join(' / ') || 'Type data unavailable'}));
+    btn.appendChild(textWrap);
+    btn.addEventListener('click', function(){ selectedDexSpeciesId = Number(id); renderPokedex(); });
+    list.appendChild(btn);
+  });
+
+  var id = String(selectedDexSpeciesId);
+  var species = allSpecies[id];
+  if (!species) return;
+  var hero = el('section', {class:'dex-hero'});
+  applyTypeStyle(hero, Number(id));
+  hero.appendChild(makeIconEl({species:Number(id),isShiny:false}, 'dex-hero-icon'));
+  var heroText = el('div');
+  heroText.appendChild(el('div', {class:'dex-id', text:'Brisk species ID ' + id + (species.constant ? ' · SPECIES_' + species.constant : '')}));
+  heroText.appendChild(el('h2', {text:species.name || ('Species #' + id)}));
+  var heroTypes = makeTypePills(species.types, true); if (heroTypes) heroText.appendChild(heroTypes);
+  hero.appendChild(heroText);
+  detail.appendChild(hero);
+
+  var grid = el('div', {class:'dex-grid'});
+  var facts = el('section', {class:'dex-card'});
+  facts.appendChild(el('h4', {text:'Species Data'}));
+  var factsGrid = el('div', {class:'dex-facts'});
+  [
+    ['Abilities',(species.abilities || []).filter(Boolean).join(' / ') || 'Unknown'],
+    ['Growth Rate',dexTitleCase(species.growthRate) || 'Unknown'],
+    ['Base Friendship',species.friendship == null ? 'Unknown' : String(species.friendship)],
+    ['Minimum Level',species.minimumLevel == null ? 'Unknown' : 'Lv' + species.minimumLevel]
+  ].forEach(function(pair){
+    var f=el('div',{class:'dex-fact'}); f.appendChild(el('div',{class:'k',text:pair[0]})); f.appendChild(el('div',{class:'v',text:pair[1]})); factsGrid.appendChild(f);
+  });
+  facts.appendChild(factsGrid);
+  grid.appendChild(facts);
+
+  var stats = el('section', {class:'dex-card'});
+  stats.appendChild(el('h4', {text:'Base Stats'}));
+  var statNames=['HP','Attack','Defense','Speed','Sp. Atk','Sp. Def'];
+  var statValues=Array.isArray(species.baseStats) ? species.baseStats : [];
+  var total=0;
+  statNames.forEach(function(name,i){
+    var value=Number(statValues[i] || 0); total+=value;
+    var row=el('div',{class:'dex-stat-row'});
+    row.appendChild(el('span',{text:name}));
+    var bar=el('div',{class:'dex-stat-bar'}); var fill=el('span'); fill.style.width=Math.min(100,(value/255)*100)+'%'; bar.appendChild(fill); row.appendChild(bar);
+    row.appendChild(el('strong',{text:String(value || '—')})); stats.appendChild(row);
+  });
+  stats.appendChild(el('div',{class:'dex-muted',text:'Base stat total: ' + total}));
+  grid.appendChild(stats);
+
+  var evolutions = el('section', {class:'dex-card full'});
+  evolutions.appendChild(el('h4', {text:'Evolution'}));
+  var chain=el('div',{class:'dex-chain'});
+  var reverse=dexReverseEvolutions(Number(id), allSpecies);
+  reverse.forEach(function(prev){
+    var source=allSpecies[String(prev.source)] || {};
+    var row=el('div',{class:'dex-evo'});
+    row.appendChild(makeIconEl({species:prev.source,isShiny:false},'encounter-icon'));
+    row.appendChild(el('span',{text:(source.name || 'Species #'+prev.source) + ' → ' + (species.name || 'Species #'+id) + ' · ' + formatEvolutionMethod(prev.evo)}));
+    chain.appendChild(row);
+  });
+  (species.evolutions || []).forEach(function(evo){
+    var target=allSpecies[String(evo.target)] || {};
+    var row=el('div',{class:'dex-evo'});
+    row.appendChild(makeIconEl({species:Number(evo.target),isShiny:false},'encounter-icon'));
+    row.appendChild(el('span',{text:(species.name || 'Species #'+id) + ' → ' + (target.name || 'Species #'+evo.target) + ' · ' + formatEvolutionMethod(evo)}));
+    chain.appendChild(row);
+  });
+  if (!chain.children.length) chain.appendChild(el('div',{class:'dex-muted',text:'No evolution relationship is present in the currently loaded Brisk data. Re-run the Brisk data extractor after this update to populate exact evolution methods.'}));
+  evolutions.appendChild(chain);
+  grid.appendChild(evolutions);
+
+  var locations=el('section',{class:'dex-card full'});
+  locations.appendChild(el('h4',{text:'Locations in Brisk Emerald'}));
+  var locationRows=dexLocationsForSpecies(Number(id));
+  if (!locationRows.length) locations.appendChild(el('div',{class:'dex-muted',text:'No wild, stationary, or gift location is present in the currently loaded Brisk encounter data.'}));
+  else{
+    var table=el('table',{class:'dex-location-table'}), thead=document.createElement('thead'), hr=document.createElement('tr');
+    ['Location','Method','Level','Chance'].forEach(function(x){hr.appendChild(el('th',{text:x}));}); thead.appendChild(hr); table.appendChild(thead);
+    var tb=document.createElement('tbody');
+    locationRows.forEach(function(r){var tr=document.createElement('tr'); [r.location,r.method,r.level,r.chance].forEach(function(x){tr.appendChild(el('td',{text:x}));}); tb.appendChild(tr);});
+    table.appendChild(tb); locations.appendChild(table);
+  }
+  grid.appendChild(locations);
+
+  var ivCard=el('section',{class:'dex-card full'});
+  ivCard.appendChild(el('h4',{text:'IVs'}));
+  ivCard.appendChild(el('div',{class:'dex-muted',text:'IVs are individual to each Pokémon, not fixed by species. When a save is loaded, Brisk Dex shows the exact IVs of your copies below.'}));
+  var owned=dexOwnedForSpecies(Number(id));
+  if (owned.length){
+    var ivTable=el('table',{class:'dex-iv-table'}), ih=document.createElement('thead'), ihr=document.createElement('tr');
+    ['Owned Pokémon','Lv','HP','Atk','Def','Spe','SpA','SpD'].forEach(function(x){ihr.appendChild(el('th',{text:x}));}); ih.appendChild(ihr); ivTable.appendChild(ih);
+    var ib=document.createElement('tbody');
+    owned.forEach(function(entry){
+      var m=entry.mon, iv=m.ivs || {}, tr=document.createElement('tr');
+      [entry.where + (m.nickname ? ' · ' + m.nickname : ''),m.level,iv.hp,iv.atk,iv.def,iv.spd,iv.spa,iv.spdef].forEach(function(x){tr.appendChild(el('td',{text:x == null ? '—' : String(x)}));});
+      ib.appendChild(tr);
+    });
+    ivTable.appendChild(ib); ivCard.appendChild(ivTable);
+  }
+  grid.appendChild(ivCard);
+  detail.appendChild(grid);
+}
+
 function setMainTab(tabName){
   var routes = tabName === 'routes';
-  document.getElementById('save-tab-panel').style.display = routes ? 'none' : 'block';
+  var dex = tabName === 'dex';
+  var save = !routes && !dex;
+  document.getElementById('save-tab-panel').style.display = save ? 'block' : 'none';
   document.getElementById('routes-tab-panel').style.display = routes ? 'block' : 'none';
-  document.getElementById('tab-save').classList.toggle('active', !routes);
-  document.getElementById('tab-save').setAttribute('aria-selected', String(!routes));
+  document.getElementById('dex-tab-panel').style.display = dex ? 'block' : 'none';
+  document.getElementById('tab-save').classList.toggle('active', save);
+  document.getElementById('tab-save').setAttribute('aria-selected', String(save));
   document.getElementById('tab-routes').classList.toggle('active', routes);
   document.getElementById('tab-routes').setAttribute('aria-selected', String(routes));
+  document.getElementById('tab-dex').classList.toggle('active', dex);
+  document.getElementById('tab-dex').setAttribute('aria-selected', String(dex));
   if (routes) renderRouteEncounters();
+  if (dex) renderPokedex();
 }
 
 /* ============================================================
@@ -2254,6 +2527,7 @@ function handleDataFile(file){
       saveNameDataToStorage();
       updateDataStatus();
       renderRouteEncounters();
+      renderPokedex();
       if (currentSave) renderAll();
     }catch(err){
       showError('Could not parse that JSON file: ' + err.message);
@@ -2267,6 +2541,9 @@ function handleDataFile(file){
    ============================================================ */
 document.getElementById('tab-save').addEventListener('click', function(){ setMainTab('save'); });
 document.getElementById('tab-routes').addEventListener('click', function(){ setMainTab('routes'); });
+document.getElementById('tab-dex').addEventListener('click', function(){ setMainTab('dex'); });
+document.getElementById('dex-search').addEventListener('input', renderPokedex);
+document.getElementById('dex-type').addEventListener('change', renderPokedex);
 document.getElementById('route-search').addEventListener('input', renderRouteEncounters);
 document.getElementById('route-kind').addEventListener('change', renderRouteEncounters);
 document.getElementById('route-order').addEventListener('change', renderRouteEncounters);
