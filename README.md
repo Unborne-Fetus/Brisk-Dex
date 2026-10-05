@@ -196,3 +196,27 @@ npm run dist:linux
 ```
 
 The generated AppImage and Debian package will be placed in `dist/`.
+
+
+## Online Battles
+
+Brisk Dex includes a private Host / Join battle mode that uses the party from each player's loaded Brisk Emerald save.
+
+### Local test
+
+Run the app and battle relay in separate terminals:
+
+```bash
+npm start
+npm run battle-server
+```
+
+The default relay is `http://localhost:8787`. Open a second Brisk Dex window, host a room in one window, and join its six-character code in the other.
+
+### Internet play
+
+The relay in `battle-server.js` must be hosted at a publicly reachable HTTPS address. Both players enter that same address in the Online Battle tab. The relay is server-authoritative: clients submit choices while the server resolves turn order, RNG, damage, status, field effects, switching, and victory.
+
+The current advanced simulator supports singles, six-Pokémon teams, PP, priority, accuracy/evasion stages, stat stages, major status conditions, confusion, flinching, Protect-family moves, common setup/recovery moves, recoil/draining moves, hazards, screens, Tailwind, weather, terrain, STAB, type effectiveness, critical hits, switching, common ability effects, and common held-item effects. Mechanics without a handler are reported in the battle log rather than silently pretending to work.
+
+Room/player tokens are kept in session storage so an accidental tab refresh can reconnect while the relay still holds the room. Relay rooms expire after six hours of inactivity.
