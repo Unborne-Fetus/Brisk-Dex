@@ -114,6 +114,11 @@ ipcMain.handle('load-game-data', async () => {
   return JSON.parse(raw);
 });
 
+ipcMain.handle('load-trainer-data', async () => {
+  const raw = await fs.readFile(path.join(__dirname, 'brisk-dex-trainer-teams.json'), 'utf8');
+  return JSON.parse(raw);
+});
+
 ipcMain.handle('load-bundled-icons', async () => {
   const folderPath = path.join(__dirname, 'brisk-dex-icons');
   const icons = {};
