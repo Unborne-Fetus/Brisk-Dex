@@ -222,12 +222,14 @@ The current advanced simulator supports singles, six-Pokémon teams, PP, priorit
 Room/player tokens are kept in session storage so an accidental tab refresh can reconnect while the relay still holds the room. Relay rooms expire after six hours of inactivity.
 
 
-### Advanced battle engine v8
+### Advanced battle engine v16
 
-The private Host / Join simulator now has a much broader competitive mechanics layer. It uses Brisk Emerald save data for teams, stored Tera Types, Brisk-extracted species forms, and Brisk move metadata/flags.
+Online battles now use a selectable team of up to six Pokémon drawn from the loaded save's Party, any PC box, or Brisk Dex External Storage. Boxed and external Pokémon have battle stats reconstructed from their Brisk species data plus their actual IVs, EVs, nature, experience/level, moves, ability slot, held item, and Tera Type. The team picker includes storage-source filters and search.
 
-Implemented coverage now includes: Mega/Tera/Gigantamax hooks, PP and Pressure, priority and Trick Room, stat stages, Contrary/Simple/Unaware, major status, confusion/flinch, Disable/Encore/Torment/Taunt, trapping, recharge and charge moves, Protect chains, Substitute, hazards, screens, Tailwind, weather, terrain, Wish/Future Sight, Perish Song, Destiny Bond, Yawn, Heal Block, Aqua Ring/Ingrain, Leech Seed, Salt Cure, Baton Pass basics, phazing, pivot moves, Defog/Rapid Spin/Mortal Spin, Knock Off, Clear Smog, Pain Split, Trick/Switcheroo, Skill Swap, multi-hit moves, recoil/draining, common fixed-damage moves, common secondary effects, common weather/terrain abilities, contact reactions, absorb/immunity abilities, priority blockers, Magic Bounce/Good as Gold-style protection, Mold Breaker-style bypasses, common offensive ability families (Iron Fist, Strong Jaw, Sharpness, Mega Launcher, Punk Rock, Tough Claws, Technician, Adaptability, Reckless), common defensive abilities (Fur Coat, Ice Scales, Marvel Scale, Multiscale, Filter/Solid Rock/Prism Armor, Thick Fat, Sturdy), common knockout/stat-trigger abilities, common recovery/status berries, Choice items, Life Orb, Assault Vest, Focus Sash, Weakness Policy, Heavy-Duty Boots, Rocky Helmet, Leftovers, Black Sludge, Air Balloon, Shed Shell, Shell Bell, status orbs, White Herb, Mental Herb, and several related interactions.
+Pokédex animated sprites replay every 1 second.
 
-The battle client shows volatile conditions, delayed effects, field state, gimmick eligibility, move locks, PP, transformations, and trapping so server-side mechanics are visible instead of hidden.
+The simulator is server-authoritative and increasingly source-driven. Brisk Dex extracts move effect names, move flags, critical-hit stages, multi-hit metadata, and secondary MOVE_EFFECT data directly from Pokémon Brisk Emerald's current source. `brisk-battle-effects.json` is regenerated from Brisk Emerald and provides a finite parity checklist for 934 moves and their primary/secondary effect families.
 
-This is intentionally Brisk-data-driven where possible. Rare one-off signature effects, every historical-generation edge case, and exact pokeemerald-expansion battle-script parity should still be verified before treating the simulator as tournament-authoritative.
+The v16 engine includes the previous damage/status/weather/terrain/hazard/gimmick systems plus broad primary and secondary effect handling, variable-power/type/category families, called-move mechanics, Transform/Imposter, rooms, move locks, trapping, delayed effects, common competitive items and abilities, Counter/Mirror Coat tracking, Magic Coat, Imprison, Mimic, Last Resort, Snore, Synchronoise, Upper Hand, and many signature move families.
+
+The manifest makes remaining parity work measurable, but exact 100% pokeemerald-expansion/Brisk Emerald parity should only be claimed after every manifest effect plus ability/item interaction is verified by tests against the game engine.
