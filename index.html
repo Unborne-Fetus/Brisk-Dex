@@ -2788,6 +2788,34 @@ function playDexCry(url){
     if(promise && promise.catch) promise.catch(function(err){showError('Could not play this Pokémon cry: '+err.message);});
   }catch(err){showError('Could not play this Pokémon cry: '+err.message);}
 }
+function pokemonPronunciationText(name){
+  var raw=String(name||'').trim();
+  if(!raw) return '—';
+  var key=raw.toLowerCase().replace(/[^a-z0-9♀♂]/g,'');
+  var known={
+    pikachu:'Pee-kuh-choo',
+    raichu:'Rye-choo',
+    arceus:'Ar-key-us',
+    gyarados:'Gair-uh-dose',
+    rayquaza:'Ray-kway-zuh',
+    suicune:'Swee-koon',
+    kyogre:'Kai-oh-ger',
+    groudon:'Grow-don',
+    jirachi:'Jee-rah-chee',
+    xerneas:'ZUR-nee-us',
+    yveltal:'Ee-VELL-tawl',
+    zygarde:'ZYE-gard'
+  };
+  if(known[key]) return known[key];
+  var cleaned=raw.replace(/[^A-Za-z0-9' .-]/g,'').replace(/([a-z])([A-Z])/g,'$1-$2');
+  var parts=cleaned.split(/([ -])/).map(function(part){
+    if(!part || /[ -]/.test(part)) return part;
+    var chunks=part.match(/[^aeiouy]*[aeiouy]+(?:[^aeiouy](?=[^aeiouy]*[aeiouy]|$))?/gi);
+    return chunks && chunks.length>1 ? chunks.join('-') : part;
+  });
+  return parts.join('').replace(/-{2,}/g,'-');
+}
+
 function makeDexSpriteCard(url,label,animationUrl){
   var card=el('div',{class:'dex-sprite-card'});
   if(url || animationUrl){
@@ -2829,7 +2857,9 @@ function renderPokedex(){
       || String(entry.constant || '').toLowerCase().includes(query)
       || (entry.types || []).some(function(t){ return String(t).toLowerCase().includes(query); })
       || (entry.abilities || []).some(function(a){ return String(a || '').toLowerCase().includes(query); })
-      || String(entry.pokedexEntry || '').toLowerCase().includes(query);
+      || String(entry.pokedexEntry || '').toLowerCase().includes(query)
+      || String(entry.categoryName || '').toLowerCase().includes(query)
+      || pokemonPronunciationText(entry.name || '').toLowerCase().includes(query);
   }).sort(function(a,b){
     var ae=allSpecies[a]||{}, be=allSpecies[b]||{};
     if(order==='alphabetical'){
@@ -3058,6 +3088,11 @@ function renderPokedexDetail(allSpecies, id, detail){
     nameRow.appendChild(el('span',{class:'dex-national-number',text:'#'+String(species.nationalDex).padStart(3,'0')}));
   }
   heroText.appendChild(nameRow);
+  var identityLine=el('div',{class:'dex-muted',style:'margin-top:2px;font-size:12px;'});
+  var category=String(species.categoryName||'').trim();
+  identityLine.appendChild(el('span',{text:category ? category + ' Pokémon' : 'Pokémon'}));
+  identityLine.appendChild(el('span',{text:' · Pronunciation: '+pokemonPronunciationText(species.name||dexSpeciesDisplayName(species))}));
+  heroText.appendChild(identityLine);
   var heroTypes = makeTypePills(species.types, true); if (heroTypes) heroText.appendChild(heroTypes);
   var heroBadge=dexFormBadge(species); if(heroBadge) heroText.appendChild(heroBadge);
   var statusControls=el('div',{class:'dex-status-controls'});
