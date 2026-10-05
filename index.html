@@ -303,6 +303,37 @@ input[type=file]{ display:none; }
 @media (max-width:760px){.dex-layout{grid-template-columns:1fr}.dex-list{max-height:245px;min-height:0}.dex-grid{grid-template-columns:1fr}.dex-card.full{grid-column:auto}.dex-facts{grid-template-columns:1fr 1fr}}
 @media (max-width:480px){.dex-facts{grid-template-columns:1fr}.dex-hero{align-items:flex-start}.dex-hero-icon{width:68px;height:68px}.dex-hero h2{font-size:20px}}
 
+/* ---------- trainer dex ---------- */
+.trainer-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+.trainer-tools input,.trainer-tools select{min-height:38px;color:var(--text);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:8px 11px;font:inherit;}
+.trainer-tools input{flex:1 1 280px;min-width:190px;}
+.trainer-tools select{flex:0 1 190px;}
+.trainer-layout{display:grid;grid-template-columns:minmax(230px,310px) minmax(0,1fr);gap:14px;align-items:start;}
+.trainer-list{display:flex;flex-direction:column;gap:5px;max-height:calc(100vh - 245px);min-height:280px;overflow:auto;padding:4px;border:1px solid var(--line);background:var(--panel-2);}
+.trainer-entry{width:100%;text-align:left;border:1px solid transparent;background:transparent;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 10px;border-radius:4px;}
+.trainer-entry.active{border-color:#285448;background:#142721;color:var(--leaf-bright);}
+.trainer-entry-text{min-width:0;display:flex;flex-direction:column;}
+.trainer-entry-text strong{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.trainer-entry-text small{font-size:10px;color:var(--muted-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.trainer-entry-count{font-size:10px;color:var(--muted);flex:none;}
+.trainer-detail{min-width:0;}
+.trainer-detail-head{background:linear-gradient(110deg,#142a27,#111 72%);border:1px solid #263a37;border-left:4px solid var(--leaf-bright);padding:16px 18px;margin-bottom:12px;}
+.trainer-detail-head h2{margin:0 0 4px;font-size:23px;}
+.trainer-meta{display:flex;gap:8px 18px;flex-wrap:wrap;color:var(--muted);font-size:11px;}
+.trainer-team-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(245px,1fr));gap:10px;}
+.trainer-mon{--hero-color:#267c5a;--hero-secondary:var(--hero-color);background:linear-gradient(105deg,color-mix(in srgb,var(--hero-color) 34%,#111),color-mix(in srgb,var(--hero-secondary) 24%,#111));border:1px solid var(--line);padding:13px;}
+.trainer-mon-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.trainer-mon-head .encounter-icon{width:42px;height:42px;}
+.trainer-mon-title{min-width:0;flex:1;}
+.trainer-mon-title strong{display:block;font-size:14px;}
+.trainer-mon-title small{display:block;color:var(--muted);font-size:10px;}
+.trainer-mon-level{font-size:11px;font-weight:700;color:#101010;background:#d9a936;border-radius:3px;padding:3px 7px;}
+.trainer-mon-fields{display:grid;grid-template-columns:auto 1fr;gap:4px 9px;font-size:11px;margin-bottom:9px;}
+.trainer-mon-fields .k{color:var(--muted-2);}
+.trainer-moves{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+.trainer-move{background:#101010a8;border:1px solid var(--line-soft);padding:5px 7px;font-size:10.5px;}
+@media (max-width:760px){.trainer-layout{grid-template-columns:1fr}.trainer-list{max-height:245px;min-height:0}.trainer-team-grid{grid-template-columns:1fr}}
+
 .box-grid{
   display:grid; grid-template-columns:repeat(6, 1fr); gap:8px;
   padding:18px;
@@ -403,6 +434,7 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
     <button class="active" id="tab-save" role="tab" aria-selected="true" aria-controls="save-tab-panel">Pok&eacute;mon &amp; Storage</button>
     <button id="tab-routes" role="tab" aria-selected="false" aria-controls="routes-tab-panel">Route Encounters</button>
     <button id="tab-dex" role="tab" aria-selected="false" aria-controls="dex-tab-panel">Pok&eacute;dex</button>
+    <button id="tab-trainers" role="tab" aria-selected="false" aria-controls="trainers-tab-panel">Trainer Teams</button>
   </nav>
 
   <div id="save-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-save">
@@ -500,6 +532,28 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
     <div class="dex-layout">
       <aside class="dex-list" id="dex-list" aria-label="Brisk Pokédex species"></aside>
       <div class="dex-detail" id="dex-detail" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section id="trainers-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-trainers" style="display:none;">
+    <div class="section-heading"><h3>Trainer Teams</h3><span class="count" id="trainer-count"></span></div>
+    <p class="route-intro">Browse the teams defined in Brisk Emerald's <code>src/data/trainers.party</code>. This is hack data, not a vanilla Emerald trainer database.</p>
+    <div class="trainer-tools">
+      <input id="trainer-search" type="search" placeholder="Search trainer, class, Pok&eacute;mon, move, ability, or item…" aria-label="Search Brisk trainer teams">
+      <select id="trainer-class" aria-label="Filter trainers by class"><option value="all">All classes</option></select>
+      <select id="trainer-size" aria-label="Filter trainers by party size">
+        <option value="all">Any team size</option>
+        <option value="1">1 Pok&eacute;mon</option>
+        <option value="2">2 Pok&eacute;mon</option>
+        <option value="3">3 Pok&eacute;mon</option>
+        <option value="4">4 Pok&eacute;mon</option>
+        <option value="5">5 Pok&eacute;mon</option>
+        <option value="6">6 Pok&eacute;mon</option>
+      </select>
+    </div>
+    <div class="trainer-layout">
+      <aside class="trainer-list" id="trainer-list" aria-label="Brisk trainers"></aside>
+      <div class="trainer-detail" id="trainer-detail" aria-live="polite"></div>
     </div>
   </section>
 
@@ -1201,6 +1255,8 @@ var BUNDLED_DATA = { species:{}, moves:{}, movePP:{}, items:{}, abilities:{} };
 var ROUTE_DATA = [];
 var selectedRouteId = null;
 var selectedDexSpeciesId = null;
+var TRAINER_DATA = [];
+var selectedTrainerConstant = null;
 var GAME_SHINY_ODDS = 8;
 
 function rebuildNameData(){
@@ -1230,6 +1286,8 @@ async function loadBundledGameData(){
   if (!IS_ELECTRON) return;
   try{
     var data = await window.briskDexAPI.loadGameData();
+    var trainerData = await window.briskDexAPI.loadTrainerData();
+    TRAINER_DATA = Array.isArray(trainerData && trainerData.trainers) ? trainerData.trainers : [];
     if (Number.isInteger(data.shinyOdds) && data.shinyOdds > 0) GAME_SHINY_ODDS = data.shinyOdds;
     BUNDLED_DATA = {
       species:data.species || {}, moves:data.moves || {},
@@ -1244,6 +1302,7 @@ async function loadBundledGameData(){
     updateDataStatus();
     renderRouteEncounters();
     renderPokedex();
+    renderTrainerTeams();
   }catch(err){
     showError('Could not load Brisk Emerald data bundled with Brisk Dex: ' + err.message);
   }
@@ -2454,21 +2513,144 @@ function renderPokedex(){
   detail.appendChild(grid);
 }
 
+function normalizeTrainerSpeciesName(value){
+  return String(value || '').toLowerCase().replace(/^species_/, '').replace(/[^a-z0-9]/g, '');
+}
+function trainerSpeciesId(name){
+  var target = normalizeTrainerSpeciesName(name);
+  if (!target) return null;
+  var ids = Object.keys(NAME_DATA.species);
+  for (var i=0;i<ids.length;i++){
+    var e=NAME_DATA.species[ids[i]];
+    if (!e || typeof e !== 'object') continue;
+    if (normalizeTrainerSpeciesName(e.name) === target || normalizeTrainerSpeciesName(e.constant) === target) return Number(ids[i]);
+  }
+  return null;
+}
+function renderTrainerClassOptions(){
+  var select=document.getElementById('trainer-class');
+  if(!select) return;
+  var prev=select.value||'all';
+  var classes=new Set(TRAINER_DATA.map(function(t){return t.class||'Pkmn Trainer';}));
+  select.innerHTML='';
+  select.appendChild(el('option',{value:'all',text:'All classes'}));
+  Array.from(classes).sort().forEach(function(c){select.appendChild(el('option',{value:c,text:c}));});
+  select.value=Array.from(select.options).some(function(o){return o.value===prev;})?prev:'all';
+}
+function trainerSearchText(t){
+  var parts=[t.constant,t.name,t.class,t.ai,t.battleType,t.items,t.pic];
+  (t.party||[]).forEach(function(m){
+    parts.push(m.species,m.nickname,m.item);
+    Object.keys(m.fields||{}).forEach(function(k){parts.push(k,m.fields[k]);});
+    (m.moves||[]).forEach(function(move){parts.push(move);});
+  });
+  return parts.filter(Boolean).join(' ').toLowerCase();
+}
+function renderTrainerTeams(){
+  var list=document.getElementById('trainer-list'), detail=document.getElementById('trainer-detail');
+  if(!list||!detail) return;
+  renderTrainerClassOptions();
+  var q=(document.getElementById('trainer-search').value||'').trim().toLowerCase();
+  var classFilter=document.getElementById('trainer-class').value;
+  var sizeFilter=document.getElementById('trainer-size').value;
+  var filtered=TRAINER_DATA.filter(function(t){
+    if(t.constant==='TRAINER_NONE') return false;
+    if(classFilter!=='all' && (t.class||'Pkmn Trainer')!==classFilter) return false;
+    if(sizeFilter!=='all' && String((t.party||[]).length)!==sizeFilter) return false;
+    return !q || trainerSearchText(t).includes(q);
+  });
+  document.getElementById('trainer-count').textContent=filtered.length+' of '+Math.max(0,TRAINER_DATA.length-1)+' trainers';
+  list.innerHTML=''; detail.innerHTML='';
+  if(!TRAINER_DATA.length){
+    list.appendChild(el('div',{class:'route-empty',text:'Trainer team data is not loaded.'}));
+    return;
+  }
+  if(!filtered.length){
+    list.appendChild(el('div',{class:'route-empty',text:'No trainers match these filters.'}));
+    return;
+  }
+  if(!filtered.some(function(t){return t.constant===selectedTrainerConstant;})) selectedTrainerConstant=filtered[0].constant;
+  filtered.forEach(function(t){
+    var btn=el('button',{class:'trainer-entry'+(t.constant===selectedTrainerConstant?' active':'')});
+    var left=el('span',{class:'trainer-entry-text'});
+    left.appendChild(el('strong',{text:t.name||t.constant.replace(/^TRAINER_/,'')}));
+    left.appendChild(el('small',{text:(t.class||'Pkmn Trainer')+' · '+t.constant.replace(/^TRAINER_/,'')}));
+    btn.appendChild(left);
+    btn.appendChild(el('span',{class:'trainer-entry-count',text:(t.party||[]).length+' mon'}));
+    btn.addEventListener('click',function(){selectedTrainerConstant=t.constant;renderTrainerTeams();});
+    list.appendChild(btn);
+  });
+  var t=filtered.find(function(x){return x.constant===selectedTrainerConstant;});
+  if(!t) return;
+  var head=el('section',{class:'trainer-detail-head'});
+  head.appendChild(el('h2',{text:t.name||t.constant.replace(/^TRAINER_/,'')}));
+  var meta=el('div',{class:'trainer-meta'});
+  [
+    t.class||'Pkmn Trainer',
+    t.constant,
+    t.battleType ? ((String(t.battleType).toLowerCase()==='yes'||String(t.battleType).toLowerCase()==='doubles')?'Double Battle':(String(t.battleType).toLowerCase()==='no'?'Single Battle':t.battleType)) : null,
+    t.ai ? 'AI: '+t.ai : null,
+    t.items ? 'Trainer items: '+t.items : null
+  ].filter(Boolean).forEach(function(x){meta.appendChild(el('span',{text:x}));});
+  head.appendChild(meta); detail.appendChild(head);
+
+  var team=el('div',{class:'trainer-team-grid'});
+  (t.party||[]).forEach(function(m){
+    var sid=trainerSpeciesId(m.species), card=el('article',{class:'trainer-mon'});
+    if(sid) applyTypeStyle(card,sid);
+    var mh=el('div',{class:'trainer-mon-head'});
+    mh.appendChild(sid?makeIconEl({species:sid,isShiny:String((m.fields||{}).Shiny||'').toLowerCase()==='yes'},'encounter-icon'):el('span',{class:'encounter-icon'}));
+    var title=el('div',{class:'trainer-mon-title'});
+    title.appendChild(el('strong',{text:(m.nickname?m.nickname+' ('+m.species+')':m.species)+(String((m.fields||{}).Shiny||'').toLowerCase()==='yes'?' ★':'')}));
+    title.appendChild(el('small',{text:m.item?'@ '+m.item:'No held item'}));
+    mh.appendChild(title);
+    mh.appendChild(el('span',{class:'trainer-mon-level',text:'Lv'+((m.fields||{}).Level||'100')}));
+    card.appendChild(mh);
+    var fields=el('div',{class:'trainer-mon-fields'});
+    var preferred=['Ability','Nature','EVs','IVs','Tera Type','Gigantamax','Dynamax Level','Ball','Happiness','Gender'];
+    preferred.forEach(function(k){
+      var v=(m.fields||{})[k];
+      if(!v && k==='Gender') v=m.gender;
+      if(!v) return;
+      fields.appendChild(el('span',{class:'k',text:k}));
+      fields.appendChild(el('span',{text:v}));
+    });
+    Object.keys(m.fields||{}).forEach(function(k){
+      if(k==='Level'||k==='Shiny'||preferred.includes(k)) return;
+      fields.appendChild(el('span',{class:'k',text:k}));
+      fields.appendChild(el('span',{text:m.fields[k]}));
+    });
+    if(fields.children.length) card.appendChild(fields);
+    if((m.moves||[]).length){
+      var moves=el('div',{class:'trainer-moves'});
+      m.moves.forEach(function(move){moves.appendChild(el('div',{class:'trainer-move',text:move}));});
+      card.appendChild(moves);
+    } else card.appendChild(el('div',{class:'dex-muted',text:'Moves use Brisk trainer defaults / level-up data.'}));
+    team.appendChild(card);
+  });
+  detail.appendChild(team);
+}
+
 function setMainTab(tabName){
   var routes = tabName === 'routes';
   var dex = tabName === 'dex';
-  var save = !routes && !dex;
+  var trainers = tabName === 'trainers';
+  var save = !routes && !dex && !trainers;
   document.getElementById('save-tab-panel').style.display = save ? 'block' : 'none';
   document.getElementById('routes-tab-panel').style.display = routes ? 'block' : 'none';
   document.getElementById('dex-tab-panel').style.display = dex ? 'block' : 'none';
+  document.getElementById('trainers-tab-panel').style.display = trainers ? 'block' : 'none';
   document.getElementById('tab-save').classList.toggle('active', save);
   document.getElementById('tab-save').setAttribute('aria-selected', String(save));
   document.getElementById('tab-routes').classList.toggle('active', routes);
   document.getElementById('tab-routes').setAttribute('aria-selected', String(routes));
   document.getElementById('tab-dex').classList.toggle('active', dex);
   document.getElementById('tab-dex').setAttribute('aria-selected', String(dex));
+  document.getElementById('tab-trainers').classList.toggle('active', trainers);
+  document.getElementById('tab-trainers').setAttribute('aria-selected', String(trainers));
   if (routes) renderRouteEncounters();
   if (dex) renderPokedex();
+  if (trainers) renderTrainerTeams();
 }
 
 /* ============================================================
@@ -2542,6 +2724,10 @@ function handleDataFile(file){
 document.getElementById('tab-save').addEventListener('click', function(){ setMainTab('save'); });
 document.getElementById('tab-routes').addEventListener('click', function(){ setMainTab('routes'); });
 document.getElementById('tab-dex').addEventListener('click', function(){ setMainTab('dex'); });
+document.getElementById('tab-trainers').addEventListener('click', function(){ setMainTab('trainers'); });
+document.getElementById('trainer-search').addEventListener('input', renderTrainerTeams);
+document.getElementById('trainer-class').addEventListener('change', renderTrainerTeams);
+document.getElementById('trainer-size').addEventListener('change', renderTrainerTeams);
 document.getElementById('dex-search').addEventListener('input', renderPokedex);
 document.getElementById('dex-type').addEventListener('change', renderPokedex);
 document.getElementById('route-search').addEventListener('input', renderRouteEncounters);
