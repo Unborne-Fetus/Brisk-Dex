@@ -3358,7 +3358,7 @@ function renderItems(){
   var all=Object.keys(ITEM_DETAILS||{}).length ? ITEM_DETAILS : Object.fromEntries(Object.keys(NAME_DATA.items||{}).map(function(id){return [id,{name:NAME_DATA.items[id],constant:'',description:'',locations:[]}];}));
   var q=(document.getElementById('item-search').value||'').trim().toLowerCase();
   var ids=Object.keys(all).filter(function(id){
-    var it=all[id]||{}, hay=[it.name,it.constant,it.description];
+    var it=all[id]||{}, hay=[it.name,it.constant,it.description,id,'#'+id];
     (it.locations||[]).forEach(function(loc){hay.push(loc.location,loc.method);});
     return !q || hay.filter(Boolean).join(' ').toLowerCase().includes(q);
   }).sort(function(a,b){return String((all[a]||{}).name||'').localeCompare(String((all[b]||{}).name||''));});
@@ -3372,7 +3372,10 @@ function renderItems(){
       var shell=el('span',{class:'asset-icon-shell',style:'width:40px;height:40px;'});
       var icon=el('img',{src:it.icon,alt:'',style:'width:40px;height:40px;'}); icon.loading='lazy'; icon.decoding='async'; shell.appendChild(icon); btn.appendChild(shell);
     }
-    btn.appendChild(el('strong',{text:it.name||itemName(Number(id))}));
+    var itemNameRow=el('strong',{style:'display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;'});
+    itemNameRow.appendChild(el('span',{text:it.name||itemName(Number(id))}));
+    itemNameRow.appendChild(el('span',{class:'dex-muted',style:'font-size:10px;font-weight:600;',text:'#'+Number(id)}));
+    btn.appendChild(itemNameRow);
     if(it.description) btn.appendChild(el('small',{text:it.description}));
     btn.addEventListener('click',function(){selectedItemId=Number(id);renderItems();});
     return btn;
@@ -3380,7 +3383,10 @@ function renderItems(){
   var it=all[String(selectedItemId)]||{};
   var head=el('section',{class:'item-detail-head'});
   if(it.icon){ var heroShell=el('span',{class:'asset-icon-shell',style:'width:80px;height:80px;float:right;margin-left:18px;'}); var heroIcon=el('img',{src:it.icon,alt:(it.name||'Item')+' icon',style:'width:80px;height:80px;'}); heroIcon.decoding='async'; heroShell.appendChild(heroIcon); head.appendChild(heroShell); }
-  head.appendChild(el('h2',{text:it.name||itemName(selectedItemId)}));
+  var itemHeading=el('div',{style:'display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;'});
+  itemHeading.appendChild(el('h2',{text:it.name||itemName(selectedItemId)}));
+  itemHeading.appendChild(el('span',{class:'dex-muted',style:'font-size:14px;font-weight:700;',text:'#'+Number(selectedItemId)}));
+  head.appendChild(itemHeading);
   head.appendChild(el('div',{class:it.description?'item-description':'dex-muted',text:it.description||'No item description is present in the currently loaded Brisk data. Re-run the Brisk data extractor to populate it.'}));
   detail.appendChild(head);
   var locations=el('section',{class:'dex-card'});
