@@ -4,7 +4,10 @@
   "version": "1.0.0",
   "description": "Companion app for Pokémon Brisk Emerald",
   "main": "main.js",
-  "author": "Brisk Emerald",
+  "author": {
+    "name": "Brisk Emerald",
+    "email": "noreply@briskemerald.local"
+  },
   "license": "UNLICENSED",
   "private": true,
   "scripts": {
