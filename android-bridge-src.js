@@ -40,9 +40,13 @@ async function shareBase64(data, fileName, mimeType) {
   return { ok: true, uri, mimeType };
 }
 
-window.briskAndroidAPI = {
-  isAndroid: Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android',
+const platform = Capacitor.getPlatform();
+const mobileAPI = {
+  isNative: Capacitor.isNativePlatform(),
+  isAndroid: Capacitor.isNativePlatform() && platform === 'android',
+  isIOS: Capacitor.isNativePlatform() && platform === 'ios',
   async openSaveFile() {
+    if (platform !== 'android') return null;
     return SaveFilePicker.openSaveFile();
   },
   saveBytes(bytes, fileName, mimeType) {
@@ -52,3 +56,6 @@ window.briskAndroidAPI = {
     return shareBase64(btoa(unescape(encodeURIComponent(String(text)))), fileName, mimeType || 'text/plain');
   }
 };
+window.briskMobileAPI = mobileAPI;
+window.briskAndroidAPI = mobileAPI;
+window.briskIOSAPI = mobileAPI;
