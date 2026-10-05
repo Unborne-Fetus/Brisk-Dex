@@ -16,7 +16,11 @@
     "android:prepare": "node tools/prepare_android.mjs",
     "android:add": "npm run android:prepare && npx cap add android && node tools/patch_android.mjs",
     "android:sync": "npm run android:prepare && npx cap sync android && node tools/patch_android.mjs",
-    "android:build": "npm run android:prepare && npx cap sync android && node tools/patch_android.mjs && cd android && ./gradlew assembleDebug"
+    "android:build": "npm run android:prepare && npx cap sync android && node tools/patch_android.mjs && cd android && ./gradlew assembleDebug",
+    "ios:prepare": "node tools/prepare_android.mjs",
+    "ios:add": "npm run ios:prepare && npx cap add ios",
+    "ios:sync": "npm run ios:prepare && npx cap sync ios",
+    "ios:build": "npm run ios:prepare && npx cap sync ios"
   },
   "devDependencies": {
     "electron": "^31.3.0",
@@ -60,6 +64,7 @@
     "@capacitor/core": "^8.0.0",
     "@capacitor/android": "^8.0.0",
     "@capacitor/filesystem": "^8.0.0",
-    "@capacitor/share": "^8.0.0"
+    "@capacitor/share": "^8.0.0",
+    "@capacitor/ios": "^8.0.0"
   }
 }
