@@ -49,18 +49,52 @@ def read_jasc_palette(palette_file):
         return None
     return colors
 
-def shiny_palette_png(source_png, palette_file, normal_palette_file, target_png):
-    """Write a sprite sheet with Brisk Emerald's exact species shiny palette."""
-    if not os.path.isfile(source_png) or not os.path.isfile(palette_file):
-        return False
+def png_palette(source_png):
     try:
-        colors = read_jasc_palette(palette_file)
-        normal_colors = read_jasc_palette(normal_palette_file)
-        if not colors or not normal_colors or len(colors) != len(normal_colors):
-            return False
         png = open(source_png, 'rb').read()
         if not png.startswith(b'\x89PNG\r\n\x1a\n'):
+            return None
+        pos = 8
+        while pos < len(png):
+            size = struct.unpack('>I', png[pos:pos + 4])[0]
+            kind = png[pos + 4:pos + 8]
+            data = png[pos + 8:pos + 8 + size]
+            if kind == b'PLTE' and size % 3 == 0:
+                return [tuple(data[i:i + 3]) for i in range(0, size, 3)]
+            pos += size + 12
+    except (OSError, ValueError, struct.error):
+        pass
+    return None
+
+def palette_variant_png(source_png, normal_palette_file, shiny_palette_file, want_shiny, target_png):
+    """Render a source sprite with the requested Brisk normal/shiny palette.
+
+    Some Expansion back PNGs are stored with their shiny palette embedded while
+    fronts are stored normal. Detect which palette the source most closely uses
+    before remapping so normal and shiny exports are always distinct/correct.
+    """
+    if not os.path.isfile(source_png):
+        return False
+    try:
+        normal_colors = read_jasc_palette(normal_palette_file)
+        shiny_colors = read_jasc_palette(shiny_palette_file)
+        source_colors = png_palette(source_png)
+        if not normal_colors or not shiny_colors or not source_colors:
             return False
+
+        def palette_distance(reference):
+            limit = min(len(source_colors), len(reference))
+            if not limit:
+                return float('inf')
+            return sum(
+                sum((source_colors[i][channel] - reference[i][channel]) ** 2 for channel in range(3))
+                for i in range(limit)
+            ) / limit
+
+        reference = shiny_colors if palette_distance(shiny_colors) < palette_distance(normal_colors) else normal_colors
+        target = shiny_colors if want_shiny else normal_colors
+
+        png = open(source_png, 'rb').read()
         chunks = []
         pos = 8
         replaced = False
@@ -69,25 +103,15 @@ def shiny_palette_png(source_png, palette_file, normal_palette_file, target_png)
             kind = png[pos + 4:pos + 8]
             data = png[pos + 8:pos + 8 + size]
             if kind == b'PLTE':
-                source_colors = [tuple(data[i:i + 3]) for i in range(0, size, 3)]
-                if size % 3:
-                    return False
-                if len(source_colors) <= len(colors):
-                    # Standard indexed sheets use the same palette order, but
-                    # may omit unused entries from the end of the palette.
-                    remapped = colors[:len(source_colors)]
-                else:
-                    # Some modern static front sprites are expanded to 256
-                    # palette entries. Match each shade to its nearest base
-                    # color, then carry its shade offset into the shiny color.
-                    remapped = []
-                    for source_color in source_colors:
-                        nearest = min(range(len(normal_colors)), key=lambda i: sum(
-                            (source_color[channel] - normal_colors[i][channel]) ** 2
-                            for channel in range(3)))
-                        remapped.append(tuple(max(0, min(255,
-                            colors[nearest][channel] + source_color[channel] - normal_colors[nearest][channel]))
-                            for channel in range(3)))
+                embedded = [tuple(data[i:i + 3]) for i in range(0, size, 3)]
+                remapped = []
+                for source_color in embedded:
+                    nearest = min(range(len(reference)), key=lambda i: sum(
+                        (source_color[channel] - reference[i][channel]) ** 2
+                        for channel in range(3)))
+                    remapped.append(tuple(max(0, min(255,
+                        target[nearest][channel] + source_color[channel] - reference[nearest][channel]))
+                        for channel in range(3)))
                 data = bytes(channel for color in remapped for channel in color)
                 replaced = True
             crc = zlib.crc32(kind + data) & 0xFFFFFFFF
@@ -951,6 +975,7 @@ def main():
         nat_dex_name = nat_dex_match.group(1) if nat_dex_match else None
         national_dex = national_dex_ids.get(nat_dex_name, 0) if nat_dex_name else 0
         is_mega = bool(re.search(r'(^|_)MEGA(?:_|$)', name))
+        is_gmax = bool(re.search(r'(^|_)GMAX(?:_|$)', name))
         form_label = None
         if is_mega:
             if name.endswith('_MEGA_X'):
@@ -959,6 +984,8 @@ def main():
                 form_label = 'Mega Y'
             else:
                 form_label = 'Mega'
+        elif is_gmax:
+            form_label = 'Gigantamax'
         elif nat_dex_name and name != nat_dex_name and name.startswith(nat_dex_name + '_'):
             form_label = name[len(nat_dex_name) + 1:].replace('_', ' ').title()
         base_stats = []
@@ -994,6 +1021,7 @@ def main():
             "nationalDex": national_dex,
             "formLabel": form_label,
             "isMega": is_mega,
+            "isGmax": is_gmax,
             "pokedexEntry": pokedex_entry
         }
 
@@ -1257,15 +1285,6 @@ def main():
             continue
         front_source = next((os.path.join(folder, fn) for fn in ("front.png", "anim_front.png") if os.path.isfile(os.path.join(folder, fn))), None)
         back_source = next((os.path.join(folder, fn) for fn in ("back.png", "anim_back.png") if os.path.isfile(os.path.join(folder, fn))), None)
-        if front_source:
-            front_target = os.path.join(sprites_out, sid + "_front.png")
-            if normalize_sprite_png(front_source, front_target, first_frame=True, transparent_bg=True):
-                species["frontSprite"] = sprites_out + "/" + sid + "_front.png"
-        if back_source:
-            back_target = os.path.join(sprites_out, sid + "_back.png")
-            if normalize_sprite_png(back_source, back_target, first_frame=True, transparent_bg=True):
-                species["backSprite"] = sprites_out + "/" + sid + "_back.png"
-
         current = folder
         shiny_palette = normal_palette = None
         while True:
@@ -1280,17 +1299,28 @@ def main():
             current = os.path.dirname(current)
 
         for side, source in (("front", front_source), ("back", back_source)):
-            if not source or not shiny_palette or not normal_palette:
+            if not source:
                 continue
-            temporary = os.path.join(sprites_out, sid + "_" + side + "_shiny_sheet.png")
-            final = os.path.join(sprites_out, sid + "_" + side + "_shiny.png")
-            if shiny_palette_png(source, shiny_palette, normal_palette, temporary):
-                normalize_sprite_png(temporary, final, first_frame=True, transparent_bg=True)
-                try:
-                    os.remove(temporary)
-                except OSError:
-                    pass
-                species[side + "ShinySprite"] = sprites_out + "/" + sid + "_" + side + "_shiny.png"
+            for want_shiny, suffix, field in (
+                (False, "", side + "Sprite"),
+                (True, "_shiny", side + "ShinySprite"),
+            ):
+                final = os.path.join(sprites_out, sid + "_" + side + suffix + ".png")
+                temporary = os.path.join(sprites_out, sid + "_" + side + suffix + "_sheet.png")
+                rendered = False
+                if shiny_palette and normal_palette:
+                    rendered = palette_variant_png(source, normal_palette, shiny_palette, want_shiny, temporary)
+                if rendered:
+                    normalize_sprite_png(temporary, final, first_frame=True, transparent_bg=True)
+                    try:
+                        os.remove(temporary)
+                    except OSError:
+                        pass
+                elif not want_shiny:
+                    normalize_sprite_png(source, final, first_frame=True, transparent_bg=True)
+                    rendered = True
+                if rendered or os.path.isfile(final):
+                    species[field] = sprites_out + "/" + sid + "_" + side + suffix + ".png"
 
     # Export every trainer battle portrait referenced by trainers.party.
     trainer_front_dir = os.path.join(repo, "graphics", "trainers", "front_pics")
