@@ -2,7 +2,7 @@
   "name": "brisk-dex",
   "productName": "Brisk Dex",
   "version": "1.0.0",
-  "description": "Companion app for Pok\u00e9mon Brisk Emerald",
+  "description": "Companion app for Pokémon Brisk Emerald",
   "main": "main.js",
   "author": "Brisk Emerald",
   "license": "UNLICENSED",
@@ -12,11 +12,17 @@
     "dist": "electron-builder",
     "dist:win": "electron-builder --win",
     "dist:mac": "electron-builder --mac",
-    "dist:linux": "electron-builder --linux"
+    "dist:linux": "electron-builder --linux",
+    "android:prepare": "node tools/prepare_android.mjs",
+    "android:add": "npm run android:prepare && npx cap add android",
+    "android:sync": "npm run android:prepare && npx cap sync android",
+    "android:build": "npm run android:prepare && npx cap sync android && cd android && ./gradlew assembleDebug"
   },
   "devDependencies": {
     "electron": "^31.3.0",
-    "electron-builder": "^24.13.3"
+    "electron-builder": "^24.13.3",
+    "@capacitor/cli": "^8.0.0",
+    "esbuild": "^0.25.0"
   },
   "build": {
     "appId": "com.briskemerald.briskdex",
@@ -46,5 +52,11 @@
     "linux": {
       "target": "AppImage"
     }
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/filesystem": "^8.0.0",
+    "@capacitor/share": "^8.0.0"
   }
 }
