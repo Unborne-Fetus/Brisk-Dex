@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('briskDexAPI', {
   loadStorage: () => ipcRenderer.invoke('load-storage'),
   saveStorage: (data) => ipcRenderer.invoke('save-storage', data),
   loadGameData: () => ipcRenderer.invoke('load-game-data'),
+  loadTrainerData: () => ipcRenderer.invoke('load-trainer-data'),
   loadBundledIcons: () => ipcRenderer.invoke('load-bundled-icons'),
   openIconFolderDialog: () => ipcRenderer.invoke('open-icon-folder')
 });
