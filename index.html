@@ -1710,7 +1710,7 @@ var ONLINE_STATE = {
   roomCode: sessionStorage.getItem('briskdex_room_code') || '',
   playerId: sessionStorage.getItem('briskdex_player_id') || '',
   playerIndex: Number(sessionStorage.getItem('briskdex_player_index') || -1),
-  room: null, polling: null, busy: false, gimmickChoice:null, selectedTeamKeys:[]
+  room: null, polling: null, busy: false, gimmickChoice:null, selectedTeamKeys:[], teamSearch:'', teamSource:'all'
 };
 function persistOnlineSession(){
   if(ONLINE_STATE.roomCode&&ONLINE_STATE.playerId){
@@ -4488,6 +4488,15 @@ function renderOnlineBattle(){
     var teamCard=el('section',{class:'online-card'});teamCard.appendChild(el('h4',{text:'Choose battle team · '+snapshot.length+'/6'}));
     var candidates=ensureBattleTeamSelection();
     if(candidates.length){
+      var pickerTools=el('div',{class:'online-form',style:'margin-bottom:10px;grid-template-columns:minmax(0,1fr) 150px;'});
+      var search=el('input',{type:'search',placeholder:'Search Pokémon, box, type…',value:ONLINE_STATE.teamSearch||''});
+      search.addEventListener('input',function(){ONLINE_STATE.teamSearch=search.value;renderOnlineBattle();});
+      var sourceSelect=el('select');
+      [['all','All storage'],['party','Party'],['boxes','PC Boxes'],['external','External Storage']].forEach(function(pair){
+        var opt=el('option',{value:pair[0],text:pair[1]});if(ONLINE_STATE.teamSource===pair[0])opt.selected=true;sourceSelect.appendChild(opt);
+      });
+      sourceSelect.addEventListener('change',function(){ONLINE_STATE.teamSource=sourceSelect.value;renderOnlineBattle();});
+      pickerTools.appendChild(search);pickerTools.appendChild(sourceSelect);teamCard.appendChild(pickerTools);
       var selectedWrap=el('div',{class:'online-team-selected'});
       ONLINE_STATE.selectedTeamKeys.forEach(function(key){
         var c=candidates.find(function(x){return x.key===key;});if(!c)return;
@@ -4497,8 +4506,18 @@ function renderOnlineBattle(){
         selectedWrap.appendChild(chip);
       });
       teamCard.appendChild(selectedWrap);
+      var q=String(ONLINE_STATE.teamSearch||'').trim().toLowerCase();
+      var filtered=candidates.filter(function(c){
+        var src=ONLINE_STATE.teamSource||'all';
+        if(src==='party'&&c.sourceLabel!=='Party')return false;
+        if(src==='boxes'&&!/^Box /.test(c.sourceLabel))return false;
+        if(src==='external'&&c.sourceLabel!=='External Storage')return false;
+        if(!q)return true;
+        return [c.name,c.sourceLabel,(c.types||[]).join(' '),c.ability,c.item,'Lv'+c.level].join(' ').toLowerCase().includes(q);
+      });
       var groups={};
-      candidates.forEach(function(c){(groups[c.sourceLabel]||(groups[c.sourceLabel]=[])).push(c);});
+      filtered.forEach(function(c){(groups[c.sourceLabel]||(groups[c.sourceLabel]=[])).push(c);});
+      if(!filtered.length)teamCard.appendChild(el('div',{class:'route-empty',text:'No stored Pokémon match that search/filter.'}));
       Object.keys(groups).forEach(function(source){
         var sec=el('div',{class:'online-source'});sec.appendChild(el('h5',{text:source}));
         var grid=el('div',{class:'online-picker-grid'});
