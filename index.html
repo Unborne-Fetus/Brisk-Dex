@@ -438,6 +438,25 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
   .list-more{width:calc(100% - 12px);margin:8px 6px 12px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);color:var(--text);cursor:pointer;}
   @media (max-width:760px){.dex-sprite-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.dex-sprite-card img{width:96px;height:96px;}}
 
+
+/* ---------- visual evolution lines ---------- */
+.dex-evolution-wrap{display:flex;flex-direction:column;gap:18px;overflow-x:auto;padding:6px 2px 10px;scrollbar-width:thin;}
+.dex-evolution-path{display:flex;align-items:center;gap:10px;min-width:max-content;}
+.dex-evo-stage{width:152px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:7px;}
+.dex-evo-stage-label{min-height:16px;font-size:11px;color:var(--muted);font-weight:700;}
+.dex-evo-sprite-ring{width:106px;height:106px;border-radius:50%;border:3px solid var(--leaf);background:color-mix(in srgb,var(--panel-2) 86%,var(--leaf) 14%);display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.dex-evo-sprite-ring.mega{border-color:#b86de0;}
+.dex-evo-sprite-ring.gmax{border-color:#d75a6b;}
+.dex-evo-sprite-ring img{width:94px;height:94px;object-fit:contain;image-rendering:pixelated;background:transparent;}
+.dex-evo-name-card{width:100%;min-height:67px;border-radius:12px;border:1px solid var(--line);background:var(--panel-2);padding:9px 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;}
+.dex-evo-name-card strong{font-size:14px;line-height:1.15;}
+.dex-evo-arrow{width:86px;flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;text-align:center;color:var(--muted);}
+.dex-evo-arrow strong{font-size:25px;line-height:1;color:var(--text);font-weight:500;}
+.dex-evo-arrow span{font-size:10px;line-height:1.25;max-width:86px;}
+.dex-movepool{display:grid;grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:7px;}
+.dex-move-chip{border:1px solid var(--line-soft);background:var(--panel-2);border-radius:8px;padding:7px 9px;font-size:11px;text-align:center;}
+@media(max-width:760px){.dex-evo-stage{width:132px}.dex-evo-sprite-ring{width:92px;height:92px}.dex-evo-sprite-ring img{width:82px;height:82px}.dex-evo-arrow{width:70px}.dex-movepool{grid-template-columns:repeat(2,minmax(0,1fr));}}
+
 </style>
 </head>
 <body>
@@ -2603,6 +2622,163 @@ function renderPokedex(){
   renderPokedexDetail(allSpecies, String(selectedDexSpeciesId), detail);
 }
 
+function dexBaseFormId(id, allSpecies){
+  var species=allSpecies[String(id)]||{};
+  if(!species.isMega && !species.isGmax) return Number(id);
+  var constant=String(species.constant||'');
+  var baseConstant=constant.replace(/_(?:MEGA(?:_[XY])?|GMAX)$/,'');
+  var exact=Object.keys(allSpecies).find(function(sid){
+    return String((allSpecies[sid]||{}).constant||'')===baseConstant;
+  });
+  if(exact) return Number(exact);
+  var nat=Number(species.nationalDex||0);
+  var fallback=Object.keys(allSpecies).find(function(sid){
+    var s=allSpecies[sid]||{};
+    return nat && Number(s.nationalDex||0)===nat && !s.isMega && !s.isGmax && !s.formLabel;
+  });
+  return fallback ? Number(fallback) : Number(id);
+}
+
+function dexTransformationForms(id, allSpecies){
+  var base=allSpecies[String(id)]||{};
+  var baseConstant=String(base.constant||'');
+  var nat=Number(base.nationalDex||0);
+  return Object.keys(allSpecies).filter(function(sid){
+    var s=allSpecies[sid]||{};
+    if(!s.isMega && !s.isGmax) return false;
+    var constant=String(s.constant||'');
+    var direct=constant.replace(/_(?:MEGA(?:_[XY])?|GMAX)$/,'')===baseConstant;
+    return direct || (nat && Number(s.nationalDex||0)===nat && constant.indexOf(baseConstant+'_')===0);
+  }).map(Number);
+}
+
+function dexEvolutionFamilies(id, allSpecies){
+  var core=dexBaseFormId(id,allSpecies);
+  var parents={};
+  Object.keys(allSpecies).forEach(function(sourceId){
+    var source=allSpecies[sourceId]||{};
+    if(source.isMega||source.isGmax) return;
+    (source.evolutions||[]).forEach(function(evo){
+      var target=Number(evo.target);
+      var targetSpecies=allSpecies[String(target)]||{};
+      if(targetSpecies.isMega||targetSpecies.isGmax) return;
+      (parents[target]||(parents[target]=[])).push({source:Number(sourceId),evo:evo});
+    });
+  });
+
+  var roots=[];
+  var seenUp={};
+  function walkUp(node){
+    if(seenUp[node]) return;
+    seenUp[node]=true;
+    var incoming=parents[node]||[];
+    if(!incoming.length){ roots.push(node); return; }
+    incoming.forEach(function(edge){walkUp(edge.source);});
+  }
+  walkUp(core);
+  if(!roots.length) roots=[core];
+
+  var paths=[];
+  function walkDown(node,path,edges,visited){
+    if(visited[node]){paths.push({nodes:path.slice(),edges:edges.slice()});return;}
+    var nextVisited=Object.assign({},visited); nextVisited[node]=true;
+    var species=allSpecies[String(node)]||{};
+    var outgoing=(species.evolutions||[]).filter(function(evo){
+      var target=allSpecies[String(evo.target)]||{};
+      return !target.isMega&&!target.isGmax;
+    });
+    if(!outgoing.length){
+      paths.push({nodes:path.concat(node),edges:edges.slice()});
+      return;
+    }
+    outgoing.forEach(function(evo){
+      walkDown(Number(evo.target),path.concat(node),edges.concat(evo),nextVisited);
+    });
+  }
+  roots.forEach(function(root){walkDown(root,[],[],{});});
+
+  // Add Mega/G-Max forms as terminal branches from whichever stage owns them.
+  var expanded=[];
+  paths.forEach(function(path){
+    var transformed=false;
+    path.nodes.forEach(function(node,index){
+      var forms=dexTransformationForms(node,allSpecies);
+      forms.forEach(function(formId){
+        transformed=true;
+        var transform=allSpecies[String(formId)]||{};
+        expanded.push({
+          nodes:path.nodes.slice(0,index+1).concat(formId),
+          edges:path.edges.slice(0,index).concat([{transform:true,kind:transform.isGmax?'Gigantamax':'Mega Evolution'}])
+        });
+      });
+    });
+    expanded.push(path);
+  });
+
+  // Put the ordinary evolutionary line first, then transformation branches.
+  expanded.sort(function(a,b){
+    var at=a.edges.some(function(e){return e.transform;})?1:0;
+    var bt=b.edges.some(function(e){return e.transform;})?1:0;
+    return at-bt || a.nodes.length-b.nodes.length;
+  });
+  var unique=[],keys={};
+  expanded.forEach(function(path){
+    var key=path.nodes.join('>');
+    if(!keys[key]){keys[key]=true;unique.push(path);}
+  });
+  return unique;
+}
+
+function dexEvolutionStageLabel(index,total,species,edgeInto){
+  if(edgeInto && edgeInto.transform) return edgeInto.kind;
+  if(index===0) return total===1?'Base Form':'Base Pokémon';
+  if(index===1) return 'First Evolution';
+  if(index===2) return 'Second Evolution';
+  return index===total-1?'Final Evolution':'Evolution '+index;
+}
+
+function makeDexEvolutionStage(species,id,label){
+  var stage=el('div',{class:'dex-evo-stage'});
+  stage.appendChild(el('div',{class:'dex-evo-stage-label',text:label}));
+  var ring=el('div',{class:'dex-evo-sprite-ring'+(species.isMega?' mega':'')+(species.isGmax?' gmax':'')});
+  var url=species.frontSprite||SPECIES_ICONS[String(id)]||null;
+  if(url){
+    var img=el('img',{src:url,alt:dexSpeciesDisplayName(species)});
+    img.loading='lazy'; img.decoding='async'; ring.appendChild(img);
+  }
+  stage.appendChild(ring);
+  var card=el('div',{class:'dex-evo-name-card'});
+  card.appendChild(el('strong',{text:dexSpeciesDisplayName(species)}));
+  var types=makeTypePills(species.types,true); if(types) card.appendChild(types);
+  stage.appendChild(card);
+  return stage;
+}
+
+function renderDexEvolutionLines(allSpecies,id){
+  var wrap=el('div',{class:'dex-evolution-wrap'});
+  var paths=dexEvolutionFamilies(Number(id),allSpecies);
+  if(!paths.length){
+    wrap.appendChild(el('div',{class:'dex-muted',text:'No evolution data is available.'}));
+    return wrap;
+  }
+  paths.forEach(function(path){
+    var row=el('div',{class:'dex-evolution-path'});
+    path.nodes.forEach(function(node,index){
+      if(index>0){
+        var edge=path.edges[index-1]||{};
+        var arrow=el('div',{class:'dex-evo-arrow'});
+        arrow.appendChild(el('strong',{text:'→'}));
+        arrow.appendChild(el('span',{text:edge.transform?edge.kind:formatEvolutionMethod(edge)}));
+        row.appendChild(arrow);
+      }
+      var species=allSpecies[String(node)]||{};
+      row.appendChild(makeDexEvolutionStage(species,node,dexEvolutionStageLabel(index,path.nodes.length,species,path.edges[index-1])));
+    });
+    wrap.appendChild(row);
+  });
+  return wrap;
+}
+
 function renderPokedexDetail(allSpecies, id, detail){
   detail.innerHTML = '';
   var species = allSpecies[String(id)];
@@ -2630,10 +2806,7 @@ function renderPokedexDetail(allSpecies, id, detail){
   facts.appendChild(el('h4', {text:'Species Data'}));
   var factsGrid = el('div', {class:'dex-facts'});
   [
-    ['Abilities',(species.abilities || []).filter(Boolean).join(' / ') || 'Unknown'],
-    ['Growth Rate',dexTitleCase(species.growthRate) || 'Unknown'],
-    ['Base Friendship',species.friendship == null ? 'Unknown' : String(species.friendship)],
-    ['Minimum Level',species.minimumLevel == null ? 'Unknown' : 'Lv' + species.minimumLevel]
+    ['Abilities',(species.abilities || []).filter(Boolean).join(' / ') || 'Unknown']
   ].forEach(function(pair){
     var f=el('div',{class:'dex-fact'}); f.appendChild(el('div',{class:'k',text:pair[0]})); f.appendChild(el('div',{class:'v',text:pair[1]})); factsGrid.appendChild(f);
   });
@@ -2656,26 +2829,23 @@ function renderPokedexDetail(allSpecies, id, detail){
   grid.appendChild(stats);
 
   var evolutions = el('section', {class:'dex-card full'});
-  evolutions.appendChild(el('h4', {text:'Evolution'}));
-  var chain=el('div',{class:'dex-chain'});
-  var reverse=dexReverseEvolutions(Number(id), allSpecies);
-  reverse.forEach(function(prev){
-    var source=allSpecies[String(prev.source)] || {};
-    var row=el('div',{class:'dex-evo'});
-    row.appendChild(makeIconEl({species:prev.source,isShiny:false},'encounter-icon'));
-    row.appendChild(el('span',{text:(source.name || 'Species #'+prev.source) + ' → ' + (species.name || 'Species #'+id) + ' · ' + formatEvolutionMethod(prev.evo)}));
-    chain.appendChild(row);
-  });
-  (species.evolutions || []).forEach(function(evo){
-    var target=allSpecies[String(evo.target)] || {};
-    var row=el('div',{class:'dex-evo'});
-    row.appendChild(makeIconEl({species:Number(evo.target),isShiny:false},'encounter-icon'));
-    row.appendChild(el('span',{text:(species.name || 'Species #'+id) + ' → ' + (target.name || 'Species #'+evo.target) + ' · ' + formatEvolutionMethod(evo)}));
-    chain.appendChild(row);
-  });
-  if (!chain.children.length) chain.appendChild(el('div',{class:'dex-muted',text:'No evolution relationship is present in the currently loaded Brisk data. Re-run the Brisk data extractor after this update to populate exact evolution methods.'}));
-  evolutions.appendChild(chain);
+  evolutions.appendChild(el('h4', {text:'Evolution & Forms'}));
+  evolutions.appendChild(renderDexEvolutionLines(allSpecies,Number(id)));
   grid.appendChild(evolutions);
+
+  var movepool=el('section',{class:'dex-card full'});
+  var learnable=(species.learnableMoves||[]).map(function(moveId){
+    return {id:Number(moveId),name:moveName(Number(moveId))};
+  }).filter(function(move){return move.id>0;}).sort(function(a,b){return a.name.localeCompare(b.name);});
+  movepool.appendChild(el('h4',{text:'Movepool'+(learnable.length?' · '+learnable.length+' moves':'')}));
+  if(learnable.length){
+    var moveGrid=el('div',{class:'dex-movepool'});
+    learnable.forEach(function(move){moveGrid.appendChild(el('div',{class:'dex-move-chip',text:move.name}));});
+    movepool.appendChild(moveGrid);
+  }else{
+    movepool.appendChild(el('div',{class:'dex-muted',text:'No learnable-move data is available for this species in the currently loaded Brisk data.'}));
+  }
+  grid.appendChild(movepool);
 
   var dexEntryCard=el('section',{class:'dex-card full'});
   dexEntryCard.appendChild(el('h4',{text:'Pokédex Entry'}));
@@ -2695,22 +2865,6 @@ function renderPokedexDetail(allSpecies, id, detail){
   }
   grid.appendChild(locations);
 
-  var ivCard=el('section',{class:'dex-card full'});
-  ivCard.appendChild(el('h4',{text:'IVs'}));
-  ivCard.appendChild(el('div',{class:'dex-muted',text:'IVs are individual to each Pokémon, not fixed by species. When a save is loaded, Brisk Dex shows the exact IVs of your copies below.'}));
-  var owned=dexOwnedForSpecies(Number(id));
-  if (owned.length){
-    var ivTable=el('table',{class:'dex-iv-table'}), ih=document.createElement('thead'), ihr=document.createElement('tr');
-    ['Owned Pokémon','Lv','HP','Atk','Def','Spe','SpA','SpD'].forEach(function(x){ihr.appendChild(el('th',{text:x}));}); ih.appendChild(ihr); ivTable.appendChild(ih);
-    var ib=document.createElement('tbody');
-    owned.forEach(function(entry){
-      var m=entry.mon, iv=m.ivs || {}, tr=document.createElement('tr');
-      [entry.where + (m.nickname ? ' · ' + m.nickname : ''),m.level,iv.hp,iv.atk,iv.def,iv.spd,iv.spa,iv.spdef].forEach(function(x){tr.appendChild(el('td',{text:x == null ? '—' : String(x)}));});
-      ib.appendChild(tr);
-    });
-    ivTable.appendChild(ib); ivCard.appendChild(ivTable);
-  }
-  grid.appendChild(ivCard);
   detail.appendChild(grid);
 }
 
