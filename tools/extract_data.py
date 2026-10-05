@@ -1426,16 +1426,22 @@ def main():
         json.dump({"source": "Pokemon-Brisk-Emerald/src/data/trainers.party", "trainers": trainer_teams},
                   f, ensure_ascii=False, separators=(',', ':'))
 
-    # The save stores the protagonist's gender. Bundle the matching Ruby/Sapphire
-    # player sprite sheets for the trainer portrait in the app header.
+    # Bundle each playable outfit's normal overworld sprite. SaveBlock2.currOutfitId
+    # selects which one Brisk Dex displays in the trainer badge.
     people_dir = os.path.join(repo, "graphics", "object_events", "pics", "people")
     trainers_out = "brisk-dex-trainers"
     if os.path.isdir(people_dir):
         os.makedirs(trainers_out, exist_ok=True)
-        for source_name, target_name in (("rs_brendan.png", "male.png"), ("rs_may.png", "female.png")):
-            source = os.path.join(people_dir, source_name)
+        outfit_sprites = (
+            (1, "male",   os.path.join("brendan", "walking.png")),
+            (1, "female", os.path.join("may", "walking.png")),
+            (2, "male",   os.path.join("ruby_sapphire_brendan", "walking.png")),
+            (2, "female", os.path.join("ruby_sapphire_may", "walking.png")),
+        )
+        for outfit_id, gender, source_rel in outfit_sprites:
+            source = os.path.join(people_dir, source_rel)
             if os.path.isfile(source):
-                shutil.copyfile(source, os.path.join(trainers_out, target_name))
+                shutil.copyfile(source, os.path.join(trainers_out, f"outfit-{outfit_id}-{gender}.png"))
 
     print()
     print("Done. Desktop builds load brisk-dex-data.json and brisk-dex-icons automatically.")
