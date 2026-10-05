@@ -2422,6 +2422,50 @@ function matchesEncounterMethod(method, filter){
   if (filter === 'super_rod') return method.type === 'fishing_mons' && method.name === 'Super Rod';
   return method.type === filter;
 }
+function canonicalLocationName(area, allAreas){
+  var name=String(area.name||'').trim();
+  if(/^Route\s+\d+$/i.test(name)) return name;
+  var match=name.match(/^(.*?)(?:\s+|_)(\d+)$/);
+  if(match){
+    var base=match[1].trim();
+    var hasSibling=(allAreas||[]).some(function(other){
+      if(other===area) return false;
+      var otherName=String(other.name||'').trim();
+      if(otherName===base) return true;
+      var otherMatch=otherName.match(/^(.*?)(?:\s+|_)(\d+)$/);
+      return !!(otherMatch && otherMatch[1].trim().toLowerCase()===base.toLowerCase());
+    });
+    if(hasSibling) return base;
+  }
+  return name;
+}
+function consolidateRouteAreas(areas){
+  var groups=[], byKey=Object.create(null);
+  (areas||[]).forEach(function(area){
+    var groupName=canonicalLocationName(area,areas);
+    var key=groupName.toLowerCase();
+    var group=byKey[key];
+    if(!group){
+      group={
+        id:'GROUP_'+key.replace(/[^a-z0-9]+/g,'_'),
+        name:groupName,
+        mapType:area.mapType,
+        gameRegion:area.gameRegion,
+        region:area.region,
+        methods:[],
+        subAreas:[]
+      };
+      byKey[key]=group;
+      groups.push(group);
+    }
+    group.subAreas.push(area);
+    (area.methods||[]).forEach(function(method){
+      group.methods.push(Object.assign({},method,{sourceArea:area.name}));
+    });
+  });
+  return groups;
+}
+
 function renderRouteEncounters(){
   var list = document.getElementById('route-list');
   var detail = document.getElementById('route-detail');
@@ -2430,7 +2474,8 @@ function renderRouteEncounters(){
   var kind = document.getElementById('route-kind').value;
   var methodFilter = document.getElementById('encounter-method').value;
   var locationOrder = document.getElementById('route-order').value;
-  var filtered = ROUTE_DATA.filter(function(area){
+  var locationData = consolidateRouteAreas(ROUTE_DATA);
+  var filtered = locationData.filter(function(area){
     if (kind === 'route' && !isRouteArea(area)) return false;
     if (kind === 'area' && isRouteArea(area)) return false;
     var methods = (area.methods || []).filter(function(method){ return matchesEncounterMethod(method, methodFilter); });
@@ -2447,12 +2492,12 @@ function renderRouteEncounters(){
   if (locationOrder === 'alphabetical') filtered.sort(function(a,b){
     return a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
   });
-  document.getElementById('route-count').textContent = ROUTE_DATA.length
-    ? filtered.length + ' of ' + ROUTE_DATA.length + ' locations'
+  document.getElementById('route-count').textContent = locationData.length
+    ? filtered.length + ' of ' + locationData.length + ' locations'
     : 'No encounter data loaded';
   list.innerHTML = '';
   if (!filtered.length){
-    list.appendChild(el('div', {class:'route-empty', text: ROUTE_DATA.length ? 'No locations match these filters.' : 'Load Brisk Emerald game data to view route encounters.'}));
+    list.appendChild(el('div', {class:'route-empty', text: locationData.length ? 'No locations match these filters.' : 'Load Brisk Emerald game data to view route encounters.'}));
     detail.innerHTML = '';
     return;
   }
@@ -2475,7 +2520,11 @@ function renderRouteEncounters(){
   selected.methods.filter(function(method){ return matchesEncounterMethod(method, methodFilter); }).forEach(function(method){
     var card = el('section', {class:'encounter-card'});
     var heading = el('div', {class:'encounter-heading'});
-    heading.appendChild(el('h4', {text:method.name}));
+    var methodHeading=method.name;
+    if((selected.subAreas||[]).length>1 && method.sourceArea && method.sourceArea!==selected.name){
+      methodHeading += ' · ' + method.sourceArea;
+    }
+    heading.appendChild(el('h4', {text:methodHeading}));
     var methodNote = method.type === 'static' ? 'Stationary encounter' : method.type === 'gift' ? 'Gift Pokémon' : method.encounterRate + '% encounter rate';
     heading.appendChild(el('span', {text:methodNote}));
     card.appendChild(heading);
