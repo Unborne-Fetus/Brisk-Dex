@@ -235,3 +235,20 @@ The v18 engine includes the previous damage/status/weather/terrain/hazard/gimmic
 The manifest makes remaining parity work measurable, but exact 100% pokeemerald-expansion/Brisk Emerald parity should only be claimed after every manifest effect plus ability/item interaction is verified by tests against the game engine.
 
 The generated Brisk battle manifest currently contains 279 primary move-effect families and 87 secondary MOVE_EFFECT families. The v18 server has direct coverage for all of those effect-family names; this is used as a coverage gate, while behavioral parity still requires interaction testing.
+
+
+### Battle coverage target
+
+The online simulator is checked against `brisk-battle-effects.json`, generated directly from Brisk Emerald's move table. The current manifest contains **279 primary effect families and 87 secondary effect families**, and all **366/366 are explicitly accounted for** by the battle server.
+
+Run:
+
+```bash
+npm run battle:coverage
+```
+
+The Brisk data-refresh GitHub Action also runs this check automatically. If a future Brisk Emerald update introduces a new extracted move-effect family, the refresh fails until the simulator accounts for it.
+
+Battle teams can be selected from the loaded save's Party, any PC Box, or Brisk Dex External Storage. Pokédex sprite animations replay every 1 second.
+
+“366/366 effect-family coverage” means every effect family extracted from Brisk's move metadata is accounted for. It does not claim that every possible compound interaction, historical-generation quirk, or frame-by-frame pokeemerald-expansion behavior is mathematically proven identical; those require differential battle testing against the ROM engine.
