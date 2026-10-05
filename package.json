@@ -41,7 +41,8 @@
       "brisk-dex-trainers/**/*",
       "brisk-dex-items/**/*",
       "brisk-dex-trainer-pics/**/*",
-      "brisk-dex-sprites/**/*"
+      "brisk-dex-sprites/**/*",
+      "brisk-dex-cries/**/*"
     ],
     "directories": {
       "output": "dist"
