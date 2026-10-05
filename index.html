@@ -511,6 +511,26 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
 .dex-name-row h2{margin:0;}
 .dex-national-number{font-size:22px;font-weight:700;letter-spacing:-.02em;color:var(--muted);}
 @media(max-width:520px){.dex-national-number{font-size:18px;}}
+
+/* ---------- unlimited item bag ---------- */
+.bag-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+.bag-tools input{min-height:38px;color:var(--text);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:8px 11px;font:inherit;}
+.bag-tools input[type="search"]{flex:1 1 260px;min-width:180px;}
+.bag-add{display:flex;gap:8px;flex-wrap:wrap;align-items:end;background:var(--panel);border:1px solid var(--line);padding:14px;margin-bottom:14px;}
+.bag-add label{display:flex;flex-direction:column;gap:5px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em;}
+.bag-add input{min-height:38px;color:var(--text);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:8px 11px;font:inherit;}
+.bag-add .bag-item-input{min-width:260px;flex:1 1 320px;}
+.bag-add .bag-qty-input{width:130px;}
+.bag-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;}
+.bag-entry{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);padding:11px 12px;min-width:0;}
+.bag-entry-info{display:flex;align-items:center;gap:10px;min-width:0;flex:1;}
+.bag-entry-text{min-width:0;display:flex;flex-direction:column;}
+.bag-entry-text strong{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.bag-entry-text small{font-size:10px;color:var(--muted-2);}
+.bag-entry-controls{display:flex;align-items:center;gap:5px;flex:none;}
+.bag-entry-controls button{padding:6px 9px;min-width:32px;justify-content:center;}
+.bag-quantity{min-width:72px;text-align:center;font-size:12px;font-weight:700;}
+@media(max-width:520px){.bag-add .bag-item-input,.bag-add .bag-qty-input{width:100%;min-width:0}.bag-entry{align-items:flex-start;flex-direction:column}.bag-entry-controls{width:100%;justify-content:flex-end}}
 </style>
 </head>
 <body>
@@ -544,6 +564,7 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
     <button id="tab-moves" role="tab" aria-selected="false" aria-controls="moves-tab-panel">Moves</button>
     <button id="tab-abilities" role="tab" aria-selected="false" aria-controls="abilities-tab-panel">Abilities</button>
     <button id="tab-items" role="tab" aria-selected="false" aria-controls="items-tab-panel">Items</button>
+    <button id="tab-bag" role="tab" aria-selected="false" aria-controls="bag-tab-panel">Bag</button>
     <button id="tab-changes" role="tab" aria-selected="false" aria-controls="changes-tab-panel">Changes</button>
   </nav>
 
@@ -732,6 +753,25 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
       <aside class="item-list" id="item-list" aria-label="Brisk Emerald items"></aside>
       <div class="item-detail" id="item-detail" aria-live="polite"></div>
     </div>
+  </section>
+
+  <section id="bag-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-bag" style="display:none;">
+    <div class="section-heading"><h3>Bag</h3><span class="count" id="bag-count"></span></div>
+    <p class="route-intro">Unlimited Brisk Dex item storage. This bag is stored by Brisk Dex itself, so it is not restricted by Emerald save-file pocket sizes or slot limits.</p>
+    <div class="bag-tools">
+      <input id="bag-search" type="search" placeholder="Search stored items…" aria-label="Search stored bag items">
+    </div>
+    <div class="bag-add">
+      <label class="bag-item-input">Item
+        <input id="bag-add-item" list="bag-item-options" placeholder="Item name or #ID" autocomplete="off">
+        <datalist id="bag-item-options"></datalist>
+      </label>
+      <label>Quantity
+        <input class="bag-qty-input" id="bag-add-qty" type="number" min="1" step="1" value="1" inputmode="numeric">
+      </label>
+      <button class="primary" id="btn-bag-add">Add to Bag</button>
+    </div>
+    <div class="bag-list" id="bag-list"></div>
   </section>
 
   <section id="changes-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-changes" style="display:none;">
@@ -1470,6 +1510,7 @@ var selectedAbilityReferenceId = null;
 var MOVE_LEARNERS_INDEX = null;
 var ABILITY_USERS_INDEX = null;
 var CHANGE_DATA = [];
+var BAG_ITEMS = {};
 var currentMainTab = 'save';
 var GAME_SHINY_ODDS = 8;
 var DEX_FLAG_BYTES = 129; // Gen IX National Dex (1025 entries + slot 0) in current Brisk Emerald.
@@ -3648,6 +3689,99 @@ function renderAbilities(){
   detail.appendChild(users);
 }
 
+function loadBagFromStorage(){
+  try{
+    var raw=localStorage.getItem('briskdex_unlimited_bag');
+    BAG_ITEMS=raw?JSON.parse(raw):{};
+    if(!BAG_ITEMS || Array.isArray(BAG_ITEMS) || typeof BAG_ITEMS!=='object') BAG_ITEMS={};
+  }catch(e){ BAG_ITEMS={}; }
+}
+function saveBagToStorage(){
+  try{localStorage.setItem('briskdex_unlimited_bag',JSON.stringify(BAG_ITEMS));}
+  catch(e){showError('Could not save the Brisk Dex Bag on this device: '+e.message);}
+}
+function bagItemData(id){
+  return (ITEM_DETAILS||{})[String(id)] || {name:itemName(Number(id)),icon:null};
+}
+function resolveBagItemId(value){
+  var raw=String(value||'').trim();
+  if(!raw) return null;
+  var numeric=raw.match(/^#?(\d+)$/);
+  if(numeric){
+    var id=Number(numeric[1]);
+    if((ITEM_DETAILS||{})[String(id)] || (NAME_DATA.items||{})[String(id)]) return id;
+  }
+  var target=raw.toLowerCase();
+  var ids=Object.keys(ITEM_DETAILS||{}).length?Object.keys(ITEM_DETAILS):Object.keys(NAME_DATA.items||{});
+  for(var i=0;i<ids.length;i++){
+    var data=bagItemData(ids[i]);
+    if(String(data.name||'').toLowerCase()===target) return Number(ids[i]);
+  }
+  var labelMatch=raw.match(/#(\d+)\s*$/);
+  if(labelMatch) return resolveBagItemId(labelMatch[1]);
+  return null;
+}
+function refreshBagItemOptions(){
+  var datalist=document.getElementById('bag-item-options');
+  if(!datalist) return;
+  datalist.innerHTML='';
+  var ids=Object.keys(ITEM_DETAILS||{}).length?Object.keys(ITEM_DETAILS):Object.keys(NAME_DATA.items||{});
+  ids.sort(function(a,b){return String(bagItemData(a).name||'').localeCompare(String(bagItemData(b).name||''));});
+  var frag=document.createDocumentFragment();
+  ids.forEach(function(id){
+    var item=bagItemData(id), option=document.createElement('option');
+    option.value=(item.name||itemName(Number(id)))+' #'+Number(id);
+    frag.appendChild(option);
+  });
+  datalist.appendChild(frag);
+}
+function addBagItem(){
+  var input=document.getElementById('bag-add-item'), qtyInput=document.getElementById('bag-add-qty');
+  var id=resolveBagItemId(input.value), qty=Math.floor(Number(qtyInput.value));
+  if(id==null){showError('Choose a valid Brisk Emerald item by name or #ID.');return;}
+  if(!Number.isFinite(qty)||qty<1){showError('Bag quantity must be at least 1.');return;}
+  var key=String(id), current=Number(BAG_ITEMS[key])||0;
+  BAG_ITEMS[key]=Math.min(Number.MAX_SAFE_INTEGER,current+qty);
+  saveBagToStorage(); input.value=''; qtyInput.value='1'; clearError(); renderBag();
+}
+function changeBagItem(id,delta){
+  var key=String(id), next=(Number(BAG_ITEMS[key])||0)+delta;
+  if(next<=0) delete BAG_ITEMS[key]; else BAG_ITEMS[key]=Math.min(Number.MAX_SAFE_INTEGER,next);
+  saveBagToStorage(); renderBag();
+}
+function removeBagItem(id){delete BAG_ITEMS[String(id)];saveBagToStorage();renderBag();}
+function renderBag(){
+  var list=document.getElementById('bag-list'); if(!list) return;
+  refreshBagItemOptions();
+  var q=(document.getElementById('bag-search').value||'').trim().toLowerCase();
+  var allIds=Object.keys(BAG_ITEMS).filter(function(id){return Number(BAG_ITEMS[id])>0;});
+  var ids=allIds.filter(function(id){
+    if(!q) return true;
+    var item=bagItemData(id);
+    return [item.name,item.constant,item.description,id,'#'+id].filter(Boolean).join(' ').toLowerCase().includes(q);
+  }).sort(function(a,b){return String(bagItemData(a).name||'').localeCompare(String(bagItemData(b).name||''));});
+  document.getElementById('bag-count').textContent=ids.length+(q?' of '+allIds.length:'')+' item type'+(allIds.length===1?'':'s')+' · no capacity limit';
+  list.innerHTML='';
+  if(!ids.length){
+    list.appendChild(el('div',{class:'route-empty',text:allIds.length?'No stored items match this search.':'Your Brisk Dex Bag is empty. Add any item above; there is no slot limit.'}));
+    return;
+  }
+  ids.forEach(function(id){
+    var item=bagItemData(id), row=el('article',{class:'bag-entry'}), info=el('div',{class:'bag-entry-info'});
+    if(item.icon){
+      var shell=el('span',{class:'asset-icon-shell',style:'width:40px;height:40px;flex:none;'});
+      var icon=el('img',{src:item.icon,alt:'',style:'width:40px;height:40px;'}); icon.loading='lazy'; icon.decoding='async'; shell.appendChild(icon); info.appendChild(shell);
+    }
+    var txt=el('div',{class:'bag-entry-text'}); txt.appendChild(el('strong',{text:item.name||itemName(Number(id))})); txt.appendChild(el('small',{text:'#'+Number(id)})); info.appendChild(txt); row.appendChild(info);
+    var controls=el('div',{class:'bag-entry-controls'});
+    var minus=el('button',{class:'ghost',text:'−','aria-label':'Remove one'}); minus.addEventListener('click',function(){changeBagItem(id,-1);});
+    var qty=el('span',{class:'bag-quantity',text:'× '+Number(BAG_ITEMS[id]).toLocaleString()});
+    var plus=el('button',{class:'ghost',text:'+','aria-label':'Add one'}); plus.addEventListener('click',function(){changeBagItem(id,1);});
+    var remove=el('button',{class:'ghost',text:'Remove'}); remove.addEventListener('click',function(){removeBagItem(id);});
+    controls.appendChild(minus); controls.appendChild(qty); controls.appendChild(plus); controls.appendChild(remove); row.appendChild(controls); list.appendChild(row);
+  });
+}
+
 function renderChanges(){
   var root=document.getElementById('changes-grid');
   if(!root) return;
@@ -3908,6 +4042,7 @@ function renderCurrentReferenceTab(){
   else if(currentMainTab==='moves') renderMoves();
   else if(currentMainTab==='abilities') renderAbilities();
   else if(currentMainTab==='items') renderItems();
+  else if(currentMainTab==='bag') renderBag();
   else if(currentMainTab==='changes') renderChanges();
 }
 
@@ -3920,8 +4055,9 @@ function setMainTab(tabName){
   var moves = tabName === 'moves';
   var abilities = tabName === 'abilities';
   var items = tabName === 'items';
+  var bag = tabName === 'bag';
   var changes = tabName === 'changes';
-  var save = !routes && !dex && !trainers && !competitive && !moves && !abilities && !items && !changes;
+  var save = !routes && !dex && !trainers && !competitive && !moves && !abilities && !items && !bag && !changes;
   document.getElementById('save-tab-panel').style.display = save ? 'block' : 'none';
   document.getElementById('routes-tab-panel').style.display = routes ? 'block' : 'none';
   document.getElementById('dex-tab-panel').style.display = dex ? 'block' : 'none';
@@ -3930,6 +4066,7 @@ function setMainTab(tabName){
   document.getElementById('moves-tab-panel').style.display = moves ? 'block' : 'none';
   document.getElementById('abilities-tab-panel').style.display = abilities ? 'block' : 'none';
   document.getElementById('items-tab-panel').style.display = items ? 'block' : 'none';
+  document.getElementById('bag-tab-panel').style.display = bag ? 'block' : 'none';
   document.getElementById('changes-tab-panel').style.display = changes ? 'block' : 'none';
   document.getElementById('tab-save').classList.toggle('active', save);
   document.getElementById('tab-save').setAttribute('aria-selected', String(save));
@@ -3947,6 +4084,8 @@ function setMainTab(tabName){
   document.getElementById('tab-abilities').setAttribute('aria-selected', String(abilities));
   document.getElementById('tab-items').classList.toggle('active', items);
   document.getElementById('tab-items').setAttribute('aria-selected', String(items));
+  document.getElementById('tab-bag').classList.toggle('active', bag);
+  document.getElementById('tab-bag').setAttribute('aria-selected', String(bag));
   document.getElementById('tab-changes').classList.toggle('active', changes);
   document.getElementById('tab-changes').setAttribute('aria-selected', String(changes));
   renderCurrentReferenceTab();
@@ -4082,12 +4221,17 @@ document.getElementById('tab-competitive').addEventListener('click', function(){
 document.getElementById('tab-moves').addEventListener('click', function(){ setMainTab('moves'); });
 document.getElementById('tab-abilities').addEventListener('click', function(){ setMainTab('abilities'); });
 document.getElementById('tab-items').addEventListener('click', function(){ setMainTab('items'); });
+document.getElementById('tab-bag').addEventListener('click', function(){ setMainTab('bag'); });
 document.getElementById('tab-changes').addEventListener('click', function(){ setMainTab('changes'); });
 document.getElementById('move-search').addEventListener('input', renderMovesDebounced);
 document.getElementById('move-type').addEventListener('change', renderMoves);
 document.getElementById('move-category').addEventListener('change', renderMoves);
 document.getElementById('ability-search').addEventListener('input', renderAbilitiesDebounced);
 document.getElementById('item-search').addEventListener('input', renderItemsDebounced);
+document.getElementById('bag-search').addEventListener('input', renderBag);
+document.getElementById('btn-bag-add').addEventListener('click', addBagItem);
+document.getElementById('bag-add-item').addEventListener('keydown', function(e){if(e.key==='Enter') addBagItem();});
+document.getElementById('bag-add-qty').addEventListener('keydown', function(e){if(e.key==='Enter') addBagItem();});
 document.getElementById('trainer-search').addEventListener('input', renderTrainerTeamsDebounced);
 document.getElementById('trainer-class').addEventListener('change', renderTrainerTeams);
 document.getElementById('trainer-size').addEventListener('change', renderTrainerTeams);
@@ -4199,6 +4343,7 @@ document.body.addEventListener('drop', function(e){
 });
 
 loadNameDataFromStorage();
+loadBagFromStorage();
 updateDataStatus();
 var gameDataReady = loadBundledGameData();
 storageReady = loadExternalStorage();
