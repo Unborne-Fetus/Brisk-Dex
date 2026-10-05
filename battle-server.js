@@ -274,7 +274,6 @@ function dynamicMovePower(room,attacker,defender,move){
   if((n==='lashout'||effectKey(move)==='lashout')&&attacker.volatile.statsLoweredTurn===room.turn)power*=2;
   if(n==='weatherball'&&room.weather)power*=2;
   if(n==='trumpcard'){const pp=Math.max(0,Number(move.pp)||0);power=pp===0?200:pp===1?80:pp===2?60:pp===3?50:40;}
-  if(n==='magnitude'){const roll=Math.random();power=roll<.05?10:roll<.15?30:roll<.35?50:roll<.65?70:roll<.85?90:roll<.95?110:150;}
   if(n==='spitup')power=100*Math.max(1,attacker.volatile.stockpile||0);
   if(n==='fling'&&attacker.item){const item=normalizeName(attacker.item);power=/ironball/.test(item)?130:/hardstone|plate/.test(item)?90:/berry/.test(item)?10:30;}
   if(n==='present'){const r=Math.random();power=r<.4?40:r<.7?80:r<.8?120:0;}
@@ -377,7 +376,6 @@ function damage(room,attacker,defender,move,defenderPlayer){
   let amount=Math.max(eff===0?0:1,Math.floor(base*modifier));
   if(hasItem(defender,'Focus Sash')&&defender.hp===defender.maxHP&&amount>=defender.hp){amount=defender.hp-1;defender.item='';}
   if(!ignoresAbility(attacker)&&hasAbility(defender,'Sturdy')&&defender.hp===defender.maxHP&&amount>=defender.hp)amount=defender.hp-1;
-  if(defender.volatile.endure&&amount>=defender.hp)amount=Math.max(0,defender.hp-1);
   if(defender.volatile.endure&&amount>=defender.hp)amount=Math.max(0,defender.hp-1);
   return {amount,eff,crit};
 }
@@ -1196,8 +1194,6 @@ function endTurn(room){
     if(mon.volatile.cursed&&!hasAbility(mon,'Magic Guard'))hurt(room,mon,Math.max(1,Math.floor(mon.maxHP/4)),'the curse');
     if(mon.volatile.nightmare&&mon.status==='sleep'&&!hasAbility(mon,'Magic Guard'))hurt(room,mon,Math.max(1,Math.floor(mon.maxHP/4)),'Nightmare');
     if(mon.status!=='sleep')mon.volatile.nightmare=false;
-    if(mon.volatile.nightmare&&mon.status==='sleep'&&!hasAbility(mon,'Magic Guard'))hurt(room,mon,Math.max(1,Math.floor(mon.maxHP/4)),'Nightmare');
-    if(mon.volatile.cursed&&!hasAbility(mon,'Magic Guard'))hurt(room,mon,Math.max(1,Math.floor(mon.maxHP/4)),'Curse');
     if(mon.volatile.seeded&&!hasAbility(mon,'Magic Guard')){
       const dmg=Math.max(1,Math.floor(mon.maxHP/8)); const actual=hurt(room,mon,dmg,'Leech Seed');
       const foe=active(room.players[other(i)]); if(foe&&alive(foe)) heal(room,foe,actual,'Leech Seed');
@@ -1226,7 +1222,6 @@ function endTurn(room){
     if(mon.volatile.healBlock>0)mon.volatile.healBlock--;
     if(mon.volatile.embargo>0)mon.volatile.embargo--;
     if(mon.volatile.laserFocus>0)mon.volatile.laserFocus--;
-    if(mon.volatile.embargo>0)mon.volatile.embargo--;
     if(mon.volatile.telekinesis>0)mon.volatile.telekinesis--;
     if(mon.volatile.throatChop>0)mon.volatile.throatChop--;
     if(mon.volatile.magnetRise>0)mon.volatile.magnetRise--;
