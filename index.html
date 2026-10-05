@@ -422,6 +422,23 @@ input[type=file]{ display:none; }
 .tag-ok{ color:var(--leaf-bright); }
 
 footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-top:60px; }
+
+  .asset-icon-shell{display:inline-flex;align-items:center;justify-content:center;background:transparent;border-radius:8px;flex:none;overflow:hidden;}
+  .asset-icon-shell img{display:block;object-fit:contain;image-rendering:pixelated;background:transparent!important;}
+  .dex-sprite-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;text-align:center;min-width:0;}
+  .dex-sprite-card img{width:112px;height:112px;max-width:100%;object-fit:contain;image-rendering:pixelated;background:transparent;display:block;margin:0 auto 6px;}
+  .dex-sprite-card strong{font-size:12px;color:var(--muted);}
+  .dex-sprite-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0;}
+  .changes-tools{display:flex;gap:10px;margin-bottom:14px;}
+  .changes-tools input{width:100%;}
+  .changes-grid{display:grid;gap:12px;}
+  .change-group{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 16px;content-visibility:auto;contain-intrinsic-size:200px;}
+  .change-group h3{margin:0 0 10px;font-size:16px;}
+  .change-group ul{margin:0;padding-left:20px;display:grid;gap:7px;color:var(--text);}
+  .list-more{width:calc(100% - 12px);margin:8px 6px 12px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);color:var(--text);cursor:pointer;}
+  @media (max-width:760px){.dex-sprite-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.dex-sprite-card img{width:96px;height:96px;}}
+  body.android-lite .dex-entry, body.android-lite .item-entry, body.android-lite .trainer-entry{content-visibility:auto;contain-intrinsic-size:64px;}
+
 </style>
 </head>
 <body>
@@ -452,6 +469,7 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
     <button id="tab-dex" role="tab" aria-selected="false" aria-controls="dex-tab-panel">Pok&eacute;dex</button>
     <button id="tab-trainers" role="tab" aria-selected="false" aria-controls="trainers-tab-panel">Trainer Teams</button>
     <button id="tab-items" role="tab" aria-selected="false" aria-controls="items-tab-panel">Items</button>
+    <button id="tab-changes" role="tab" aria-selected="false" aria-controls="changes-tab-panel">Changes</button>
   </nav>
 
   <div id="save-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-save">
@@ -588,6 +606,15 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
       <aside class="item-list" id="item-list" aria-label="Brisk Emerald items"></aside>
       <div class="item-detail" id="item-detail" aria-live="polite"></div>
     </div>
+  </section>
+
+  <section id="changes-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-changes" style="display:none;">
+    <div class="section-heading"><h3>Brisk Emerald Changes</h3><span class="count" id="change-count"></span></div>
+    <p class="route-intro">A categorized reference for Brisk-specific changes plus the enabled pokeemerald-expansion feature set that Brisk is built on.</p>
+    <div class="changes-tools">
+      <input id="change-search" type="search" placeholder="Search mechanics, encounters, quality of life, trainers…" aria-label="Search Brisk Emerald changes">
+    </div>
+    <div class="changes-grid" id="changes-grid"></div>
   </section>
 
   <footer class="foot">Brisk Dex &middot; reads Gen III GBA save data entirely in your browser</footer>
@@ -1292,6 +1319,7 @@ var TRAINER_DATA = [];
 var selectedTrainerConstant = null;
 var ITEM_DETAILS = {};
 var selectedItemId = null;
+var CHANGE_DATA = [];
 var GAME_SHINY_ODDS = 8;
 
 function rebuildNameData(){
@@ -1343,8 +1371,10 @@ async function loadBundledGameData(){
     BUNDLED_DATA = {
       species:data.species || {}, moves:data.moves || {},
       movePP:data.movePP || {}, items:data.items || {}, abilities:data.abilities || {},
-      itemDetails:data.itemDetails || {}
+      itemDetails:data.itemDetails || {},
+      changes:Array.isArray(data.changes) ? data.changes : []
     };
+    CHANGE_DATA = BUNDLED_DATA.changes;
     ITEM_DETAILS = Object.assign({}, BUNDLED_DATA.itemDetails || {}, USER_DATA.itemDetails || {});
     ROUTE_DATA = Array.isArray(data.routeEncounters) ? data.routeEncounters : [];
     rebuildNameData();
@@ -1356,6 +1386,8 @@ async function loadBundledGameData(){
     renderPokedex();
     renderTrainerTeams();
     renderItems();
+    renderChanges();
+    if (IS_ANDROID) document.body.classList.add('android-lite');
   }catch(err){
     showError('Could not load Brisk Emerald data bundled with Brisk Dex: ' + err.message);
   }
@@ -1871,6 +1903,8 @@ function makeIconEl(mon, className){
     var img = document.createElement('img');
     img.src = url;
     img.className = 'icon-frame';
+    img.loading = 'lazy';
+    img.decoding = 'async';
     wrap.appendChild(img);
   }
   return wrap;
@@ -2466,6 +2500,42 @@ function dexFormBadge(entry){
   });
 }
 
+function appendChunkedButtons(list, ids, renderer, initialCount){
+  var count = Math.min(ids.length, initialCount || ids.length);
+  function appendRange(from,to){
+    var fragment=document.createDocumentFragment();
+    for(var i=from;i<to;i++) fragment.appendChild(renderer(ids[i]));
+    list.appendChild(fragment);
+  }
+  appendRange(0,count);
+  if(count<ids.length){
+    var more=el('button',{class:'list-more',text:'Show more ('+(ids.length-count)+' remaining)'});
+    more.addEventListener('click',function(){
+      var start=count;
+      count=Math.min(ids.length,count+(IS_ANDROID?80:200));
+      more.remove();
+      appendRange(start,count);
+      if(count<ids.length){
+        more.textContent='Show more ('+(ids.length-count)+' remaining)';
+        list.appendChild(more);
+      }
+    });
+    list.appendChild(more);
+  }
+}
+function makeDexSpriteCard(url,label){
+  var card=el('div',{class:'dex-sprite-card'});
+  if(url){
+    var img=el('img',{src:url,alt:label});
+    img.loading='lazy'; img.decoding='async';
+    card.appendChild(img);
+  }else{
+    card.appendChild(el('div',{class:'dex-muted',style:'height:112px;display:grid;place-items:center;',text:'Sprite unavailable'}));
+  }
+  card.appendChild(el('strong',{text:label}));
+  return card;
+}
+
 function renderPokedex(){
   var list = document.getElementById('dex-list');
   var detail = document.getElementById('dex-detail');
@@ -2503,7 +2573,7 @@ function renderPokedex(){
     return;
   }
   if (!ids.includes(String(selectedDexSpeciesId))) selectedDexSpeciesId = Number(ids[0]);
-  ids.forEach(function(id){
+  appendChunkedButtons(list, ids, function(id){
     var entry = allSpecies[id];
     var btn = el('button', {class:'dex-entry' + (Number(id) === Number(selectedDexSpeciesId) ? ' active' : '')});
     btn.appendChild(makeIconEl({species:Number(id),isShiny:false}, 'encounter-icon'));
@@ -2516,8 +2586,8 @@ function renderPokedex(){
     textWrap.appendChild(el('small', {text:(dexNum ? '#'+String(dexNum).padStart(4,'0')+' · ' : '') + ((entry.types || []).join(' / ') || 'Type data unavailable')}));
     btn.appendChild(textWrap);
     btn.addEventListener('click', function(){ selectedDexSpeciesId = Number(id); renderPokedex(); });
-    list.appendChild(btn);
-  });
+    return btn;
+  }, IS_ANDROID ? 80 : ids.length);
 
   var id = String(selectedDexSpeciesId);
   var species = allSpecies[id];
@@ -2532,6 +2602,13 @@ function renderPokedex(){
   var heroBadge=dexFormBadge(species); if(heroBadge) heroText.appendChild(heroBadge);
   hero.appendChild(heroText);
   detail.appendChild(hero);
+
+  var spriteGrid=el('section',{class:'dex-sprite-grid'});
+  spriteGrid.appendChild(makeDexSpriteCard(species.frontSprite,'Front'));
+  spriteGrid.appendChild(makeDexSpriteCard(species.backSprite,'Back'));
+  spriteGrid.appendChild(makeDexSpriteCard(species.frontShinySprite,'Shiny Front'));
+  spriteGrid.appendChild(makeDexSpriteCard(species.backShinySprite,'Shiny Back'));
+  detail.appendChild(spriteGrid);
 
   var grid = el('div', {class:'dex-grid'});
   var facts = el('section', {class:'dex-card'});
@@ -2683,7 +2760,7 @@ function renderTrainerTeams(){
   filtered.forEach(function(t){
     var btn=el('button',{class:'trainer-entry'+(t.constant===selectedTrainerConstant?' active':'')});
     if(t.portrait){
-      var portrait=el('img',{src:t.portrait,alt:'',style:'width:48px;height:48px;object-fit:contain;image-rendering:pixelated;flex:none;'});
+      var portrait=el('img',{src:t.portrait,alt:'',style:'width:48px;height:48px;object-fit:contain;image-rendering:pixelated;flex:none;'}); portrait.loading='lazy'; portrait.decoding='async';
       btn.appendChild(portrait);
     }
     var left=el('span',{class:'trainer-entry-text'});
@@ -2698,7 +2775,7 @@ function renderTrainerTeams(){
   if(!t) return;
   var head=el('section',{class:'trainer-detail-head'});
   if(t.portrait){
-    head.appendChild(el('img',{src:t.portrait,alt:(t.name||'Trainer')+' battle sprite',style:'width:120px;height:120px;object-fit:contain;image-rendering:pixelated;float:right;margin-left:18px;'}));
+    var trainerHero=el('img',{src:t.portrait,alt:(t.name||'Trainer')+' battle sprite',style:'width:120px;height:120px;object-fit:contain;image-rendering:pixelated;float:right;margin-left:18px;'}); trainerHero.loading='lazy'; trainerHero.decoding='async'; head.appendChild(trainerHero);
   }
   head.appendChild(el('h2',{text:t.name||t.constant.replace(/^TRAINER_/,'')}));
   var meta=el('div',{class:'trainer-meta'});
@@ -2776,17 +2853,20 @@ function renderItems(){
   list.innerHTML=''; detail.innerHTML='';
   if(!ids.length){list.appendChild(el('div',{class:'route-empty',text:Object.keys(all).length?'No items match this search.':'No item data is loaded.'}));return;}
   if(!ids.includes(String(selectedItemId))) selectedItemId=Number(ids[0]);
-  ids.forEach(function(id){
+  appendChunkedButtons(list, ids, function(id){
     var it=all[id]||{}, btn=el('button',{class:'item-entry'+(Number(id)===Number(selectedItemId)?' active':'')});
-    if(it.icon) btn.appendChild(el('img',{src:it.icon,alt:'',style:'width:40px;height:40px;object-fit:contain;image-rendering:pixelated;flex:none;'}));
+    if(it.icon){
+      var shell=el('span',{class:'asset-icon-shell',style:'width:40px;height:40px;'});
+      var icon=el('img',{src:it.icon,alt:'',style:'width:40px;height:40px;'}); icon.loading='lazy'; icon.decoding='async'; shell.appendChild(icon); btn.appendChild(shell);
+    }
     btn.appendChild(el('strong',{text:it.name||itemName(Number(id))}));
     btn.appendChild(el('small',{text:it.constant||('Item #'+id)}));
     btn.addEventListener('click',function(){selectedItemId=Number(id);renderItems();});
-    list.appendChild(btn);
-  });
+    return btn;
+  }, IS_ANDROID ? 100 : ids.length);
   var it=all[String(selectedItemId)]||{};
   var head=el('section',{class:'item-detail-head'});
-  if(it.icon) head.appendChild(el('img',{src:it.icon,alt:(it.name||'Item')+' icon',style:'width:80px;height:80px;object-fit:contain;image-rendering:pixelated;float:right;margin-left:18px;'}));
+  if(it.icon){ var heroShell=el('span',{class:'asset-icon-shell',style:'width:80px;height:80px;float:right;margin-left:18px;'}); var heroIcon=el('img',{src:it.icon,alt:(it.name||'Item')+' icon',style:'width:80px;height:80px;'}); heroIcon.decoding='async'; heroShell.appendChild(heroIcon); head.appendChild(heroShell); }
   head.appendChild(el('div',{class:'dex-id',text:it.constant||('Item #'+selectedItemId)}));
   head.appendChild(el('h2',{text:it.name||itemName(selectedItemId)}));
   head.appendChild(el('div',{class:it.description?'item-description':'dex-muted',text:it.description||'No item description is present in the currently loaded Brisk data. Re-run the Brisk data extractor to populate it.'}));
@@ -2804,17 +2884,45 @@ function renderItems(){
   detail.appendChild(locations);
 }
 
+function renderChanges(){
+  var root=document.getElementById('changes-grid');
+  if(!root) return;
+  var q=(document.getElementById('change-search').value||'').trim().toLowerCase();
+  root.innerHTML='';
+  var groups=(CHANGE_DATA||[]).map(function(group){
+    var changes=(group.changes||[]).filter(function(change){
+      return !q || (String(group.category||'')+' '+String(change||'')).toLowerCase().includes(q);
+    });
+    return {category:group.category,changes:changes};
+  }).filter(function(group){return group.changes.length;});
+  var total=groups.reduce(function(sum,g){return sum+g.changes.length;},0);
+  document.getElementById('change-count').textContent=total+' changes / features';
+  if(!groups.length){root.appendChild(el('div',{class:'route-empty',text:(CHANGE_DATA||[]).length?'No changes match this search.':'No change catalog is loaded.'}));return;}
+  var fragment=document.createDocumentFragment();
+  groups.forEach(function(group){
+    var section=el('section',{class:'change-group'});
+    section.appendChild(el('h3',{text:group.category}));
+    var ul=document.createElement('ul');
+    group.changes.forEach(function(change){ul.appendChild(el('li',{text:change}));});
+    section.appendChild(ul);
+    fragment.appendChild(section);
+  });
+  root.appendChild(fragment);
+}
+
 function setMainTab(tabName){
   var routes = tabName === 'routes';
   var dex = tabName === 'dex';
   var trainers = tabName === 'trainers';
   var items = tabName === 'items';
-  var save = !routes && !dex && !trainers && !items;
+  var changes = tabName === 'changes';
+  var save = !routes && !dex && !trainers && !items && !changes;
   document.getElementById('save-tab-panel').style.display = save ? 'block' : 'none';
   document.getElementById('routes-tab-panel').style.display = routes ? 'block' : 'none';
   document.getElementById('dex-tab-panel').style.display = dex ? 'block' : 'none';
   document.getElementById('trainers-tab-panel').style.display = trainers ? 'block' : 'none';
   document.getElementById('items-tab-panel').style.display = items ? 'block' : 'none';
+  document.getElementById('changes-tab-panel').style.display = changes ? 'block' : 'none';
   document.getElementById('tab-save').classList.toggle('active', save);
   document.getElementById('tab-save').setAttribute('aria-selected', String(save));
   document.getElementById('tab-routes').classList.toggle('active', routes);
@@ -2825,10 +2933,13 @@ function setMainTab(tabName){
   document.getElementById('tab-trainers').setAttribute('aria-selected', String(trainers));
   document.getElementById('tab-items').classList.toggle('active', items);
   document.getElementById('tab-items').setAttribute('aria-selected', String(items));
+  document.getElementById('tab-changes').classList.toggle('active', changes);
+  document.getElementById('tab-changes').setAttribute('aria-selected', String(changes));
   if (routes) renderRouteEncounters();
   if (dex) renderPokedex();
   if (trainers) renderTrainerTeams();
   if (items) renderItems();
+  if (changes) renderChanges();
 }
 
 /* ============================================================
@@ -2888,6 +2999,7 @@ function handleDataFile(file){
       USER_DATA.itemDetails = Object.assign({}, USER_DATA.itemDetails || {}, parsed.itemDetails || {});
       ITEM_DETAILS = Object.assign({}, BUNDLED_DATA.itemDetails || {}, USER_DATA.itemDetails || {});
       if (Array.isArray(parsed.routeEncounters)) ROUTE_DATA = parsed.routeEncounters;
+      if (Array.isArray(parsed.changes)) CHANGE_DATA = parsed.changes;
       rebuildNameData();
       refreshBoxLevels();
       saveNameDataToStorage();
@@ -2896,6 +3008,7 @@ function handleDataFile(file){
       renderPokedex();
       renderTrainerTeams();
       renderItems();
+      renderChanges();
       if (currentSave) renderAll();
     }catch(err){
       showError('Could not parse that JSON file: ' + err.message);
@@ -2903,6 +3016,20 @@ function handleDataFile(file){
   };
   reader.readAsText(file);
 }
+
+function debounce(fn,wait){
+  var timer=null;
+  return function(){
+    var args=arguments, self=this;
+    clearTimeout(timer);
+    timer=setTimeout(function(){fn.apply(self,args);},wait);
+  };
+}
+var renderPokedexDebounced=debounce(renderPokedex,120);
+var renderItemsDebounced=debounce(renderItems,120);
+var renderTrainerTeamsDebounced=debounce(renderTrainerTeams,120);
+var renderRouteEncountersDebounced=debounce(renderRouteEncounters,120);
+var renderChangesDebounced=debounce(renderChanges,120);
 
 /* ============================================================
    Wiring
@@ -2912,17 +3039,19 @@ document.getElementById('tab-routes').addEventListener('click', function(){ setM
 document.getElementById('tab-dex').addEventListener('click', function(){ setMainTab('dex'); });
 document.getElementById('tab-trainers').addEventListener('click', function(){ setMainTab('trainers'); });
 document.getElementById('tab-items').addEventListener('click', function(){ setMainTab('items'); });
-document.getElementById('item-search').addEventListener('input', renderItems);
-document.getElementById('trainer-search').addEventListener('input', renderTrainerTeams);
+document.getElementById('tab-changes').addEventListener('click', function(){ setMainTab('changes'); });
+document.getElementById('item-search').addEventListener('input', renderItemsDebounced);
+document.getElementById('trainer-search').addEventListener('input', renderTrainerTeamsDebounced);
 document.getElementById('trainer-class').addEventListener('change', renderTrainerTeams);
 document.getElementById('trainer-size').addEventListener('change', renderTrainerTeams);
-document.getElementById('dex-search').addEventListener('input', renderPokedex);
+document.getElementById('dex-search').addEventListener('input', renderPokedexDebounced);
 document.getElementById('dex-type').addEventListener('change', renderPokedex);
 document.getElementById('dex-order').addEventListener('change', renderPokedex);
-document.getElementById('route-search').addEventListener('input', renderRouteEncounters);
+document.getElementById('route-search').addEventListener('input', renderRouteEncountersDebounced);
 document.getElementById('route-kind').addEventListener('change', renderRouteEncounters);
 document.getElementById('route-order').addEventListener('change', renderRouteEncounters);
 document.getElementById('encounter-method').addEventListener('change', renderRouteEncounters);
+document.getElementById('change-search').addEventListener('input', renderChangesDebounced);
 document.getElementById('btn-load-sav').addEventListener('click', function(){
   if (IS_ELECTRON) handleSavFromElectron();
   else document.getElementById('file-sav').click();
