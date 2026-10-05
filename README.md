@@ -220,3 +220,8 @@ The relay in `battle-server.js` must be hosted at a publicly reachable HTTPS add
 The current advanced simulator supports singles, six-Pokémon teams, PP, priority, accuracy/evasion stages, stat stages, major status conditions, confusion, flinching, Protect-family moves, common setup/recovery moves, recoil/draining moves, hazards, screens, Tailwind, weather, terrain, STAB, type effectiveness, critical hits, switching, common ability effects, and common held-item effects. Mechanics without a handler are reported in the battle log rather than silently pretending to work.
 
 Room/player tokens are kept in session storage so an accidental tab refresh can reconnect while the relay still holds the room. Relay rooms expire after six hours of inactivity.
+
+
+### Advanced battle engine v3
+
+The online simulator now also supports Brisk save-file Tera Types, Brisk-extracted Mega/Gigantamax forms, Trick Room, Choice locking, Encore locking, Knock Off, Rapid Spin, Defog, phazing, Baton Pass stage passing, pivot moves, common multi-hit moves, and expanded switch-state handling. Mega/Gigantamax form data is sourced from Brisk Dex's extracted species tables rather than a vanilla Pokémon database.
