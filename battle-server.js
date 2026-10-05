@@ -136,7 +136,7 @@ function publicRoom(room){
     weather:room.weather, weatherTurns:room.weatherTurns, terrain:room.terrain, terrainTurns:room.terrainTurns,
     log:room.log.slice(-100),
     players:room.players.map(p=>({
-      name:p.name,ready:p.ready,connected:true,active:p.active,
+      name:p.name,ready:p.ready,connected:true,active:p.active,hasChoice:!!p.choice,
       side:p.side, team:p.team.map(publicMon)
     }))
   };
@@ -346,7 +346,7 @@ function applyStatusMove(room,pi,move){
   if(n==='grassyterrain'){room.terrain='grassy';room.terrainTurns=5;log(room,'Grassy Terrain spread across the field!');return;}
   if(n==='psychicterrain'){room.terrain='psychic';room.terrainTurns=5;log(room,'Psychic Terrain spread across the field!');return;}
   if(n==='mistyterrain'){room.terrain='misty';room.terrainTurns=5;log(room,'Misty Terrain spread across the field!');return;}
-  const drops={growl:['atk',-1],charm:['atk',-2],leer:['def',-1],screech:['def',-2],tailwhip:['def',-1],metalSound:['spd',-2],fakeTears:['spd',-2],scaryFace:['spe',-2],stringshot:['spe',-2]};
+  const drops={growl:['atk',-1],charm:['atk',-2],leer:['def',-1],screech:['def',-2],tailwhip:['def',-1],metalsound:['spd',-2],fakeTears:['spd',-2],scaryFace:['spe',-2],stringshot:['spe',-2]};
   if(drops[n]){boost(room,target,drops[n][0],drops[n][1]);return;}
   log(room,mon.name+' used '+move.name+'. Its special effect is not implemented yet.');
 }
@@ -357,7 +357,7 @@ function secondaryEffect(room,attacker,defender,move){
   else if(n==='icebeam'&&chance(10)) setStatus(room,defender,'freeze');
   else if(n==='scald'&&chance(30)) setStatus(room,defender,'burn');
   else if(n==='sludgebomb'&&chance(30)) setStatus(room,defender,'poison');
-  else if(n==='bodySlam'&&chance(30)) setStatus(room,defender,'paralysis');
+  else if(n==='bodyslam'&&chance(30)) setStatus(room,defender,'paralysis');
   else if((n==='ironhead'||n==='rockslide'||n==='airslash'||n==='waterfall'||n==='darkpulse')&&chance(30)) defender.volatile.flinch=true;
   else if(n==='shadowball'&&chance(20)) boost(room,defender,'spd',-1);
   else if(n==='psychic'&&chance(10)) boost(room,defender,'spd',-1);
