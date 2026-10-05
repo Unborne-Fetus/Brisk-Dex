@@ -1,5 +1,10 @@
 const http = require('http');
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
+
+let BRISK_DATA={moveDetails:{},moves:{},movePP:{}};
+try{BRISK_DATA=JSON.parse(fs.readFileSync(path.join(__dirname,'brisk-dex-data.json'),'utf8'));}catch(err){console.warn('Battle server could not load brisk-dex-data.json:',err.message);}
 
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -42,6 +47,19 @@ function clamp(n,min,max){ return Math.max(min,Math.min(max,n)); }
 function chance(percent){ return Math.random()*100 < percent; }
 function choose(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 function normalizeName(v){ return String(v||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
+function catalogMove(id){
+  const d=(BRISK_DATA.moveDetails||{})[String(id)]||{};
+  if(!d.name&&!BRISK_DATA.moves[String(id)])return null;
+  return {id:Number(id),name:d.name||BRISK_DATA.moves[String(id)]||('Move '+id),type:d.type||'Normal',category:d.category||'Status',
+    power:Number(d.power)||0,accuracy:Number(d.accuracy)||100,priority:Number(d.priority)||0,pp:Number(d.pp||(BRISK_DATA.movePP||{})[String(id)]||16),
+    maxPP:Number(d.pp||(BRISK_DATA.movePP||{})[String(id)]||16),effect:d.effect||'',target:d.target||'',flags:Array.isArray(d.flags)?d.flags:[],
+    criticalHitStage:Number(d.criticalHitStage)||0,multiHit:!!d.multiHit,moveEffects:Array.isArray(d.moveEffects)?d.moveEffects:[]};
+}
+function randomCatalogMove(filterFn){
+  const ids=Object.keys(BRISK_DATA.moveDetails||{}).filter(id=>Number(id)>0);
+  const candidates=ids.map(catalogMove).filter(Boolean).filter(filterFn||(()=>true));
+  return candidates.length?choose(candidates):null;
+}
 
 function cleanTeam(team){
   if(!Array.isArray(team)) return [];
@@ -172,7 +190,7 @@ function resetTurnVolatiles(room){
   });
 }
 function beginBattle(room){
-  room.phase='battle'; room.turn=1; room.weather=null; room.weatherTurns=0; room.terrain=null; room.terrainTurns=0; room.trickRoom=false; room.trickRoomTurns=0; room.gravity=false;room.gravityTurns=0;room.magicRoom=false;room.magicRoomTurns=0;room.wonderRoom=false;room.wonderRoomTurns=0;
+  room.phase='battle'; room.turn=1; room.lastMove=null; room.weather=null; room.weatherTurns=0; room.terrain=null; room.terrainTurns=0; room.trickRoom=false; room.trickRoomTurns=0; room.gravity=false;room.gravityTurns=0;room.magicRoom=false;room.magicRoomTurns=0;room.wonderRoom=false;room.wonderRoomTurns=0;
   room.players.forEach(p=>{
     p.side={stealthRock:false,spikes:0,toxicSpikes:0,stickyWeb:false,reflect:0,lightScreen:0,auroraVeil:0,safeguard:0,mist:0,tailwind:0,wish:null,futureSight:null,healingWish:null}; p.usedMega=false;p.usedGmax=false;p.usedTera=false;
     p.team.forEach(mon=>{ mon.hp=mon.maxHP; mon.status=null; mon.choiceLock=null;mon.lastMoveIndex=null;mon.transformed=false;mon.transformedKind=null;mon.originalTypes=null; mon.statusTurns=0; mon.toxicCounter=0; mon.stages={atk:0,def:0,spa:0,spd:0,spe:0,acc:0,eva:0}; mon.volatile={protect:false,protectCounter:0,flinch:false,confusion:0,seeded:false,taunt:0,encore:0,encoreMove:null,substitute:0,
@@ -747,14 +765,15 @@ function resolveAttack(room,pi,choice){
   mon.volatile.lastMoveFailed=false;
   if(!alive(mon)||!alive(target)) return;
   if(choice.gimmick) transformMon(room,pi,choice.gimmick,choice.formIndex);
-  const move=mon.moves[choice.moveIndex]; if(!move){log(room,mon.name+' has no usable move there.');return;}
-  if(mon.choiceLock!==null && mon.choiceLock!==choice.moveIndex){log(room,mon.name+" is locked into "+(mon.moves[mon.choiceLock]&&mon.moves[mon.choiceLock].name||'another move')+'!');return;}
-  if(mon.volatile.encore>0 && mon.volatile.encoreMove!==null && mon.volatile.encoreMove!==choice.moveIndex){log(room,mon.name+" must repeat "+(mon.moves[mon.volatile.encoreMove]&&mon.moves[mon.volatile.encoreMove].name||'its encored move')+'!');return;}
-  if(mon.volatile.disabledMove===choice.moveIndex&&mon.volatile.disableTurns>0){log(room,move.name+' is disabled!');return;}
-  if(mon.volatile.torment&&mon.lastMoveIndex===choice.moveIndex){log(room,mon.name+" can't use the same move twice because of Torment!");return;}
-  if(move.pp<=0){log(room,move.name+' has no PP left!');return;}
-  move.pp=Math.max(0,move.pp-(hasAbility(target,'Pressure')?2:1)); mon.lastMoveIndex=choice.moveIndex;
-  if((hasItem(mon,'Choice Band')||hasItem(mon,'Choice Specs')||hasItem(mon,'Choice Scarf'))&&mon.choiceLock===null) mon.choiceLock=choice.moveIndex;
+  const called=choice.calledMove&&choice.depth<3;
+  const move=called?choice.calledMove:mon.moves[choice.moveIndex]; if(!move){log(room,mon.name+' has no usable move there.');return;}
+  if(!called&&mon.choiceLock!==null && mon.choiceLock!==choice.moveIndex){log(room,mon.name+" is locked into "+(mon.moves[mon.choiceLock]&&mon.moves[mon.choiceLock].name||'another move')+'!');return;}
+  if(!called&&mon.volatile.encore>0 && mon.volatile.encoreMove!==null && mon.volatile.encoreMove!==choice.moveIndex){log(room,mon.name+" must repeat "+(mon.moves[mon.volatile.encoreMove]&&mon.moves[mon.volatile.encoreMove].name||'its encored move')+'!');return;}
+  if(!called&&mon.volatile.disabledMove===choice.moveIndex&&mon.volatile.disableTurns>0){log(room,move.name+' is disabled!');return;}
+  if(!called&&mon.volatile.torment&&mon.lastMoveIndex===choice.moveIndex){log(room,mon.name+" can't use the same move twice because of Torment!");return;}
+  if(!called&&move.pp<=0){log(room,move.name+' has no PP left!');return;}
+  if(!called){move.pp=Math.max(0,move.pp-(hasAbility(target,'Pressure')?2:1)); mon.lastMoveIndex=choice.moveIndex;}
+  if(!called&&(hasItem(mon,'Choice Band')||hasItem(mon,'Choice Specs')||hasItem(mon,'Choice Scarf'))&&mon.choiceLock===null) mon.choiceLock=choice.moveIndex;
   if(mon.volatile.taunt>0&&move.category==='Status'){log(room,mon.name+" can't use "+move.name+' after the taunt!');return;}
   const movePriority=effectivePriority(room,pi,move);
   if(priorityBlocked(mon,target,movePriority,room)){log(room,target.name+' blocked the priority move!');return;}
@@ -775,6 +794,7 @@ function resolveAttack(room,pi,choice){
     if(hasAbility(mon,'Compound Eyes')) accuracy*=1.3;
     if(!chance(clamp(accuracy,1,100))){log(room,mon.name+' used '+move.name+', but it missed!');mon.volatile.lastMoveFailed=true;return;}
   }
+  room.lastMove=Object.assign({},move,{pp:move.maxPP||move.pp||1});
   if(move.category==='Status'||move.power<=0){
     log(room,mon.name+' used '+move.name+'!');
     const statusKey=normalizeName(move.name);
@@ -788,7 +808,31 @@ function resolveAttack(room,pi,choice){
       return;
     }
     const statusName=normalizeName(move.name);
-    if(statusName==='trickroom'){
+    if(statusName==='metronome'){
+      const selected=randomCatalogMove(function(m){return m.name!==move.name&&!moveHasFlag(m,'metronome banned');});
+      if(selected){log(room,'Metronome selected '+selected.name+'!');resolveAttack(room,pi,{calledMove:selected,depth:(choice.depth||0)+1,moveIndex:choice.moveIndex});}else log(room,'But it failed!');
+      return;
+    }else if(statusName==='copycat'||statusName==='mirrormove'){
+      const selected=room.lastMove?Object.assign({},room.lastMove):null;
+      if(selected&&normalizeName(selected.name)!==statusName){log(room,move.name+' copied '+selected.name+'!');resolveAttack(room,pi,{calledMove:selected,depth:(choice.depth||0)+1,moveIndex:choice.moveIndex});}else log(room,'But it failed!');
+      return;
+    }else if(statusName==='sleeptalk'){
+      if(mon.status!=='sleep'){log(room,'But it failed!');return;}
+      const pool=mon.moves.filter(m=>!['sleeptalk','rest'].includes(normalizeName(m.name)));
+      const selected=pool.length?choose(pool):null;
+      if(selected){log(room,'Sleep Talk selected '+selected.name+'!');resolveAttack(room,pi,{calledMove:Object.assign({},selected),depth:(choice.depth||0)+1,moveIndex:choice.moveIndex});}else log(room,'But it failed!');
+      return;
+    }else if(statusName==='assist'){
+      const pool=p.team.flatMap(x=>x.moves||[]).filter(m=>!['assist','metronome','copycat','mirrormove'].includes(normalizeName(m.name))&&!moveHasFlag(m,'assist banned'));
+      const selected=pool.length?choose(pool):null;
+      if(selected){log(room,'Assist selected '+selected.name+'!');resolveAttack(room,pi,{calledMove:Object.assign({},selected),depth:(choice.depth||0)+1,moveIndex:choice.moveIndex});}else log(room,'But it failed!');
+      return;
+    }else if(statusName==='naturepower'){
+      const desired=room.terrain==='electric'?'thunderbolt':room.terrain==='grassy'?'energyball':room.terrain==='misty'?'moonblast':room.terrain==='psychic'?'psychic':'triattack';
+      const selected=randomCatalogMove(m=>normalizeName(m.name)===desired);
+      if(selected)resolveAttack(room,pi,{calledMove:selected,depth:(choice.depth||0)+1,moveIndex:choice.moveIndex});else log(room,'But it failed!');
+      return;
+    }else if(statusName==='trickroom'){
       room.trickRoom=!room.trickRoom;room.trickRoomTurns=room.trickRoom?5:0;log(room,'The dimensions twisted!');
     }else if(statusName==='encore'){
       if(target.lastMoveIndex!==null){target.volatile.encoreMove=target.lastMoveIndex;target.volatile.encore=3;log(room,target.name+' received an encore!');}
@@ -994,7 +1038,7 @@ const server=http.createServer(async (req,res)=>{
   if(req.method==='OPTIONS') return json(res,204,{});
   const url=new URL(req.url,'http://localhost');
   try{
-    if(req.method==='GET'&&url.pathname==='/health') return json(res,200,{ok:true,rooms:rooms.size,engine:'advanced-v11'});
+    if(req.method==='GET'&&url.pathname==='/health') return json(res,200,{ok:true,rooms:rooms.size,engine:'advanced-v12'});
     if(req.method==='POST'&&url.pathname==='/rooms'){
       const body=await readBody(req), code=roomCode(), playerId=id(), team=cleanTeam(body.team);
       if(!team.length) return json(res,400,{error:'Load a save with at least one party Pokémon first.'});
@@ -1049,4 +1093,4 @@ const server=http.createServer(async (req,res)=>{
     return json(res,405,{error:'Method not allowed'});
   }catch(err){ return json(res,400,{error:err.message||String(err)}); }
 });
-server.listen(PORT,HOST,()=>console.log('Brisk battle relay listening on http://'+HOST+':'+PORT+' (advanced-v11)'));
+server.listen(PORT,HOST,()=>console.log('Brisk battle relay listening on http://'+HOST+':'+PORT+' (advanced-v12)'));
