@@ -26,6 +26,7 @@
       "preload.js",
       "index.html",
       "brisk-dex-data.json",
+      "brisk-dex-trainer-teams.json",
       "brisk-dex-icons/**/*",
       "brisk-dex-trainers/**/*"
     ],
