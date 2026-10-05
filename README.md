@@ -160,3 +160,39 @@ handles Brisk Emerald's packed species, item, experience, move, and ability fiel
 - External storage lives at (OS-dependent app data folder)/Brisk Dex/briskdex-storage.json,
   independent of any game save — that's what lets you deposit from one save
   file and withdraw into a different one for cross-save trading.
+
+
+## Linux
+
+Brisk Dex can be built as either a portable AppImage or a Debian package.
+
+### Download from GitHub Actions
+
+Open the repository's **Actions** tab, select **Build Linux**, open the latest successful run, and download the **Brisk-Dex-Linux** artifact. It contains:
+
+- `Brisk Dex-1.0.0-linux-x64.AppImage`
+- `Brisk Dex-1.0.0-linux-x64.deb`
+
+For the AppImage:
+
+```bash
+chmod +x "Brisk Dex-1.0.0-linux-x64.AppImage"
+./"Brisk Dex-1.0.0-linux-x64.AppImage"
+```
+
+For Debian/Ubuntu-based systems:
+
+```bash
+sudo apt install ./"Brisk Dex-1.0.0-linux-x64.deb"
+```
+
+### Build locally on Linux
+
+Install Node.js 20 or newer, then run:
+
+```bash
+npm ci
+npm run dist:linux
+```
+
+The generated AppImage and Debian package will be placed in `dist/`.
