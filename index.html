@@ -457,6 +457,32 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
 .dex-move-chip{border:1px solid var(--line-soft);background:var(--panel-2);border-radius:8px;padding:7px 9px;font-size:11px;text-align:center;}
 @media(max-width:760px){.dex-evo-stage{width:132px}.dex-evo-sprite-ring{width:92px;height:92px}.dex-evo-sprite-ring img{width:82px;height:82px}.dex-evo-arrow{width:70px}.dex-movepool{grid-template-columns:repeat(2,minmax(0,1fr));}}
 
+
+/* ---------- Move / Ability reference ---------- */
+.reference-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+.reference-tools input,.reference-tools select{min-height:38px;color:var(--text);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:8px 11px;font:inherit;}
+.reference-tools input{flex:1 1 280px;min-width:190px}.reference-tools select{flex:0 1 170px;}
+.reference-layout{display:grid;grid-template-columns:minmax(225px,310px) minmax(0,1fr);gap:14px;align-items:start;}
+.reference-list{display:flex;flex-direction:column;gap:5px;max-height:calc(100vh - 245px);min-height:280px;overflow:auto;padding:4px;border:1px solid var(--line);background:var(--panel-2);}
+.reference-entry{width:100%;text-align:left;border:1px solid transparent;background:transparent;padding:9px 10px;border-radius:4px;display:flex;flex-direction:column;gap:3px;}
+.reference-entry.active{border-color:#285448;background:#142721;color:var(--leaf-bright)}.reference-entry small{font-size:10px;color:var(--muted-2);}
+.reference-detail{min-width:0}.reference-hero{padding:18px;border:1px solid var(--line);background:var(--panel);margin-bottom:12px}.reference-hero h2{margin:3px 0 8px;}
+.reference-description{font-size:14px;line-height:1.55;color:var(--text);max-width:820px;}
+.reference-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:8px;margin:12px 0;}
+.reference-stat{border:1px solid var(--line-soft);background:var(--panel-2);padding:9px 10px;border-radius:7px}.reference-stat .k{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-2)}.reference-stat .v{font-size:14px;font-weight:700;margin-top:3px;}
+.reference-flags{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.reference-flag{font-size:10px;border:1px solid var(--line);border-radius:999px;padding:4px 8px;background:var(--panel-2);color:var(--muted);}
+.reference-users{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:8px}.reference-user{display:flex;align-items:center;gap:8px;border:1px solid var(--line-soft);background:var(--panel-2);border-radius:8px;padding:7px 9px;min-width:0}.reference-user .encounter-icon{width:36px;height:36px}.reference-user strong{font-size:11px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;}
+@media(max-width:720px){.reference-layout{grid-template-columns:1fr}.reference-list{max-height:225px;min-height:0}.reference-tools select{flex:1 1 130px}}
+
+/* Transformations attach to the normal evolutionary stage rather than duplicating the line. */
+.dex-evo-stage-wrap{display:flex;flex-direction:column;align-items:center;position:relative;flex:none;}
+.dex-transform-group{position:relative;margin-top:26px;display:flex;gap:12px;justify-content:center;align-items:flex-start;}
+.dex-transform-lines{position:absolute;left:0;right:0;top:-27px;width:100%;height:30px;overflow:visible;pointer-events:none;}
+.dex-transform-lines line{stroke:var(--muted-2);stroke-width:1.8;vector-effect:non-scaling-stroke;}
+.dex-transform-card{width:126px;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;}
+.dex-transform-card .dex-evo-sprite-ring{width:78px;height:78px}.dex-transform-card .dex-evo-sprite-ring img{width:70px;height:70px}.dex-transform-card .dex-evo-name-card{min-height:55px;padding:7px 6px}.dex-transform-card .dex-evo-name-card strong{font-size:11px}.dex-transform-kind{font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+@media(max-width:760px){.dex-transform-card{width:108px}.dex-transform-card .dex-evo-sprite-ring{width:68px;height:68px}.dex-transform-card .dex-evo-sprite-ring img{width:61px;height:61px}}
+
 </style>
 </head>
 <body>
@@ -486,6 +512,8 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
     <button id="tab-routes" role="tab" aria-selected="false" aria-controls="routes-tab-panel">Route Encounters</button>
     <button id="tab-dex" role="tab" aria-selected="false" aria-controls="dex-tab-panel">Pok&eacute;dex</button>
     <button id="tab-trainers" role="tab" aria-selected="false" aria-controls="trainers-tab-panel">Trainer Teams</button>
+    <button id="tab-moves" role="tab" aria-selected="false" aria-controls="moves-tab-panel">Moves</button>
+    <button id="tab-abilities" role="tab" aria-selected="false" aria-controls="abilities-tab-panel">Abilities</button>
     <button id="tab-items" role="tab" aria-selected="false" aria-controls="items-tab-panel">Items</button>
     <button id="tab-changes" role="tab" aria-selected="false" aria-controls="changes-tab-panel">Changes</button>
   </nav>
@@ -611,6 +639,32 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
     <div class="trainer-layout">
       <aside class="trainer-list" id="trainer-list" aria-label="Brisk trainers"></aside>
       <div class="trainer-detail" id="trainer-detail" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section id="moves-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-moves" style="display:none;">
+    <div class="section-heading"><h3>Moves</h3><span class="count" id="move-count"></span></div>
+    <p class="route-intro">Move data and learnability come directly from Brisk Emerald's move and Pokémon tables.</p>
+    <div class="reference-tools">
+      <input id="move-search" type="search" placeholder="Search move, description, type, effect, or Pokémon…" aria-label="Search Brisk Emerald moves">
+      <select id="move-type" aria-label="Filter moves by type"><option value="all">All types</option></select>
+      <select id="move-category" aria-label="Filter moves by category"><option value="all">All categories</option><option value="Physical">Physical</option><option value="Special">Special</option><option value="Status">Status</option></select>
+    </div>
+    <div class="reference-layout">
+      <aside class="reference-list" id="move-list" aria-label="Brisk Emerald moves"></aside>
+      <div class="reference-detail" id="move-detail" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section id="abilities-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-abilities" style="display:none;">
+    <div class="section-heading"><h3>Abilities</h3><span class="count" id="ability-count"></span></div>
+    <p class="route-intro">Ability descriptions, behavior flags, and Pokémon users come directly from Brisk Emerald.</p>
+    <div class="reference-tools">
+      <input id="ability-search" type="search" placeholder="Search ability, description, constant, or Pokémon…" aria-label="Search Brisk Emerald abilities">
+    </div>
+    <div class="reference-layout">
+      <aside class="reference-list" id="ability-list" aria-label="Brisk Emerald abilities"></aside>
+      <div class="reference-detail" id="ability-detail" aria-live="polite"></div>
     </div>
   </section>
 
@@ -1329,7 +1383,7 @@ var NAME_DATA = { species: buildDefaultSpecies(), moves:{}, items:{}, abilities:
 var DEFAULT_SPECIES_COUNT = DEFAULT_SPECIES_ARRAY.length;
 
 var USER_DATA = { species:{}, moves:{}, items:{}, abilities:{} };
-var BUNDLED_DATA = { species:{}, moves:{}, movePP:{}, items:{}, abilities:{} };
+var BUNDLED_DATA = { species:{}, moves:{}, movePP:{}, moveDetails:{}, items:{}, abilities:{}, abilityDetails:{} };
 var ROUTE_DATA = [];
 var selectedRouteId = null;
 var selectedDexSpeciesId = null;
@@ -1337,6 +1391,10 @@ var TRAINER_DATA = [];
 var selectedTrainerConstant = null;
 var ITEM_DETAILS = {};
 var selectedItemId = null;
+var MOVE_DETAILS = {};
+var selectedMoveReferenceId = null;
+var ABILITY_DETAILS = {};
+var selectedAbilityReferenceId = null;
 var CHANGE_DATA = [];
 var currentMainTab = 'save';
 var GAME_SHINY_ODDS = 8;
@@ -1365,7 +1423,7 @@ function saveNameDataToStorage(){
   try{ localStorage.setItem('briskdex_namedata_overrides', JSON.stringify(USER_DATA)); }catch(e){}
 }
 async function loadBundledGameData(){
-  if (!IS_ELECTRON && !IS_ANDROID) return;
+  if (!IS_ELECTRON && !IS_ANDROID && !IS_IOS) return;
   try{
     var data, trainerData, icons;
     if (IS_ELECTRON){
@@ -1389,12 +1447,15 @@ async function loadBundledGameData(){
     if (Number.isInteger(data.shinyOdds) && data.shinyOdds > 0) GAME_SHINY_ODDS = data.shinyOdds;
     BUNDLED_DATA = {
       species:data.species || {}, moves:data.moves || {},
-      movePP:data.movePP || {}, items:data.items || {}, abilities:data.abilities || {},
+      movePP:data.movePP || {}, moveDetails:data.moveDetails || {},
+      items:data.items || {}, abilities:data.abilities || {}, abilityDetails:data.abilityDetails || {},
       itemDetails:data.itemDetails || {},
       changes:Array.isArray(data.changes) ? data.changes : []
     };
     CHANGE_DATA = BUNDLED_DATA.changes;
     ITEM_DETAILS = Object.assign({}, BUNDLED_DATA.itemDetails || {}, USER_DATA.itemDetails || {});
+    MOVE_DETAILS = Object.assign({}, BUNDLED_DATA.moveDetails || {}, USER_DATA.moveDetails || {});
+    ABILITY_DETAILS = Object.assign({}, BUNDLED_DATA.abilityDetails || {}, USER_DATA.abilityDetails || {});
     ROUTE_DATA = Array.isArray(data.routeEncounters) ? data.routeEncounters : [];
     rebuildNameData();
     SPECIES_ICONS = Object.assign({}, SPECIES_ICONS, icons && icons.icons || {});
@@ -3196,7 +3257,11 @@ function handleDataFile(file){
       USER_DATA.moves = Object.assign({}, USER_DATA.moves, parsed.moves || {});
       USER_DATA.items = Object.assign({}, USER_DATA.items, parsed.items || {});
       USER_DATA.itemDetails = Object.assign({}, USER_DATA.itemDetails || {}, parsed.itemDetails || {});
+      USER_DATA.moveDetails = Object.assign({}, USER_DATA.moveDetails || {}, parsed.moveDetails || {});
+      USER_DATA.abilityDetails = Object.assign({}, USER_DATA.abilityDetails || {}, parsed.abilityDetails || {});
       ITEM_DETAILS = Object.assign({}, BUNDLED_DATA.itemDetails || {}, USER_DATA.itemDetails || {});
+      MOVE_DETAILS = Object.assign({}, BUNDLED_DATA.moveDetails || {}, USER_DATA.moveDetails || {});
+      ABILITY_DETAILS = Object.assign({}, BUNDLED_DATA.abilityDetails || {}, USER_DATA.abilityDetails || {});
       if (Array.isArray(parsed.routeEncounters)) ROUTE_DATA = parsed.routeEncounters;
       if (Array.isArray(parsed.changes)) CHANGE_DATA = parsed.changes;
       rebuildNameData();
