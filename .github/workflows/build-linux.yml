@@ -11,6 +11,8 @@ on:
       - "preload.js"
       - "index.html"
       - "battle-server.js"
+      - "tools/check_battle_coverage.js"
+      - "tools/test_battle_server.js"
       - "brisk-battle-effects.json"
       - "brisk-dex-data.json"
       - "brisk-dex-trainer-teams.json"
