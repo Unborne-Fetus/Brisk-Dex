@@ -1134,6 +1134,14 @@ def main():
                 shutil.copyfile(os.path.join(trainer_front_dir, source_name), os.path.join(trainer_pics_out, target))
                 trainer["portrait"] = trainer_pics_out + "/" + target
 
+    # Asset paths are added after the first JSON pass, so rewrite the generated
+    # data files with item icon and trainer portrait references included.
+    with open("brisk-dex-data.json", "w", encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
+    with open("brisk-dex-trainer-teams.json", "w", encoding='utf-8') as f:
+        json.dump({"source": "Pokemon-Brisk-Emerald/src/data/trainers.party", "trainers": trainer_teams},
+                  f, ensure_ascii=False, separators=(',', ':'))
+
     # The save stores the protagonist's gender. Bundle the matching Ruby/Sapphire
     # player sprite sheets for the trainer portrait in the app header.
     people_dir = os.path.join(repo, "graphics", "object_events", "pics", "people")
