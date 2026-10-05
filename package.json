@@ -44,7 +44,8 @@
       "brisk-dex-trainer-pics/**/*",
       "brisk-dex-sprites/**/*",
       "brisk-dex-cries/**/*",
-      "battle-server.js"
+      "battle-server.js",
+      "brisk-battle-effects.json"
     ],
     "directories": {
       "output": "dist"
