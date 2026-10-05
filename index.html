@@ -486,6 +486,11 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
 
 .dex-evolution-path{align-items:flex-start;}
 .dex-evolution-path>.dex-evo-arrow{margin-top:62px;}
+
+.dex-name-row{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+.dex-name-row h2{margin:0;}
+.dex-national-number{font-size:22px;font-weight:700;letter-spacing:-.02em;color:var(--muted);}
+@media(max-width:520px){.dex-national-number{font-size:18px;}}
 </style>
 </head>
 <body>
@@ -2422,15 +2427,20 @@ function matchesEncounterMethod(method, filter){
   if (filter === 'super_rod') return method.type === 'fishing_mons' && method.name === 'Super Rod';
   return method.type === filter;
 }
+function cleanLocationFloorName(value){
+  return String(value||'').trim()
+    .replace(/\s+(?:Floor\s*\d+|B\d+F|\d+F|B\d+\s+F|\d+\s+F)$/i,'')
+    .trim();
+}
 function canonicalLocationName(area, allAreas){
-  var name=String(area.name||'').trim();
+  var name=cleanLocationFloorName(area.name);
   if(/^Route\s+\d+$/i.test(name)) return name;
   var match=name.match(/^(.*?)(?:\s+|_)(\d+)$/);
   if(match){
     var base=match[1].trim();
     var hasSibling=(allAreas||[]).some(function(other){
       if(other===area) return false;
-      var otherName=String(other.name||'').trim();
+      var otherName=cleanLocationFloorName(other.name);
       if(otherName===base) return true;
       var otherMatch=otherName.match(/^(.*?)(?:\s+|_)(\d+)$/);
       return !!(otherMatch && otherMatch[1].trim().toLowerCase()===base.toLowerCase());
@@ -2522,7 +2532,8 @@ function renderRouteEncounters(){
     var heading = el('div', {class:'encounter-heading'});
     var methodHeading=method.name;
     if((selected.subAreas||[]).length>1 && method.sourceArea && method.sourceArea!==selected.name){
-      methodHeading += ' · ' + method.sourceArea;
+      var cleanSourceArea=cleanLocationFloorName(method.sourceArea);
+      if(cleanSourceArea && cleanSourceArea!==selected.name) methodHeading += ' · ' + cleanSourceArea;
     }
     heading.appendChild(el('h4', {text:methodHeading}));
     var methodNote = method.type === 'static' ? 'Stationary encounter' : method.type === 'gift' ? 'Gift Pokémon' : method.encounterRate + '% encounter rate';
@@ -2916,9 +2927,13 @@ function renderPokedexDetail(allSpecies, id, detail){
   var hero = el('section', {class:'dex-hero'});
   applyTypeStyle(hero, Number(id));
   hero.appendChild(makeIconEl({species:Number(id),isShiny:false}, 'dex-hero-icon'));
-  var heroText = el('div');
-  heroText.appendChild(el('div', {class:'dex-id', text:(species.nationalDex ? 'National Dex #' + String(species.nationalDex).padStart(4,'0') + ' · ' : '') + 'Brisk species ID ' + id + (species.constant ? ' · SPECIES_' + species.constant : '')}));
-  heroText.appendChild(el('h2', {text:dexSpeciesDisplayName(species)}));
+  var heroText = el('div',{style:'flex:1;min-width:0;'});
+  var nameRow=el('div',{class:'dex-name-row'});
+  nameRow.appendChild(el('h2',{text:dexSpeciesDisplayName(species)}));
+  if(species.nationalDex){
+    nameRow.appendChild(el('span',{class:'dex-national-number',text:'#'+String(species.nationalDex).padStart(3,'0')}));
+  }
+  heroText.appendChild(nameRow);
   var heroTypes = makeTypePills(species.types, true); if (heroTypes) heroText.appendChild(heroTypes);
   var heroBadge=dexFormBadge(species); if(heroBadge) heroText.appendChild(heroBadge);
   hero.appendChild(heroText);
@@ -2935,8 +2950,11 @@ function renderPokedexDetail(allSpecies, id, detail){
   var facts = el('section', {class:'dex-card'});
   facts.appendChild(el('h4', {text:'Species Data'}));
   var factsGrid = el('div', {class:'dex-facts'});
+  var abilitySlots=species.abilities||[];
   [
-    ['Abilities',(species.abilities || []).filter(Boolean).join(' / ') || 'Unknown']
+    ['Ability 1',abilitySlots[0]||'—'],
+    ['Ability 2',abilitySlots[1]||'—'],
+    ['Hidden Ability',abilitySlots[2]||'—']
   ].forEach(function(pair){
     var f=el('div',{class:'dex-fact'}); f.appendChild(el('div',{class:'k',text:pair[0]})); f.appendChild(el('div',{class:'v',text:pair[1]})); factsGrid.appendChild(f);
   });
@@ -3179,14 +3197,13 @@ function renderItems(){
       var icon=el('img',{src:it.icon,alt:'',style:'width:40px;height:40px;'}); icon.loading='lazy'; icon.decoding='async'; shell.appendChild(icon); btn.appendChild(shell);
     }
     btn.appendChild(el('strong',{text:it.name||itemName(Number(id))}));
-    btn.appendChild(el('small',{text:it.constant||('Item #'+id)}));
+    if(it.description) btn.appendChild(el('small',{text:it.description}));
     btn.addEventListener('click',function(){selectedItemId=Number(id);renderItems();});
     return btn;
   }, (IS_ANDROID || IS_IOS) ? 100 : ids.length);
   var it=all[String(selectedItemId)]||{};
   var head=el('section',{class:'item-detail-head'});
   if(it.icon){ var heroShell=el('span',{class:'asset-icon-shell',style:'width:80px;height:80px;float:right;margin-left:18px;'}); var heroIcon=el('img',{src:it.icon,alt:(it.name||'Item')+' icon',style:'width:80px;height:80px;'}); heroIcon.decoding='async'; heroShell.appendChild(heroIcon); head.appendChild(heroShell); }
-  head.appendChild(el('div',{class:'dex-id',text:it.constant||('Item #'+selectedItemId)}));
   head.appendChild(el('h2',{text:it.name||itemName(selectedItemId)}));
   head.appendChild(el('div',{class:it.description?'item-description':'dex-muted',text:it.description||'No item description is present in the currently loaded Brisk data. Re-run the Brisk data extractor to populate it.'}));
   detail.appendChild(head);
@@ -3381,14 +3398,13 @@ function renderAbilities(){
     var users=abilityUsers(Number(id));
     var btn=el('button',{class:'reference-entry'+(Number(id)===Number(selectedAbilityReferenceId)?' active':'')});
     btn.appendChild(el('strong',{text:ability.name||('Ability #'+id)}));
-    btn.appendChild(el('small',{text:users.length+' Pokémon · '+(ability.constant||'')}));
+    btn.appendChild(el('small',{text:users.length+' Pokémon'}));
     btn.addEventListener('click',function(){selectedAbilityReferenceId=Number(id);renderAbilities();});
     return btn;
   },(IS_ANDROID||IS_IOS)?100:ids.length);
 
   var ability=all[String(selectedAbilityReferenceId)]||{};
   var hero=el('section',{class:'reference-hero'});
-  hero.appendChild(el('div',{class:'dex-id',text:ability.constant||('Ability #'+selectedAbilityReferenceId)}));
   hero.appendChild(el('h2',{text:ability.name||('Ability #'+selectedAbilityReferenceId)}));
   hero.appendChild(el('div',{class:ability.description?'reference-description':'dex-muted',text:ability.description||'No ability description is present in the currently loaded Brisk data.'}));
   detail.appendChild(hero);
