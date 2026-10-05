@@ -79,7 +79,7 @@ function cleanTeam(team){
     statusTurns:0,
     toxicCounter:0,
     stages:{atk:0,def:0,spa:0,spd:0,spe:0,acc:0,eva:0},
-    volatile:{protect:false,flinch:false,confusion:0,seeded:false,taunt:0,encore:0,substitute:0},
+    volatile:{protect:false,flinch:false,confusion:0,seeded:false,taunt:0,encore:0,encoreMove:null,substitute:0},
     moves:(Array.isArray(mon.moves)?mon.moves:[]).slice(0,4).map(move=>({
       id:Number(move.id)||0,
       name:cleanText(move.name,60)||'Move',
@@ -171,7 +171,7 @@ function beginBattle(room){
   room.phase='battle'; room.turn=1; room.weather=null; room.weatherTurns=0; room.terrain=null; room.terrainTurns=0; room.trickRoom=false; room.trickRoomTurns=0;
   room.players.forEach(p=>{
     p.side={stealthRock:false,spikes:0,toxicSpikes:0,stickyWeb:false,reflect:0,lightScreen:0,tailwind:0}; p.usedMega=false;p.usedGmax=false;p.usedTera=false;
-    p.team.forEach(mon=>{ mon.hp=mon.maxHP; mon.status=null; mon.choiceLock=null;mon.lastMoveIndex=null;mon.transformed=false;mon.transformedKind=null;mon.originalTypes=null; mon.statusTurns=0; mon.toxicCounter=0; mon.stages={atk:0,def:0,spa:0,spd:0,spe:0,acc:0,eva:0}; mon.volatile={protect:false,flinch:false,confusion:0,seeded:false,taunt:0,encore:0,substitute:0}; });
+    p.team.forEach(mon=>{ mon.hp=mon.maxHP; mon.status=null; mon.choiceLock=null;mon.lastMoveIndex=null;mon.transformed=false;mon.transformedKind=null;mon.originalTypes=null; mon.statusTurns=0; mon.toxicCounter=0; mon.stages={atk:0,def:0,spa:0,spd:0,spe:0,acc:0,eva:0}; mon.volatile={protect:false,flinch:false,confusion:0,seeded:false,taunt:0,encore:0,encoreMove:null,substitute:0}; });
     p.active=Math.max(0,p.team.findIndex(mon=>mon.hp>0)); p.choice=null;
   });
   log(room,'Battle started!');
@@ -207,10 +207,16 @@ function damage(room,attacker,defender,move,defenderPlayer){
   if(item==='choiceband'&&move.category==='Physical') attack=Math.floor(attack*1.5);
   if(item==='choicespecs'&&move.category==='Special') attack=Math.floor(attack*1.5);
   if(item==='lifeorb') power=Math.floor(power*1.3);
+  if(mn==='knockoff'&&defender.item) power=Math.floor(power*1.5);
   if(item==='muscleband'&&move.category==='Physical') power=Math.floor(power*1.1);
   if(item==='wiseglasses'&&move.category==='Special') power=Math.floor(power*1.1);
   let base=Math.floor((((2*attacker.level/5+2)*power*attack/Math.max(1,defense))/50)+2);
-  const stab=hasType(attacker,move.type)?(an==='adaptability'?2:1.5):1;
+  let stab=1;
+  if(attacker.transformedKind==='Tera'){
+    const wasOriginal=(attacker.originalTypes||[]).includes(move.type), isTera=attacker.teraType===move.type;
+    if(isTera) stab=wasOriginal?2:1.5;
+    else if(wasOriginal) stab=1.5;
+  }else if(hasType(attacker,move.type)) stab=(an==='adaptability'?2:1.5);
   let eff=effectiveness(move.type,defender.types);
   if(hasAbility(defender,'Levitate')&&move.type==='Ground') eff=0;
   if(hasAbility(defender,'Flash Fire')&&move.type==='Fire') eff=0;
@@ -438,6 +444,7 @@ function resolveAttack(room,pi,choice){
   if(choice.gimmick) transformMon(room,pi,choice.gimmick,choice.formIndex);
   const move=mon.moves[choice.moveIndex]; if(!move){log(room,mon.name+' has no usable move there.');return;}
   if(mon.choiceLock!==null && mon.choiceLock!==choice.moveIndex){log(room,mon.name+" is locked into "+(mon.moves[mon.choiceLock]&&mon.moves[mon.choiceLock].name||'another move')+'!');return;}
+  if(mon.volatile.encore>0 && mon.volatile.encoreMove!==null && mon.volatile.encoreMove!==choice.moveIndex){log(room,mon.name+" must repeat "+(mon.moves[mon.volatile.encoreMove]&&mon.moves[mon.volatile.encoreMove].name||'its encored move')+'!');return;}
   if(move.pp<=0){log(room,move.name+' has no PP left!');return;} move.pp--; mon.lastMoveIndex=choice.moveIndex;
   if((hasItem(mon,'Choice Band')||hasItem(mon,'Choice Specs')||hasItem(mon,'Choice Scarf'))&&mon.choiceLock===null) mon.choiceLock=choice.moveIndex;
   if(mon.volatile.taunt>0&&move.category==='Status'){log(room,mon.name+" can't use "+move.name+' after the taunt!');return;}
@@ -454,7 +461,7 @@ function resolveAttack(room,pi,choice){
     if(statusName==='trickroom'){
       room.trickRoom=!room.trickRoom;room.trickRoomTurns=room.trickRoom?5:0;log(room,'The dimensions twisted!');
     }else if(statusName==='encore'){
-      if(target.lastMoveIndex!==null){target.choiceLock=target.lastMoveIndex;target.volatile.encore=3;log(room,target.name+' received an encore!');}
+      if(target.lastMoveIndex!==null){target.volatile.encoreMove=target.lastMoveIndex;target.volatile.encore=3;log(room,target.name+' received an encore!');}
     }else if(statusName==='roar'||statusName==='whirlwind'||statusName==='dragontail'){
       const slot=randomBenchSlot(foe);if(slot>=0)doSwitch(room,other(pi),slot);
     }else if(statusName==='batonpass'){
@@ -516,7 +523,7 @@ function effectiveSpeed(room,pi){
 }
 function doSwitch(room,pi,slot){
   const p=room.players[pi], outgoing=active(p);
-  if(outgoing){ outgoing.choiceLock=null;outgoing.lastMoveIndex=null;outgoing.stages={atk:0,def:0,spa:0,spd:0,spe:0,acc:0,eva:0}; outgoing.volatile={protect:false,flinch:false,confusion:0,seeded:outgoing.volatile.seeded,taunt:0,encore:0,substitute:0}; }
+  if(outgoing){ outgoing.choiceLock=null;outgoing.lastMoveIndex=null;outgoing.stages={atk:0,def:0,spa:0,spd:0,spe:0,acc:0,eva:0}; outgoing.volatile={protect:false,flinch:false,confusion:0,seeded:outgoing.volatile.seeded,taunt:0,encore:0,encoreMove:null,substitute:0}; }
   p.active=slot; log(room,p.name+' switched to '+active(p).name+'!'); onSwitchIn(room,pi);
 }
 function endTurn(room){
@@ -535,7 +542,7 @@ function endTurn(room){
     if(room.weather==='sand'&&!hasType(mon,'Rock')&&!hasType(mon,'Ground')&&!hasType(mon,'Steel')&&!hasAbility(mon,'Magic Guard')) hurt(room,mon,Math.max(1,Math.floor(mon.maxHP/16)),'the sandstorm');
     p.side.reflect=Math.max(0,p.side.reflect-1);p.side.lightScreen=Math.max(0,p.side.lightScreen-1);p.side.tailwind=Math.max(0,p.side.tailwind-1);
     if(mon.volatile.taunt>0) mon.volatile.taunt--;
-    if(mon.volatile.encore>0 && --mon.volatile.encore===0) mon.choiceLock=null;
+    if(mon.volatile.encore>0 && --mon.volatile.encore===0) mon.volatile.encoreMove=null;
   }
   faintCheck(room,0); if(room.phase==='battle') faintCheck(room,1);
   if(room.weatherTurns>0&&--room.weatherTurns===0){log(room,'The weather returned to normal.');room.weather=null;}
@@ -609,6 +616,7 @@ const server=http.createServer(async (req,res)=>{
         if(!Number.isInteger(idx)||idx<0||idx>=mon.moves.length) return json(res,400,{error:'Invalid move.'});
         if(mon.moves[idx].pp<=0) return json(res,400,{error:'That move has no PP left.'});
         if(mon.choiceLock!==null&&mon.choiceLock!==idx) return json(res,400,{error:'That Pokémon is locked into another move.'});
+        if(mon.volatile.encore>0&&mon.volatile.encoreMove!==null&&mon.volatile.encoreMove!==idx) return json(res,400,{error:'That Pokémon must repeat its encored move.'});
         const gimmick=['Mega','Gigantamax','Tera'].includes(body.gimmick)?body.gimmick:null;
         p.choice={type:'move',moveIndex:idx,gimmick:gimmick,formIndex:Number(body.formIndex)||0}; resolveTurn(room);
       }else if(body.type==='switch'&&room.phase==='battle'){
