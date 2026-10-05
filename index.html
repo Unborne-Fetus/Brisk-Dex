@@ -334,6 +334,22 @@ input[type=file]{ display:none; }
 .trainer-move{background:#101010a8;border:1px solid var(--line-soft);padding:5px 7px;font-size:10.5px;}
 @media (max-width:760px){.trainer-layout{grid-template-columns:1fr}.trainer-list{max-height:245px;min-height:0}.trainer-team-grid{grid-template-columns:1fr}}
 
+/* ---------- item dex ---------- */
+.item-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+.item-tools input{min-height:38px;color:var(--text);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:8px 11px;font:inherit;flex:1 1 300px;min-width:190px;}
+.item-layout{display:grid;grid-template-columns:minmax(230px,310px) minmax(0,1fr);gap:14px;align-items:start;}
+.item-list{display:flex;flex-direction:column;gap:5px;max-height:calc(100vh - 245px);min-height:280px;overflow:auto;padding:4px;border:1px solid var(--line);background:var(--panel-2);}
+.item-entry{width:100%;text-align:left;border:1px solid transparent;background:transparent;padding:9px 10px;border-radius:4px;}
+.item-entry.active{border-color:#285448;background:#142721;color:var(--leaf-bright);}
+.item-entry strong{display:block;font-size:13px;}
+.item-entry small{display:block;color:var(--muted-2);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.item-detail-head{background:linear-gradient(110deg,#142a27,#111 72%);border:1px solid #263a37;border-left:4px solid var(--leaf-bright);padding:16px 18px;margin-bottom:12px;}
+.item-detail-head h2{margin:0 0 4px;font-size:23px;}
+.item-description{font-size:13px;line-height:1.55;color:var(--text);margin-top:10px;}
+.reference-location{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line-soft);font-size:12px;}
+.reference-location:last-child{border-bottom:0}.reference-location span:last-child{color:var(--muted);}
+@media (max-width:760px){.item-layout{grid-template-columns:1fr}.item-list{max-height:245px;min-height:0}}
+
 .box-grid{
   display:grid; grid-template-columns:repeat(6, 1fr); gap:8px;
   padding:18px;
@@ -435,6 +451,7 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
     <button id="tab-routes" role="tab" aria-selected="false" aria-controls="routes-tab-panel">Route Encounters</button>
     <button id="tab-dex" role="tab" aria-selected="false" aria-controls="dex-tab-panel">Pok&eacute;dex</button>
     <button id="tab-trainers" role="tab" aria-selected="false" aria-controls="trainers-tab-panel">Trainer Teams</button>
+    <button id="tab-items" role="tab" aria-selected="false" aria-controls="items-tab-panel">Items</button>
   </nav>
 
   <div id="save-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-save">
@@ -554,6 +571,18 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
     <div class="trainer-layout">
       <aside class="trainer-list" id="trainer-list" aria-label="Brisk trainers"></aside>
       <div class="trainer-detail" id="trainer-detail" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section id="items-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-items" style="display:none;">
+    <div class="section-heading"><h3>Items</h3><span class="count" id="item-count"></span></div>
+    <p class="route-intro">Descriptions and obtain locations are extracted from Brisk Emerald's own item tables, maps, shops, hidden items, and reward scripts.</p>
+    <div class="item-tools">
+      <input id="item-search" type="search" placeholder="Search item, description, constant, or location…" aria-label="Search Brisk Emerald items">
+    </div>
+    <div class="item-layout">
+      <aside class="item-list" id="item-list" aria-label="Brisk Emerald items"></aside>
+      <div class="item-detail" id="item-detail" aria-live="polite"></div>
     </div>
   </section>
 
@@ -1257,6 +1286,8 @@ var selectedRouteId = null;
 var selectedDexSpeciesId = null;
 var TRAINER_DATA = [];
 var selectedTrainerConstant = null;
+var ITEM_DETAILS = {};
+var selectedItemId = null;
 var GAME_SHINY_ODDS = 8;
 
 function rebuildNameData(){
@@ -1291,8 +1322,10 @@ async function loadBundledGameData(){
     if (Number.isInteger(data.shinyOdds) && data.shinyOdds > 0) GAME_SHINY_ODDS = data.shinyOdds;
     BUNDLED_DATA = {
       species:data.species || {}, moves:data.moves || {},
-      movePP:data.movePP || {}, items:data.items || {}, abilities:data.abilities || {}
+      movePP:data.movePP || {}, items:data.items || {}, abilities:data.abilities || {},
+      itemDetails:data.itemDetails || {}
     };
+    ITEM_DETAILS = Object.assign({}, BUNDLED_DATA.itemDetails || {}, USER_DATA.itemDetails || {});
     ROUTE_DATA = Array.isArray(data.routeEncounters) ? data.routeEncounters : [];
     rebuildNameData();
     var icons = await window.briskDexAPI.loadBundledIcons();
@@ -1303,6 +1336,7 @@ async function loadBundledGameData(){
     renderRouteEncounters();
     renderPokedex();
     renderTrainerTeams();
+    renderItems();
   }catch(err){
     showError('Could not load Brisk Emerald data bundled with Brisk Dex: ' + err.message);
   }
@@ -2391,7 +2425,8 @@ function renderPokedex(){
     return String(entry.name || '').toLowerCase().includes(query)
       || String(entry.constant || '').toLowerCase().includes(query)
       || (entry.types || []).some(function(t){ return String(t).toLowerCase().includes(query); })
-      || (entry.abilities || []).some(function(a){ return String(a || '').toLowerCase().includes(query); });
+      || (entry.abilities || []).some(function(a){ return String(a || '').toLowerCase().includes(query); })
+      || String(entry.pokedexEntry || '').toLowerCase().includes(query);
   }).sort(function(a,b){
     var an = (allSpecies[a].name || '').localeCompare(allSpecies[b].name || '');
     return an || Number(a)-Number(b);
@@ -2481,6 +2516,11 @@ function renderPokedex(){
   evolutions.appendChild(chain);
   grid.appendChild(evolutions);
 
+  var dexEntryCard=el('section',{class:'dex-card full'});
+  dexEntryCard.appendChild(el('h4',{text:'Pokédex Entry'}));
+  dexEntryCard.appendChild(el('div',{class:species.pokedexEntry?'':'dex-muted',text:species.pokedexEntry || 'No Pokédex description is present in the currently loaded Brisk data. Re-run the Brisk data extractor to populate it.'}));
+  grid.appendChild(dexEntryCard);
+
   var locations=el('section',{class:'dex-card full'});
   locations.appendChild(el('h4',{text:'Locations in Brisk Emerald'}));
   var locationRows=dexLocationsForSpecies(Number(id));
@@ -2539,6 +2579,7 @@ function renderTrainerClassOptions(){
 }
 function trainerSearchText(t){
   var parts=[t.constant,t.name,t.class,t.ai,t.battleType,t.items,t.pic];
+  (t.locations||[]).forEach(function(loc){parts.push(loc.location,loc.method);});
   (t.party||[]).forEach(function(m){
     parts.push(m.species,m.nickname,m.item);
     Object.keys(m.fields||{}).forEach(function(k){parts.push(k,m.fields[k]);});
@@ -2594,6 +2635,20 @@ function renderTrainerTeams(){
   ].filter(Boolean).forEach(function(x){meta.appendChild(el('span',{text:x}));});
   head.appendChild(meta); detail.appendChild(head);
 
+  var locationCard=el('section',{class:'dex-card',style:'margin-bottom:12px;'});
+  locationCard.appendChild(el('h4',{text:'Where to Find'}));
+  if((t.locations||[]).length){
+    (t.locations||[]).forEach(function(loc){
+      var row=el('div',{class:'reference-location'});
+      row.appendChild(el('strong',{text:loc.location}));
+      row.appendChild(el('span',{text:loc.method||'Trainer battle'}));
+      locationCard.appendChild(row);
+    });
+  }else{
+    locationCard.appendChild(el('div',{class:'dex-muted',text:'No encounter map is present in the currently loaded trainer data. Re-run the Brisk data extractor to populate trainer locations.'}));
+  }
+  detail.appendChild(locationCard);
+
   var team=el('div',{class:'trainer-team-grid'});
   (t.party||[]).forEach(function(m){
     var sid=trainerSpeciesId(m.species), card=el('article',{class:'trainer-mon'});
@@ -2631,15 +2686,57 @@ function renderTrainerTeams(){
   detail.appendChild(team);
 }
 
+function renderItems(){
+  var list=document.getElementById('item-list'), detail=document.getElementById('item-detail');
+  if(!list||!detail) return;
+  var all=Object.keys(ITEM_DETAILS||{}).length ? ITEM_DETAILS : Object.fromEntries(Object.keys(NAME_DATA.items||{}).map(function(id){return [id,{name:NAME_DATA.items[id],constant:'',description:'',locations:[]}];}));
+  var q=(document.getElementById('item-search').value||'').trim().toLowerCase();
+  var ids=Object.keys(all).filter(function(id){
+    var it=all[id]||{}, hay=[it.name,it.constant,it.description];
+    (it.locations||[]).forEach(function(loc){hay.push(loc.location,loc.method);});
+    return !q || hay.filter(Boolean).join(' ').toLowerCase().includes(q);
+  }).sort(function(a,b){return String((all[a]||{}).name||'').localeCompare(String((all[b]||{}).name||''));});
+  document.getElementById('item-count').textContent=ids.length+' of '+Object.keys(all).length+' items';
+  list.innerHTML=''; detail.innerHTML='';
+  if(!ids.length){list.appendChild(el('div',{class:'route-empty',text:Object.keys(all).length?'No items match this search.':'No item data is loaded.'}));return;}
+  if(!ids.includes(String(selectedItemId))) selectedItemId=Number(ids[0]);
+  ids.forEach(function(id){
+    var it=all[id]||{}, btn=el('button',{class:'item-entry'+(Number(id)===Number(selectedItemId)?' active':'')});
+    btn.appendChild(el('strong',{text:it.name||itemName(Number(id))}));
+    btn.appendChild(el('small',{text:it.constant||('Item #'+id)}));
+    btn.addEventListener('click',function(){selectedItemId=Number(id);renderItems();});
+    list.appendChild(btn);
+  });
+  var it=all[String(selectedItemId)]||{};
+  var head=el('section',{class:'item-detail-head'});
+  head.appendChild(el('div',{class:'dex-id',text:it.constant||('Item #'+selectedItemId)}));
+  head.appendChild(el('h2',{text:it.name||itemName(selectedItemId)}));
+  head.appendChild(el('div',{class:it.description?'item-description':'dex-muted',text:it.description||'No item description is present in the currently loaded Brisk data. Re-run the Brisk data extractor to populate it.'}));
+  detail.appendChild(head);
+  var locations=el('section',{class:'dex-card'});
+  locations.appendChild(el('h4',{text:'Where to Find'}));
+  if((it.locations||[]).length){
+    (it.locations||[]).forEach(function(loc){
+      var row=el('div',{class:'reference-location'});
+      row.appendChild(el('strong',{text:loc.location}));
+      row.appendChild(el('span',{text:loc.method||'Obtainable here'}));
+      locations.appendChild(row);
+    });
+  }else locations.appendChild(el('div',{class:'dex-muted',text:'No pickup, hidden-item, shop, or scripted reward location is present in the currently loaded Brisk data.'}));
+  detail.appendChild(locations);
+}
+
 function setMainTab(tabName){
   var routes = tabName === 'routes';
   var dex = tabName === 'dex';
   var trainers = tabName === 'trainers';
-  var save = !routes && !dex && !trainers;
+  var items = tabName === 'items';
+  var save = !routes && !dex && !trainers && !items;
   document.getElementById('save-tab-panel').style.display = save ? 'block' : 'none';
   document.getElementById('routes-tab-panel').style.display = routes ? 'block' : 'none';
   document.getElementById('dex-tab-panel').style.display = dex ? 'block' : 'none';
   document.getElementById('trainers-tab-panel').style.display = trainers ? 'block' : 'none';
+  document.getElementById('items-tab-panel').style.display = items ? 'block' : 'none';
   document.getElementById('tab-save').classList.toggle('active', save);
   document.getElementById('tab-save').setAttribute('aria-selected', String(save));
   document.getElementById('tab-routes').classList.toggle('active', routes);
@@ -2648,9 +2745,12 @@ function setMainTab(tabName){
   document.getElementById('tab-dex').setAttribute('aria-selected', String(dex));
   document.getElementById('tab-trainers').classList.toggle('active', trainers);
   document.getElementById('tab-trainers').setAttribute('aria-selected', String(trainers));
+  document.getElementById('tab-items').classList.toggle('active', items);
+  document.getElementById('tab-items').setAttribute('aria-selected', String(items));
   if (routes) renderRouteEncounters();
   if (dex) renderPokedex();
   if (trainers) renderTrainerTeams();
+  if (items) renderItems();
 }
 
 /* ============================================================
@@ -2703,6 +2803,8 @@ function handleDataFile(file){
       USER_DATA.species = Object.assign({}, USER_DATA.species, parsed.species || {});
       USER_DATA.moves = Object.assign({}, USER_DATA.moves, parsed.moves || {});
       USER_DATA.items = Object.assign({}, USER_DATA.items, parsed.items || {});
+      USER_DATA.itemDetails = Object.assign({}, USER_DATA.itemDetails || {}, parsed.itemDetails || {});
+      ITEM_DETAILS = Object.assign({}, BUNDLED_DATA.itemDetails || {}, USER_DATA.itemDetails || {});
       if (Array.isArray(parsed.routeEncounters)) ROUTE_DATA = parsed.routeEncounters;
       rebuildNameData();
       refreshBoxLevels();
@@ -2710,6 +2812,8 @@ function handleDataFile(file){
       updateDataStatus();
       renderRouteEncounters();
       renderPokedex();
+      renderTrainerTeams();
+      renderItems();
       if (currentSave) renderAll();
     }catch(err){
       showError('Could not parse that JSON file: ' + err.message);
@@ -2725,6 +2829,8 @@ document.getElementById('tab-save').addEventListener('click', function(){ setMai
 document.getElementById('tab-routes').addEventListener('click', function(){ setMainTab('routes'); });
 document.getElementById('tab-dex').addEventListener('click', function(){ setMainTab('dex'); });
 document.getElementById('tab-trainers').addEventListener('click', function(){ setMainTab('trainers'); });
+document.getElementById('tab-items').addEventListener('click', function(){ setMainTab('items'); });
+document.getElementById('item-search').addEventListener('input', renderItems);
 document.getElementById('trainer-search').addEventListener('input', renderTrainerTeams);
 document.getElementById('trainer-class').addEventListener('change', renderTrainerTeams);
 document.getElementById('trainer-size').addEventListener('change', renderTrainerTeams);
