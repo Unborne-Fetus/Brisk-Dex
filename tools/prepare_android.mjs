@@ -13,7 +13,11 @@ for (const file of ['brisk-dex-data.json', 'brisk-dex-trainer-teams.json']) {
 }
 
 for (const dir of ['brisk-dex-icons', 'brisk-dex-trainers', 'brisk-dex-items', 'brisk-dex-trainer-pics']) {
-  await fs.cp(path.join(root, dir), path.join(webDir, dir), { recursive: true });
+  try {
+    await fs.cp(path.join(root, dir), path.join(webDir, dir), { recursive: true });
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err;
+  }
 }
 
 const iconFiles = await fs.readdir(path.join(root, 'brisk-dex-icons'));
