@@ -671,7 +671,7 @@ function endTurn(room){
     if((mon.status==='poison'||mon.status==='toxic')&&hasAbility(mon,'Poison Heal'))heal(room,mon,Math.max(1,Math.floor(mon.maxHP/8)),'Poison Heal');
     if(mon.volatile.yawn>0&&--mon.volatile.yawn===0)setStatus(room,mon,'sleep');
     if(mon.volatile.perish>0){mon.volatile.perish--;log(room,mon.name+"'s perish count fell to "+mon.volatile.perish+'!');if(mon.volatile.perish===0)mon.hp=0;}
-    if(mon.volatile.saltCure&&!hasAbility(mon,'Magic Guard'))hurt(room,mon,Math.max(1,Math.floor(mon.maxHP*(hasType(mon,'Water')||hasType(mon,'Steel')?1/4:1/8)),'Salt Cure');
+    if(mon.volatile.saltCure&&!hasAbility(mon,'Magic Guard'))hurt(room,mon,Math.max(1,Math.floor(mon.maxHP*(hasType(mon,'Water')||hasType(mon,'Steel')?1/4:1/8))),'Salt Cure');
     if(mon.volatile.seeded&&!hasAbility(mon,'Magic Guard')){
       const dmg=Math.max(1,Math.floor(mon.maxHP/8)); const actual=hurt(room,mon,dmg,'Leech Seed');
       const foe=active(room.players[other(i)]); if(foe&&alive(foe)) heal(room,foe,actual,'Leech Seed');
