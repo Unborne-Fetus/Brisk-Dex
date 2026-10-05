@@ -4330,7 +4330,7 @@ function battleCandidateFromMon(mon,key,sourceLabel){
       return {id:Number(id),name:d.name||moveName(Number(id)),type:d.type||'Normal',category:d.category||'Status',
         power:Number(d.power||0),accuracy:Number(d.accuracy||100),priority:Number(d.priority||0),
         pp:Number((mon.pp&&mon.pp[moveIndex])||d.pp||BUNDLED_DATA.movePP[String(id)]||16),
-        effect:d.effect||'',target:d.target||'',flags:Array.isArray(d.flags)?d.flags.slice():[]};
+        effect:d.effect||'',target:d.target||'',flags:Array.isArray(d.flags)?d.flags.slice():[],criticalHitStage:Number(d.criticalHitStage||0),multiHit:!!d.multiHit,moveEffects:Array.isArray(d.moveEffects)?d.moveEffects.map(function(x){return {effect:x.effect||'',chance:Number(x.chance||100),self:!!x.self};}):[]};
     })
   };
 }
