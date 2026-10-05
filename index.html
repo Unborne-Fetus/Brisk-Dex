@@ -1514,14 +1514,16 @@ async function loadIconFolder(){
    Environment detection (plain browser vs. the Electron desktop app)
    ============================================================ */
 var IS_ELECTRON = !!(window.briskDexAPI);
-var IS_ANDROID = !!(window.briskAndroidAPI && window.briskAndroidAPI.isAndroid);
-if (IS_ANDROID){
-  var androidSaveInput = document.getElementById('file-sav');
-  if (androidSaveInput) androidSaveInput.setAttribute('accept', '*/*');
+var MOBILE_API = window.briskMobileAPI || window.briskAndroidAPI || window.briskIOSAPI || null;
+var IS_ANDROID = !!(MOBILE_API && MOBILE_API.isAndroid);
+var IS_IOS = !!(MOBILE_API && MOBILE_API.isIOS);
+if (IS_ANDROID || IS_IOS){
+  var mobileSaveInput = document.getElementById('file-sav');
+  if (mobileSaveInput) mobileSaveInput.setAttribute('accept', '*/*');
   var loadButton = document.getElementById('btn-load-sav');
   var loadButton2 = document.getElementById('btn-load-sav-2');
   if (loadButton) loadButton.textContent = 'Open save file';
-  if (loadButton2) loadButton2.textContent = 'Browse device files';
+  if (loadButton2) loadButton2.textContent = IS_IOS ? 'Browse Files' : 'Browse device files';
 }
 
 /* ============================================================
@@ -1701,16 +1703,16 @@ async function saveChangesToFile(){
   } else {
     var fname = (currentSave.trainer.name || 'save').toLowerCase().replace(/[^a-z0-9]/g,'') || 'brisk-emerald';
     var saveExt = currentSave.fileExtension === 'srm' ? 'srm' : 'sav';
-    if (IS_ANDROID && window.briskAndroidAPI){
+    if ((IS_ANDROID || IS_IOS) && MOBILE_API){
       try{
-        await window.briskAndroidAPI.saveBytes(currentSave._internal.rawBytes, fname + '-updated.' + saveExt, 'application/octet-stream');
+        await MOBILE_API.saveBytes(currentSave._internal.rawBytes, fname + '-updated.' + saveExt, 'application/octet-stream');
         clearDirty();
-        var androidQueuedCount = Object.keys(pendingWithdrawals).filter(function(id){ return pendingWithdrawals[id] === saveSessionId; }).length;
-        showNotice('Opened Android sharing so you can save the updated .' + saveExt + ' file.' +
-          (androidQueuedCount ? ' Archive copies are retained until you confirm the new save works.' : ''));
+        var mobileQueuedCount = Object.keys(pendingWithdrawals).filter(function(id){ return pendingWithdrawals[id] === saveSessionId; }).length;
+        showNotice('Opened the ' + (IS_IOS ? 'iOS' : 'Android') + ' share sheet so you can save the updated .' + saveExt + ' file.' +
+          (mobileQueuedCount ? ' Archive copies are retained until you confirm the new save works.' : ''));
         return false;
       }catch(e){
-        showError('Could not export the updated save on Android: ' + e.message);
+        showError('Could not export the updated save on ' + (IS_IOS ? 'iPhone' : 'Android') + ': ' + e.message);
         return false;
       }
     }
@@ -3145,7 +3147,7 @@ async function handleSavFromAndroid(){
   clearError();
   try{
     await gameDataReady;
-    var result = await window.briskAndroidAPI.openSaveFile();
+    var result = await MOBILE_API.openSaveFile();
     if (!result || !result.data) return;
     var bytes = base64ToBytes(result.data);
     var save = parseSav(bytes.buffer);
@@ -3247,12 +3249,12 @@ document.getElementById('encounter-method').addEventListener('change', renderRou
 document.getElementById('change-search').addEventListener('input', renderChangesDebounced);
 document.getElementById('btn-load-sav').addEventListener('click', function(){
   if (IS_ELECTRON) handleSavFromElectron();
-  else if (IS_ANDROID && window.briskAndroidAPI && window.briskAndroidAPI.openSaveFile) handleSavFromAndroid();
+  else if (IS_ANDROID && MOBILE_API && MOBILE_API.openSaveFile) handleSavFromAndroid();
   else document.getElementById('file-sav').click();
 });
 document.getElementById('btn-load-sav-2').addEventListener('click', function(){
   if (IS_ELECTRON) handleSavFromElectron();
-  else if (IS_ANDROID && window.briskAndroidAPI && window.briskAndroidAPI.openSaveFile) handleSavFromAndroid();
+  else if (IS_ANDROID && MOBILE_API && MOBILE_API.openSaveFile) handleSavFromAndroid();
   else document.getElementById('file-sav').click();
 });
 document.getElementById('btn-load-data').addEventListener('click', function(){
