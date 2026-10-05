@@ -69,6 +69,7 @@ function cleanTeam(team){
     name:cleanText(mon.name,40)||('Pokémon '+(index+1)),
     level:clamp(Number(mon.level)||50,1,100),
     friendship:clamp(Number(mon.friendship)||0,0,255),weight:Math.max(0,Number(mon.weight)||0),
+    ivs:{hp:clamp(Number(mon.ivs&&mon.ivs.hp)||0,0,31),atk:clamp(Number(mon.ivs&&mon.ivs.atk)||0,0,31),def:clamp(Number(mon.ivs&&mon.ivs.def)||0,0,31),spd:clamp(Number(mon.ivs&&mon.ivs.spd)||0,0,31),spa:clamp(Number(mon.ivs&&mon.ivs.spa)||0,0,31),spdef:clamp(Number(mon.ivs&&mon.ivs.spdef)||0,0,31)},
     types:Array.isArray(mon.types)?mon.types.slice(0,2).map(x=>cleanText(x,20)):[],
     ability:cleanText(mon.ability,60),
     item:cleanText(mon.item,60),
@@ -283,6 +284,15 @@ function dynamicMovePower(room,attacker,defender,move){
   return Math.max(0,power);
 }
 
+function hiddenPowerType(mon){
+  const iv=mon.ivs||{},bits=[iv.hp,iv.atk,iv.def,iv.spd,iv.spa,iv.spdef].map(v=>(Number(v)||0)&1);
+  const value=Math.floor((bits[0]+2*bits[1]+4*bits[2]+8*bits[3]+16*bits[4]+32*bits[5])*15/63);
+  return ['Fighting','Flying','Poison','Ground','Rock','Bug','Ghost','Steel','Fire','Water','Grass','Electric','Psychic','Ice','Dragon','Dark'][value]||'Dark';
+}
+function itemGrantedType(item){
+  const n=normalizeName(item),map={fistplate:'Fighting',skyplate:'Flying',toxicplate:'Poison',earthplate:'Ground',stoneplate:'Rock',insectplate:'Bug',spookyplate:'Ghost',ironplate:'Steel',flameplate:'Fire',splashplate:'Water',meadowplate:'Grass',zapplate:'Electric',mindplate:'Psychic',icicleplate:'Ice',dracoplate:'Dragon',dreadplate:'Dark',pixieplate:'Fairy',fightingmemory:'Fighting',flyingmemory:'Flying',poisonmemory:'Poison',groundmemory:'Ground',rockmemory:'Rock',bugmemory:'Bug',ghostmemory:'Ghost',steelmemory:'Steel',firememory:'Fire',watermemory:'Water',grassmemory:'Grass',electricmemory:'Electric',psychicmemory:'Psychic',icememory:'Ice',dragonmemory:'Dragon',darkmemory:'Dark',fairymemory:'Fairy',burndrive:'Fire',dousedrive:'Water',shockdrive:'Electric',chilldrive:'Ice'};
+  return map[n]||null;
+}
 function damage(room,attacker,defender,move,defenderPlayer){
   if(!move || move.power<=0 || move.category==='Status') return {amount:0,eff:1,crit:false};
   const specialName=normalizeName(move.name);
@@ -309,6 +319,11 @@ function damage(room,attacker,defender,move,defenderPlayer){
   let power=dynamicMovePower(room,attacker,defender,move);
   const an=normalizeName(attacker.ability), item=room.magicRoom?'':normalizeName(attacker.item), mn=normalizeName(move.name);
   let effectiveType=move.type;
+  if(mn==='hiddenpower')effectiveType=hiddenPowerType(attacker);
+  if(['judgment','technoblast','multiattack'].includes(mn)){const granted=itemGrantedType(attacker.item);if(granted)effectiveType=granted;}
+  if(mn==='aurawheel')effectiveType=/hangry/i.test(attacker.name)?'Dark':'Electric';
+  if(mn==='ivycudgel'){const it=normalizeName(attacker.item);effectiveType=it.includes('hearthflame')?'Fire':it.includes('wellspring')?'Water':it.includes('cornerstone')?'Rock':'Grass';}
+  if(mn==='terastarstorm'&&attacker.transformedKind==='Tera')effectiveType='Stellar';
   if(room.ionDeluge&&effectiveType==='Normal')effectiveType='Electric';
   if(mn==='weatherball'&&room.weather)effectiveType=room.weather==='sun'?'Fire':room.weather==='rain'?'Water':room.weather==='sand'?'Rock':'Ice';
   if(mn==='terrainpulse'&&room.terrain)effectiveType=room.terrain==='electric'?'Electric':room.terrain==='grassy'?'Grass':room.terrain==='psychic'?'Psychic':'Fairy';
@@ -1303,7 +1318,7 @@ const server=http.createServer(async (req,res)=>{
   if(req.method==='OPTIONS') return json(res,204,{});
   const url=new URL(req.url,'http://localhost');
   try{
-    if(req.method==='GET'&&url.pathname==='/health') return json(res,200,{ok:true,rooms:rooms.size,engine:'advanced-v16'});
+    if(req.method==='GET'&&url.pathname==='/health') return json(res,200,{ok:true,rooms:rooms.size,engine:'advanced-v17'});
     if(req.method==='POST'&&url.pathname==='/rooms'){
       const body=await readBody(req), code=roomCode(), playerId=id(), team=cleanTeam(body.team);
       if(!team.length) return json(res,400,{error:'Load a save with at least one party Pokémon first.'});
@@ -1358,4 +1373,4 @@ const server=http.createServer(async (req,res)=>{
     return json(res,405,{error:'Method not allowed'});
   }catch(err){ return json(res,400,{error:err.message||String(err)}); }
 });
-server.listen(PORT,HOST,()=>console.log('Brisk battle relay listening on http://'+HOST+':'+PORT+' (advanced-v16)'));
+server.listen(PORT,HOST,()=>console.log('Brisk battle relay listening on http://'+HOST+':'+PORT+' (advanced-v17)'));
