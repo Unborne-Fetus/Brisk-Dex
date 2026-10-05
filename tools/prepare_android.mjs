@@ -12,7 +12,7 @@ for (const file of ['brisk-dex-data.json', 'brisk-dex-trainer-teams.json']) {
   await fs.copyFile(path.join(root, file), path.join(webDir, file));
 }
 
-for (const dir of ['brisk-dex-icons', 'brisk-dex-trainers', 'brisk-dex-items', 'brisk-dex-trainer-pics']) {
+for (const dir of ['brisk-dex-icons', 'brisk-dex-trainers', 'brisk-dex-items', 'brisk-dex-trainer-pics', 'brisk-dex-sprites']) {
   try {
     await fs.cp(path.join(root, dir), path.join(webDir, dir), { recursive: true });
   } catch (err) {
