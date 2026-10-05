@@ -41,7 +41,7 @@ await build({
   minify: true,
   format: 'iife',
   platform: 'browser',
-  target: ['chrome120']
+  target: ['safari16', 'chrome110']
 });
 
 let html = await fs.readFile(path.join(root, 'index.html'), 'utf8');
@@ -50,4 +50,4 @@ if (!html.includes(marker)) throw new Error('Could not find the Brisk Dex applic
 html = html.replace(marker, '<script src="android-bridge.js"></script>\n' + marker);
 await fs.writeFile(path.join(webDir, 'index.html'), html);
 
-console.log(`Prepared Android web bundle with ${Object.keys(icons).length} normal and ${Object.keys(shinyIcons).length} shiny icons.`);
+console.log(`Prepared mobile web bundle with ${Object.keys(icons).length} normal and ${Object.keys(shinyIcons).length} shiny icons.`);
