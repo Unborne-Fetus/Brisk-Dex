@@ -2738,6 +2738,7 @@ function persistDexStatusOverrides(){
 function dexFlagIsSet(bytes,nationalDex){
   var dex=Number(nationalDex||0);
   if(!bytes || dex<=0) return false;
+  dex--; // Mirrors Brisk Emerald GetSetPokedexFlag(): National Dex #1 is bit 0.
   var index=dex>>3, mask=1<<(dex&7);
   return index<bytes.length && (bytes[index]&mask)!==0;
 }
