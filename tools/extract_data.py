@@ -102,7 +102,7 @@ def shiny_palette_png(source_png, palette_file, normal_palette_file, target_png)
         return False
 
 def normalize_sprite_png(source_png, target_png, first_frame=False, transparent_bg=False):
-    """Copy a PNG for the companion app, optionally taking frame 1 and clearing flat backgrounds."""
+    """Copy a PNG for the companion app, optionally taking frame 1 and clearing connected border backgrounds."""
     if not os.path.isfile(source_png):
         return False
     if Image is None:
@@ -115,21 +115,61 @@ def normalize_sprite_png(source_png, target_png, first_frame=False, transparent_
                 image = image.crop((0, 0, image.width, image.width))
             elif first_frame and image.width > image.height and image.width >= image.height * 2:
                 image = image.crop((0, 0, image.height, image.height))
-            if transparent_bg:
+
+            if transparent_bg and image.width and image.height:
                 pixels = image.load()
-                corners = [pixels[0,0], pixels[image.width-1,0], pixels[0,image.height-1], pixels[image.width-1,image.height-1]]
-                if corners.count(corners[0]) >= 3:
-                    bg = corners[0][:3]
+                border = []
+                for x in range(image.width):
+                    border.append(pixels[x, 0])
+                    border.append(pixels[x, image.height - 1])
+                for y in range(image.height):
+                    border.append(pixels[0, y])
+                    border.append(pixels[image.width - 1, y])
+
+                opaque_border = [px for px in border if px[3] > 16]
+                if opaque_border:
+                    # Item art is palette-based. The most common border color is
+                    # the canvas color, even when one corner contains stray pixels.
+                    counts = {}
+                    for px in opaque_border:
+                        rgb = px[:3]
+                        counts[rgb] = counts.get(rgb, 0) + 1
+                    bg = max(counts, key=counts.get)
+
+                    def near_bg(px):
+                        if px[3] <= 16:
+                            return True
+                        r, g, b = px[:3]
+                        return abs(r - bg[0]) + abs(g - bg[1]) + abs(b - bg[2]) <= 30
+
+                    # Only remove pixels connected to the outer edge. This avoids
+                    # deleting same-colored highlights/details inside the icon.
+                    stack = []
+                    seen = set()
+                    for x in range(image.width):
+                        stack.append((x, 0))
+                        stack.append((x, image.height - 1))
                     for y in range(image.height):
-                        for x in range(image.width):
-                            r,g,b,a = pixels[x,y]
-                            if (r,g,b) == bg:
-                                pixels[x,y] = (r,g,b,0)
+                        stack.append((0, y))
+                        stack.append((image.width - 1, y))
+
+                    while stack:
+                        x, y = stack.pop()
+                        if (x, y) in seen or x < 0 or y < 0 or x >= image.width or y >= image.height:
+                            continue
+                        seen.add((x, y))
+                        px = pixels[x, y]
+                        if not near_bg(px):
+                            continue
+                        pixels[x, y] = (px[0], px[1], px[2], 0)
+                        stack.extend(((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)))
+
             image.save(target_png)
         return True
     except (OSError, ValueError):
         shutil.copyfile(source_png, target_png)
         return True
+
 
 def extract_feature_catalog(repo):
     """Turn Expansion's FEATURES.md into categorized readable entries, then append Brisk-specific changes."""
