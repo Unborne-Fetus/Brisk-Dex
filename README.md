@@ -222,7 +222,7 @@ The current advanced simulator supports singles, six-Pokémon teams, PP, priorit
 Room/player tokens are kept in session storage so an accidental tab refresh can reconnect while the relay still holds the room. Relay rooms expire after six hours of inactivity.
 
 
-### Advanced battle engine v16
+### Advanced battle engine v18
 
 Online battles now use a selectable team of up to six Pokémon drawn from the loaded save's Party, any PC box, or Brisk Dex External Storage. Boxed and external Pokémon have battle stats reconstructed from their Brisk species data plus their actual IVs, EVs, nature, experience/level, moves, ability slot, held item, and Tera Type. The team picker includes storage-source filters and search.
 
@@ -230,6 +230,8 @@ Pokédex animated sprites replay every 1 second.
 
 The simulator is server-authoritative and increasingly source-driven. Brisk Dex extracts move effect names, move flags, critical-hit stages, multi-hit metadata, and secondary MOVE_EFFECT data directly from Pokémon Brisk Emerald's current source. `brisk-battle-effects.json` is regenerated from Brisk Emerald and provides a finite parity checklist for 934 moves and their primary/secondary effect families.
 
-The v16 engine includes the previous damage/status/weather/terrain/hazard/gimmick systems plus broad primary and secondary effect handling, variable-power/type/category families, called-move mechanics, Transform/Imposter, rooms, move locks, trapping, delayed effects, common competitive items and abilities, Counter/Mirror Coat tracking, Magic Coat, Imprison, Mimic, Last Resort, Snore, Synchronoise, Upper Hand, and many signature move families.
+The v18 engine includes the previous damage/status/weather/terrain/hazard/gimmick systems plus broad primary and secondary effect handling, variable-power/type/category families, called-move mechanics, Transform/Imposter, rooms, move locks, trapping, delayed effects, common competitive items and abilities, Counter/Mirror Coat tracking, Magic Coat, Imprison, Mimic, Last Resort, Snore, Synchronoise, Upper Hand, and many signature move families.
 
 The manifest makes remaining parity work measurable, but exact 100% pokeemerald-expansion/Brisk Emerald parity should only be claimed after every manifest effect plus ability/item interaction is verified by tests against the game engine.
+
+The generated Brisk battle manifest currently contains 279 primary move-effect families and 87 secondary MOVE_EFFECT families. The v18 server has direct coverage for all of those effect-family names; this is used as a coverage gate, while behavioral parity still requires interaction testing.
