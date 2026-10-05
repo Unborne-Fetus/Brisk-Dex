@@ -2978,7 +2978,7 @@ function renderTrainerClassOptions(){
   select.value=Array.from(select.options).some(function(o){return o.value===prev;})?prev:'all';
 }
 function trainerSearchText(t){
-  var parts=[t.constant,t.name,t.class,t.ai,t.battleType,t.items,t.pic];
+  var parts=[t.name,t.class,t.ai,t.battleType,t.items,t.pic];
   (t.locations||[]).forEach(function(loc){parts.push(loc.location,loc.method);});
   (t.party||[]).forEach(function(m){
     parts.push(m.species,m.nickname,m.item);
@@ -3019,7 +3019,7 @@ function renderTrainerTeams(){
     }
     var left=el('span',{class:'trainer-entry-text'});
     left.appendChild(el('strong',{text:t.name||t.constant.replace(/^TRAINER_/,'')}));
-    left.appendChild(el('small',{text:(t.class||'Pkmn Trainer')+' · '+t.constant.replace(/^TRAINER_/,'')}));
+    left.appendChild(el('small',{text:t.class||'Pkmn Trainer'}));
     btn.appendChild(left);
     btn.appendChild(el('span',{class:'trainer-entry-count',text:(t.party||[]).length+' mon'}));
     btn.addEventListener('click',function(){selectedTrainerConstant=t.constant;renderTrainerTeams();});
@@ -3035,7 +3035,6 @@ function renderTrainerTeams(){
   var meta=el('div',{class:'trainer-meta'});
   [
     t.class||'Pkmn Trainer',
-    t.constant,
     t.battleType ? ((String(t.battleType).toLowerCase()==='yes'||String(t.battleType).toLowerCase()==='doubles')?'Double Battle':(String(t.battleType).toLowerCase()==='no'?'Single Battle':t.battleType)) : null,
     t.ai ? 'AI: '+t.ai : null,
     t.items ? 'Trainer items: '+t.items : null
@@ -3069,7 +3068,14 @@ function renderTrainerTeams(){
     mh.appendChild(el('span',{class:'trainer-mon-level',text:'Lv'+((m.fields||{}).Level||'100')}));
     card.appendChild(mh);
     var fields=el('div',{class:'trainer-mon-fields'});
-    var preferred=['Ability','Nature','EVs','IVs','Tera Type','Gigantamax','Dynamax Level','Ball','Happiness','Gender'];
+    var speciesData=sid ? (dexSpeciesData()[String(sid)]||{}) : {};
+    var explicitAbility=(m.fields||{}).Ability;
+    var abilityText=explicitAbility || (speciesData.abilities||[]).filter(Boolean).join(' / ');
+    if(abilityText){
+      fields.appendChild(el('span',{class:'k',text:'Ability'}));
+      fields.appendChild(el('span',{text:abilityText}));
+    }
+    var preferred=['Nature','EVs','Tera Type','Gigantamax','Dynamax Level','Ball','Happiness','Gender'];
     preferred.forEach(function(k){
       var v=(m.fields||{})[k];
       if(!v && k==='Gender') v=m.gender;
@@ -3078,16 +3084,26 @@ function renderTrainerTeams(){
       fields.appendChild(el('span',{text:v}));
     });
     Object.keys(m.fields||{}).forEach(function(k){
-      if(k==='Level'||k==='Shiny'||preferred.includes(k)) return;
+      if(k==='Level'||k==='Shiny'||k==='IVs'||k==='Ability'||preferred.includes(k)) return;
       fields.appendChild(el('span',{class:'k',text:k}));
       fields.appendChild(el('span',{text:m.fields[k]}));
     });
     if(fields.children.length) card.appendChild(fields);
-    if((m.moves||[]).length){
+
+    var moveNames=(m.moves||[]).slice();
+    if(!moveNames.length && sid){
+      moveNames=(speciesData.learnableMoves||[]).map(function(moveId){return moveName(Number(moveId));}).filter(Boolean);
+    }
+    var moveSection=el('div',{style:'margin-top:10px;'});
+    moveSection.appendChild(el('div',{class:'dex-id',text:'Movepool'}));
+    if(moveNames.length){
       var moves=el('div',{class:'trainer-moves'});
-      m.moves.forEach(function(move){moves.appendChild(el('div',{class:'trainer-move',text:move}));});
-      card.appendChild(moves);
-    } else card.appendChild(el('div',{class:'dex-muted',text:'Moves use Brisk trainer defaults / level-up data.'}));
+      moveNames.forEach(function(move){moves.appendChild(el('div',{class:'trainer-move',text:move}));});
+      moveSection.appendChild(moves);
+    } else {
+      moveSection.appendChild(el('div',{class:'dex-muted',text:'No movepool data is available for this Pokémon.'}));
+    }
+    card.appendChild(moveSection);
     team.appendChild(card);
   });
   detail.appendChild(team);
