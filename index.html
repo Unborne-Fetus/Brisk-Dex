@@ -4438,6 +4438,23 @@ function renderOnlineBattle(){
     var head=el('div',{class:'online-side-head'});head.appendChild(makeIconEl({species:mon.species,isShiny:false},'dex-hero-icon'));
     var info=el('div',{style:'flex:1;'});info.appendChild(el('strong',{text:label+' · '+mon.name+' · Lv'+mon.level}));
     info.appendChild(el('div',{class:'dex-muted',text:'HP '+mon.hp+' / '+mon.maxHP+(mon.status?' · '+String(mon.status).toUpperCase():'')+(mon.transformedKind?' · '+mon.transformedKind:'')}));
+    var vol=mon.volatile||{},volBits=[];
+    if(vol.substitute>0)volBits.push('Substitute');
+    if(vol.confusion>0)volBits.push('Confused '+vol.confusion);
+    if(vol.seeded)volBits.push('Leech Seed');
+    if(vol.taunt>0)volBits.push('Taunt '+vol.taunt);
+    if(vol.encore>0)volBits.push('Encore '+vol.encore);
+    if(vol.disableTurns>0)volBits.push('Disable '+vol.disableTurns);
+    if(vol.torment)volBits.push('Torment');
+    if(vol.trapped||vol.ingrain)volBits.push('Trapped');
+    if(vol.recharge)volBits.push('Recharge');
+    if(vol.charging!==null&&vol.charging!==undefined)volBits.push('Charging');
+    if(vol.perish>0)volBits.push('Perish '+vol.perish);
+    if(vol.yawn>0)volBits.push('Drowsy');
+    if(vol.aquaRing)volBits.push('Aqua Ring');
+    if(vol.healBlock>0)volBits.push('Heal Block '+vol.healBlock);
+    if(vol.saltCure)volBits.push('Salt Cure');
+    if(volBits.length)info.appendChild(el('div',{class:'online-status',text:volBits.join(' · ')}));
     var hp=el('div',{class:'online-hp'}),fill=el('span');fill.style.width=Math.max(0,Math.min(100,100*mon.hp/mon.maxHP))+'%';hp.appendChild(fill);info.appendChild(hp);head.appendChild(info);card.appendChild(head);return card;
   }
   field.appendChild(side(foe,foe.name));field.appendChild(side(me,me.name));
@@ -4463,13 +4480,15 @@ function renderOnlineBattle(){
     });
     if(active.teraType&&active.teraType!=='None'&&active.teraType!=='Mystery')gimmickButton('Terastallize · '+active.teraType,'Tera',0,me.usedTera);
     if(gimmicks.childNodes.length)controls.appendChild(gimmicks);
-    var sideBits=[];var side=me.side||{};if(side.stealthRock)sideBits.push('Stealth Rock');if(side.spikes)sideBits.push('Spikes x'+side.spikes);if(side.toxicSpikes)sideBits.push('Toxic Spikes x'+side.toxicSpikes);if(side.stickyWeb)sideBits.push('Sticky Web');if(side.reflect)sideBits.push('Reflect '+side.reflect);if(side.lightScreen)sideBits.push('Light Screen '+side.lightScreen);if(side.tailwind)sideBits.push('Tailwind '+side.tailwind);if(sideBits.length)controls.appendChild(el('div',{class:'online-status',text:'Your field: '+sideBits.join(' · ')}));
+    var sideBits=[];var side=me.side||{};if(side.stealthRock)sideBits.push('Stealth Rock');if(side.spikes)sideBits.push('Spikes x'+side.spikes);if(side.toxicSpikes)sideBits.push('Toxic Spikes x'+side.toxicSpikes);if(side.stickyWeb)sideBits.push('Sticky Web');if(side.reflect)sideBits.push('Reflect '+side.reflect);if(side.lightScreen)sideBits.push('Light Screen '+side.lightScreen);if(side.tailwind)sideBits.push('Tailwind '+side.tailwind);if(side.wish)sideBits.push('Wish '+side.wish.turns);if(side.futureSight)sideBits.push('Future Sight '+side.futureSight.turns);if(sideBits.length)controls.appendChild(el('div',{class:'online-status',text:'Your field: '+sideBits.join(' · ')}));
     var moves=el('div',{class:'online-moves'});
     (active.moves||[]).forEach(function(move,index){
       var btn=el('button',{class:'online-move',text:move.name+' · '+move.type+(move.power?' · '+move.power:'')+' · PP '+move.pp+'/'+move.maxPP});
       var locked=active.choiceLock!==null&&active.choiceLock!==undefined&&Number(active.choiceLock)!==index;
       var encored=active.volatile&&active.volatile.encore>0&&active.volatile.encoreMove!==null&&active.volatile.encoreMove!==undefined&&Number(active.volatile.encoreMove)!==index;
-      btn.disabled=!!me.hasChoice||move.pp<=0||locked||encored;btn.addEventListener('click',function(){
+      var disabled=active.volatile&&active.volatile.disableTurns>0&&Number(active.volatile.disabledMove)===index;
+      var tormented=active.volatile&&active.volatile.torment&&active.lastMoveIndex!==null&&active.lastMoveIndex!==undefined&&Number(active.lastMoveIndex)===index;
+      btn.disabled=!!me.hasChoice||move.pp<=0||locked||encored||disabled||tormented;btn.addEventListener('click',function(){
         var gimmick=ONLINE_STATE.gimmickChoice;
         battleAction('move',{moveIndex:index,gimmick:gimmick&&gimmick.kind,formIndex:gimmick&&gimmick.formIndex});
         ONLINE_STATE.gimmickChoice=null;
@@ -4477,7 +4496,10 @@ function renderOnlineBattle(){
     });controls.appendChild(moves);
     var roster=el('div',{class:'online-roster'});
     me.team.forEach(function(mon,index){
-      var btn=el('button',{text:mon.name+(mon.hp<=0?' (fainted)':'')});btn.disabled=!!me.hasChoice||index===me.active||mon.hp<=0;
+      var foeActive=foe&&foe.team&&foe.team[foe.active],foeAbility=foeActive?String(foeActive.ability||'').toLowerCase():'';
+      var selfTrapped=active.volatile&&(active.volatile.trapped||active.volatile.ingrain);
+      var abilityTrap=foeAbility==='shadow tag'||(foeAbility==='magnet pull'&&(active.types||[]).includes('Steel'))||(foeAbility==='arena trap'&&!(active.types||[]).includes('Flying')&&String(active.ability||'').toLowerCase()!=='levitate');
+      var btn=el('button',{text:mon.name+(mon.hp<=0?' (fainted)':'')});btn.disabled=!!me.hasChoice||index===me.active||mon.hp<=0||selfTrapped||abilityTrap;
       btn.addEventListener('click',function(){battleAction('switch',{slot:index});});roster.appendChild(btn);
     });controls.appendChild(roster);field.appendChild(controls);
   }
