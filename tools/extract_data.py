@@ -295,6 +295,97 @@ def extract_abilities(block):
         ids = [name for name in re.findall(r'\bABILITY_([A-Za-z0-9_]+)', block or "") if name != 'NONE']
     return ids
 
+
+def extract_trainer_teams(repo):
+    """Parse Brisk Emerald's trainers.party into JSON-friendly trainer/team records."""
+    path = os.path.join(repo, "src/data/trainers.party")
+    if not os.path.isfile(path):
+        return []
+
+    text = open(path, encoding="utf-8").read()
+    # Remove C comments; preserve line breaks so trainer blocks remain readable.
+    text = re.sub(r'/\*[\s\S]*?\*/', lambda m: ''.join('\n' if c == '\n' else ' ' for c in m.group(0)), text)
+    matches = list(re.finditer(r'^===\s*(TRAINER_[A-Z0-9_]+)\s*===\s*$', text, re.MULTILINE))
+    trainers = []
+
+    def parse_mon_header(line):
+        item = None
+        left = line.strip()
+        if " @ " in left:
+            left, item = left.rsplit(" @ ", 1)
+            left, item = left.strip(), item.strip()
+        gender = None
+        gm = re.search(r'\s+\(([MF])\)\s*$', left)
+        if gm:
+            gender = gm.group(1)
+            left = left[:gm.start()].strip()
+        nickname = None
+        species = left
+        nm = re.match(r'^(.+?)\s+\(([^()]+)\)$', left)
+        if nm:
+            nickname, species = nm.group(1).strip(), nm.group(2).strip()
+        return {"species": species, "nickname": nickname, "gender": gender, "item": item}
+
+    for i, match in enumerate(matches):
+        constant = match.group(1)
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        lines = text[match.end():end].splitlines()
+        meta, party = {}, []
+        p = 0
+        while p < len(lines) and not lines[p].strip():
+            p += 1
+        while p < len(lines):
+            line = lines[p].strip()
+            if not line:
+                p += 1
+                break
+            field = re.match(r'^([^:]+):\s*(.*)$', line)
+            if not field:
+                break
+            meta[field.group(1).strip()] = field.group(2).strip()
+            p += 1
+
+        while p < len(lines):
+            while p < len(lines) and not lines[p].strip():
+                p += 1
+            if p >= len(lines):
+                break
+            header = lines[p].strip()
+            p += 1
+            if not header:
+                continue
+            mon = parse_mon_header(header)
+            mon["moves"] = []
+            mon["fields"] = {}
+            while p < len(lines) and lines[p].strip():
+                line = lines[p].strip()
+                p += 1
+                if line.startswith("- "):
+                    mon["moves"].append(line[2:].strip())
+                    continue
+                field = re.match(r'^([^:]+):\s*(.*)$', line)
+                if field:
+                    mon["fields"][field.group(1).strip()] = field.group(2).strip()
+            party.append(mon)
+
+        trainers.append({
+            "constant": constant,
+            "name": meta.get("Name", ""),
+            "class": meta.get("Class", "Pkmn Trainer"),
+            "pic": meta.get("Pic", ""),
+            "gender": meta.get("Gender", ""),
+            "music": meta.get("Music", ""),
+            "items": meta.get("Items", ""),
+            "battleType": meta.get("Battle Type", meta.get("Double Battle", "")),
+            "ai": meta.get("AI", ""),
+            "mugshot": meta.get("Mugshot", ""),
+            "startingStatus": meta.get("Starting Status", ""),
+            "multiParty": meta.get("Multi Party", ""),
+            "party": party,
+        })
+    return trainers
+
+
 def extract_route_encounters(repo, species_ids):
     encounters_path = os.path.join(repo, "src/data/wild_encounters.json")
     if not os.path.isfile(encounters_path):
@@ -777,10 +868,14 @@ def main():
         out_items[str(iid)] = item_name or name.replace('_', ' ').title()
 
     route_encounters = extract_route_encounters(repo, species_ids)
+    trainer_teams = extract_trainer_teams(repo)
     data = {"species": out_species, "moves": out_moves, "movePP": out_move_pp, "abilities": out_abilities,
             "items": out_items, "routeEncounters": route_encounters, "shinyOdds": shiny_odds}
     with open("brisk-dex-data.json", "w", encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
+    with open("brisk-dex-trainer-teams.json", "w", encoding='utf-8') as f:
+        json.dump({"source": "Pokemon-Brisk-Emerald/src/data/trainers.party", "trainers": trainer_teams},
+                  f, ensure_ascii=False, separators=(',', ':'))
 
     print()
     print("Wrote brisk-dex-data.json:")
@@ -791,6 +886,7 @@ def main():
     print("  abilities:", len(out_abilities))
     print("  items:", len(out_items))
     print("  locations with wild encounters:", len(route_encounters))
+    print("  trainers:", len(trainer_teams), "  pokemon on trainer teams:", sum(len(t["party"]) for t in trainer_teams))
 
     if first_block_sample and (with_types < len(out_species) * 0.5 or with_abilities < len(out_species) * 0.5):
         with open("debug_sample_species_block.txt", "w", encoding='utf-8') as f:
