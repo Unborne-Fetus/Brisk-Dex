@@ -4291,7 +4291,7 @@ function battlePartySnapshot(){
       moves:(mon.moves||[]).filter(function(id){return Number(id)>0;}).slice(0,4).map(function(id){
         var d=MOVE_DETAILS[String(id)]||MOVE_DETAILS[id]||{};
         return {id:Number(id),name:d.name||moveName(Number(id)),type:d.type||'Normal',category:d.category||'Status',
-          power:Number(d.power||0),accuracy:Number(d.accuracy||100),priority:Number(d.priority||0),pp:Number(d.pp||BUNDLED_DATA.movePP[String(id)]||16)};
+          power:Number(d.power||0),accuracy:Number(d.accuracy||100),priority:Number(d.priority||0),pp:Number(d.pp||BUNDLED_DATA.movePP[String(id)]||16),effect:d.effect||'',target:d.target||'',flags:Array.isArray(d.flags)?d.flags.slice():[]};
       })
     };
   });
