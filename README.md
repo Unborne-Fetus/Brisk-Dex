@@ -222,6 +222,12 @@ The current advanced simulator supports singles, six-Pokémon teams, PP, priorit
 Room/player tokens are kept in session storage so an accidental tab refresh can reconnect while the relay still holds the room. Relay rooms expire after six hours of inactivity.
 
 
-### Advanced battle engine v3
+### Advanced battle engine v8
 
-The online simulator now also supports Brisk save-file Tera Types, Brisk-extracted Mega/Gigantamax forms, Trick Room, Choice locking, Encore locking, Knock Off, Rapid Spin, Defog, phazing, Baton Pass stage passing, pivot moves, common multi-hit moves, and expanded switch-state handling. Mega/Gigantamax form data is sourced from Brisk Dex's extracted species tables rather than a vanilla Pokémon database.
+The private Host / Join simulator now has a much broader competitive mechanics layer. It uses Brisk Emerald save data for teams, stored Tera Types, Brisk-extracted species forms, and Brisk move metadata/flags.
+
+Implemented coverage now includes: Mega/Tera/Gigantamax hooks, PP and Pressure, priority and Trick Room, stat stages, Contrary/Simple/Unaware, major status, confusion/flinch, Disable/Encore/Torment/Taunt, trapping, recharge and charge moves, Protect chains, Substitute, hazards, screens, Tailwind, weather, terrain, Wish/Future Sight, Perish Song, Destiny Bond, Yawn, Heal Block, Aqua Ring/Ingrain, Leech Seed, Salt Cure, Baton Pass basics, phazing, pivot moves, Defog/Rapid Spin/Mortal Spin, Knock Off, Clear Smog, Pain Split, Trick/Switcheroo, Skill Swap, multi-hit moves, recoil/draining, common fixed-damage moves, common secondary effects, common weather/terrain abilities, contact reactions, absorb/immunity abilities, priority blockers, Magic Bounce/Good as Gold-style protection, Mold Breaker-style bypasses, common offensive ability families (Iron Fist, Strong Jaw, Sharpness, Mega Launcher, Punk Rock, Tough Claws, Technician, Adaptability, Reckless), common defensive abilities (Fur Coat, Ice Scales, Marvel Scale, Multiscale, Filter/Solid Rock/Prism Armor, Thick Fat, Sturdy), common knockout/stat-trigger abilities, common recovery/status berries, Choice items, Life Orb, Assault Vest, Focus Sash, Weakness Policy, Heavy-Duty Boots, Rocky Helmet, Leftovers, Black Sludge, Air Balloon, Shed Shell, Shell Bell, status orbs, White Herb, Mental Herb, and several related interactions.
+
+The battle client shows volatile conditions, delayed effects, field state, gimmick eligibility, move locks, PP, transformations, and trapping so server-side mechanics are visible instead of hidden.
+
+This is intentionally Brisk-data-driven where possible. Rare one-off signature effects, every historical-generation edge case, and exact pokeemerald-expansion battle-script parity should still be verified before treating the simulator as tournament-authoritative.
