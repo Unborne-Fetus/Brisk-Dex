@@ -14,6 +14,9 @@ on:
       - "brisk-dex-trainer-teams.json"
       - "brisk-dex-icons/**"
       - "brisk-dex-trainers/**"
+      - "brisk-dex-sprites/**"
+      - "brisk-dex-trainer-pics/**"
+      - "brisk-dex-items/**"
       - "tools/prepare_android.mjs"
       - ".github/workflows/build-android.yml"
 
