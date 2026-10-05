@@ -262,6 +262,34 @@ input[type=file]{ display:none; }
 .route-empty{padding:20px;color:var(--muted);background:var(--panel-2);border:1px solid var(--line);}
 @media (max-width:720px){.route-layout{grid-template-columns:1fr}.route-list{max-height:230px;min-height:0}.route-tools select{flex:1 1 135px}.main-tabs button{padding:11px 10px;font-size:12px}}
 
+/* ---------- Online battles ---------- */
+.online-shell{display:grid;grid-template-columns:minmax(260px,360px) minmax(0,1fr);gap:14px;align-items:start;}
+.online-card{background:var(--panel);border:1px solid var(--line);padding:16px;}
+.online-card h4{margin:0 0 10px;color:var(--leaf-bright);}
+.online-form{display:grid;gap:10px;}
+.online-form label{display:grid;gap:5px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+.online-form input,.online-form select{min-height:38px;color:var(--text);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:8px 11px;font:inherit;text-transform:none;letter-spacing:0;}
+.online-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.online-code{font-family:var(--font-display);font-size:22px;letter-spacing:.12em;color:var(--leaf-bright);margin:8px 0;}
+.online-status{font-size:12px;color:var(--muted);margin-top:8px;}
+.online-team{display:grid;gap:7px;margin-top:10px;}
+.online-mon{display:grid;grid-template-columns:42px 1fr auto;gap:9px;align-items:center;padding:8px;background:var(--panel-2);border:1px solid var(--line-soft);}
+.online-mon .encounter-icon{width:42px;height:42px;}
+.online-mon small{display:block;color:var(--muted);font-size:10px;}
+.online-battlefield{display:grid;gap:12px;}
+.online-side{--hero-color:#267c5a;--hero-secondary:var(--hero-color);padding:14px;border:1px solid var(--line);background:linear-gradient(105deg,color-mix(in srgb,var(--hero-color) 28%,#111),color-mix(in srgb,var(--hero-secondary) 18%,#111));}
+.online-side-head{display:flex;align-items:center;gap:12px;}
+.online-side-head .dex-hero-icon{width:72px;height:72px;}
+.online-hp{height:8px;background:#202020;border-radius:6px;overflow:hidden;margin-top:8px;}
+.online-hp span{display:block;height:100%;background:var(--hp-full);}
+.online-moves{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px;}
+.online-move{justify-content:space-between;}
+.online-log{max-height:220px;overflow:auto;background:#0d0d0d;border:1px solid var(--line);padding:10px;font-size:12px;white-space:pre-line;}
+.online-roster{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+.online-roster button{padding:6px 8px;font-size:10px;}
+.online-roster button[disabled]{opacity:.45;cursor:default;}
+@media (max-width:760px){.online-shell{grid-template-columns:1fr}.online-moves{grid-template-columns:1fr}}
+
 /* ---------- Brisk Pokédex ---------- */
 .dex-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
 .dex-tools input,.dex-tools select{min-height:38px;color:var(--text);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:8px 11px;font:inherit;}
@@ -561,6 +589,7 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
     <button id="tab-dex" role="tab" aria-selected="false" aria-controls="dex-tab-panel">Pok&eacute;dex</button>
     <button id="tab-trainers" role="tab" aria-selected="false" aria-controls="trainers-tab-panel">Trainer Teams</button>
     <button id="tab-competitive" role="tab" aria-selected="false" aria-controls="competitive-tab-panel">Competitive Sets</button>
+    <button id="tab-online" role="tab" aria-selected="false" aria-controls="online-tab-panel">Online Battle</button>
     <button id="tab-moves" role="tab" aria-selected="false" aria-controls="moves-tab-panel">Moves</button>
     <button id="tab-abilities" role="tab" aria-selected="false" aria-controls="abilities-tab-panel">Abilities</button>
     <button id="tab-items" role="tab" aria-selected="false" aria-controls="items-tab-panel">Items</button>
@@ -715,6 +744,12 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
       <aside class="comp-list" id="competitive-list" aria-label="Pokémon with competitive sets"></aside>
       <div id="competitive-detail" aria-live="polite"></div>
     </div>
+  </section>
+
+  <section id="online-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-online" style="display:none;">
+    <div class="section-heading"><h3>Online Battle</h3><span class="count" id="online-count">Host / Join</span></div>
+    <p class="route-intro">Private Brisk battles using your loaded save-file party. Host a six-character room or join a friend's room. The first prototype supports singles, switching, damaging moves, STAB, accuracy, priority, and type effectiveness.</p>
+    <div id="online-root"></div>
   </section>
 
   <section id="moves-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-moves" style="display:none;">
@@ -1586,6 +1621,11 @@ var ABILITY_USERS_INDEX = null;
 var CHANGE_DATA = [];
 var BAG_ITEMS = {};
 var currentMainTab = 'save';
+var ONLINE_STATE = {
+  relayUrl: localStorage.getItem('briskdex_battle_relay') || 'http://localhost:8787',
+  roomCode: '', playerId: '', playerIndex: -1, room: null,
+  polling: null, busy: false
+};
 var GAME_SHINY_ODDS = 8;
 var DEX_FLAG_BYTES = 129; // Gen IX National Dex (1025 entries + slot 0) in current Brisk Emerald.
 var DEX_SEEN_OFFSET = 0x3598; // SaveBlock1.dexSeen for Brisk Emerald's current save.h configuration.
@@ -4139,11 +4179,192 @@ function renderCompetitiveSets(){
   detail.appendChild(grid);
 }
 
+function battlePartySnapshot(){
+  if(!currentSave) return [];
+  return (currentSave.party||[]).filter(function(mon){return mon&&!mon.empty;}).slice(0,6).map(function(mon){
+    var species=NAME_DATA.species[String(mon.species)]||{};
+    var abilityList=Array.isArray(species.abilities)?species.abilities.filter(Boolean):[];
+    var ability=abilityList[Math.min(Number(mon.abilitySlot)||0,Math.max(0,abilityList.length-1))]||abilityList[0]||'';
+    return {
+      species:Number(mon.species), name:mon.nickname||speciesName(mon.species), level:Number(mon.level)||50,
+      types:(species.types||[]).filter(Boolean).slice(0,2), ability:ability,
+      item:itemName(mon.heldItem||0),
+      maxHP:Number(mon.maxHP)||1, atk:Number(mon.atk)||1, def:Number(mon.def)||1,
+      speed:Number(mon.speed)||1, spAtk:Number(mon.spAtk)||1, spDef:Number(mon.spDef)||1,
+      isShiny:!!mon.isShiny,
+      moves:(mon.moves||[]).filter(function(id){return Number(id)>0;}).slice(0,4).map(function(id){
+        var d=MOVE_DETAILS[String(id)]||MOVE_DETAILS[id]||{};
+        return {id:Number(id),name:d.name||moveName(Number(id)),type:d.type||'Normal',category:d.category||'Status',
+          power:Number(d.power||0),accuracy:Number(d.accuracy||100),priority:Number(d.priority||0)};
+      })
+    };
+  });
+}
+function battleRelayUrl(){
+  return String(ONLINE_STATE.relayUrl||'').replace(/\/+$/,'');
+}
+async function battleRequest(path,options){
+  var url=battleRelayUrl()+path;
+  var response=await fetch(url,Object.assign({headers:{'Content-Type':'application/json'}},options||{}));
+  var data=await response.json().catch(function(){return {};});
+  if(!response.ok) throw new Error(data.error||('Battle server returned '+response.status));
+  return data;
+}
+function stopBattlePolling(){
+  if(ONLINE_STATE.polling){clearInterval(ONLINE_STATE.polling);ONLINE_STATE.polling=null;}
+}
+function startBattlePolling(){
+  stopBattlePolling();
+  ONLINE_STATE.polling=setInterval(async function(){
+    if(!ONLINE_STATE.roomCode||!ONLINE_STATE.playerId||ONLINE_STATE.busy) return;
+    try{
+      var data=await battleRequest('/rooms/'+ONLINE_STATE.roomCode+'?playerId='+encodeURIComponent(ONLINE_STATE.playerId),{method:'GET'});
+      ONLINE_STATE.room=data.room; ONLINE_STATE.playerIndex=data.playerIndex; renderOnlineBattle();
+      if(data.room.phase==='finished') stopBattlePolling();
+    }catch(err){
+      var status=document.getElementById('online-live-status');
+      if(status) status.textContent='Connection problem: '+err.message;
+    }
+  },900);
+}
+async function hostOnlineBattle(){
+  if(ONLINE_STATE.busy) return;
+  var team=battlePartySnapshot();
+  if(!team.length){showError('Load a Brisk Emerald save with at least one party Pokémon before hosting.');return;}
+  var relay=document.getElementById('online-relay'), name=document.getElementById('online-name');
+  ONLINE_STATE.relayUrl=(relay&&relay.value.trim())||ONLINE_STATE.relayUrl;
+  localStorage.setItem('briskdex_battle_relay',ONLINE_STATE.relayUrl);
+  ONLINE_STATE.busy=true;
+  try{
+    var data=await battleRequest('/rooms',{method:'POST',body:JSON.stringify({
+      name:(name&&name.value.trim())||(currentSave&&currentSave.trainer&&currentSave.trainer.name)||'Host',
+      team:team,rules:{format:'singles',teamSize:Math.min(6,team.length)}
+    })});
+    ONLINE_STATE.roomCode=data.code;ONLINE_STATE.playerId=data.playerId;ONLINE_STATE.playerIndex=data.playerIndex;ONLINE_STATE.room=data.room;
+    startBattlePolling();renderOnlineBattle();
+  }catch(err){showError('Could not host battle: '+err.message);}
+  finally{ONLINE_STATE.busy=false;}
+}
+async function joinOnlineBattle(){
+  if(ONLINE_STATE.busy) return;
+  var team=battlePartySnapshot();
+  if(!team.length){showError('Load a Brisk Emerald save with at least one party Pokémon before joining.');return;}
+  var relay=document.getElementById('online-relay'), name=document.getElementById('online-name'), codeInput=document.getElementById('online-code-input');
+  var roomCode=String(codeInput&&codeInput.value||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);
+  if(roomCode.length!==6){showError('Enter the six-character battle room code.');return;}
+  ONLINE_STATE.relayUrl=(relay&&relay.value.trim())||ONLINE_STATE.relayUrl;
+  localStorage.setItem('briskdex_battle_relay',ONLINE_STATE.relayUrl);
+  ONLINE_STATE.busy=true;
+  try{
+    var data=await battleRequest('/rooms/'+roomCode+'/join',{method:'POST',body:JSON.stringify({
+      name:(name&&name.value.trim())||(currentSave&&currentSave.trainer&&currentSave.trainer.name)||'Challenger',team:team
+    })});
+    ONLINE_STATE.roomCode=data.code;ONLINE_STATE.playerId=data.playerId;ONLINE_STATE.playerIndex=data.playerIndex;ONLINE_STATE.room=data.room;
+    startBattlePolling();renderOnlineBattle();
+  }catch(err){showError('Could not join battle: '+err.message);}
+  finally{ONLINE_STATE.busy=false;}
+}
+async function battleAction(type,payload){
+  if(ONLINE_STATE.busy||!ONLINE_STATE.roomCode) return;
+  ONLINE_STATE.busy=true;
+  try{
+    var body=Object.assign({playerId:ONLINE_STATE.playerId,type:type},payload||{});
+    var data=await battleRequest('/rooms/'+ONLINE_STATE.roomCode+'/action',{method:'POST',body:JSON.stringify(body)});
+    ONLINE_STATE.room=data.room;ONLINE_STATE.playerIndex=data.playerIndex;renderOnlineBattle();
+  }catch(err){showError('Battle action failed: '+err.message);}
+  finally{ONLINE_STATE.busy=false;}
+}
+function leaveOnlineBattle(){
+  stopBattlePolling();
+  ONLINE_STATE.roomCode='';ONLINE_STATE.playerId='';ONLINE_STATE.playerIndex=-1;ONLINE_STATE.room=null;
+  renderOnlineBattle();
+}
+function appendOnlineTeam(parent,team){
+  var wrap=el('div',{class:'online-team'});
+  (team||[]).forEach(function(mon){
+    var row=el('div',{class:'online-mon'});
+    row.appendChild(makeIconEl({species:mon.species,isShiny:!!mon.isShiny},'encounter-icon'));
+    var info=el('div');info.appendChild(el('strong',{text:mon.name||speciesName(mon.species)}));
+    info.appendChild(el('small',{text:'Lv'+mon.level+' · '+((mon.types||[]).join(' / ')||'Unknown type')}));
+    row.appendChild(info);row.appendChild(el('span',{text:(mon.moves||[]).length+' moves',class:'dex-muted'}));wrap.appendChild(row);
+  });
+  parent.appendChild(wrap);
+}
+function renderOnlineBattle(){
+  var root=document.getElementById('online-root');if(!root)return;
+  root.innerHTML='';
+  var snapshot=battlePartySnapshot();
+  if(!ONLINE_STATE.room){
+    var shell=el('div',{class:'online-shell'});
+    var setup=el('section',{class:'online-card'});
+    setup.appendChild(el('h4',{text:'Host or join'}));
+    var form=el('div',{class:'online-form'});
+    var relayLabel=el('label',{text:'Battle relay URL'});
+    relayLabel.appendChild(el('input',{id:'online-relay',value:ONLINE_STATE.relayUrl,placeholder:'https://battle.example.com'}));form.appendChild(relayLabel);
+    var nameLabel=el('label',{text:'Trainer name'});
+    nameLabel.appendChild(el('input',{id:'online-name',value:(currentSave&&currentSave.trainer&&currentSave.trainer.name)||'',maxlength:'24'}));form.appendChild(nameLabel);
+    var codeLabel=el('label',{text:'Room code'});
+    codeLabel.appendChild(el('input',{id:'online-code-input',placeholder:'ABC123',maxlength:'6',style:'text-transform:uppercase;'}));form.appendChild(codeLabel);
+    var actions=el('div',{class:'online-actions'});
+    var host=el('button',{class:'primary',text:'Host Battle'});host.addEventListener('click',hostOnlineBattle);
+    var join=el('button',{text:'Join Battle'});join.addEventListener('click',joinOnlineBattle);
+    actions.appendChild(host);actions.appendChild(join);form.appendChild(actions);setup.appendChild(form);
+    setup.appendChild(el('div',{class:'online-status',text:'For testing, run npm run battle-server and use http://localhost:8787. For internet play, both players use the same publicly reachable relay URL.'}));
+    shell.appendChild(setup);
+    var teamCard=el('section',{class:'online-card'});teamCard.appendChild(el('h4',{text:'Your save-file party'}));
+    if(snapshot.length) appendOnlineTeam(teamCard,snapshot);
+    else teamCard.appendChild(el('div',{class:'route-empty',text:'Load a save file first. Your current party becomes your battle team.'}));
+    shell.appendChild(teamCard);root.appendChild(shell);return;
+  }
+  var room=ONLINE_STATE.room, me=room.players[ONLINE_STATE.playerIndex], foe=room.players[ONLINE_STATE.playerIndex===0?1:0];
+  var top=el('section',{class:'online-card'});
+  top.appendChild(el('div',{class:'dex-muted',text:'Room code'}));top.appendChild(el('div',{class:'online-code',text:room.code}));
+  top.appendChild(el('div',{id:'online-live-status',class:'online-status',text:room.phase==='lobby'?(foe?'Opponent connected. Ready up when your team is set.':'Waiting for opponent to join…'):room.phase==='finished'?'Battle finished.':'Turn '+room.turn}));
+  var topActions=el('div',{class:'online-actions',style:'margin-top:10px;'});
+  if(room.phase==='lobby'){
+    var ready=el('button',{class:me&&me.ready?'':'primary',text:me&&me.ready?'Not Ready':'Ready'});
+    ready.addEventListener('click',function(){battleAction('ready',{ready:!(me&&me.ready)});});topActions.appendChild(ready);
+  }
+  var leave=el('button',{class:'ghost',text:'Leave Room'});leave.addEventListener('click',leaveOnlineBattle);topActions.appendChild(leave);top.appendChild(topActions);root.appendChild(top);
+  if(room.phase==='lobby'){
+    var lobby=el('div',{class:'online-shell',style:'margin-top:12px;'});
+    var a=el('section',{class:'online-card'});a.appendChild(el('h4',{text:(me&&me.name)||'You'}));appendOnlineTeam(a,(me&&me.team)||[]);lobby.appendChild(a);
+    var b=el('section',{class:'online-card'});b.appendChild(el('h4',{text:(foe&&foe.name)||'Opponent'}));
+    if(foe) appendOnlineTeam(b,foe.team); else b.appendChild(el('div',{class:'route-empty',text:'Share room '+room.code+' with your opponent.'}));
+    lobby.appendChild(b);root.appendChild(lobby);return;
+  }
+  if(!me||!foe)return;
+  var field=el('div',{class:'online-battlefield',style:'margin-top:12px;'});
+  function side(player,label){
+    var mon=player.team[player.active], card=el('section',{class:'online-side'});applyTypeStyle(card,mon.species);
+    var head=el('div',{class:'online-side-head'});head.appendChild(makeIconEl({species:mon.species,isShiny:false},'dex-hero-icon'));
+    var info=el('div',{style:'flex:1;'});info.appendChild(el('strong',{text:label+' · '+mon.name+' · Lv'+mon.level}));
+    info.appendChild(el('div',{class:'dex-muted',text:'HP '+mon.hp+' / '+mon.maxHP}));
+    var hp=el('div',{class:'online-hp'}),fill=el('span');fill.style.width=Math.max(0,Math.min(100,100*mon.hp/mon.maxHP))+'%';hp.appendChild(fill);info.appendChild(hp);head.appendChild(info);card.appendChild(head);return card;
+  }
+  field.appendChild(side(foe,foe.name));field.appendChild(side(me,me.name));
+  if(room.phase==='battle'){
+    var active=me.team[me.active], controls=el('section',{class:'online-card'});controls.appendChild(el('h4',{text:'Choose your action'}));
+    var moves=el('div',{class:'online-moves'});
+    (active.moves||[]).forEach(function(move,index){
+      var btn=el('button',{class:'online-move',text:move.name+' · '+move.type+(move.power?' · '+move.power:'')});
+      btn.addEventListener('click',function(){battleAction('move',{moveIndex:index});});moves.appendChild(btn);
+    });controls.appendChild(moves);
+    var roster=el('div',{class:'online-roster'});
+    me.team.forEach(function(mon,index){
+      var btn=el('button',{text:mon.name+(mon.hp<=0?' (fainted)':'')});btn.disabled=index===me.active||mon.hp<=0;
+      btn.addEventListener('click',function(){battleAction('switch',{slot:index});});roster.appendChild(btn);
+    });controls.appendChild(roster);field.appendChild(controls);
+  }
+  var log=el('div',{class:'online-log',text:(room.log||[]).join('\n')||'Battle log is empty.'});field.appendChild(log);root.appendChild(field);
+}
+
 function renderCurrentReferenceTab(){
   if(currentMainTab==='routes') renderRouteEncounters();
   else if(currentMainTab==='dex') renderPokedex();
   else if(currentMainTab==='trainers') renderTrainerTeams();
   else if(currentMainTab==='competitive') renderCompetitiveSets();
+  else if(currentMainTab==='online') renderOnlineBattle();
   else if(currentMainTab==='moves') renderMoves();
   else if(currentMainTab==='abilities') renderAbilities();
   else if(currentMainTab==='items') renderItems();
@@ -4157,17 +4378,19 @@ function setMainTab(tabName){
   var dex = tabName === 'dex';
   var trainers = tabName === 'trainers';
   var competitive = tabName === 'competitive';
+  var online = tabName === 'online';
   var moves = tabName === 'moves';
   var abilities = tabName === 'abilities';
   var items = tabName === 'items';
   var bag = tabName === 'bag';
   var changes = tabName === 'changes';
-  var save = !routes && !dex && !trainers && !competitive && !moves && !abilities && !items && !bag && !changes;
+  var save = !routes && !dex && !trainers && !competitive && !online && !moves && !abilities && !items && !bag && !changes;
   document.getElementById('save-tab-panel').style.display = save ? 'block' : 'none';
   document.getElementById('routes-tab-panel').style.display = routes ? 'block' : 'none';
   document.getElementById('dex-tab-panel').style.display = dex ? 'block' : 'none';
   document.getElementById('trainers-tab-panel').style.display = trainers ? 'block' : 'none';
   document.getElementById('competitive-tab-panel').style.display = competitive ? 'block' : 'none';
+  document.getElementById('online-tab-panel').style.display = online ? 'block' : 'none';
   document.getElementById('moves-tab-panel').style.display = moves ? 'block' : 'none';
   document.getElementById('abilities-tab-panel').style.display = abilities ? 'block' : 'none';
   document.getElementById('items-tab-panel').style.display = items ? 'block' : 'none';
@@ -4183,6 +4406,8 @@ function setMainTab(tabName){
   document.getElementById('tab-trainers').setAttribute('aria-selected', String(trainers));
   document.getElementById('tab-competitive').classList.toggle('active', competitive);
   document.getElementById('tab-competitive').setAttribute('aria-selected', String(competitive));
+  document.getElementById('tab-online').classList.toggle('active', online);
+  document.getElementById('tab-online').setAttribute('aria-selected', String(online));
   document.getElementById('tab-moves').classList.toggle('active', moves);
   document.getElementById('tab-moves').setAttribute('aria-selected', String(moves));
   document.getElementById('tab-abilities').classList.toggle('active', abilities);
@@ -4323,6 +4548,7 @@ document.getElementById('tab-routes').addEventListener('click', function(){ setM
 document.getElementById('tab-dex').addEventListener('click', function(){ setMainTab('dex'); });
 document.getElementById('tab-trainers').addEventListener('click', function(){ setMainTab('trainers'); });
 document.getElementById('tab-competitive').addEventListener('click', function(){ setMainTab('competitive'); });
+document.getElementById('tab-online').addEventListener('click', function(){ setMainTab('online'); });
 document.getElementById('tab-moves').addEventListener('click', function(){ setMainTab('moves'); });
 document.getElementById('tab-abilities').addEventListener('click', function(){ setMainTab('abilities'); });
 document.getElementById('tab-items').addEventListener('click', function(){ setMainTab('items'); });
