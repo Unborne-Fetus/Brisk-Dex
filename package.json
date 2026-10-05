@@ -20,7 +20,8 @@
     "ios:prepare": "node tools/prepare_android.mjs",
     "ios:add": "npm run ios:prepare && npx cap add ios",
     "ios:sync": "npm run ios:prepare && npx cap sync ios",
-    "ios:build": "npm run ios:prepare && npx cap sync ios"
+    "ios:build": "npm run ios:prepare && npx cap sync ios",
+    "battle-server": "node battle-server.js"
   },
   "devDependencies": {
     "electron": "^31.3.0",
@@ -42,7 +43,8 @@
       "brisk-dex-items/**/*",
       "brisk-dex-trainer-pics/**/*",
       "brisk-dex-sprites/**/*",
-      "brisk-dex-cries/**/*"
+      "brisk-dex-cries/**/*",
+      "battle-server.js"
     ],
     "directories": {
       "output": "dist"
