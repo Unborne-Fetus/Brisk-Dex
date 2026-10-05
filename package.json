@@ -34,7 +34,9 @@
       "brisk-dex-data.json",
       "brisk-dex-trainer-teams.json",
       "brisk-dex-icons/**/*",
-      "brisk-dex-trainers/**/*"
+      "brisk-dex-trainers/**/*",
+      "brisk-dex-items/**/*",
+      "brisk-dex-trainer-pics/**/*"
     ],
     "directories": {
       "output": "dist"
