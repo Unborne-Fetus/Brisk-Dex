@@ -143,9 +143,7 @@ input[type=file]{ display:none; }
   border:1px solid #55a887;
   flex-shrink:0;
 }
-.trainer-badge::after{content:"";position:absolute;width:26px;height:52px;left:50%;bottom:0;transform:translateX(-50%);background-repeat:no-repeat;background-size:900% 100%;background-position:0 0;image-rendering:pixelated;}
-.trainer-badge.gender-male::after{background-image:url("./brisk-dex-trainers/male.png");}
-.trainer-badge.gender-female::after{background-image:url("./brisk-dex-trainers/female.png");}
+.trainer-badge::after{content:"";position:absolute;width:26px;height:52px;left:50%;bottom:0;transform:translateX(-50%);background-image:var(--trainer-sprite);background-repeat:no-repeat;background-size:900% 100%;background-position:0 0;image-rendering:pixelated;}
 .trainer-id h2{ margin:0 0 4px; font-size:19px; }
 .trainer-id span{ color:var(--muted); font-size:12.5px; }
 .trainer-stats{
@@ -997,9 +995,12 @@ function parseTrainer(v0, s0){
   var hours = u16(v0, 0x000E);
   var minutes = u8(v0, 0x0010);
   var seconds = u8(v0, 0x0011);
+  var outfitId = u16(v0, 0x0090);
+  if (outfitId !== 1 && outfitId !== 2) outfitId = 1;
   return {
     name: name || "TRAINER",
     gender: gender === 1 ? "Female" : "Male",
+    outfitId: outfitId,
     publicId: publicId,
     secretId: secretId,
     hours: hours, minutes: minutes, seconds: seconds
@@ -1954,12 +1955,20 @@ function formatPlaytime(t){
   return h + ':' + m + ':' + s;
 }
 
+function trainerSpritePath(trainer){
+  var gender = trainer.gender === 'Female' ? 'female' : 'male';
+  var outfitId = trainer.outfitId === 2 ? 2 : 1;
+  return './brisk-dex-trainers/outfit-' + outfitId + '-' + gender + '.png';
+}
+
 function renderTrainerCard(save){
   var c = document.getElementById('trainer-card');
   c.innerHTML = '';
   var t = save.trainer;
+  var badge = el('div', {class:'trainer-badge'});
+  badge.style.setProperty('--trainer-sprite', 'url("' + trainerSpritePath(t) + '")');
   var idBlock = el('div', {class:'trainer-id'}, [
-    el('div', {class:'trainer-badge ' + (t.gender === 'Female' ? 'gender-female' : 'gender-male')}),
+    badge,
     el('div', {}, [
       el('h2', {text: t.name}),
       el('span', {text: t.gender + ' Trainer · ID No. ' + String(t.publicId).padStart(5,'0')})
