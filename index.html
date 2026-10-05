@@ -1320,6 +1320,7 @@ var selectedTrainerConstant = null;
 var ITEM_DETAILS = {};
 var selectedItemId = null;
 var CHANGE_DATA = [];
+var currentMainTab = 'save';
 var GAME_SHINY_ODDS = 8;
 
 function rebuildNameData(){
@@ -1382,12 +1383,8 @@ async function loadBundledGameData(){
     SPECIES_SHINY_ICONS = Object.assign({}, SPECIES_SHINY_ICONS, icons && icons.shinyIcons || {});
     refreshBoxLevels();
     updateDataStatus();
-    renderRouteEncounters();
-    renderPokedex();
-    renderTrainerTeams();
-    renderItems();
-    renderChanges();
     if (IS_ANDROID) document.body.classList.add('android-lite');
+    renderCurrentReferenceTab();
   }catch(err){
     showError('Could not load Brisk Emerald data bundled with Brisk Dex: ' + err.message);
   }
@@ -2910,7 +2907,16 @@ function renderChanges(){
   root.appendChild(fragment);
 }
 
+function renderCurrentReferenceTab(){
+  if(currentMainTab==='routes') renderRouteEncounters();
+  else if(currentMainTab==='dex') renderPokedex();
+  else if(currentMainTab==='trainers') renderTrainerTeams();
+  else if(currentMainTab==='items') renderItems();
+  else if(currentMainTab==='changes') renderChanges();
+}
+
 function setMainTab(tabName){
+  currentMainTab = tabName;
   var routes = tabName === 'routes';
   var dex = tabName === 'dex';
   var trainers = tabName === 'trainers';
@@ -2935,11 +2941,7 @@ function setMainTab(tabName){
   document.getElementById('tab-items').setAttribute('aria-selected', String(items));
   document.getElementById('tab-changes').classList.toggle('active', changes);
   document.getElementById('tab-changes').setAttribute('aria-selected', String(changes));
-  if (routes) renderRouteEncounters();
-  if (dex) renderPokedex();
-  if (trainers) renderTrainerTeams();
-  if (items) renderItems();
-  if (changes) renderChanges();
+  renderCurrentReferenceTab();
 }
 
 /* ============================================================
@@ -3004,11 +3006,7 @@ function handleDataFile(file){
       refreshBoxLevels();
       saveNameDataToStorage();
       updateDataStatus();
-      renderRouteEncounters();
-      renderPokedex();
-      renderTrainerTeams();
-      renderItems();
-      renderChanges();
+      renderCurrentReferenceTab();
       if (currentSave) renderAll();
     }catch(err){
       showError('Could not parse that JSON file: ' + err.message);
