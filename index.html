@@ -554,6 +554,28 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
 .dex-national-number{font-size:22px;font-weight:700;letter-spacing:-.02em;color:var(--muted);}
 @media(max-width:520px){.dex-national-number{font-size:18px;}}
 
+
+/* ---------- player guide ---------- */
+.guide-hero{background:linear-gradient(110deg,#142a27,#111 72%);border:1px solid #263a37;border-left:4px solid var(--leaf-bright);padding:18px 20px;margin-bottom:16px;}
+.guide-hero h2{margin:0 0 6px;font-size:23px;}
+.guide-hero p{margin:0;color:var(--muted);font-size:13px;max-width:850px;}
+.guide-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+.guide-card{background:var(--panel);border:1px solid var(--line);min-width:0;}
+.guide-card>summary{cursor:pointer;list-style:none;padding:14px 16px;font-weight:700;color:var(--leaf-bright);display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.guide-card>summary::-webkit-details-marker{display:none;}
+.guide-card>summary::after{content:"+";font-size:20px;color:var(--muted);font-weight:400;}
+.guide-card[open]>summary::after{content:"−";}
+.guide-card[open]>summary{border-bottom:1px solid var(--line-soft);}
+.guide-body{padding:14px 16px 16px;font-size:13px;color:var(--text);}
+.guide-body p{margin:0 0 10px;}
+.guide-body p:last-child{margin-bottom:0;}
+.guide-body ul,.guide-body ol{margin:7px 0 10px;padding-left:20px;}
+.guide-body li{margin:5px 0;}
+.guide-tip{margin-top:10px;padding:9px 11px;background:#11291a;border:1px solid #366d49;color:#c9edd2;}
+.guide-warning{margin-top:10px;padding:9px 11px;background:#2a2111;border:1px solid #665025;color:#f1dda8;}
+.guide-faq strong{color:var(--leaf-bright);}
+@media(max-width:720px){.guide-grid{grid-template-columns:1fr;}}
+
 /* ---------- unlimited item bag ---------- */
 .bag-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
 .bag-tools input{min-height:38px;color:var(--text);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:8px 11px;font:inherit;}
@@ -608,6 +630,7 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
     <button id="tab-abilities" role="tab" aria-selected="false" aria-controls="abilities-tab-panel">Abilities</button>
     <button id="tab-items" role="tab" aria-selected="false" aria-controls="items-tab-panel">Items</button>
     <button id="tab-bag" role="tab" aria-selected="false" aria-controls="bag-tab-panel">Bag</button>
+    <button id="tab-guide" role="tab" aria-selected="false" aria-controls="guide-tab-panel">Guide</button>
     <button id="tab-changes" role="tab" aria-selected="false" aria-controls="changes-tab-panel">Changes</button>
   </nav>
 
@@ -821,6 +844,173 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
       <button class="primary" id="btn-bag-add">Add to Bag</button>
     </div>
     <div class="bag-list" id="bag-list"></div>
+  </section>
+
+
+  <section id="guide-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-guide" style="display:none;">
+    <div class="guide-hero">
+      <h2>Brisk Dex Player Guide</h2>
+      <p>Everything you need to use Brisk Dex with Pok&eacute;mon Brisk Emerald. Open a section below whenever you need help &mdash; no developer knowledge required.</p>
+    </div>
+    <div class="guide-grid">
+      <details class="guide-card" open>
+        <summary>Getting Started</summary>
+        <div class="guide-body">
+          <ol>
+            <li>Open Brisk Dex and choose <strong>Load .sav / .srm file</strong>.</li>
+            <li>Select your Pok&eacute;mon Brisk Emerald save file.</li>
+            <li>Brisk Dex reads the save locally and fills in your trainer, party, boxes, and Pok&eacute;dex information.</li>
+            <li>Use the tabs across the top to browse encounters, Pok&eacute;mon, trainers, moves, abilities, items, and other features.</li>
+          </ol>
+          <div class="guide-tip">Brisk Dex uses Brisk Emerald data rather than assuming the original Emerald or standard National Pok&eacute;dex data.</div>
+        </div>
+      </details>
+
+      <details class="guide-card">
+        <summary>Loading &amp; Saving</summary>
+        <div class="guide-body">
+          <p>Loading a save does not automatically overwrite the file on your device. Changes made through Brisk Dex are staged until you use the save changes control.</p>
+          <ul>
+            <li><strong>.sav</strong> and <strong>.srm</strong> are supported save-file extensions.</li>
+            <li>The app checks the save structure before displaying editable data.</li>
+            <li>If you are moving Pok&eacute;mon or editing save-backed information, save your changes before closing Brisk Dex.</li>
+          </ul>
+          <div class="guide-warning">Keep a backup of an important save before making large edits.</div>
+        </div>
+      </details>
+
+      <details class="guide-card">
+        <summary>Pok&eacute;mon &amp; PC Boxes</summary>
+        <div class="guide-body">
+          <p>The first tab displays your party and Brisk Emerald PC boxes. Select a Pok&eacute;mon to view its information and available editing options.</p>
+          <ul>
+            <li>Pok&eacute;mon can be dragged between supported storage tiles.</li>
+            <li>Brisk Emerald saves can use the expanded 20-box layout.</li>
+            <li>Shiny Pok&eacute;mon are visually marked.</li>
+            <li>Species, moves, forms, abilities, and types are interpreted using Brisk Emerald's data.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="guide-card">
+        <summary>External Storage</summary>
+        <div class="guide-body">
+          <p>External Storage is Brisk Dex storage that exists outside a single game save. It is useful for keeping Pok&eacute;mon available between saves.</p>
+          <ul>
+            <li>Drag a party or boxed Pok&eacute;mon into External Storage to store it.</li>
+            <li>Drag a stored Pok&eacute;mon onto a compatible empty box slot to withdraw it.</li>
+            <li>Use search and sorting to find stored Pok&eacute;mon quickly.</li>
+            <li>Export an archive if you want a separate copy of your Brisk Dex storage.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="guide-card">
+        <summary>Brisk Pok&eacute;dex</summary>
+        <div class="guide-body">
+          <p>The Pok&eacute;dex combines Brisk Emerald species information with progress read from your save.</p>
+          <ul>
+            <li><strong>None:</strong> no Pok&eacute;dex progress is currently recorded.</li>
+            <li><strong>Seen:</strong> the Pok&eacute;mon has been seen.</li>
+            <li><strong>Caught:</strong> the Pok&eacute;mon has been obtained.</li>
+            <li><strong>Shiny:</strong> a shiny copy is present or the status has been marked manually.</li>
+            <li>Entries include Brisk stats, abilities, evolutions/forms, movepools, locations, sprites, and cries when available.</li>
+          </ul>
+          <p>You can manually change a displayed Pok&eacute;dex status in Brisk Dex after the save has been read.</p>
+        </div>
+      </details>
+
+      <details class="guide-card">
+        <summary>Route Encounters &amp; Locations</summary>
+        <div class="guide-body">
+          <p>Route Encounters shows where Pok&eacute;mon can be found in the current Brisk Emerald data.</p>
+          <ul>
+            <li>Filter by walking, surfing, fishing rods, Rock Smash, static encounters, or gifts.</li>
+            <li>Search by location, Pok&eacute;mon, or type.</li>
+            <li>Related floors and subareas may be grouped under a cleaner player-facing location name.</li>
+            <li>Encounter information can differ greatly from normal Pok&eacute;mon Emerald.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="guide-card">
+        <summary>Trainer Teams</summary>
+        <div class="guide-body">
+          <p>Trainer Teams lets you look up opponents before or after battling them in Brisk Emerald.</p>
+          <ul>
+            <li>Search by trainer, class, Pok&eacute;mon, move, ability, item, or location.</li>
+            <li>Each Pok&eacute;mon shows the information specific to that trainer's actual team member.</li>
+            <li>Bosses and special trainers can differ substantially from vanilla Emerald.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="guide-card">
+        <summary>Moves, Abilities &amp; Items</summary>
+        <div class="guide-body">
+          <p>These tabs are reference dexes built from Brisk Emerald itself.</p>
+          <ul>
+            <li><strong>Moves:</strong> descriptions, type, category, battle data, and Pok&eacute;mon that can learn them.</li>
+            <li><strong>Abilities:</strong> descriptions and Pok&eacute;mon that can have each ability.</li>
+            <li><strong>Items:</strong> descriptions, locations, and the <strong>#ID</strong> used by Brisk Emerald's debug item selection.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="guide-card">
+        <summary>Bag</summary>
+        <div class="guide-body">
+          <p>The Brisk Dex Bag is separate from the limited pockets inside an Emerald save. It acts as effectively unlimited item storage managed by Brisk Dex.</p>
+          <ul>
+            <li>Search stored items by name.</li>
+            <li>Add an item by name or its displayed #ID.</li>
+            <li>Adjust quantities from the Bag tab.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="guide-card">
+        <summary>Competitive Sets</summary>
+        <div class="guide-body">
+          <p>Competitive Sets provides suggested builds using each Pok&eacute;mon's current Brisk stats, typing, abilities, and legal moves.</p>
+          <p>These are starting points rather than a guarantee that a set is the single best option for every battle. Brisk balance changes can make standard-game sets outdated.</p>
+        </div>
+      </details>
+
+      <details class="guide-card">
+        <summary>Online Battles</summary>
+        <div class="guide-body">
+          <p>Online Battle lets two Brisk Dex players host or join a private room.</p>
+          <ol>
+            <li>Choose up to six Pok&eacute;mon from your party, PC boxes, or External Storage.</li>
+            <li>One player selects <strong>Host Battle</strong> and shares the six-character room code.</li>
+            <li>The other player enters the same relay and room code, then selects <strong>Join Battle</strong>.</li>
+            <li>Both players ready up and play the battle from Brisk Dex.</li>
+          </ol>
+          <p>The available battle mechanics are those currently implemented by the Brisk Dex simulator, which may not yet reproduce every Brisk Emerald mechanic exactly.</p>
+        </div>
+      </details>
+
+      <details class="guide-card">
+        <summary>Wonder Trade</summary>
+        <div class="guide-body">
+          <p>Wonder Trade exchanges an eligible Pok&eacute;mon for another eligible Pok&eacute;mon. Special species that are excluded by Brisk's Wonder Trade rules cannot be submitted.</p>
+          <div class="guide-warning">Treat a Wonder Trade as a real trade: do not send a Pok&eacute;mon you intend to keep unless you already have another copy or backup.</div>
+        </div>
+      </details>
+
+      <details class="guide-card">
+        <summary>FAQ &amp; Troubleshooting</summary>
+        <div class="guide-body guide-faq">
+          <p><strong>Why does Brisk Dex disagree with a normal Pok&eacute;dex website?</strong><br>Brisk Emerald changes Pok&eacute;mon, trainers, encounters, moves, abilities, items, and other mechanics, so Brisk Dex prioritizes Brisk Emerald's own extracted data.</p>
+          <p><strong>Why is my save not loading?</strong><br>Make sure you selected the actual emulator/game save file rather than a save state, ROM, ZIP, or unrelated file.</p>
+          <p><strong>Why did an edit not appear in game?</strong><br>Make sure you saved the changes from Brisk Dex and then loaded the resulting save in your emulator or game.</p>
+          <p><strong>Why is a sprite, cry, description, or location missing?</strong><br>The current Brisk data bundle may not contain that asset or field yet. Updating Brisk Dex and its Brisk Emerald reference data may resolve it.</p>
+          <p><strong>Does External Storage belong to my Emerald save?</strong><br>No. It is Brisk Dex storage kept separately from an individual game save.</p>
+          <p><strong>Can I use boxed or externally stored Pok&eacute;mon online?</strong><br>Yes. The Online Battle team picker can use eligible Pok&eacute;mon from the party, PC boxes, or External Storage.</p>
+        </div>
+      </details>
+    </div>
   </section>
 
   <section id="changes-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-changes" style="display:none;">
@@ -4650,8 +4840,9 @@ function setMainTab(tabName){
   var abilities = tabName === 'abilities';
   var items = tabName === 'items';
   var bag = tabName === 'bag';
+  var guide = tabName === 'guide';
   var changes = tabName === 'changes';
-  var save = !routes && !dex && !trainers && !competitive && !online && !moves && !abilities && !items && !bag && !changes;
+  var save = !routes && !dex && !trainers && !competitive && !online && !moves && !abilities && !items && !bag && !guide && !changes;
   document.getElementById('save-tab-panel').style.display = save ? 'block' : 'none';
   document.getElementById('routes-tab-panel').style.display = routes ? 'block' : 'none';
   document.getElementById('dex-tab-panel').style.display = dex ? 'block' : 'none';
@@ -4662,6 +4853,7 @@ function setMainTab(tabName){
   document.getElementById('abilities-tab-panel').style.display = abilities ? 'block' : 'none';
   document.getElementById('items-tab-panel').style.display = items ? 'block' : 'none';
   document.getElementById('bag-tab-panel').style.display = bag ? 'block' : 'none';
+  document.getElementById('guide-tab-panel').style.display = guide ? 'block' : 'none';
   document.getElementById('changes-tab-panel').style.display = changes ? 'block' : 'none';
   document.getElementById('tab-save').classList.toggle('active', save);
   document.getElementById('tab-save').setAttribute('aria-selected', String(save));
@@ -4683,6 +4875,8 @@ function setMainTab(tabName){
   document.getElementById('tab-items').setAttribute('aria-selected', String(items));
   document.getElementById('tab-bag').classList.toggle('active', bag);
   document.getElementById('tab-bag').setAttribute('aria-selected', String(bag));
+  document.getElementById('tab-guide').classList.toggle('active', guide);
+  document.getElementById('tab-guide').setAttribute('aria-selected', String(guide));
   document.getElementById('tab-changes').classList.toggle('active', changes);
   document.getElementById('tab-changes').setAttribute('aria-selected', String(changes));
   renderCurrentReferenceTab();
@@ -4820,6 +5014,7 @@ document.getElementById('tab-moves').addEventListener('click', function(){ setMa
 document.getElementById('tab-abilities').addEventListener('click', function(){ setMainTab('abilities'); });
 document.getElementById('tab-items').addEventListener('click', function(){ setMainTab('items'); });
 document.getElementById('tab-bag').addEventListener('click', function(){ setMainTab('bag'); });
+document.getElementById('tab-guide').addEventListener('click', function(){ setMainTab('guide'); });
 document.getElementById('tab-changes').addEventListener('click', function(){ setMainTab('changes'); });
 document.getElementById('move-search').addEventListener('input', renderMovesDebounced);
 document.getElementById('move-type').addEventListener('change', renderMoves);
