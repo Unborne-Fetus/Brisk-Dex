@@ -1748,7 +1748,12 @@ def main():
         for outfit_id, gender, source_rel in outfit_sprites:
             source = os.path.join(people_dir, source_rel)
             if os.path.isfile(source):
-                shutil.copyfile(source, os.path.join(trainers_out, f"outfit-{outfit_id}-{gender}.png"))
+                # Walking sheets contain nine 16x32 frames. Export only the
+                # south-facing standing frame and clear palette index zero.
+                with Image.open(source) as sheet:
+                    standing = source_rgba(sheet).crop((0, 0, 16, 32))
+                    standing = standing.crop(standing.getbbox())
+                    standing.save(os.path.join(trainers_out, f"outfit-{outfit_id}-{gender}.png"))
 
     print()
     print("Done. Desktop builds load brisk-dex-data.json and brisk-dex-icons automatically.")
