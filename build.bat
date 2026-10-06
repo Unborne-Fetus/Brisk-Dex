@@ -1,7 +1,7 @@
 @echo off
 cd /d "%~dp0"
-echo Brisk Dex - Windows, Android and iOS
-echo Builds on GitHub and downloads EXE, APK and unsigned IPA into dist.
+echo Brisk Dex - Windows and Android
+echo Builds the Windows installer and Android APK locally into dist.
 if not exist "%~dp0tools\build_all.ps1" (
     echo Missing tools\build_all.ps1. Download or pull the complete repository.
     pause
