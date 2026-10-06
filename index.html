@@ -4784,6 +4784,10 @@ function battlePartySnapshot(){
 function battleRelayUrl(){
   return String(ONLINE_STATE.relayUrl||'').replace(/\/+$/,'');
 }
+function battleConnectionStatus(message){
+  var node=document.getElementById('online-connection-status');
+  if(node)node.textContent=message;
+}
 async function battleRequest(path,options){
   var url=battleRelayUrl()+path;
   var parsed=new URL(url);
@@ -4791,7 +4795,12 @@ async function battleRequest(path,options){
     if(['localhost','127.0.0.1','[::1]'].includes(parsed.hostname))throw new Error('Enter the PC network relay address shown by the host; localhost refers to this phone.');
     return window.briskMobileAPI.battleRequest(url,options||{});
   }
-  var response=await fetch(url,Object.assign({headers:{'Content-Type':'application/json'}},options||{}));
+  var controller=new AbortController();
+  var timeout=setTimeout(function(){controller.abort();},10000);
+  var response;
+  try{response=await fetch(url,Object.assign({headers:{'Content-Type':'application/json'}},options||{},{signal:controller.signal}));}
+  catch(err){throw new Error(err.name==='AbortError'?'Relay did not respond within 10 seconds. Check the address and firewall.':err.message);}
+  finally{clearTimeout(timeout);}
   var data=await response.json().catch(function(){return {};});
   if(!response.ok) throw new Error(data.error||('Battle server returned '+response.status));
   return data;
@@ -4821,10 +4830,13 @@ async function hostOnlineBattle(){
   ONLINE_STATE.relayUrl=(relay&&relay.value.trim())||ONLINE_STATE.relayUrl;
   localStorage.setItem('briskdex_battle_relay',ONLINE_STATE.relayUrl);
   ONLINE_STATE.busy=true;
+  battleConnectionStatus('Connecting to battle relay…');
   try{
     var hostUrl=new URL(battleRelayUrl());
     if(window.briskDexAPI&&window.briskDexAPI.startBattleRelay&&['localhost','127.0.0.1','[::1]'].includes(hostUrl.hostname)){
-      var started=await window.briskDexAPI.startBattleRelay();
+      var existing=false;
+      try{var health=await battleRequest('/health',{method:'GET'});existing=health.ok===true&&health.engine==='advanced-v18';}catch(err){}
+      var started=existing?{ok:true,url:battleRelayUrl(),lanUrls:[]}:await window.briskDexAPI.startBattleRelay();
       if(!started.ok)throw new Error('Local relay could not start: '+started.error);
       ONLINE_STATE.relayUrl=started.url;ONLINE_STATE.lanUrls=started.lanUrls;
       localStorage.setItem('briskdex_battle_relay',started.url);
@@ -4835,7 +4847,7 @@ async function hostOnlineBattle(){
     })});
     ONLINE_STATE.roomCode=data.code;ONLINE_STATE.playerId=data.playerId;ONLINE_STATE.playerIndex=data.playerIndex;ONLINE_STATE.room=data.room;persistOnlineSession();
     startBattlePolling();renderOnlineBattle();
-  }catch(err){showError('Could not host battle: '+err.message);}
+  }catch(err){battleConnectionStatus('Could not host battle: '+err.message);showError('Could not host battle: '+err.message);}
   finally{ONLINE_STATE.busy=false;}
 }
 async function joinOnlineBattle(){
@@ -4854,7 +4866,7 @@ async function joinOnlineBattle(){
     })});
     ONLINE_STATE.roomCode=data.code;ONLINE_STATE.playerId=data.playerId;ONLINE_STATE.playerIndex=data.playerIndex;ONLINE_STATE.room=data.room;persistOnlineSession();
     startBattlePolling();renderOnlineBattle();
-  }catch(err){showError('Could not join battle: '+err.message);}
+  }catch(err){battleConnectionStatus('Could not join battle: '+err.message);showError('Could not join battle: '+err.message);}
   finally{ONLINE_STATE.busy=false;}
 }
 async function battleAction(type,payload){
@@ -4902,6 +4914,7 @@ function renderOnlineBattle(){
     var host=el('button',{class:'primary',text:'Host Battle'});host.addEventListener('click',hostOnlineBattle);
     var join=el('button',{text:'Join Battle'});join.addEventListener('click',joinOnlineBattle);
     actions.appendChild(host);actions.appendChild(join);form.appendChild(actions);setup.appendChild(form);
+    setup.appendChild(el('div',{id:'online-connection-status',class:'online-status',role:'status','aria-live':'polite',text:'Ready to connect.'}));
     setup.appendChild(el('div',{class:'online-status',text:'On Windows, Host Battle starts a local relay automatically. On Android, enter the PC network address shown by the host. Both devices must use the same Wi-Fi/LAN; allow Brisk Dex through Windows Firewall on private networks. For internet play, use a publicly reachable relay.'}));
     shell.appendChild(setup);
     var teamCard=el('section',{class:'online-card'});teamCard.appendChild(el('h4',{text:'Choose battle team · '+snapshot.length+'/6'}));
