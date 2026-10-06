@@ -1407,6 +1407,22 @@ const server=http.createServer(async (req,res)=>{
   const url=new URL(req.url,'http://localhost');
   try{
     if(req.method==='GET'&&url.pathname==='/health') return json(res,200,{ok:true,rooms:rooms.size,engine:'advanced-v18'});
+    if(req.method==='GET'&&url.pathname==='/rooms'){
+      const openRooms=[];
+      for(const room of rooms.values()){
+        if(room.phase!=='lobby'||room.players.length>=2) continue;
+        openRooms.push({
+          code:room.code,
+          host:(room.players[0]&&room.players[0].name)||'Host',
+          players:room.players.length,
+          teamSize:(room.players[0]&&room.players[0].team&&room.players[0].team.length)||0,
+          createdAt:room.createdAt,
+          updatedAt:room.updatedAt
+        });
+      }
+      openRooms.sort((a,b)=>b.updatedAt-a.updatedAt);
+      return json(res,200,{ok:true,rooms:openRooms});
+    }
     if(req.method==='POST'&&url.pathname==='/rooms'){
       const body=await readBody(req), code=roomCode(), playerId=id(), team=cleanTeam(body.team);
       if(!team.length) return json(res,400,{error:'Load a save with at least one party Pokémon first.'});
