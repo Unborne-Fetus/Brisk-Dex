@@ -10,6 +10,10 @@ const plugin = `package com.briskemerald.briskdex;
 import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
+import android.net.ConnectivityManager;
+import android.net.LinkAddress;
+import android.net.LinkProperties;
+import android.net.Network;
 import android.provider.OpenableColumns;
 import android.util.Base64;
 import android.database.Cursor;
@@ -26,6 +30,17 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 @CapacitorPlugin(name = "SaveFilePicker")
 public class SaveFilePickerPlugin extends Plugin {
@@ -63,6 +78,68 @@ public class SaveFilePickerPlugin extends Plugin {
             }
             JSObject result = new JSObject(); result.put("ok", true); call.resolve(result);
         } catch (Exception error) {call.reject("Could not save file: " + error.getMessage());}
+    }
+
+    @PluginMethod
+    public void discoverBattleRelay(PluginCall call) {
+        final int port = call.getInt("port", 8787);
+        final int timeoutMs = call.getInt("timeoutMs", 2200);
+        CompletableFuture.runAsync(() -> {
+            ExecutorService pool = Executors.newFixedThreadPool(32);
+            AtomicReference<String> found = new AtomicReference<>(null);
+            try {
+                ConnectivityManager cm = (ConnectivityManager) getContext().getSystemService(android.content.Context.CONNECTIVITY_SERVICE);
+                Network network = cm.getActiveNetwork();
+                LinkProperties props = network == null ? null : cm.getLinkProperties(network);
+                List<String> prefixes = new ArrayList<>();
+                if (props != null) {
+                    for (LinkAddress link : props.getLinkAddresses()) {
+                        InetAddress address = link.getAddress();
+                        if (!(address instanceof Inet4Address) || address.isLoopbackAddress()) continue;
+                        byte[] b = address.getAddress();
+                        prefixes.add((b[0] & 255) + "." + (b[1] & 255) + "." + (b[2] & 255) + ".");
+                    }
+                }
+                long deadline = System.currentTimeMillis() + Math.max(500, timeoutMs);
+                List<CompletableFuture<Void>> jobs = new ArrayList<>();
+                for (String prefix : prefixes) {
+                    for (int host = 1; host <= 254; host++) {
+                        final String candidate = "http://" + prefix + host + ":" + port;
+                        jobs.add(CompletableFuture.runAsync(() -> {
+                            if (found.get() != null || System.currentTimeMillis() >= deadline) return;
+                            HttpURLConnection conn = null;
+                            try {
+                                conn = (HttpURLConnection) new URL(candidate + "/").openConnection();
+                                conn.setConnectTimeout(180);
+                                conn.setReadTimeout(250);
+                                conn.setRequestMethod("GET");
+                                int status = conn.getResponseCode();
+                                if (status >= 200 && status < 300) {
+                                    String server = conn.getHeaderField("Content-Type");
+                                    if (server != null && server.toLowerCase().contains("application/json")) found.compareAndSet(null, candidate);
+                                }
+                            } catch (Exception ignored) {
+                            } finally {
+                                if (conn != null) conn.disconnect();
+                            }
+                        }, pool));
+                    }
+                }
+                for (CompletableFuture<Void> job : jobs) {
+                    long left = deadline - System.currentTimeMillis();
+                    if (left <= 0 || found.get() != null) break;
+                    try { job.get(left, TimeUnit.MILLISECONDS); } catch (Exception ignored) {}
+                }
+                JSObject result = new JSObject();
+                if (found.get() != null) result.put("url", found.get());
+                result.put("found", found.get() != null);
+                call.resolve(result);
+            } catch (Exception error) {
+                call.reject("Could not scan the local network: " + error.getMessage());
+            } finally {
+                pool.shutdownNow();
+            }
+        });
     }
 
     @PluginMethod
