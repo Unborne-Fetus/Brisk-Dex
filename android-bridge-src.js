@@ -1,4 +1,4 @@
-import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Capacitor, CapacitorHttp, registerPlugin } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 
@@ -45,6 +45,14 @@ const mobileAPI = {
   isNative: Capacitor.isNativePlatform(),
   isAndroid: Capacitor.isNativePlatform() && platform === 'android',
   isIOS: Capacitor.isNativePlatform() && platform === 'ios',
+  async battleRequest(url, options) {
+    const parsed=new URL(url);
+    if(!['http:','https:'].includes(parsed.protocol))throw new Error('Use an HTTP or HTTPS relay address.');
+    const response=await CapacitorHttp.request({url,method:options.method||'GET',headers:{'Content-Type':'application/json'},data:options.body?JSON.parse(options.body):undefined,connectTimeout:10000,readTimeout:15000});
+    const data=typeof response.data==='string'?JSON.parse(response.data):response.data;
+    if(response.status<200||response.status>=300)throw new Error(data.error||('Battle server returned '+response.status));
+    return data;
+  },
   async openSaveFile() {
     if (platform !== 'android') return null;
     return SaveFilePicker.openSaveFile();

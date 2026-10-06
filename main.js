@@ -193,3 +193,17 @@ ipcMain.handle('load-asset-patch', async (_, file) => {
  if(typeof file!=='string'||!/^brisk-dex-asset-patches\/(manifest|[0-9]+|tm-[0-9]+)\.json$/.test(file))throw new Error('Invalid graphic pack');
  return fs.readFile(path.join(__dirname,file),'utf8');
 });
+
+let localBattleRelay=null;
+ipcMain.handle('start-battle-relay',async()=>{
+  try{
+    if(!localBattleRelay)localBattleRelay=require('./battle-server');
+    const address=await localBattleRelay.ready;
+    const urls=[];
+    for(const entries of Object.values(require('os').networkInterfaces())){
+      for(const entry of entries||[])if(entry.family==='IPv4'&&!entry.internal)urls.push('http://'+entry.address+':'+address.port);
+    }
+    return {ok:true,url:'http://127.0.0.1:'+address.port,lanUrls:urls};
+  }catch(err){return {ok:false,error:err.message};}
+});
+app.on('before-quit',()=>{if(localBattleRelay)localBattleRelay.server.close();});

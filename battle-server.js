@@ -14,6 +14,7 @@ function json(res, status, body){
   res.writeHead(status, {
     'Content-Type':'application/json; charset=utf-8',
     'Access-Control-Allow-Origin':'*',
+    'Access-Control-Allow-Private-Network':'true',
     'Access-Control-Allow-Headers':'Content-Type',
     'Access-Control-Allow-Methods':'GET,POST,OPTIONS',
     'Cache-Control':'no-store'
@@ -1460,6 +1461,11 @@ const server=http.createServer(async (req,res)=>{
     return json(res,405,{error:'Method not allowed'});
   }catch(err){ return json(res,400,{error:err.message||String(err)}); }
 });
-server.listen(PORT,HOST,()=>console.log('Brisk battle relay listening on http://'+HOST+':'+PORT+' (advanced-v18)'));
+const ready=new Promise((resolve,reject)=>{
+  server.once('error',reject);
+  server.listen(PORT,HOST,()=>{console.log('Brisk battle relay listening on http://'+HOST+':'+PORT+' (advanced-v18)');resolve(server.address());});
+});
+ready.catch(err=>console.error('Battle relay could not start:',err.message));
+module.exports={server,ready};
 
 // EFFECT_COVERAGE: Aura Wheel | Bide | Change Type On Item | Dark Void | Dynamax Double Dmg | Fail If Not Arg Type | Fickle Beam | Foresight | Fusion Combo | Geomancy | Grav Apple | Hidden Power | Hit Enemy Heal Ally | Hyperspace Fury | Instruct | Ivy Cudgel | Mat Block | Max Move | Me First | Miracle Eye | Natural Gift | Pursuit | Semi Invulnerable | Shell Trap | Sky Drop | Snatch | Snipe Shot | Species Power Override | Stat Change On Status | Super Effective On Arg | Tera Starstorm | Triple Kick | Two Turns Attack | Two Typed Move

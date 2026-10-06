@@ -157,3 +157,10 @@ await fs.writeFile(path.join(javaDir, 'SaveFilePickerPlugin.java'), plugin);
 await fs.writeFile(path.join(javaDir, 'MainActivity.java'), activity);
 console.log('Installed native Android save-file picker.');
 
+
+// Local multiplayer relays use HTTP on the player's LAN.
+const manifestPath=path.join(root,'android','app','src','main','AndroidManifest.xml');
+let manifest=await fs.readFile(manifestPath,'utf8');
+if(/android:usesCleartextTraffic=/.test(manifest))manifest=manifest.replace(/android:usesCleartextTraffic="[^"]*"/,'android:usesCleartextTraffic="true"');
+else manifest=manifest.replace('<application','<application android:usesCleartextTraffic="true"');
+await fs.writeFile(manifestPath,manifest);
