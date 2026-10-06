@@ -4,6 +4,15 @@ const fs = require('fs/promises');
 const fsSync = require('fs');
 
 let mainWindow;
+let openedSavePath=null;
+const {translateText}=require('./translation-service');
+ipcMain.handle('translate-text',(_,text,language)=>translateText(text,language));
+function lastSavePath(){return path.join(app.getPath('userData'),'briskdex-last-save.json');}
+async function rememberSave(filePath){openedSavePath=filePath;await writeFileAtomically(lastSavePath(),JSON.stringify({filePath}));}
+ipcMain.handle('load-last-sav',async()=>{
+ try{const {filePath}=JSON.parse(await fs.readFile(lastSavePath(),'utf8'));const buffer=await fs.readFile(filePath);openedSavePath=filePath;return {filePath,buffer:new Uint8Array(buffer)};}
+ catch(e){if(e.code==='ENOENT')return null;return {error:e.message};}
+});
 
 function createWindow(){
   mainWindow = new BrowserWindow({
@@ -59,12 +68,14 @@ ipcMain.handle('open-sav', async () => {
   if (result.canceled || result.filePaths.length === 0) return null;
   const filePath = result.filePaths[0];
   const buffer = await fs.readFile(filePath);
+  await rememberSave(filePath);
   return { filePath, buffer: new Uint8Array(buffer) };
 });
 
 /* ---- Write modified save bytes back to disk, keeping a timestamped backup ---- */
 ipcMain.handle('write-sav', async (event, filePath, bytes) => {
   try{
+    if(filePath!==openedSavePath)throw new Error('Open this save before writing it.');
     const dir = path.dirname(filePath);
     const base = path.basename(filePath, path.extname(filePath));
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -175,4 +186,10 @@ ipcMain.handle('open-icon-folder', async () => {
   };
   await walk(folderPath);
   return { folderPath, icons, shinyIcons };
+});
+
+
+ipcMain.handle('load-asset-patch', async (_, file) => {
+ if(typeof file!=='string'||!/^brisk-dex-asset-patches\/(manifest|[0-9]+|tm-[0-9]+)\.json$/.test(file))throw new Error('Invalid graphic pack');
+ return fs.readFile(path.join(__dirname,file),'utf8');
 });

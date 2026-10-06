@@ -125,6 +125,34 @@ def palette_variant_png(source_png, normal_palette_file, shiny_palette_file, wan
     except (OSError, ValueError, IndexError, struct.error):
         return False
 
+def source_rgba(image):
+    # Gen III graphics reserve palette index 0 for transparency, including
+    # enclosed gaps. Border flood fill alone leaves those gaps opaque.
+    if image.mode == "P":
+        image = image.copy()
+        image.info["transparency"] = 0
+    return image.convert("RGBA")
+
+
+def resolve_stat_expression(expression, source, depth=0):
+    if depth > 12:
+        raise ValueError("Recursive stat macro: " + expression)
+    expression = expression.strip()
+    while expression.startswith('(') and expression.endswith(')'):
+        expression = expression[1:-1].strip()
+    if re.fullmatch(r'\d+', expression):
+        return int(expression)
+    # Brisk sets P_UPDATED_STATS to GEN_LATEST; select its updated branch.
+    ternary = re.search(r'\?\s*([^?:]+)\s*:', expression)
+    if ternary:
+        return resolve_stat_expression(ternary.group(1), source, depth + 1)
+    if re.fullmatch(r'[A-Z][A-Z0-9_]*', expression):
+        macro = re.search(r'^\s*#define\s+' + re.escape(expression) + r'\s+([^\n]+)', source, re.M)
+        if macro:
+            return resolve_stat_expression(macro.group(1).split('//')[0], source, depth + 1)
+    raise ValueError("Unresolved base stat expression: " + expression)
+
+
 def normalize_sprite_png(source_png, target_png, first_frame=False, transparent_bg=False):
     """Copy a PNG for the companion app, optionally taking frame 1 and clearing connected border backgrounds."""
     if not os.path.isfile(source_png):
@@ -134,7 +162,7 @@ def normalize_sprite_png(source_png, target_png, first_frame=False, transparent_
         return True
     try:
         with Image.open(source_png) as source:
-            image = source.convert("RGBA")
+            image = source_rgba(source)
             if first_frame and image.height > image.width and image.height >= image.width * 2:
                 image = image.crop((0, 0, image.width, image.width))
             elif first_frame and image.width > image.height and image.width >= image.height * 2:
@@ -201,7 +229,7 @@ def save_animation_gif(source_png, target_gif):
         return False
     try:
         with Image.open(source_png) as source:
-            sheet = source.convert("RGBA")
+            sheet = source_rgba(source)
         frame_size = min(sheet.width, sheet.height)
         if frame_size <= 0:
             return False
@@ -1006,7 +1034,20 @@ def main():
     species_ids = parse_constants(species_const_text, "SPECIES_")
     move_ids = parse_constants(moves_const_text, "MOVE_")
     ability_ids = parse_constants(abilities_const_text, "ABILITY_")
-    item_ids = parse_constants(items_const_text, "ITEM_")
+    item_enum = re.search(r"\benum\b[^{}]*\bItem\s*\{[\s\S]*?\};", items_const_text)
+    if not item_enum:
+        raise ValueError("Could not find the Item enum")
+    item_ids = parse_enums(item_enum.group(), "ITEM_")
+    tmhm_text = find_source(repo, "include/constants/tms_hms.h")
+    tmhm_moves = {}
+    for kind in ("TM", "HM"):
+        definition = re.search(r'#define\s+FOREACH_' + kind + r'\(F\)([\s\S]*?)(?=\n\s*#define|\Z)', tmhm_text)
+        if definition:
+            for number, move in enumerate(re.findall(r'F\((\w+)\)', definition.group(1)), 1):
+                numeric = f"{kind}{number:02}"
+                if numeric in item_ids:
+                    item_ids[kind + "_" + move] = item_ids[numeric]
+                    tmhm_moves[item_ids[numeric]] = move
     national_dex_ids = parse_constants(pokedex_const_text, "NATIONAL_DEX_")
 
     print("  species constants:", len(species_ids))
@@ -1093,31 +1134,13 @@ def main():
             form_label = name[len(nat_dex_name) + 1:].replace('_', ' ').title()
         base_stats = []
         for stat_field in ('.baseHP', '.baseAttack', '.baseDefense', '.baseSpeed', '.baseSpAttack', '.baseSpDefense'):
-            # Stats are sometimes conditional expressions (for example
-            # P_UPDATED_STATS >= GEN_2 ? 80 : 65) or a macro whose value is
-            # conditional.  The old digit-only regex treated those as 1.
             stat_expr_match = re.search(re.escape(stat_field) + r'\s*=\s*([^,\n}]+)', data_block)
-            stat_value = 1
-            if stat_expr_match:
-                stat_expr = stat_expr_match.group(1).strip()
-                ternary = re.search(r'\?\s*(\d+)\s*:\s*(\d+)', stat_expr)
-                literal = re.match(r'^(\d+)\b', stat_expr)
-                if ternary:
-                    # Brisk targets the current expansion generations, so the
-                    # updated-stat branch is the correct value.
-                    stat_value = int(ternary.group(1))
-                elif literal:
-                    stat_value = int(literal.group(1))
-                else:
-                    macro = re.match(r'^([A-Z][A-Z0-9_]*)$', stat_expr)
-                    if macro:
-                        macro_def = re.search(r'^\s*#define\s+' + re.escape(macro.group(1)) + r'\s+([^\n]+)', species_text, re.MULTILINE)
-                        if macro_def:
-                            expression = macro_def.group(1).strip()
-                            resolved = re.search(r'\?\s*(\d+)\s*:', expression) or re.match(r'^\s*\(?\s*(\d+)\b', expression)
-                            if resolved:
-                                stat_value = int(resolved.group(1))
-            base_stats.append(stat_value)
+            if not stat_expr_match:
+                if name == "EGG":
+                    base_stats.append(1)
+                    continue
+                raise ValueError(f"Missing {stat_field} for {name}")
+            base_stats.append(resolve_stat_expression(stat_expr_match.group(1), species_text))
         friendship_match = re.search(r'\.friendship\s*=\s*(\d+)', data_block)
         gender_ratio = 127
         gender_match = re.search(r'\.genderRatio\s*=\s*PERCENT_FEMALE\((\d+(?:\.\d+)?)\)', data_block)
@@ -1345,6 +1368,8 @@ def main():
     out_items = {}
     item_details = {}
     for name, iid in item_ids.items():
+        if name not in item_blocks:
+            continue
         if iid == 0:
             continue
         block = item_blocks.get(name)
@@ -1352,13 +1377,18 @@ def main():
         display_item_name = item_name or name.replace('_', ' ').title()
         out_items[str(iid)] = display_item_name
         icon_match = re.search(r'\.iconPic\s*=\s*gItemIcon_([A-Za-z0-9_]+)', block or "")
+        tm_kind = "HM" if name.startswith("HM") else "TM" if name.startswith("TM") and name != "TM_CASE" else None
+        move_constant = tmhm_moves.get(iid)
+        tm_move = move_details.get(str(move_ids.get(move_constant, 0)), {})
+        tm_type = tm_move.get("type") or "Normal"
         pocket_constant = extract_enum_field(block, '.pocket', 'POCKET_') if block else None
         item_details[str(iid)] = {
             "name": display_item_name,
             "constant": "ITEM_" + name,
             "description": extract_compound_field(block, '.description') if block else None,
             "locations": item_locations.get("ITEM_" + name, []),
-            "iconKey": icon_match.group(1) if icon_match else None,
+            "iconKey": icon_match.group(1) if icon_match else tm_kind,
+            "tmType": tm_type if tm_kind else None,
             "pocket": pocket_constant
         }
 
@@ -1539,7 +1569,16 @@ def main():
         source = os.path.join(repo, rel)
         if os.path.isfile(source):
             target = iid + ".png"
-            normalize_sprite_png(source, os.path.join(items_out, target), transparent_bg=True)
+            item_target = os.path.join(items_out, target)
+            if details.get("tmType") and Image is not None:
+                palette_file = os.path.join(repo, "graphics/items/icon_palettes", details["tmType"].lower() + "_tm_hm.pal")
+                colors = read_jasc_palette(palette_file)
+                with Image.open(source) as tm_image:
+                    if colors and tm_image.mode == "P":
+                        tm_image.putpalette([channel for color in colors for channel in color])
+                    source_rgba(tm_image).save(item_target)
+            else:
+                normalize_sprite_png(source, item_target, transparent_bg=True)
             details["icon"] = items_out + "/" + target
 
     # Export front/back and shiny front/back species artwork for the Pokédex.
@@ -1716,3 +1755,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

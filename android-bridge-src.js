@@ -49,6 +49,8 @@ const mobileAPI = {
     if (platform !== 'android') return null;
     return SaveFilePicker.openSaveFile();
   },
+  async readSaveFile(uri) {return SaveFilePicker.readSaveFile({uri});},
+  async writeSaveFile(uri, bytes) {return SaveFilePicker.writeSaveFile({uri,data:bytesToBase64(bytes)});},
   saveBytes(bytes, fileName, mimeType) {
     return shareBase64(bytesToBase64(bytes), fileName, mimeType || 'application/octet-stream');
   },
@@ -59,3 +61,4 @@ const mobileAPI = {
 window.briskMobileAPI = mobileAPI;
 window.briskAndroidAPI = mobileAPI;
 window.briskIOSAPI = mobileAPI;
+

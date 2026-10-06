@@ -646,6 +646,9 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
 :root[data-theme="light"] .brand h1{color:var(--text);}
 :root[data-theme="light"] :is(.pc-panel,.online-log,.bag-entry,.reference-hero,.item-detail-head,.dex-card){background:var(--panel);color:var(--text);}
 
+
+[hidden]{display:none!important;}
+html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){text-align:right;}
 </style>
 </head>
 <body>
@@ -662,8 +665,9 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
       </div>
     </div>
     <div class="top-actions">
-      <button class="ghost" id="btn-load-data">Load species/move data</button>
-      <button class="ghost" id="btn-load-icons">Load icon folder</button>
+      <button hidden class="ghost" id="btn-load-data">Load species/move data</button>
+      <button hidden class="ghost" id="btn-load-icons">Load icon folder</button>
+      <button id="btn-export-save">Export saved copy</button>
       <button class="primary" id="btn-load-sav">Load .sav / .srm file</button>
       <input type="file" id="file-sav" accept=".sav,.srm">
       <input type="file" id="file-data" accept=".json">
@@ -688,7 +692,7 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
 
   <div id="save-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-save">
 
-  <div id="dirty-bar" class="loader-panel" style="display:none; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; border-color:var(--accent-soft);">
+  <div hidden id="dirty-bar" class="loader-panel" style="display:none; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; border-color:var(--accent-soft);">
     <span>Transfers are staged in Brisk Dex. The save file on disk still has the original until you save changes.</span>
     <button class="primary" id="btn-save-changes">Save changes</button>
   </div>
@@ -886,8 +890,9 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
   <section id="settings-tab-panel" class="main-tab-panel" style="display:none;">
     <div class="section-heading"><h3>Settings</h3></div>
     <div class="dex-card settings-controls">
-      <label>Language <select id="setting-language"><option value="en">English</option><option value="es">Español</option><option value="fr">Français</option><option value="de">Deutsch</option></select></label>
-      <p class="dex-muted">Interface navigation is translated. Brisk game descriptions retain their source language.</p>
+      <label>Language <select id="setting-language" translate="no"><option value="en">English</option><option value="es">Español</option><option value="it">Italiano</option><option value="fr">Français</option><option value="ru">Русский</option><option value="ja">日本語</option><option value="zh-CN">简体中文</option><option value="ar">العربية</option></select></label>
+      <p class="dex-muted">All visible text is translated. New translations require an internet connection and are cached on this device.</p>
+      <div id="translation-status" translate="no" class="dex-muted" role="status"></div>
       <label>Appearance <select id="setting-theme"><option value="system">System</option><option value="dark">Dark</option><option value="light">Light</option></select></label>
       <label>Zoom <select id="setting-zoom"><option value="0.8">80%</option><option value="1">100%</option><option value="1.25">125%</option><option value="1.5">150%</option><option value="2">200%</option></select></label>
     </div>
@@ -950,11 +955,11 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
       <details class="guide-card">
         <summary>Loading &amp; Saving</summary>
         <div class="guide-body">
-          <p>Loading a save does not automatically overwrite the file on your device. Changes made through Brisk Dex are staged until you use the save changes control.</p>
+          <p>Changes save automatically. Desktop and Android update the opened file. Browser and iOS sessions keep a recovery copy inside Brisk Dex; export a copy when you need to use it in an emulator.</p>
           <ul>
             <li><strong>.sav</strong> and <strong>.srm</strong> are supported save-file extensions.</li>
             <li>The app checks the save structure before displaying editable data.</li>
-            <li>If you are moving Pok&eacute;mon or editing save-backed information, save your changes before closing Brisk Dex.</li>
+            <li>Your last-used save reopens automatically. If an automatic save fails, the app displays the error.</li>
           </ul>
           <div class="guide-warning">Keep a backup of an important save before making large edits.</div>
         </div>
@@ -1045,7 +1050,7 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
           <ul>
             <li>Search stored items by name or displayed #ID.</li>
             <li>Use the pocket subtabs to browse Poké Balls, medicine, berries, TMs/HMs, battle items, held items, key items, and other items.</li>
-            <li>Drag existing stacks between the Bag and External Item Storage. Brisk Dex does not create items or increase quantities.</li>
+            <li>Drag a stack or select Move, then choose the quantity. Key items cannot be transferred. Brisk Dex does not create items or increase quantities.</li>
           </ul>
         </div>
       </details>
@@ -1109,6 +1114,8 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
 
 <div id="modal-root"></div>
 
+<script src="asset-loader.js"></script>
+<script src="localization.js"></script>
 <script>
 (function(){
 "use strict";
@@ -1866,7 +1873,7 @@ async function wonderTradeAtLocation(mon, loc){
   if (IS_ELECTRON && currentSave.filePath && !saved) return;
   document.getElementById('modal-root').innerHTML = '';
   renderAll();
-  showNotice('Wonder Trade complete: received ' + speciesName(speciesId) + ' at Lv' + level + (received.isShiny ? ' (shiny)!' : '.') + (IS_ELECTRON ? '' : ' Replace your original save file with the downloaded updated save to keep it in-game.'));
+  showNotice('Wonder Trade complete: received ' + speciesName(speciesId) + ' at Lv' + level + (received.isShiny ? ' (shiny)!' : '.') + (IS_ELECTRON ? '' : ' Changes are saved automatically in Brisk Dex.'));
 }
 function setTeraTypeInRecord(rawRecord, newType){
   if (!rawRecord || rawRecord.length < 80) throw new Error('Pokémon record is incomplete.');
@@ -2010,7 +2017,7 @@ function rebuildNameData(){
   NAME_DATA.moves = Object.assign({}, BUNDLED_DATA.moves, USER_DATA.moves);
   NAME_DATA.items = Object.assign({}, BUNDLED_DATA.items, USER_DATA.items);
   NAME_DATA.abilities = Object.assign({}, BUNDLED_DATA.abilities, USER_DATA.abilities);
-  Object.values(NAME_DATA.species).forEach(repairSpeciesStats);
+
 }
 
 function loadNameDataFromStorage(){
@@ -2043,20 +2050,15 @@ function normalizeBundledReferenceData(){
     detail.name=info[0]; detail.constant=info[1];
     detail.pocket='POCKET_POKE_BALLS';
     detail.description=CORE_BALL_DESCRIPTIONS[Number(id)-1];
-    if(!detail.icon || /brisk-dex-items\/[1-5]\.png$/.test(detail.icon)) detail.icon=coreBallIcon(Number(id));
+    detail.icon='brisk-dex-items/'+id+'.png';
     ITEM_DETAILS[id]=detail;
     BUNDLED_DATA.items[id]=info[0];
   });
-  Object.keys(BUNDLED_DATA.species||{}).forEach(function(id){
-    var species=BUNDLED_DATA.species[id];
-    // Compatibility for data bundles extracted before conditional stat
-    // expressions were supported. Future extracts are fixed at the source.
-    repairSpeciesStats(species);
-  });
+
 }
 
 async function loadBundledGameData(){
-  if (!IS_ELECTRON && !IS_ANDROID && !IS_IOS) return;
+
   try{
     var data, trainerData, icons;
     if (IS_ELECTRON){
@@ -2310,7 +2312,7 @@ async function removeFromStorage(storageId){
   return true;
 }
 
-function markDirty(){ dirty = true; updateDirtyBanner(); }
+function markDirty(){ dirty=true;saveRevision++;updateDirtyBanner(); }
 function clearDirty(){ dirty = false; updateDirtyBanner(); }
 
 async function depositFromBox(boxIndex, slotIndex){
@@ -2386,49 +2388,46 @@ async function finalizeWithdrawalsAfterDiskSave(){
   return true;
 }
 
-async function saveChangesToFile(){
-  if (!currentSave) return false;
-  if (IS_ELECTRON && currentSave.filePath){
-    try{
-      var res = await window.briskDexAPI.writeSav(currentSave.filePath, currentSave._internal.rawBytes);
-      if (res && res.ok){
-        var archiveUpdated = await finalizeWithdrawalsAfterDiskSave();
-        clearDirty();
-        if (archiveUpdated) showNotice('Saved. A backup of the previous file was kept at ' + res.backupPath);
-        return true;
-      } else {
-        showError('Could not write the save file: ' + (res && res.error ? res.error : 'unknown error'));
-        return false;
-      }
-    }catch(e){ showError('Could not write the save file: ' + e.message); return false; }
-  } else {
-    var fname = (currentSave.trainer.name || 'save').toLowerCase().replace(/[^a-z0-9]/g,'') || 'brisk-emerald';
-    var saveExt = currentSave.fileExtension === 'srm' ? 'srm' : 'sav';
-    if ((IS_ANDROID || IS_IOS) && MOBILE_API){
-      try{
-        await MOBILE_API.saveBytes(currentSave._internal.rawBytes, fname + '-updated.' + saveExt, 'application/octet-stream');
-        clearDirty();
-        var mobileQueuedCount = Object.keys(pendingWithdrawals).filter(function(id){ return pendingWithdrawals[id] === saveSessionId; }).length;
-        showNotice('Opened the ' + (IS_IOS ? 'iOS' : 'Android') + ' share sheet so you can save the updated .' + saveExt + ' file.' +
-          (mobileQueuedCount ? ' Archive copies are retained until you confirm the new save works.' : ''));
-        return false;
-      }catch(e){
-        showError('Could not export the updated save on ' + (IS_IOS ? 'iPhone' : 'Android') + ': ' + e.message);
-        return false;
-      }
-    }
-    var blob = new Blob([currentSave._internal.rawBytes], {type:'application/octet-stream'});
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url; a.download = fname + '-updated.' + saveExt;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+var saveRevision=0,autoSaveTimer=null,autoSaveQueue=Promise.resolve();
+function scheduleAutoSave(){clearTimeout(autoSaveTimer);autoSaveTimer=setTimeout(function(){saveChangesToFile();},400);}
+function snapshotDB(){return new Promise(function(resolve,reject){var r=indexedDB.open('briskdex-saves',1);r.onupgradeneeded=function(){r.result.createObjectStore('snapshots');};r.onsuccess=function(){resolve(r.result);};r.onerror=function(){reject(r.error);};});}
+async function storeSnapshot(save){
+ var db=await snapshotDB();try{await new Promise(function(resolve,reject){var tx=db.transaction('snapshots','readwrite');tx.objectStore('snapshots').put({bytes:new Uint8Array(save._internal.rawBytes),filePath:save.filePath,uri:save.uri||null,fileExtension:save.fileExtension},'last');tx.oncomplete=resolve;tx.onerror=function(){reject(tx.error);};});}finally{db.close();}
+}
+async function readSnapshot(){var db=await snapshotDB();try{return await new Promise(function(resolve,reject){var r=db.transaction('snapshots').objectStore('snapshots').get('last');r.onsuccess=function(){resolve(r.result);};r.onerror=function(){reject(r.error);};});}finally{db.close();}}
+function saveChangesToFile(){
+ clearTimeout(autoSaveTimer);if(!currentSave)return Promise.resolve(false);
+ var save=currentSave,revision=saveRevision,bytes=new Uint8Array(save._internal.rawBytes);
+ autoSaveQueue=autoSaveQueue.catch(function(){}).then(async function(){
+  try{
+   if(IS_ELECTRON && save.filePath){var res=await window.briskDexAPI.writeSav(save.filePath,bytes);if(!res||!res.ok)throw new Error(res&&res.error||'Could not write save');}
+   else if(IS_ANDROID && save.uri && MOBILE_API.writeSaveFile){await MOBILE_API.writeSaveFile(save.uri,bytes);}
+   await storeSnapshot(Object.assign({},save,{_internal:Object.assign({},save._internal,{rawBytes:bytes})}));
+   if(save===currentSave && revision===saveRevision){
+    if(IS_ELECTRON || (IS_ANDROID&&save.uri))await finalizeWithdrawalsAfterDiskSave();
     clearDirty();
-    var queuedCount = Object.keys(pendingWithdrawals).filter(function(id){ return pendingWithdrawals[id] === saveSessionId; }).length;
-    showNotice('Downloaded an updated .' + saveExt + ' file. Replace your original save file with this one to keep the changes in-game.' +
-      (queuedCount ? ' The archive copies are retained; remove them from External Storage after replacing the original save.' : ''));
-    return false;
-  }
+   }
+   return true;
+  }catch(err){showError('Automatic save failed: '+err.message);return false;}
+ });return autoSaveQueue;
+}
+async function restoreLastSave(){
+ try{
+  await gameDataReady;await storageReady;
+  var saved=IS_ELECTRON&&window.briskDexAPI.loadLastSav?await window.briskDexAPI.loadLastSav():await readSnapshot();
+  if(!saved)return;if(saved.error)throw new Error(saved.error);
+  var bytes=saved.buffer||saved.bytes;
+  if(IS_ANDROID&&saved.uri&&MOBILE_API.readSaveFile){var fresh=await MOBILE_API.readSaveFile(saved.uri);bytes=base64ToBytes(fresh.data);}
+  var raw=new Uint8Array(bytes),save=parseSav(raw.buffer);save.filePath=saved.filePath||null;save.uri=saved.uri||null;save.fileExtension=saved.fileExtension||(/\.srm$/i.test(saved.filePath||'')?'srm':'sav');
+  currentSave=save;loadDexStatusOverrides(save);saveSessionId=genId();dirty=false;
+  document.getElementById('empty-state').style.display='none';document.getElementById('app-content').style.display='block';renderAll();
+ }catch(err){showError('Could not reopen your last save: '+err.message);}
+}
+async function exportSaveChangesToFile(){
+ if(!currentSave)return false;
+ var fname=(currentSave.trainer.name||'brisk-emerald').toLowerCase().replace(/[^a-z0-9]/g,'')||'brisk-emerald',extension=currentSave.fileExtension==='srm'?'srm':'sav';
+ if((IS_ANDROID||IS_IOS)&&MOBILE_API){try{await MOBILE_API.saveBytes(currentSave._internal.rawBytes,fname+'.'+extension,'application/octet-stream');return true;}catch(err){showError('Could not export save: '+err.message);return false;}}
+ var blob=new Blob([currentSave._internal.rawBytes],{type:'application/octet-stream'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=fname+'.'+extension;document.body.appendChild(link);link.click();link.remove();setTimeout(function(){URL.revokeObjectURL(url);},1000);return true;
 }
 
 /* ============================================================
@@ -2589,45 +2588,11 @@ function showNotice(msg){
 function updateDirtyBanner(){
   var bar = document.getElementById('dirty-bar');
   if (!currentSave){ bar.style.display = 'none'; return; }
-  bar.style.display = dirty ? 'flex' : 'none';
+  bar.style.display='none';
+  if(dirty)scheduleAutoSave();
 }
 
-function updateDataStatus(){
-  var panel = document.getElementById('data-status');
-  var customS = Object.keys(Object.assign({}, BUNDLED_DATA.species, USER_DATA.species)).length;
-  var customM = Object.keys(Object.assign({}, BUNDLED_DATA.moves, USER_DATA.moves)).length;
-  var customI = Object.keys(Object.assign({}, BUNDLED_DATA.items, USER_DATA.items)).length;
-  var withAbilities = 0;
-  var mergedSpecies = Object.assign({}, BUNDLED_DATA.species, USER_DATA.species);
-  Object.keys(mergedSpecies).forEach(function(id){
-    var e = mergedSpecies[id];
-    if (e && e.abilities && e.abilities.length) withAbilities++;
-  });
-  panel.style.display = 'block';
-  panel.innerHTML = '';
-  panel.appendChild(el('span', {}, [document.createTextNode(
-    'Built-in baseline: ' + DEFAULT_SPECIES_COUNT + ' vanilla Gen I\u2013III species (names/types only). '
-  )]));
-  if (customS || customM || customI){
-    var strong = el('strong', {text: (IS_ELECTRON ? 'Brisk Emerald data: ' : 'Loaded data: ') + customS + ' species (' + withAbilities + ' with abilities), ' + customM + ' moves, ' + customI + ' items.'});
-    panel.appendChild(strong);
-  } else {
-    panel.appendChild(el('span', {class:'tag-ok', text:'Load your Brisk Emerald data to add the full species, move, and item data.'}));
-  }
-  var row = el('div', {class:'row'});
-  if (customS || customM || customI){
-    var clearBtn = el('button', {class:'ghost', text:'Clear your custom data'});
-    clearBtn.addEventListener('click', function(){
-      USER_DATA = {species:{}, moves:{}, items:{}};
-      try{ localStorage.removeItem('briskdex_namedata_overrides'); }catch(e){}
-      rebuildNameData();
-      updateDataStatus();
-      if (currentSave) renderAll();
-    });
-    row.appendChild(clearBtn);
-  }
-  panel.appendChild(row);
-}
+function updateDataStatus(){document.getElementById('data-status').style.display='none';}
 
 function formatMoney(n){
   return '₽' + n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -3389,17 +3354,7 @@ function dexSpeciesDisplayName(entry){
   var normalizedForm=String(entry.formLabel).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
   return normalizedForm && normalizedBase.includes(normalizedForm) ? base : base + ' · ' + entry.formLabel;
 }
-function dexFormBadge(entry){
-  if (!entry || !entry.formLabel) return null;
-  var base=String(entry.name||entry.constant||'').toLowerCase().replace(/[^a-z0-9]+/g,' ');
-  var form=String(entry.formLabel).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
-  if(form && base.includes(form)) return null;
-  return el('span', {
-    class:'type-pill',
-    text:entry.formLabel,
-    style: entry.isMega ? 'background:#b86de0;color:white;' : 'background:var(--line);color:var(--text);'
-  });
-}
+function dexFormBadge(entry){return null;}
 
 function appendChunkedButtons(list, ids, renderer, initialCount){
   var count = Math.min(ids.length, initialCount || ids.length);
@@ -4059,7 +4014,8 @@ function renderItems(){
   var q=(document.getElementById('item-search').value||'').trim().toLowerCase();
   var order=(document.getElementById('item-order')||{}).value||'alphabetical';
   var ids=Object.keys(all).filter(function(id){
-    var it=all[id]||{}, hay=[it.name,it.constant,it.description,id,'#'+id];
+    var it=all[id]||{};if(Number(id)<=0 || /^ITEM_USE_/.test(it.constant||'') || !it.description || /^\?+$/.test(it.description.trim()))return false;
+    var hay=[it.name,it.constant,it.description,id,'#'+id];
     (it.locations||[]).forEach(function(loc){hay.push(loc.location,loc.method);});
     return !q || hay.filter(Boolean).join(' ').toLowerCase().includes(q);
   }).sort(function(a,b){
@@ -4091,7 +4047,7 @@ function renderItems(){
   itemHeading.appendChild(el('h2',{text:it.name||itemName(selectedItemId)}));
   itemHeading.appendChild(el('span',{class:'dex-muted',style:'font-size:14px;font-weight:700;',text:'#'+Number(selectedItemId)}));
   head.appendChild(itemHeading);
-  head.appendChild(el('div',{class:it.description?'item-description':'dex-muted',text:it.description||'No item description is present in the currently loaded Brisk data. Re-run the Brisk data extractor to populate it.'}));
+  head.appendChild(el('div',{class:it.description?'item-description':'dex-muted',text:it.description||'Description unavailable.'}));
   detail.appendChild(head);
   var locations=el('section',{class:'dex-card'});
   locations.appendChild(el('h4',{text:'Where to Find'}));
@@ -4102,7 +4058,7 @@ function renderItems(){
       row.appendChild(el('span',{text:loc.method||'Obtainable here'}));
       locations.appendChild(row);
     });
-  }else locations.appendChild(el('div',{class:'dex-muted',text:'No pickup, hidden-item, shop, or scripted reward location is present in the currently loaded Brisk data.'}));
+  }else locations.appendChild(el('div',{class:'dex-muted',text:'No fixed pickup or shop location is recorded for this item.'}));
   detail.appendChild(locations);
 }
 
@@ -4357,21 +4313,33 @@ function setBagCategory(category){
   document.querySelectorAll('#bag-subtabs [data-bag-category]').forEach(function(btn){btn.classList.toggle('active',btn.dataset.bagCategory===BAG_CATEGORY);});
   renderBag();
 }
-function moveItemStack(id,from,to){
+function openItemTransferDialog(id,from,to,available){
+ if(!available)return;
+ var root=document.getElementById('modal-root');root.innerHTML='';
+ var backdrop=el('div',{class:'modal-backdrop'}),dialog=el('section',{class:'modal',role:'dialog','aria-modal':'true','aria-label':'Move items'});
+ dialog.appendChild(el('h3',{text:bagItemData(id).name}));dialog.appendChild(el('p',{text:'Choose how many items to move. Available: '+available}));
+ var label=el('label',{text:'Quantity'}),input=el('input',{type:'number',min:'1',max:String(available),value:String(available),style:'width:100%;padding:10px;font:inherit;'});label.appendChild(input);dialog.appendChild(label);
+ var actions=el('div',{class:'top-actions',style:'margin-top:16px;'}),cancel=el('button',{text:'Cancel'}),confirm=el('button',{class:'primary',text:'Move'});
+ cancel.onclick=function(){root.innerHTML='';};confirm.onclick=function(){var qty=Number(input.value);if(!Number.isInteger(qty)||qty<1||qty>available){input.reportValidity();return;}root.innerHTML='';moveItemStack(id,from,to,qty);};actions.appendChild(cancel);actions.appendChild(confirm);dialog.appendChild(actions);backdrop.appendChild(dialog);root.appendChild(backdrop);input.focus();input.select();
+}
+function moveItemStack(id,from,to,requestedQty){
   id=String(id);
   if(bagItemCategory(id)==='key'){showError('Key items stay in the game Bag and cannot be transferred.');return;}
   if(!currentSave){showError('Load a save before transferring items.');return;}
   var source=from==='external'?ITEM_STORAGE:BAG_ITEMS;
   var target=to==='external'?ITEM_STORAGE:BAG_ITEMS;
-  var qty=Math.floor(Number(source[id])||0);
+  var available=Math.floor(Number(source[id])||0);
+  if(requestedQty==null){openItemTransferDialog(id,from,to,available);return;}
+  var qty=Number(requestedQty);
+  if(!Number.isInteger(qty)||qty<1||qty>available){showError("Choose a quantity within the available stack.");return;}
   if(qty<=0 || source===target) return;
   var nextBag=Object.assign({},BAG_ITEMS);
-  if(to==='bag')nextBag[id]=(Number(nextBag[id])||0)+qty;else delete nextBag[id];
+  if(to==='bag')nextBag[id]=(Number(nextBag[id])||0)+qty;else {nextBag[id]=available-qty;if(!nextBag[id])delete nextBag[id];}
   if(!writeSaveBag(nextBag))return;
   target[id]=(Number(target[id])||0)+qty;
-  delete source[id];
+  source[id]=available-qty;if(!source[id])delete source[id];
   if(to==='bag'&&!BAG_ORDER.includes(id)) BAG_ORDER.push(id);
-  if(from==='bag') BAG_ORDER=BAG_ORDER.filter(function(x){return String(x)!==id;});
+  if(from==='bag'&&!source[id]) BAG_ORDER=BAG_ORDER.filter(function(x){return String(x)!==id;});
   saveBagToStorage();renderBag();
 }
 function reorderBagItem(sourceId,targetId){
@@ -4386,12 +4354,13 @@ function makeStoredItemCard(id,qty,source){
   var item=bagItemData(id), row=el('article',{class:'bag-entry',draggable:bagItemCategory(id)==='key'?'false':'true'}), info=el('div',{class:'bag-entry-info'});
   if(item.icon){
     var shell=el('span',{class:'asset-icon-shell'});
-    var icon=el('img',{src:item.icon,alt:'',style:'width:54px;height:54px;'});icon.loading='lazy';icon.decoding='async';icon.addEventListener('error',function(){shell.style.display='none';});shell.appendChild(icon);info.appendChild(shell);
+    var icon=el('img',{src:item.icon,alt:'',style:'width:54px;height:54px;'});icon.loading='lazy';icon.decoding='async';icon.addEventListener('error',function(){shell.style.display='none';});icon.addEventListener('load',function(){shell.style.display='';});shell.appendChild(icon);info.appendChild(shell);
   }
   var txt=el('div',{class:'bag-entry-text'});
   txt.appendChild(el('strong',{text:item.name||itemName(Number(id))}));
   txt.appendChild(el('small',{text:'#'+Number(id)}));info.appendChild(txt);row.appendChild(info);
   row.appendChild(el('div',{class:'bag-entry-qty',text:'× '+Number(qty).toLocaleString()}));
+  if(bagItemCategory(id)!=='key'){var move=el('button',{text:'Move'});move.addEventListener('click',function(){moveItemStack(id,source,source==='bag'?'external':'bag');});row.appendChild(move);}else row.appendChild(el('small',{text:'Key item · stays in the game'}));
   row.addEventListener('dragstart',function(e){
     if(bagItemCategory(id)==='key'){e.preventDefault();return;}
     row.classList.add('dragging');e.dataTransfer.effectAllowed='move';
@@ -5146,6 +5115,7 @@ function handleSavFile(file){
       var extMatch = String(file && file.name || '').match(/\.(sav|srm)$/i);
       save.fileExtension = extMatch ? extMatch[1].toLowerCase() : 'sav';
       currentSave = save;
+      storeSnapshot(save).catch(function(e){showError('Could not remember this save: '+e.message);});
       loadDexStatusOverrides(save);
       saveSessionId = genId();
       dirty = false;
@@ -5170,7 +5140,9 @@ async function handleSavFromAndroid(){
     var save = parseSav(bytes.buffer);
     var extMatch = String(result.name || '').match(/\.(sav|srm)$/i);
     save.fileExtension = extMatch ? extMatch[1].toLowerCase() : 'sav';
+    save.uri=result.uri||null;
     currentSave = save;
+    await storeSnapshot(save);
     loadDexStatusOverrides(save);
     saveSessionId = genId();
     dirty = false;
@@ -5195,6 +5167,7 @@ async function handleSavFromElectron(){
     var extMatch = String(result.filePath || '').match(/\.(sav|srm)$/i);
     save.fileExtension = extMatch ? extMatch[1].toLowerCase() : 'sav';
     currentSave = save;
+    await storeSnapshot(save);
     loadDexStatusOverrides(save);
     saveSessionId = genId();
     dirty = false;
@@ -5309,6 +5282,7 @@ document.getElementById('btn-load-data').addEventListener('click', function(){
 document.getElementById('btn-load-icons').addEventListener('click', function(){
   loadIconFolder();
 });
+document.getElementById('btn-export-save').addEventListener('click',function(){exportSaveChangesToFile();});
 document.getElementById('btn-save-changes').addEventListener('click', function(){
   saveChangesToFile();
 });
@@ -5365,7 +5339,7 @@ storageDropTarget.addEventListener('drop', async function(event){
     lastPokemonDropAt = Date.now();
     document.getElementById('modal-root').innerHTML = '';
     renderAll();
-    showNotice('Moved ' + speciesName(mon.species) + ' to External Storage.' + (!IS_ELECTRON || !currentSave.filePath ? ' Save the updated file to keep the change.' : ''));
+    showNotice('Moved ' + speciesName(mon.species) + ' to External Storage.' + (!IS_ELECTRON || !currentSave.filePath ? ' Changes are saved automatically.' : ''));
   }catch(err){ showError('Could not move Pokémon to External Storage: ' + err.message); }
 });
 
@@ -5389,13 +5363,6 @@ document.body.addEventListener('drop', function(e){
 });
 
 
-var BRISK_SOURCE_STATS={"BULBASAUR":[45,49,49,45,65,65],"IVYSAUR":[60,62,63,60,80,80],"VENUSAUR":[80,82,83,80,100,100],"VENUSAUR_MEGA":[80,100,123,80,122,120],"VENUSAUR_GMAX":[80,82,83,80,100,100],"CHARMANDER":[39,52,43,65,60,50],"CHARMELEON":[58,64,58,80,80,65],"CHARIZARD":[78,84,78,100,null,85],"CHARIZARD_MEGA_X":[78,130,111,100,130,85],"CHARIZARD_MEGA_Y":[78,104,78,100,159,115],"CHARIZARD_GMAX":[78,84,78,100,null,85],"SQUIRTLE":[44,48,65,43,50,64],"WARTORTLE":[59,63,80,58,65,80],"BLASTOISE":[79,83,100,78,85,null],"BLASTOISE_MEGA":[79,103,120,78,135,115],"BLASTOISE_GMAX":[79,83,100,78,85,null],"CATERPIE":[45,30,35,45,20,20],"METAPOD":[50,20,55,30,25,25],"BUTTERFREE":[60,45,50,70,90,80],"BUTTERFREE_GMAX":[60,45,50,70,90,80],"WEEDLE":[40,35,30,50,20,20],"KAKUNA":[45,25,50,35,25,25],"BEEDRILL":[65,90,40,75,45,80],"BEEDRILL_MEGA":[65,150,40,145,15,80],"PIDGEY":[40,45,40,56,35,35],"PIDGEOTTO":[63,60,55,71,50,50],"PIDGEOT":[83,80,75,101,70,70],"PIDGEOT_MEGA":[83,80,80,121,135,80],"RATTATA":[30,56,35,72,25,35],"RATICATE":[55,81,60,97,50,70],"RATTATA_ALOLA":[30,56,35,72,25,35],"RATICATE_ALOLA":[75,71,70,77,40,80],"RATICATE_ALOLA_TOTEM":[75,71,70,77,40,80],"SPEAROW":[40,60,30,70,31,31],"FEAROW":[65,90,65,100,61,61],"EKANS":[35,60,44,55,40,54],"ARBOK":[60,95,69,80,65,79],"PICHU":[20,40,15,60,35,35],"PICHU_SPIKY_EARED":[20,40,15,60,35,35],"PIKACHU":[35,55,null,90,50,50],"PIKACHU_COSPLAY":[35,55,40,90,50,50],"PIKACHU_ROCK_STAR":[35,55,40,90,50,50],"PIKACHU_BELLE":[35,55,40,90,50,50],"PIKACHU_POP_STAR":[35,55,40,90,50,50],"PIKACHU_PHD":[35,55,40,90,50,50],"PIKACHU_LIBRE":[35,55,40,90,50,50],"PIKACHU_ORIGINAL":[35,55,40,90,50,50],"PIKACHU_HOENN":[35,55,40,90,50,50],"PIKACHU_SINNOH":[35,55,40,90,50,50],"PIKACHU_UNOVA":[35,55,40,90,50,50],"PIKACHU_KALOS":[35,55,40,90,50,50],"PIKACHU_ALOLA":[35,55,40,90,50,50],"PIKACHU_PARTNER":[35,55,40,90,50,50],"PIKACHU_WORLD":[35,55,40,90,50,50],"PIKACHU_GMAX":[35,55,null,90,50,null],"PIKACHU_STARTER":[45,80,50,120,75,60],"RAICHU":[60,90,55,110,90,80],"RAICHU_ALOLA":[60,85,50,110,95,85],"RAICHU_MEGA_X":[60,135,95,110,90,95],"RAICHU_MEGA_Y":[60,100,55,130,160,80],"SANDSHREW":[50,75,85,40,20,30],"SANDSLASH":[75,100,110,65,45,55],"SANDSHREW_ALOLA":[50,75,90,40,10,35],"SANDSLASH_ALOLA":[75,100,120,65,25,65],"NIDORAN_F":[55,47,52,41,40,40],"NIDORINA":[70,62,67,56,55,55],"NIDOQUEEN":[90,92,87,76,75,85],"NIDORAN_M":[46,57,40,50,40,40],"NIDORINO":[61,72,57,65,55,55],"NIDOKING":[81,102,77,85,85,75],"CLEFFA":[50,25,28,15,45,55],"CLEFAIRY":[70,45,48,35,60,65],"CLEFABLE":[95,70,73,60,95,90],"CLEFABLE_MEGA":[95,80,93,70,135,110],"VULPIX":[38,41,40,65,50,65],"NINETALES":[73,76,75,100,81,100],"VULPIX_ALOLA":[38,41,40,65,50,65],"NINETALES_ALOLA":[73,67,75,109,81,100],"IGGLYBUFF":[90,30,15,15,40,20],"JIGGLYPUFF":[115,45,20,20,45,25],"WIGGLYTUFF":[140,70,45,45,null,50],"ZUBAT":[40,45,35,55,30,40],"GOLBAT":[75,80,70,90,65,75],"CROBAT":[85,90,80,130,70,80],"ODDISH":[45,50,55,30,75,65],"GLOOM":[60,65,70,40,85,75],"VILEPLUME":[75,80,85,50,110,90],"BELLOSSOM":[75,80,95,50,90,100],"PARAS":[35,70,55,25,45,55],"PARASECT":[60,95,80,30,60,80],"VENONAT":[60,55,50,45,40,55],"VENOMOTH":[70,65,60,90,90,75],"DIGLETT":[10,55,25,95,35,45],"DUGTRIO":[35,100,50,120,50,70],"DIGLETT_ALOLA":[10,55,30,90,35,45],"DUGTRIO_ALOLA":[35,100,60,110,50,70],"MEOWTH":[40,45,35,90,40,40],"PERSIAN":[65,70,60,115,65,65],"MEOWTH_ALOLA":[40,35,35,90,50,40],"PERSIAN_ALOLA":[65,60,60,115,75,65],"MEOWTH_GALAR":[50,65,55,40,40,40],"PERRSERKER":[70,110,100,50,50,60],"MEOWTH_GMAX":[40,45,35,90,40,40],"PSYDUCK":[50,52,48,55,65,50],"GOLDUCK":[80,82,78,85,95,80],"MANKEY":[40,80,35,70,35,45],"PRIMEAPE":[65,105,60,95,60,70],"ANNIHILAPE":[110,115,80,90,50,90],"GROWLITHE":[55,70,45,60,70,50],"ARCANINE":[90,110,80,95,100,80],"GROWLITHE_HISUI":[60,75,45,55,65,50],"ARCANINE_HISUI":[95,115,80,90,95,80],"POLIWAG":[40,50,40,90,40,40],"POLIWHIRL":[65,65,65,90,50,50],"POLIWRATH":[90,95,95,70,70,90],"POLITOED":[90,75,75,70,90,100],"ABRA":[25,20,15,90,105,55],"KADABRA":[40,35,30,105,120,70],"ALAKAZAM":[55,50,45,120,135,null],"ALAKAZAM_MEGA":[55,50,65,150,175,105],"MACHOP":[70,80,50,35,35,35],"MACHOKE":[80,100,70,45,50,60],"MACHAMP":[120,150,100,105,65,85],"MACHAMP_GMAX":[90,130,80,55,65,85],"BELLSPROUT":[50,75,35,40,70,30],"WEEPINBELL":[65,90,50,55,85,45],"VICTREEBEL":[80,105,65,70,100,null],"VICTREEBEL_MEGA":[80,125,85,70,135,95],"TENTACOOL":[40,40,35,70,50,100],"TENTACRUEL":[80,70,65,100,80,120],"GEODUDE":[40,80,100,20,30,30],"GRAVELER":[55,95,115,35,45,45],"GOLEM":[80,120,130,45,55,65],"GEODUDE_ALOLA":[40,80,100,20,30,30],"GRAVELER_ALOLA":[55,95,115,35,45,45],"GOLEM_ALOLA":[80,120,130,45,55,65],"PONYTA":[50,85,55,90,65,65],"RAPIDASH":[65,100,70,105,80,80],"PONYTA_GALAR":[50,85,55,90,65,65],"RAPIDASH_GALAR":[65,100,70,105,80,80],"SLOWPOKE":[90,65,65,15,40,40],"SLOWBRO":[95,75,110,30,100,80],"SLOWKING":[95,75,80,30,100,110],"SLOWBRO_MEGA":[95,75,180,30,130,80],"SLOWPOKE_GALAR":[90,65,65,15,40,40],"SLOWBRO_GALAR":[95,100,95,30,100,70],"SLOWKING_GALAR":[95,65,80,30,110,110],"MAGNEMITE":[25,35,70,45,95,55],"MAGNETON":[50,60,95,70,120,70],"MAGNEZONE":[70,70,115,60,130,90],"FARFETCHD":[52,90,55,60,58,62],"FARFETCHD_GALAR":[52,95,55,55,58,62],"SIRFETCHD":[62,135,95,65,68,82],"DODUO":[35,85,45,75,35,35],"DODRIO":[60,110,70,110,60,60],"SEEL":[65,45,55,45,45,70],"DEWGONG":[90,70,80,70,70,95],"GRIMER":[80,80,50,25,40,50],"MUK":[105,105,75,50,65,100],"GRIMER_ALOLA":[80,80,50,25,40,50],"MUK_ALOLA":[105,105,75,50,65,100],"SHELLDER":[30,65,100,40,45,25],"CLOYSTER":[50,95,180,70,85,45],"GASTLY":[30,35,30,80,100,35],"HAUNTER":[45,50,45,95,115,55],"GENGAR":[60,65,60,110,130,null],"GENGAR_MEGA":[60,65,80,130,170,95],"GENGAR_GMAX":[60,65,60,110,130,null],"ONIX":[75,105,160,85,30,45],"STEELIX":[120,105,200,55,55,65],"STEELIX_MEGA":[75,125,230,30,55,95],"DROWZEE":[60,48,45,42,43,90],"HYPNO":[85,73,70,67,73,115],"KRABBY":[30,105,90,50,25,25],"KINGLER":[55,130,115,75,50,50],"KINGLER_GMAX":[55,130,115,75,50,50],"VOLTORB":[40,30,50,100,55,55],"ELECTRODE":[60,50,70,150,80,80],"VOLTORB_HISUI":[40,30,50,100,55,55],"ELECTRODE_HISUI":[60,50,70,150,80,80],"EXEGGCUTE":[60,40,80,40,60,45],"EXEGGUTOR":[95,95,85,55,125,75],"EXEGGUTOR_ALOLA":[95,105,85,45,125,75],"CUBONE":[50,50,95,35,40,50],"MAROWAK":[60,80,110,45,50,80],"MAROWAK_ALOLA":[60,80,110,45,50,80],"MAROWAK_ALOLA_TOTEM":[60,80,110,45,50,80],"TYROGUE":[35,35,35,35,35,35],"HITMONLEE":[50,120,53,87,35,110],"HITMONCHAN":[50,105,79,76,35,110],"HITMONTOP":[50,95,95,70,35,110],"LICKITUNG":[90,55,75,30,60,75],"LICKILICKY":[110,85,95,50,80,95],"KOFFING":[40,65,95,35,60,45],"WEEZING":[65,90,120,60,85,70],"WEEZING_GALAR":[65,90,120,60,85,70],"RHYHORN":[80,85,95,25,30,30],"RHYDON":[105,130,120,40,45,45],"RHYPERIOR":[115,140,130,40,55,55],"HAPPINY":[100,5,5,30,15,65],"CHANSEY":[250,5,5,50,35,105],"BLISSEY":[255,10,10,55,75,135],"TANGELA":[65,55,115,60,100,40],"TANGROWTH":[100,100,125,50,110,50],"KANGASKHAN":[105,95,80,90,40,80],"KANGASKHAN_MEGA":[105,125,100,100,60,100],"HORSEA":[30,40,70,60,70,25],"SEADRA":[55,65,95,85,95,45],"KINGDRA":[75,95,95,85,95,95],"GOLDEEN":[45,67,60,63,35,50],"SEAKING":[80,92,65,68,65,80],"STARYU":[30,45,55,85,70,55],"STARMIE":[60,75,85,115,100,85],"STARMIE_MEGA":[60,100,105,120,130,105],"MIME_JR":[20,25,45,60,70,90],"MR_MIME":[40,45,65,90,100,120],"MR_MIME_GALAR":[50,65,65,100,90,90],"MR_RIME":[80,85,75,70,110,100],"SCYTHER":[70,110,80,105,55,80],"SCIZOR":[70,130,100,65,55,80],"SCIZOR_MEGA":[70,150,140,75,65,100],"KLEAVOR":[70,135,95,85,45,70],"SMOOCHUM":[45,30,15,65,85,65],"JYNX":[65,50,35,95,115,95],"ELEKID":[45,63,37,95,65,55],"ELECTABUZZ":[65,83,57,105,95,85],"ELECTIVIRE":[75,123,67,95,95,85],"MAGBY":[45,75,37,83,70,55],"MAGMAR":[65,95,57,93,100,85],"MAGMORTAR":[75,95,67,83,125,95],"PINSIR":[65,125,100,85,55,70],"PINSIR_MEGA":[65,155,120,105,65,90],"TAUROS":[75,100,95,110,40,70],"TAUROS_PALDEA_COMBAT":[75,110,105,100,30,70],"TAUROS_PALDEA_BLAZE":[75,110,105,100,30,70],"TAUROS_PALDEA_AQUA":[75,110,105,100,30,70],"MAGIKARP":[20,10,55,80,15,20],"GYARADOS":[95,125,79,81,60,100],"GYARADOS_MEGA":[95,155,109,81,70,130],"LAPRAS":[130,85,80,60,85,95],"LAPRAS_GMAX":[130,85,80,60,85,95],"DITTO":[48,48,48,48,48,48],"EEVEE":[55,55,50,55,null,65],"EEVEE_GMAX":[55,55,50,55,null,65],"EEVEE_STARTER":[65,75,70,75,65,85],"VAPOREON":[130,65,60,65,110,95],"JOLTEON":[65,65,60,130,110,95],"FLAREON":[65,130,60,65,95,110],"ESPEON":[65,65,60,110,130,95],"UMBREON":[95,65,110,65,60,130],"LEAFEON":[65,110,130,95,60,65],"GLACEON":[65,60,110,65,130,95],"SYLVEON":[95,65,65,60,110,130],"PORYGON":[65,60,70,40,85,75],"PORYGON2":[85,80,90,60,105,95],"PORYGON_Z":[85,80,70,90,135,75],"OMANYTE":[35,40,100,35,90,55],"OMASTAR":[70,60,125,55,115,70],"KABUTO":[30,80,90,55,55,45],"KABUTOPS":[60,115,105,80,65,70],"AERODACTYL":[80,105,65,130,60,75],"AERODACTYL_MEGA":[80,135,85,150,70,95],"MUNCHLAX":[135,85,40,5,40,85],"SNORLAX":[160,110,65,30,65,110],"SNORLAX_GMAX":[160,110,65,30,65,110],"ARTICUNO":[90,85,100,85,95,125],"ARTICUNO_GALAR":[90,85,85,95,125,100],"ZAPDOS":[90,90,85,100,125,90],"ZAPDOS_GALAR":[90,125,90,100,85,90],"MOLTRES":[90,100,90,90,125,85],"MOLTRES_GALAR":[90,85,90,90,100,125],"DRATINI":[41,64,45,50,50,50],"DRAGONAIR":[61,84,65,70,70,70],"DRAGONITE":[91,134,95,80,100,100],"DRAGONITE_MEGA":[91,124,115,100,145,125],"MEWTWO":[106,110,90,130,154,90],"MEWTWO_MEGA_X":[106,190,100,130,154,100],"MEWTWO_MEGA_Y":[106,150,70,140,194,120],"MEW":[100,100,100,100,100,100],"CHIKORITA":[45,49,65,45,49,65],"BAYLEEF":[60,62,80,60,63,80],"MEGANIUM":[80,82,100,80,83,100],"MEGANIUM_MEGA":[80,92,115,80,143,115],"CYNDAQUIL":[39,52,43,65,60,50],"QUILAVA":[58,64,58,80,80,65],"TYPHLOSION":[78,84,78,100,109,85],"TYPHLOSION_HISUI":[73,84,78,95,119,85],"TOTODILE":[50,65,64,43,44,48],"CROCONAW":[65,80,80,58,59,63],"FERALIGATR":[85,105,100,78,79,83],"FERALIGATR_MEGA":[85,160,125,78,89,93],"SENTRET":[35,46,34,20,35,45],"FURRET":[85,76,64,90,45,55],"HOOTHOOT":[60,30,30,50,36,56],"NOCTOWL":[100,50,50,70,86,96],"LEDYBA":[40,20,30,55,40,80],"LEDIAN":[55,35,50,85,55,110],"SPINARAK":[40,60,40,30,40,40],"ARIADOS":[70,90,70,40,60,70],"CHINCHOU":[75,38,38,67,56,56],"LANTURN":[125,58,58,67,76,76],"TOGEPI":[35,20,65,20,40,65],"TOGETIC":[55,40,85,40,80,105],"TOGEKISS":[85,50,95,80,120,115],"NATU":[40,50,45,70,70,45],"XATU":[65,75,70,95,95,70],"MAREEP":[55,40,40,35,65,45],"FLAAFFY":[70,55,55,45,80,60],"AMPHAROS":[90,75,85,55,115,90],"AMPHAROS_MEGA":[90,95,105,45,165,110],"AZURILL":[50,20,40,20,20,40],"MARILL":[70,20,50,40,20,50],"AZUMARILL":[100,50,80,50,60,80],"BONSLY":[50,80,95,10,10,45],"SUDOWOODO":[70,100,115,30,30,65],"HOPPIP":[35,35,40,50,35,55],"SKIPLOOM":[55,45,50,80,45,65],"JUMPLUFF":[75,55,70,110,55,95],"AIPOM":[55,70,55,85,40,55],"AMBIPOM":[75,100,66,115,60,66],"SUNKERN":[30,30,30,30,30,30],"SUNFLORA":[75,75,55,30,105,85],"YANMA":[65,65,45,95,75,45],"YANMEGA":[86,76,86,95,116,56],"WOOPER":[55,45,45,15,25,25],"QUAGSIRE":[95,85,85,35,65,65],"WOOPER_PALDEA":[55,45,45,15,25,25],"CLODSIRE":[130,75,60,20,45,100],"MURKROW":[60,85,42,91,85,42],"HONCHKROW":[100,125,52,71,105,52],"MISDREAVUS":[60,60,60,85,85,85],"MISMAGIUS":[60,60,60,105,105,105],"WYNAUT":[95,23,48,23,23,48],"WOBBUFFET":[190,33,58,33,33,58],"GIRAFARIG":[70,80,65,85,90,65],"FARIGIRAF":[120,90,70,60,110,70],"PINECO":[50,65,90,15,35,35],"FORRETRESS":[75,90,140,40,60,60],"DUNSPARCE":[100,70,70,45,65,65],"DUDUNSPARCE_TWO_SEGMENT":[125,100,80,55,85,75],"DUDUNSPARCE_THREE_SEGMENT":[125,100,80,55,85,75],"GLIGAR":[65,75,105,85,35,65],"GLISCOR":[75,95,125,95,45,75],"SNUBBULL":[60,80,50,30,40,40],"GRANBULL":[90,120,75,45,60,60],"QWILFISH":[65,95,85,85,55,55],"QWILFISH_HISUI":[65,95,85,85,55,55],"OVERQWIL":[85,115,95,85,65,65],"SHUCKLE":[20,10,230,5,10,230],"HERACROSS":[80,125,75,85,40,95],"HERACROSS_MEGA":[80,185,115,75,40,105],"SNEASEL":[55,95,55,115,35,75],"WEAVILE":[70,120,65,125,45,85],"SNEASEL_HISUI":[55,95,55,115,35,75],"SNEASLER":[80,130,60,120,40,80],"TEDDIURSA":[60,80,50,40,50,50],"URSARING":[90,130,75,55,75,75],"URSALUNA":[130,140,105,50,45,80],"URSALUNA_BLOODMOON":[113,70,120,52,135,65],"SLUGMA":[40,40,40,20,70,40],"MAGCARGO":[60,50,120,30,90,80],"SWINUB":[50,50,40,50,30,30],"PILOSWINE":[100,100,80,50,60,60],"MAMOSWINE":[110,130,80,80,70,60],"CORSOLA":[65,55,95,35,65,95],"CORSOLA_GALAR":[60,55,100,30,65,100],"CURSOLA":[60,95,50,30,145,130],"REMORAID":[35,65,35,65,65,35],"OCTILLERY":[75,105,75,45,105,75],"DELIBIRD":[45,55,45,75,65,45],"MANTYKE":[45,20,50,50,60,120],"MANTINE":[85,40,70,70,80,140],"SKARMORY":[65,80,140,70,40,70],"SKARMORY_MEGA":[65,140,110,110,40,100],"HOUNDOUR":[45,60,30,65,80,50],"HOUNDOOM":[75,90,50,95,110,80],"HOUNDOOM_MEGA":[75,90,90,115,140,90],"PHANPY":[90,60,60,40,40,40],"DONPHAN":[90,120,120,50,60,60],"STANTLER":[73,95,62,85,85,65],"WYRDEER":[103,105,72,65,105,75],"SMEARGLE":[55,20,35,75,20,45],"MILTANK":[95,80,105,100,40,70],"RAIKOU":[90,85,75,115,115,100],"ENTEI":[115,115,85,100,90,75],"SUICUNE":[100,75,115,85,90,115],"LARVITAR":[50,64,50,41,45,50],"PUPITAR":[70,84,70,51,65,70],"TYRANITAR":[100,134,110,61,95,100],"TYRANITAR_MEGA":[100,164,150,71,95,120],"LUGIA":[106,90,130,110,90,154],"HO_OH":[106,130,90,90,110,154],"CELEBI":[100,100,100,100,100,100],"TREECKO":[40,45,35,70,65,55],"GROVYLE":[50,65,45,95,85,65],"SCEPTILE":[70,85,65,120,105,85],"SCEPTILE_MEGA":[70,110,75,145,145,85],"TORCHIC":[45,60,40,45,70,50],"COMBUSKEN":[60,85,60,55,85,60],"BLAZIKEN":[80,120,70,80,110,70],"BLAZIKEN_MEGA":[80,160,80,100,130,80],"MUDKIP":[50,70,50,40,50,50],"MARSHTOMP":[70,85,70,50,60,70],"SWAMPERT":[100,110,90,60,85,90],"SWAMPERT_MEGA":[100,150,110,70,95,110],"POOCHYENA":[35,55,35,35,30,30],"MIGHTYENA":[70,90,70,70,60,60],"ZIGZAGOON":[38,30,41,60,30,41],"LINOONE":[78,70,61,100,50,61],"ZIGZAGOON_GALAR":[38,30,41,60,30,41],"LINOONE_GALAR":[78,70,61,100,50,61],"OBSTAGOON":[93,90,101,95,60,81],"WURMPLE":[45,45,35,20,20,30],"SILCOON":[50,35,55,15,25,25],"BEAUTIFLY":[60,70,50,65,100,50],"CASCOON":[50,35,55,15,25,25],"DUSTOX":[60,50,70,65,50,90],"LOTAD":[40,30,30,30,40,50],"LOMBRE":[60,50,50,50,60,70],"LUDICOLO":[80,70,70,70,90,100],"SEEDOT":[40,40,50,30,30,30],"NUZLEAF":[70,70,40,60,60,40],"SHIFTRY":[90,100,60,80,90,60],"TAILLOW":[40,55,30,85,30,30],"SWELLOW":[60,85,60,125,75,50],"WINGULL":[40,30,30,85,55,30],"PELIPPER":[60,50,100,65,95,70],"RALTS":[28,25,25,40,45,35],"KIRLIA":[38,35,35,50,65,55],"GARDEVOIR":[68,65,65,80,125,115],"GARDEVOIR_MEGA":[68,85,65,100,165,135],"GALLADE":[68,125,65,80,65,115],"GALLADE_MEGA":[68,165,95,110,65,115],"SURSKIT":[40,30,32,65,50,52],"MASQUERAIN":[70,60,62,80,100,82],"SHROOMISH":[60,40,60,35,40,60],"BRELOOM":[60,130,80,70,60,60],"SLAKOTH":[60,60,60,30,35,35],"VIGOROTH":[80,80,80,90,55,55],"SLAKING":[150,160,100,100,95,65],"NINCADA":[31,45,90,40,30,30],"NINJASK":[61,90,45,160,50,50],"SHEDINJA":[1,200,1,160,120,1],"WHISMUR":[64,51,23,28,51,23],"LOUDRED":[84,71,43,48,71,43],"EXPLOUD":[104,91,63,68,91,73],"MAKUHITA":[72,60,30,25,20,30],"HARIYAMA":[145,175,100,80,40,60],"NOSEPASS":[30,45,135,30,45,90],"PROBOPASS":[60,105,145,40,75,150],"SKITTY":[50,45,45,50,35,35],"DELCATTY":[70,65,65,90,55,55],"SABLEYE":[50,75,75,50,65,65],"SABLEYE_MEGA":[50,85,125,20,85,115],"MAWILE":[50,85,85,50,55,55],"MAWILE_MEGA":[50,105,125,50,55,95],"ARON":[50,70,100,30,40,40],"LAIRON":[60,90,140,40,50,50],"AGGRON":[70,110,180,50,60,60],"AGGRON_MEGA":[70,140,200,50,1,200],"MEDITITE":[30,40,55,60,40,55],"MEDICHAM":[60,60,75,80,60,75],"MEDICHAM_MEGA":[60,100,85,100,80,85],"ELECTRIKE":[40,45,40,65,65,40],"MANECTRIC":[70,75,60,105,105,60],"MANECTRIC_MEGA":[70,75,80,135,135,80],"PLUSLE":[60,50,40,95,85,75],"MINUN":[60,40,50,95,75,85],"VOLBEAT":[65,73,75,85,47,85],"ILLUMISE":[65,47,75,85,73,85],"BUDEW":[40,30,35,55,50,70],"ROSELIA":[50,60,45,65,100,80],"ROSERADE":[60,70,65,90,125,105],"GULPIN":[70,43,53,40,43,53],"SWALOT":[100,73,83,55,73,83],"CARVANHA":[45,90,20,65,65,20],"SHARPEDO":[70,120,40,95,95,40],"SHARPEDO_MEGA":[70,140,70,105,110,65],"WAILMER":[130,70,35,60,70,35],"WAILORD":[170,90,95,60,90,95],"NUMEL":[60,60,40,35,65,45],"CAMERUPT":[70,100,70,40,105,75],"CAMERUPT_MEGA":[70,120,100,20,145,105],"TORKOAL":[70,85,140,20,85,70],"SPOINK":[60,25,35,60,70,80],"GRUMPIG":[80,45,65,80,90,110],"SPINDA":[60,60,60,60,60,60],"TRAPINCH":[45,100,45,10,45,45],"VIBRAVA":[50,70,50,70,50,50],"FLYGON":[80,115,80,120,120,85],"CACNEA":[50,85,40,35,85,40],"CACTURNE":[70,115,60,55,115,60],"SWABLU":[45,40,60,50,40,75],"ALTARIA":[75,70,90,80,70,105],"ALTARIA_MEGA":[75,110,110,80,110,105],"ZANGOOSE":[73,115,60,90,60,60],"SEVIPER":[73,100,60,65,100,60],"LUNATONE":[90,55,65,70,95,85],"SOLROCK":[90,95,85,70,55,65],"BARBOACH":[50,48,43,60,46,41],"WHISCASH":[110,78,73,60,76,71],"CORPHISH":[43,80,65,35,50,35],"CRAWDAUNT":[63,120,85,55,90,55],"BALTOY":[40,40,55,55,40,70],"CLAYDOL":[60,70,105,75,70,120],"LILEEP":[66,41,77,23,61,87],"CRADILY":[106,107,97,43,81,107],"ANORITH":[45,95,50,75,40,50],"ARMALDO":[75,125,100,45,70,80],"FEEBAS":[20,15,20,80,10,55],"MILOTIC":[95,60,79,81,100,125],"CASTFORM_NORMAL":[70,70,70,70,70,70],"CASTFORM_SUNNY":[70,70,70,70,70,70],"CASTFORM_RAINY":[70,70,70,70,70,70],"CASTFORM_SNOWY":[70,70,70,70,70,70],"KECLEON":[60,90,70,40,60,120],"SHUPPET":[44,75,35,45,63,33],"BANETTE":[64,115,65,65,83,63],"BANETTE_MEGA":[64,165,75,75,93,83],"DUSKULL":[20,40,90,25,30,90],"DUSCLOPS":[40,70,130,25,60,130],"DUSKNOIR":[45,100,135,45,65,135],"TROPIUS":[99,68,83,51,72,87],"CHINGLING":[45,30,50,45,65,50],"CHIMECHO":[75,50,80,65,95,90],"CHIMECHO_MEGA":[75,50,110,65,135,120],"ABSOL":[65,130,60,75,75,60],"ABSOL_MEGA":[65,150,60,115,115,60],"ABSOL_MEGA_Z":[65,154,60,151,75,60],"SNORUNT":[50,50,50,50,50,50],"GLALIE":[80,80,80,80,80,80],"GLALIE_MEGA":[80,120,80,100,120,80],"FROSLASS":[70,80,70,110,80,70],"FROSLASS_MEGA":[70,80,70,120,140,100],"SPHEAL":[70,40,50,25,55,50],"SEALEO":[90,60,70,45,75,70],"WALREIN":[110,80,90,65,95,90],"CLAMPERL":[35,64,85,32,74,55],"HUNTAIL":[55,104,105,52,94,75],"GOREBYSS":[55,84,105,52,114,75],"RELICANTH":[100,90,130,55,45,65],"LUVDISC":[43,30,55,97,40,65],"BAGON":[45,75,60,50,40,30],"SHELGON":[65,95,100,50,60,50],"SALAMENCE":[95,135,80,100,110,80],"SALAMENCE_MEGA":[95,145,130,120,120,90],"BELDUM":[40,55,80,30,35,60],"METANG":[60,75,100,50,55,80],"METAGROSS":[80,135,130,70,95,90],"METAGROSS_MEGA":[80,145,150,110,105,110],"REGIROCK":[80,100,200,50,50,100],"REGICE":[80,50,100,50,100,200],"REGISTEEL":[80,75,150,50,75,150],"LATIAS":[80,80,90,110,110,130],"LATIAS_MEGA":[80,100,120,110,140,150],"LATIOS":[80,90,80,110,130,110],"LATIOS_MEGA":[80,130,100,110,160,120],"KYOGRE":[100,100,90,90,150,140],"KYOGRE_PRIMAL":[100,150,90,90,180,160],"GROUDON":[100,150,140,90,100,90],"GROUDON_PRIMAL":[100,180,160,90,150,90],"RAYQUAZA":[105,150,90,95,150,90],"RAYQUAZA_MEGA":[105,180,100,115,180,100],"JIRACHI":[100,100,100,100,100,100],"DEOXYS_NORMAL":[50,150,50,150,150,50],"DEOXYS_ATTACK":[50,180,20,150,180,20],"DEOXYS_DEFENSE":[50,70,160,90,70,160],"DEOXYS_SPEED":[50,95,90,180,95,90],"TURTWIG":[55,68,64,31,45,55],"GROTLE":[75,89,85,36,55,65],"TORTERRA":[95,109,105,56,75,85],"CHIMCHAR":[44,58,44,61,58,44],"MONFERNO":[64,78,52,81,78,52],"INFERNAPE":[76,104,71,108,104,71],"PIPLUP":[53,51,53,40,61,56],"PRINPLUP":[64,66,68,50,81,76],"EMPOLEON":[84,86,88,60,111,101],"STARLY":[40,55,30,60,30,30],"STARAVIA":[55,75,50,80,40,40],"STARAPTOR":[85,120,70,100,50,60],"STARAPTOR_MEGA":[85,140,100,110,60,90],"BIDOOF":[59,45,40,31,35,40],"BIBAREL":[79,85,60,71,55,60],"KRICKETOT":[37,25,41,25,25,41],"KRICKETUNE":[77,85,51,65,55,51],"SHINX":[45,65,34,45,40,34],"LUXIO":[60,85,49,60,60,49],"LUXRAY":[90,145,85,120,75,85],"CRANIDOS":[67,125,40,58,30,30],"RAMPARDOS":[97,195,60,108,65,50],"SHIELDON":[30,42,118,30,42,88],"BASTIODON":[95,92,168,30,47,138],"BURMY_PLANT":[40,29,45,36,29,45],"BURMY_SANDY":[40,29,45,36,29,45],"BURMY_TRASH":[40,29,45,36,29,45],"WORMADAM_PLANT":[60,59,85,36,79,105],"WORMADAM_SANDY":[60,79,105,36,59,85],"WORMADAM_TRASH":[60,69,95,36,69,95],"COMBEE":[30,30,42,70,30,42],"VESPIQUEN":[70,80,102,40,80,102],"PACHIRISU":[60,45,70,95,45,90],"BUIZEL":[55,65,35,85,60,30],"FLOATZEL":[85,105,55,115,85,50],"CHERUBI":[45,35,45,35,62,53],"CHERRIM_OVERCAST":[70,60,70,85,87,78],"CHERRIM_SUNSHINE":[70,60,70,85,87,78],"SHELLOS_WEST":[76,48,48,34,57,62],"SHELLOS_EAST":[76,48,48,34,57,62],"GASTRODON_WEST":[111,83,68,39,92,82],"GASTRODON_EAST":[111,83,68,39,92,82],"DRIFLOON":[90,50,34,70,60,44],"DRIFBLIM":[150,80,44,80,90,54],"BUNEARY":[55,66,44,85,44,56],"LOPUNNY":[65,76,84,105,54,96],"LOPUNNY_MEGA":[65,136,94,135,54,96],"GLAMEOW":[49,55,42,85,42,37],"PURUGLY":[71,82,64,112,64,59],"STUNKY":[63,63,47,74,41,41],"SKUNTANK":[103,93,67,84,71,61],"BRONZOR":[57,24,86,23,24,86],"BRONZONG":[67,89,116,33,79,116],"CHATOT":[76,65,45,91,92,42],"SPIRITOMB":[50,92,108,35,92,108],"GIBLE":[58,70,45,42,40,45],"GABITE":[68,90,65,82,50,55],"GARCHOMP":[108,130,95,102,80,85],"GARCHOMP_MEGA":[108,170,115,92,120,95],"GARCHOMP_MEGA_Z":[108,130,85,151,141,85],"RIOLU":[40,70,40,60,35,40],"LUCARIO":[70,110,70,90,115,70],"LUCARIO_MEGA":[70,145,88,112,140,70],"LUCARIO_MEGA_Z":[70,100,70,151,164,70],"HIPPOPOTAS":[68,72,78,32,38,42],"HIPPOWDON":[108,112,118,47,68,72],"SKORUPI":[40,50,90,65,30,55],"DRAPION":[70,90,110,95,60,75],"CROAGUNK":[48,61,40,50,61,40],"TOXICROAK":[83,106,65,85,86,65],"CARNIVINE":[74,100,72,46,90,72],"FINNEON":[49,49,56,66,49,61],"LUMINEON":[69,69,76,91,69,86],"SNOVER":[60,62,50,40,62,60],"ABOMASNOW":[90,92,75,60,92,85],"ABOMASNOW_MEGA":[90,132,105,30,132,105],"ROTOM":[50,50,77,91,95,77],"ROTOM_HEAT":[50,65,107,86,105,107],"ROTOM_WASH":[50,65,107,86,105,107],"ROTOM_FROST":[50,65,107,86,105,107],"ROTOM_FAN":[50,65,107,86,105,107],"ROTOM_MOW":[50,65,107,86,105,107],"UXIE":[75,75,130,95,75,130],"MESPRIT":[80,105,105,80,105,105],"AZELF":[75,125,70,115,125,70],"DIALGA":[100,120,120,90,150,100],"DIALGA_ORIGIN":[100,100,120,90,150,120],"PALKIA":[90,120,100,100,150,120],"PALKIA_ORIGIN":[90,100,100,120,150,120],"HEATRAN":[91,90,106,77,130,106],"HEATRAN_MEGA":[91,120,106,67,175,141],"REGIGIGAS":[110,160,110,100,80,110],"GIRATINA_ALTERED":[150,100,120,90,100,120],"GIRATINA_ORIGIN":[150,120,100,90,120,100],"CRESSELIA":[120,70,110,85,75,120],"PHIONE":[80,80,80,80,80,80],"MANAPHY":[100,100,100,100,100,100],"DARKRAI":[70,90,90,125,135,90],"DARKRAI_MEGA":[70,120,130,85,165,130],"SHAYMIN_LAND":[100,100,100,100,100,100],"SHAYMIN_SKY":[100,103,75,127,120,75],"VICTINI":[100,100,100,100,100,100],"SNIVY":[45,45,55,63,45,55],"SERVINE":[60,60,75,83,60,75],"SERPERIOR":[75,75,95,113,75,95],"TEPIG":[65,63,45,45,45,45],"PIGNITE":[90,93,55,55,70,55],"EMBOAR":[110,123,65,65,100,65],"EMBOAR_MEGA":[110,148,75,75,110,110],"OSHAWOTT":[55,55,45,45,63,45],"DEWOTT":[75,75,60,60,83,60],"SAMUROTT":[95,100,85,70,108,70],"SAMUROTT_HISUI":[90,108,80,85,100,65],"PATRAT":[45,55,39,42,35,39],"WATCHOG":[60,85,69,77,60,69],"LILLIPUP":[45,60,45,55,25,45],"HERDIER":[65,80,65,60,35,65],"STOUTLAND":[85,110,90,80,45,90],"PURRLOIN":[41,50,37,66,50,37],"LIEPARD":[64,88,50,106,88,50],"PANSAGE":[50,53,48,64,53,48],"SIMISAGE":[75,98,63,101,98,63],"PANSEAR":[50,53,48,64,53,48],"SIMISEAR":[75,98,63,101,98,63],"PANPOUR":[50,53,48,64,53,48],"SIMIPOUR":[75,98,63,101,98,63],"MUNNA":[76,25,45,24,67,55],"MUSHARNA":[116,55,85,29,107,95],"PIDOVE":[50,55,50,43,36,30],"TRANQUILL":[62,77,62,65,50,42],"UNFEZANT":[80,115,80,93,65,55],"BLITZLE":[45,60,32,76,50,32],"ZEBSTRIKA":[75,100,63,116,80,63],"ROGGENROLA":[55,75,85,15,25,25],"BOLDORE":[70,105,105,20,50,40],"GIGALITH":[85,135,130,25,60,80],"WOOBAT":[65,45,43,72,55,43],"SWOOBAT":[67,57,55,114,77,55],"DRILBUR":[60,85,40,68,30,45],"EXCADRILL":[110,135,60,88,50,65],"EXCADRILL_MEGA":[110,165,100,103,65,65],"AUDINO":[103,60,86,50,60,86],"AUDINO_MEGA":[103,60,126,50,80,126],"TIMBURR":[75,80,55,35,25,35],"GURDURR":[85,105,85,40,40,50],"CONKELDURR":[105,140,95,45,55,65],"TYMPOLE":[50,50,40,64,50,40],"PALPITOAD":[75,65,55,69,65,55],"SEISMITOAD":[105,95,75,74,85,75],"THROH":[120,100,85,45,30,85],"SAWK":[75,125,75,85,30,75],"SEWADDLE":[45,53,70,42,40,60],"SWADLOON":[55,63,90,42,50,80],"LEAVANNY":[75,103,80,92,70,80],"VENIPEDE":[30,45,59,57,30,39],"WHIRLIPEDE":[40,55,99,47,40,79],"SCOLIPEDE":[60,100,89,112,55,69],"SCOLIPEDE_MEGA":[60,140,149,62,75,99],"COTTONEE":[40,27,60,66,37,50],"WHIMSICOTT":[60,67,85,116,77,75],"PETILIL":[45,35,50,30,70,50],"LILLIGANT":[70,60,75,90,110,75],"LILLIGANT_HISUI":[70,105,75,105,50,75],"BASCULIN_RED_STRIPED":[70,92,65,98,80,55],"BASCULIN_BLUE_STRIPED":[70,92,65,98,80,55],"BASCULIN_WHITE_STRIPED":[70,92,65,98,80,55],"BASCULEGION_M":[120,112,65,78,80,75],"BASCULEGION_F":[120,92,65,78,100,75],"SANDILE":[50,72,35,65,35,35],"KROKOROK":[60,82,45,74,45,45],"KROOKODILE":[95,117,80,92,65,70],"DARUMAKA":[70,90,45,50,15,45],"DARMANITAN_STANDARD":[105,140,55,95,30,55],"DARMANITAN_ZEN":[105,30,105,55,140,105],"DARUMAKA_GALAR":[70,90,45,50,15,45],"DARMANITAN_GALAR_STANDARD":[105,140,55,95,30,55],"DARMANITAN_GALAR_ZEN":[105,160,55,135,30,55],"MARACTUS":[75,86,67,60,106,67],"DWEBBLE":[50,65,85,55,35,35],"CRUSTLE":[70,105,125,45,65,75],"SCRAGGY":[50,75,70,48,35,70],"SCRAFTY":[65,90,115,58,45,115],"SCRAFTY_MEGA":[65,130,135,68,55,135],"SIGILYPH":[72,58,80,97,103,80],"YAMASK":[38,30,85,30,55,65],"COFAGRIGUS":[58,50,145,30,95,105],"YAMASK_GALAR":[38,55,85,30,30,65],"RUNERIGUS":[58,95,145,30,50,105],"TIRTOUGA":[54,78,103,22,53,45],"CARRACOSTA":[74,108,133,32,83,65],"ARCHEN":[55,112,45,70,74,45],"ARCHEOPS":[75,140,65,110,112,65],"TRUBBISH":[50,50,62,65,40,62],"GARBODOR":[80,95,82,75,60,82],"GARBODOR_GMAX":[80,95,82,75,60,82],"ZORUA":[40,65,40,65,80,40],"ZOROARK":[60,105,60,105,120,60],"ZORUA_HISUI":[35,60,40,70,85,40],"ZOROARK_HISUI":[55,100,60,110,125,60],"MINCCINO":[55,50,40,75,40,40],"CINCCINO":[75,95,60,115,65,60],"GOTHITA":[45,30,50,45,55,65],"GOTHORITA":[60,45,70,55,75,85],"GOTHITELLE":[70,55,95,65,95,110],"SOLOSIS":[45,30,40,20,105,50],"DUOSION":[65,40,50,30,125,60],"REUNICLUS":[110,65,75,30,125,85],"DUCKLETT":[62,44,50,55,44,50],"SWANNA":[75,87,63,98,87,63],"VANILLITE":[36,50,50,44,65,60],"VANILLISH":[51,65,65,59,80,75],"VANILLUXE":[71,95,85,79,110,95],"DEERLING_SPRING":[60,60,50,75,40,50],"DEERLING_SUMMER":[60,60,50,75,40,50],"DEERLING_AUTUMN":[60,60,50,75,40,50],"DEERLING_WINTER":[60,60,50,75,40,50],"SAWSBUCK_SPRING":[80,100,70,95,60,70],"SAWSBUCK_SUMMER":[80,100,70,95,60,70],"SAWSBUCK_AUTUMN":[80,100,70,95,60,70],"SAWSBUCK_WINTER":[80,100,70,95,60,70],"EMOLGA":[55,75,60,103,75,60],"KARRABLAST":[50,75,45,60,40,45],"ESCAVALIER":[70,135,105,20,60,105],"FOONGUS":[69,55,45,15,55,55],"AMOONGUSS":[114,85,70,30,85,80],"FRILLISH":[55,40,50,40,65,85],"JELLICENT":[100,60,70,60,85,105],"ALOMOMOLA":[165,75,80,65,40,45],"JOLTIK":[50,47,50,65,57,50],"GALVANTULA":[70,77,60,108,97,60],"FERROSEED":[44,50,91,10,24,86],"FERROTHORN":[74,94,131,20,54,116],"KLINK":[40,55,70,30,45,60],"KLANG":[60,80,95,50,70,85],"KLINKLANG":[60,100,115,90,70,85],"TYNAMO":[35,55,40,60,45,40],"EELEKTRIK":[65,85,70,40,75,70],"EELEKTROSS":[85,115,80,50,105,80],"EELEKTROSS_MEGA":[85,145,80,80,135,90],"ELGYEM":[55,55,55,30,85,55],"BEHEEYEM":[75,75,75,40,125,95],"LITWICK":[50,30,55,20,65,55],"LAMPENT":[60,40,60,55,95,60],"CHANDELURE":[60,55,90,80,145,90],"CHANDELURE_MEGA":[60,75,110,90,175,110],"AXEW":[46,87,60,57,30,40],"FRAXURE":[66,117,70,67,40,50],"HAXORUS":[76,147,90,97,60,70],"CUBCHOO":[55,70,40,40,60,40],"BEARTIC":[95,130,80,50,70,80],"CRYOGONAL":[80,50,50,105,95,135],"SHELMET":[50,40,85,25,40,65],"ACCELGOR":[80,70,40,145,100,60],"STUNFISK":[109,66,84,32,81,99],"STUNFISK_GALAR":[109,81,99,32,66,84],"MIENFOO":[45,85,50,65,55,50],"MIENSHAO":[65,125,60,105,95,60],"DRUDDIGON":[77,120,90,48,60,90],"GOLETT":[59,74,50,35,35,50],"GOLURK":[89,124,80,55,55,80],"GOLURK_MEGA":[89,159,105,55,70,105],"PAWNIARD":[45,85,70,60,40,40],"BISHARP":[65,125,100,70,60,70],"KINGAMBIT":[100,135,120,50,60,85],"BOUFFALANT":[95,110,95,55,40,95],"RUFFLET":[70,83,50,60,37,50],"BRAVIARY":[100,145,75,120,57,75],"BRAVIARY_HISUI":[110,83,70,65,112,70],"VULLABY":[70,55,75,60,45,65],"MANDIBUZZ":[110,65,105,80,55,95],"HEATMOR":[85,97,66,65,105,66],"DURANT":[58,109,112,109,48,48],"DEINO":[52,65,50,38,45,50],"ZWEILOUS":[72,85,70,58,65,70],"HYDREIGON":[92,105,90,98,125,90],"LARVESTA":[55,85,55,60,50,55],"VOLCARONA":[85,60,65,100,135,105],"COBALION":[91,90,129,108,90,72],"TERRAKION":[91,129,90,108,72,90],"VIRIZION":[91,90,72,108,90,129],"TORNADUS_INCARNATE":[79,115,70,111,125,80],"TORNADUS_THERIAN":[79,100,80,121,110,90],"THUNDURUS_INCARNATE":[79,115,70,111,125,80],"THUNDURUS_THERIAN":[79,105,70,101,145,80],"RESHIRAM":[100,120,100,90,150,120],"ZEKROM":[100,150,120,90,120,100],"LANDORUS_INCARNATE":[89,125,90,101,115,80],"LANDORUS_THERIAN":[89,145,90,91,105,80],"KYUREM":[125,130,90,95,130,90],"KYUREM_WHITE":[125,120,90,95,170,100],"KYUREM_BLACK":[125,170,100,95,120,90],"KELDEO_ORDINARY":[91,72,90,108,129,90],"KELDEO_RESOLUTE":[91,72,90,108,129,90],"MELOETTA_ARIA":[100,77,77,90,128,128],"MELOETTA_PIROUETTE":[100,128,90,128,77,77],"CHESPIN":[56,61,65,38,48,45],"QUILLADIN":[61,78,95,57,56,58],"CHESNAUGHT":[88,107,122,64,74,75],"CHESNAUGHT_MEGA":[88,137,172,44,74,115],"FENNEKIN":[40,45,40,60,62,60],"BRAIXEN":[59,59,58,73,90,70],"DELPHOX":[75,69,72,104,114,100],"DELPHOX_MEGA":[75,69,72,134,159,125],"FROAKIE":[41,56,40,71,62,44],"FROGADIER":[54,63,52,97,83,56],"GRENINJA":[72,95,67,122,103,71],"GRENINJA_BATTLE_BOND":[72,95,67,122,103,71],"GRENINJA_ASH":[72,145,67,132,153,71],"GRENINJA_MEGA":[72,125,77,142,133,81],"BUNNELBY":[38,36,38,57,32,36],"DIGGERSBY":[85,56,77,78,50,77],"FLETCHLING":[45,50,43,62,40,38],"FLETCHINDER":[62,73,55,84,56,52],"TALONFLAME":[78,81,71,126,74,69],"LITLEO":[62,50,58,72,73,54],"PYROAR":[86,68,72,106,109,66],"PYROAR_MEGA":[86,88,92,126,129,86],"FLOETTE_ETERNAL":[74,65,67,92,125,128],"FLOETTE_MEGA":[74,85,87,102,155,148],"SKIDDO":[66,65,48,52,62,57],"GOGOAT":[123,100,62,68,97,81],"PANCHAM":[67,82,62,43,46,48],"PANGORO":[95,124,78,58,69,71],"ESPURR":[62,48,54,68,63,60],"MEOWSTIC_M":[74,48,76,104,83,81],"MEOWSTIC_F":[74,48,76,104,83,81],"MEOWSTIC_M_MEGA":[74,48,76,124,143,101],"MEOWSTIC_F_MEGA":[74,48,76,124,143,101],"HONEDGE":[45,80,100,28,35,37],"DOUBLADE":[59,110,150,35,45,49],"AEGISLASH_SHIELD":[60,50,null,60,50,null],"AEGISLASH_BLADE":[60,null,50,60,null,50],"SPRITZEE":[78,52,60,23,63,65],"AROMATISSE":[101,72,72,29,99,89],"SWIRLIX":[62,48,66,49,59,57],"SLURPUFF":[82,80,86,72,85,75],"INKAY":[53,54,53,45,37,46],"MALAMAR":[86,92,88,73,68,75],"MALAMAR_MEGA":[86,102,88,88,98,120],"BINACLE":[42,52,67,50,39,56],"BARBARACLE":[72,105,115,68,54,86],"BARBARACLE_MEGA":[72,140,130,88,64,106],"SKRELP":[50,60,60,30,60,60],"DRAGALGE":[65,75,90,44,97,123],"DRAGALGE_MEGA":[65,85,105,44,132,163],"CLAUNCHER":[50,53,62,44,58,63],"CLAWITZER":[71,73,88,59,120,89],"HELIOPTILE":[44,38,33,70,61,43],"HELIOLISK":[62,55,52,109,109,94],"TYRUNT":[58,89,77,48,45,45],"TYRANTRUM":[82,121,119,71,69,59],"AMAURA":[77,59,50,46,67,63],"AURORUS":[123,77,72,58,99,92],"HAWLUCHA":[78,92,75,118,74,63],"HAWLUCHA_MEGA":[78,137,100,118,74,93],"DEDENNE":[67,58,57,101,81,67],"CARBINK":[50,50,150,50,50,150],"GOOMY":[45,50,35,40,55,75],"SLIGGOO":[68,75,53,60,83,113],"GOODRA":[90,100,70,80,110,150],"SLIGGOO_HISUI":[58,75,83,40,83,113],"GOODRA_HISUI":[80,100,100,60,110,150],"KLEFKI":[57,80,91,75,80,87],"PHANTUMP":[43,70,48,38,50,60],"TREVENANT":[85,110,76,56,65,82],"PUMPKABOO_AVERAGE":[49,66,70,51,44,55],"PUMPKABOO_SMALL":[44,66,70,56,44,55],"PUMPKABOO_LARGE":[54,66,70,46,44,55],"PUMPKABOO_SUPER":[59,66,70,41,44,55],"GOURGEIST_AVERAGE":[65,90,122,84,58,75],"GOURGEIST_SMALL":[55,85,122,99,58,75],"GOURGEIST_LARGE":[75,95,122,69,58,75],"GOURGEIST_SUPER":[85,100,122,54,58,75],"BERGMITE":[55,69,85,28,32,35],"AVALUGG":[125,117,184,28,44,106],"AVALUGG_HISUI":[95,127,184,38,34,36],"NOIBAT":[40,30,35,55,45,40],"NOIVERN":[85,70,80,123,97,80],"XERNEAS_NEUTRAL":[126,131,95,99,131,98],"XERNEAS_ACTIVE":[126,131,95,99,131,98],"YVELTAL":[126,131,95,99,131,98],"ZYGARDE_50":[108,100,121,95,81,95],"ZYGARDE_50_POWER_CONSTRUCT":[108,100,121,95,81,95],"ZYGARDE_10_AURA_BREAK":[54,100,71,115,61,85],"ZYGARDE_10_POWER_CONSTRUCT":[54,100,71,115,61,85],"ZYGARDE_COMPLETE":[216,100,121,85,91,95],"ZYGARDE_MEGA":[216,70,91,100,216,85],"DIANCIE":[50,100,150,50,100,150],"DIANCIE_MEGA":[50,160,110,110,160,110],"HOOPA_CONFINED":[80,110,60,70,150,130],"HOOPA_UNBOUND":[80,160,60,80,170,130],"VOLCANION":[80,110,120,70,130,90],"ROWLET":[68,55,55,42,50,50],"DARTRIX":[78,75,75,52,70,70],"DECIDUEYE":[78,107,75,70,100,100],"DECIDUEYE_HISUI":[88,112,80,60,95,95],"LITTEN":[45,65,40,70,60,40],"TORRACAT":[65,85,50,90,80,50],"INCINEROAR":[95,115,90,60,80,90],"POPPLIO":[50,54,54,40,66,56],"BRIONNE":[60,69,69,50,91,81],"PRIMARINA":[80,74,74,60,126,116],"PIKIPEK":[35,75,30,65,30,30],"TRUMBEAK":[55,85,50,75,40,50],"TOUCANNON":[80,120,75,60,75,75],"YUNGOOS":[48,70,30,45,30,30],"GUMSHOOS":[88,110,60,45,55,60],"GUMSHOOS_TOTEM":[88,110,60,45,55,60],"GRUBBIN":[47,62,45,46,55,45],"CHARJABUG":[57,82,95,36,55,75],"VIKAVOLT":[77,30,90,120,145,75],"VIKAVOLT_TOTEM":[77,70,90,43,145,75],"CRABRAWLER":[47,82,57,63,42,47],"CRABOMINABLE":[97,132,77,43,62,67],"CRABOMINABLE_MEGA":[97,157,122,33,62,107],"ORICORIO_BAILE":[75,70,70,93,98,70],"ORICORIO_POM_POM":[75,70,70,93,98,70],"ORICORIO_PAU":[75,70,70,93,98,70],"ORICORIO_SENSU":[75,70,70,93,98,70],"CUTIEFLY":[40,45,40,84,55,40],"RIBOMBEE":[60,55,60,124,95,70],"RIBOMBEE_TOTEM":[60,55,60,124,95,70],"ROCKRUFF":[45,65,40,60,30,40],"ROCKRUFF_OWN_TEMPO":[45,65,40,60,30,40],"LYCANROC_MIDDAY":[75,115,65,112,55,65],"LYCANROC_MIDNIGHT":[85,115,75,82,55,75],"LYCANROC_DUSK":[75,117,65,110,55,65],"WISHIWASHI_SOLO":[45,20,20,40,25,25],"WISHIWASHI_SCHOOL":[45,140,130,30,140,135],"MAREANIE":[50,53,62,45,43,52],"TOXAPEX":[50,63,152,35,53,142],"MUDBRAY":[70,100,70,45,45,55],"MUDSDALE":[100,125,100,35,55,85],"DEWPIDER":[38,40,52,27,40,72],"ARAQUANID":[68,70,92,42,50,132],"ARAQUANID_TOTEM":[68,70,92,42,50,132],"FOMANTIS":[40,55,35,35,50,35],"LURANTIS":[70,105,90,45,80,90],"LURANTIS_TOTEM":[70,105,90,45,80,90],"MORELULL":[40,35,55,15,65,75],"SHIINOTIC":[60,45,80,30,90,100],"SALANDIT":[48,44,40,77,71,40],"SALAZZLE":[68,64,60,117,111,60],"SALAZZLE_TOTEM":[68,64,60,117,111,60],"STUFFUL":[70,75,50,50,45,50],"BEWEAR":[120,130,120,110,55,60],"BOUNSWEET":[42,30,38,32,30,38],"STEENEE":[52,40,48,62,40,48],"TSAREENA":[72,120,98,72,50,98],"COMFEY":[51,52,90,100,82,110],"ORANGURU":[90,60,80,60,90,110],"PASSIMIAN":[100,120,90,80,40,60],"WIMPOD":[25,35,40,80,20,30],"GOLISOPOD":[75,125,140,40,60,90],"GOLISOPOD_MEGA":[75,150,175,40,70,120],"SANDYGAST":[55,55,80,15,70,45],"PALOSSAND":[85,75,110,35,100,75],"PYUKUMUKU":[55,60,130,5,30,130],"TYPE_NULL":[95,95,95,59,95,95],"KOMALA":[65,115,65,65,75,95],"TURTONATOR":[90,80,150,40,125,115],"TOGEDEMARU":[65,98,63,96,40,73],"TOGEDEMARU_TOTEM":[65,98,63,96,40,73],"MIMIKYU_DISGUISED":[55,90,80,96,50,105],"MIMIKYU_BUSTED":[55,90,80,96,50,105],"MIMIKYU_TOTEM_DISGUISED":[55,90,80,96,50,105],"MIMIKYU_BUSTED_TOTEM":[55,90,80,96,50,105],"BRUXISH":[68,105,70,92,70,70],"DRAMPA":[78,60,85,36,135,91],"DRAMPA_MEGA":[78,85,110,36,160,116],"DHELMISE":[70,131,100,40,86,90],"JANGMO_O":[45,55,65,45,45,45],"HAKAMO_O":[55,75,90,65,65,70],"KOMMO_O":[75,110,125,85,100,105],"KOMMO_O_TOTEM":[75,110,125,85,100,105],"TAPU_KOKO":[70,115,85,130,95,75],"TAPU_LELE":[70,85,75,95,130,115],"TAPU_BULU":[70,130,115,75,85,95],"TAPU_FINI":[70,75,115,85,95,130],"COSMOG":[43,29,31,37,29,31],"COSMOEM":[43,29,131,37,29,131],"SOLGALEO":[137,137,107,97,113,89],"LUNALA":[137,113,89,97,137,107],"NIHILEGO":[109,53,47,103,127,131],"BUZZWOLE":[107,139,139,79,53,53],"PHEROMOSA":[71,137,37,151,137,37],"XURKITREE":[83,89,71,83,173,71],"CELESTEELA":[97,101,103,61,107,101],"KARTANA":[59,181,131,109,59,31],"GUZZLORD":[223,101,53,43,97,53],"NECROZMA":[97,107,101,79,127,89],"NECROZMA_DUSK_MANE":[97,157,127,77,113,109],"NECROZMA_DAWN_WINGS":[97,113,109,77,157,127],"NECROZMA_ULTRA":[97,167,97,129,167,97],"MAGEARNA":[80,95,115,65,130,115],"MAGEARNA_ORIGINAL":[80,95,115,65,130,115],"MAGEARNA_MEGA":[80,125,115,95,170,115],"MAGEARNA_ORIGINAL_MEGA":[80,125,115,95,170,115],"MARSHADOW":[90,125,80,125,90,90],"POIPOLE":[67,73,67,73,73,67],"NAGANADEL":[73,73,73,121,127,73],"STAKATAKA":[61,131,211,13,53,101],"BLACEPHALON":[53,127,53,107,151,79],"ZERAORA":[88,112,75,143,102,80],"ZERAORA_MEGA":[88,157,75,153,147,80],"MELTAN":[46,65,65,34,55,35],"MELMETAL":[135,143,143,34,80,65],"MELMETAL_GMAX":[135,143,143,34,80,65],"GROOKEY":[50,65,50,65,40,40],"THWACKEY":[70,85,70,80,55,60],"RILLABOOM":[100,125,90,85,60,70],"RILLABOOM_GMAX":[100,125,90,85,60,70],"SCORBUNNY":[50,71,40,69,40,40],"RABOOT":[65,86,60,94,55,60],"CINDERACE":[80,116,75,119,65,75],"CINDERACE_GMAX":[80,116,75,119,65,75],"SOBBLE":[50,40,40,70,70,40],"DRIZZILE":[65,60,55,90,95,55],"INTELEON":[70,85,65,120,125,65],"INTELEON_GMAX":[70,85,65,120,125,65],"SKWOVET":[70,55,55,25,35,35],"GREEDENT":[120,95,95,20,55,75],"ROOKIDEE":[38,47,35,57,33,35],"CORVISQUIRE":[68,67,55,77,43,55],"CORVIKNIGHT":[98,87,105,67,53,85],"CORVIKNIGHT_GMAX":[98,87,105,67,53,85],"BLIPBUG":[25,20,20,45,25,45],"DOTTLER":[50,35,80,30,50,90],"ORBEETLE":[60,45,110,90,80,120],"ORBEETLE_GMAX":[60,45,110,90,80,120],"NICKIT":[40,28,28,50,47,52],"THIEVUL":[70,58,58,90,87,92],"GOSSIFLEUR":[40,40,60,10,40,60],"ELDEGOSS":[60,50,90,60,80,120],"WOOLOO":[42,40,55,48,40,45],"DUBWOOL":[72,80,100,88,60,90],"CHEWTLE":[50,64,50,44,38,38],"DREDNAW":[90,115,90,74,48,68],"DREDNAW_GMAX":[90,115,90,74,48,68],"YAMPER":[59,45,50,26,40,50],"BOLTUND":[69,90,60,121,90,60],"ROLYCOLY":[30,40,50,30,40,50],"CARKOL":[80,60,90,50,60,70],"COALOSSAL":[110,80,120,30,80,90],"COALOSSAL_GMAX":[110,80,120,30,80,90],"APPLIN":[40,40,80,20,40,40],"FLAPPLE":[70,110,80,70,95,60],"FLAPPLE_GMAX":[70,110,80,70,95,60],"APPLETUN":[110,85,80,30,100,80],"APPLETUN_GMAX":[110,85,80,30,100,80],"DIPPLIN":[80,80,110,40,95,80],"HYDRAPPLE":[106,80,110,44,120,80],"SILICOBRA":[52,57,75,46,35,50],"SANDACONDA":[72,107,125,71,65,70],"SANDACONDA_GMAX":[72,107,125,71,65,70],"CRAMORANT":[70,85,55,85,85,95],"CRAMORANT_GULPING":[70,85,55,85,85,95],"CRAMORANT_GORGING":[70,85,55,85,85,95],"ARROKUDA":[41,63,40,66,40,30],"BARRASKEWDA":[61,123,60,136,60,50],"TOXEL":[40,38,35,40,54,35],"TOXTRICITY_AMPED":[75,98,70,75,114,70],"TOXTRICITY_AMPED_GMAX":[75,98,70,75,114,70],"TOXTRICITY_LOW_KEY":[75,98,70,75,114,70],"TOXTRICITY_LOW_KEY_GMAX":[75,98,70,75,114,70],"SIZZLIPEDE":[50,65,45,45,50,50],"CENTISKORCH":[100,115,65,65,90,90],"CENTISKORCH_GMAX":[100,115,65,65,90,90],"CLOBBOPUS":[50,68,60,32,50,50],"GRAPPLOCT":[80,158,90,130,70,80],"SINISTEA_PHONY":[40,45,45,50,74,54],"SINISTEA_ANTIQUE":[40,45,45,50,74,54],"POLTEAGEIST_PHONY":[60,65,65,70,134,114],"POLTEAGEIST_ANTIQUE":[60,65,65,70,134,114],"HATENNA":[42,30,45,39,56,53],"HATTREM":[57,40,65,49,86,73],"HATTERENE":[57,90,95,29,136,103],"HATTERENE_GMAX":[57,90,95,29,136,103],"IMPIDIMP":[45,45,30,50,55,40],"MORGREM":[65,60,45,70,75,55],"GRIMMSNARL":[95,120,65,60,95,75],"GRIMMSNARL_GMAX":[95,120,65,60,95,75],"MILCERY":[45,40,40,34,50,61],"FALINKS":[65,100,100,75,70,60],"FALINKS_MEGA":[65,135,135,100,70,65],"PINCURCHIN":[48,101,95,15,91,85],"SNOM":[10,1,1,1,1,1],"FROSMOTH":[70,25,55,130,180,160],"STONJOURNER":[100,125,135,70,20,20],"EISCUE_ICE":[75,80,110,50,65,90],"EISCUE_NOICE":[75,80,70,130,65,50],"INDEEDEE_M":[60,65,55,95,105,95],"INDEEDEE_F":[70,55,65,85,95,105],"MORPEKO_FULL_BELLY":[58,95,58,97,70,58],"MORPEKO_HANGRY":[58,95,58,97,70,58],"CUFANT":[72,80,49,40,40,49],"COPPERAJAH":[122,130,69,90,80,109],"COPPERAJAH_GMAX":[122,130,69,30,80,69],"DRACOZOLT":[90,100,90,75,80,70],"ARCTOZOLT":[90,100,90,55,90,80],"DRACOVISH":[90,90,100,75,70,80],"ARCTOVISH":[90,90,100,55,80,90],"DURALUDON":[70,95,115,85,120,50],"DURALUDON_GMAX":[70,95,115,85,120,50],"ARCHALUDON":[90,105,130,85,125,65],"DREEPY":[28,60,30,82,40,30],"DRAKLOAK":[68,80,50,102,60,50],"DRAGAPULT":[88,120,75,142,100,75],"ZACIAN_HERO":[92,120,115,138,80,115],"ZACIAN_CROWNED":[92,150,115,148,80,115],"ZAMAZENTA_HERO":[92,120,115,138,80,115],"ZAMAZENTA_CROWNED":[92,120,140,128,80,140],"ETERNATUS":[140,85,95,130,145,95],"ETERNATUS_ETERNAMAX":[255,115,250,130,125,250],"KUBFU":[60,90,60,72,53,50],"URSHIFU_SINGLE_STRIKE":[100,130,100,97,63,60],"URSHIFU_SINGLE_STRIKE_GMAX":[100,130,100,97,63,60],"URSHIFU_RAPID_STRIKE":[100,130,100,97,63,60],"URSHIFU_RAPID_STRIKE_GMAX":[100,130,100,97,63,60],"ZARUDE":[105,120,105,105,70,95],"ZARUDE_DADA":[105,120,105,105,70,95],"REGIELEKI":[80,100,50,200,100,50],"REGIDRAGO":[200,100,50,80,100,50],"GLASTRIER":[100,145,130,30,65,110],"SPECTRIER":[100,65,60,130,145,80],"CALYREX":[100,80,80,80,80,80],"CALYREX_ICE":[100,165,150,50,85,130],"CALYREX_SHADOW":[100,85,80,150,165,100],"ENAMORUS_INCARNATE":[74,115,70,106,135,80],"ENAMORUS_THERIAN":[74,115,110,46,135,100],"SPRIGATITO":[40,61,54,65,45,45],"FLORAGATO":[61,80,63,83,60,63],"MEOWSCARADA":[76,110,70,123,81,70],"FUECOCO":[67,45,59,36,63,40],"CROCALOR":[81,55,78,49,90,58],"SKELEDIRGE":[104,75,100,66,110,75],"QUAXLY":[55,65,45,50,50,45],"QUAXWELL":[70,85,65,65,65,60],"QUAQUAVAL":[85,120,80,85,85,75],"LECHONK":[54,45,40,35,35,45],"OINKOLOGNE_M":[110,100,75,65,59,80],"OINKOLOGNE_F":[115,90,70,65,59,90],"TAROUNTULA":[35,41,45,20,29,40],"SPIDOPS":[60,79,92,35,52,86],"NYMBLE":[33,46,40,45,21,25],"LOKIX":[71,102,78,92,52,55],"PAWMI":[45,50,20,60,40,25],"PAWMO":[60,75,40,85,50,40],"PAWMOT":[70,115,70,105,70,60],"TANDEMAUS":[50,50,45,75,40,45],"MAUSHOLD_THREE":[74,75,70,111,65,75],"MAUSHOLD_FOUR":[74,75,70,111,65,75],"FIDOUGH":[37,55,70,65,30,55],"DACHSBUN":[57,80,115,95,50,80],"SMOLIV":[41,35,45,30,58,51],"DOLLIV":[52,53,60,33,78,78],"ARBOLIVA":[78,69,90,39,125,109],"SQUAWKABILLY_GREEN":[82,96,51,92,45,51],"SQUAWKABILLY_BLUE":[82,96,51,92,45,51],"SQUAWKABILLY_YELLOW":[82,96,51,92,45,51],"SQUAWKABILLY_WHITE":[82,96,51,92,45,51],"NACLI":[55,55,75,25,35,35],"NACLSTACK":[60,60,100,35,35,65],"GARGANACL":[100,100,130,35,45,90],"CHARCADET":[40,50,40,35,50,40],"ARMAROUGE":[85,60,100,75,125,80],"CERULEDGE":[75,125,80,85,60,100],"TADBULB":[61,31,41,45,59,35],"BELLIBOLT":[109,64,91,45,103,83],"WATTREL":[40,40,35,70,55,40],"KILOWATTREL":[70,70,60,125,105,60],"MASCHIFF":[60,78,60,51,40,51],"MABOSSTIFF":[80,120,90,85,60,70],"SHROODLE":[40,65,35,75,40,35],"GRAFAIAI":[63,95,65,110,80,72],"BRAMBLIN":[40,65,30,60,45,35],"BRAMBLEGHAST":[55,115,70,90,80,70],"TOEDSCOOL":[40,40,35,70,50,100],"TOEDSCRUEL":[80,70,65,100,80,120],"KLAWF":[70,100,115,75,35,55],"CAPSAKID":[50,62,40,50,62,40],"SCOVILLAIN":[65,108,65,75,108,65],"SCOVILLAIN_MEGA":[65,138,85,75,138,85],"RELLOR":[41,50,60,30,31,58],"RABSCA":[75,50,85,45,115,100],"FLITTLE":[30,35,30,75,55,30],"ESPATHRA":[95,60,60,105,101,60],"TINKATINK":[50,45,45,58,35,64],"TINKATUFF":[65,55,55,78,45,82],"TINKATON":[85,75,77,94,70,105],"WIGLETT":[10,55,25,95,35,25],"WUGTRIO":[35,100,50,120,50,70],"BOMBIRDIER":[70,103,85,82,60,85],"FINIZEN":[70,45,40,75,45,40],"PALAFIN_ZERO":[100,70,72,100,53,62],"PALAFIN_HERO":[100,160,97,100,106,87],"VAROOM":[45,70,63,47,30,45],"REVAVROOM":[80,119,90,90,54,67],"CYCLIZAR":[70,95,65,121,85,65],"ORTHWORM":[70,85,145,65,60,55],"GLIMMET":[48,35,42,60,105,60],"GLIMMORA":[83,55,90,86,130,81],"GLIMMORA_MEGA":[83,90,105,101,150,96],"GREAVARD":[50,61,60,34,30,55],"HOUNDSTONE":[72,101,100,68,50,97],"FLAMIGO":[82,115,74,90,75,64],"CETODDLE":[108,68,45,43,30,40],"CETITAN":[170,113,65,73,45,55],"VELUZA":[90,102,73,70,78,65],"DONDOZO":[150,100,115,35,65,65],"TATSUGIRI_CURLY":[68,50,60,82,120,95],"TATSUGIRI_DROOPY":[68,50,60,82,120,95],"TATSUGIRI_STRETCHY":[68,50,60,82,120,95],"TATSUGIRI_CURLY_MEGA":[68,65,90,92,135,125],"TATSUGIRI_DROOPY_MEGA":[68,65,90,92,135,125],"TATSUGIRI_STRETCHY_MEGA":[68,65,90,92,135,125],"GREAT_TUSK":[115,131,131,87,53,53],"SCREAM_TAIL":[115,65,99,111,65,115],"BRUTE_BONNET":[111,127,99,55,79,99],"FLUTTER_MANE":[55,55,55,135,135,135],"SLITHER_WING":[85,135,79,81,85,105],"SANDY_SHOCKS":[85,81,97,101,121,85],"IRON_TREADS":[90,112,120,106,72,70],"IRON_BUNDLE":[56,80,114,136,124,60],"IRON_HANDS":[154,140,108,50,50,68],"IRON_JUGULIS":[94,80,86,108,122,80],"IRON_MOTH":[80,70,60,110,140,110],"IRON_THORNS":[100,134,110,72,70,84],"FRIGIBAX":[65,75,45,55,35,45],"ARCTIBAX":[90,95,66,62,45,65],"BAXCALIBUR":[115,145,92,87,75,86],"BAXCALIBUR_MEGA":[115,175,117,87,105,101],"GIMMIGHOUL_CHEST":[45,30,70,10,75,70],"GIMMIGHOUL_ROAMING":[45,30,25,80,75,45],"GHOLDENGO":[87,60,95,84,133,91],"WO_CHIEN":[85,85,100,70,95,135],"CHIEN_PAO":[80,120,80,135,90,65],"TING_LU":[155,110,125,45,55,80],"CHI_YU":[55,80,80,100,135,120],"ROARING_MOON":[105,139,71,119,55,101],"IRON_VALIANT":[74,130,90,116,120,60],"KORAIDON":[100,135,115,135,85,100],"MIRAIDON":[100,85,100,135,135,115],"WALKING_WAKE":[99,83,91,109,125,83],"IRON_LEAVES":[90,130,88,104,70,108],"POLTCHAGEIST_COUNTERFEIT":[40,45,45,50,74,54],"POLTCHAGEIST_ARTISAN":[40,45,45,50,74,54],"SINISTCHA_UNREMARKABLE":[71,60,106,70,121,80],"SINISTCHA_MASTERPIECE":[71,60,106,70,121,80],"OKIDOGI":[88,128,115,80,58,86],"MUNKIDORI":[88,75,66,106,130,90],"FEZANDIPITI":[88,91,82,99,70,125],"GOUGING_FIRE":[105,115,121,91,65,93],"RAGING_BOLT":[125,73,91,75,137,89],"IRON_BOULDER":[90,120,80,124,68,108],"IRON_CROWN":[90,72,100,98,122,108],"TERAPAGOS_NORMAL":[90,65,85,60,65,85],"TERAPAGOS_TERASTAL":[95,95,110,85,105,110],"TERAPAGOS_STELLAR":[160,105,110,85,130,110],"PECHARUNT":[88,88,160,88,88,88]};
-function repairSpeciesStats(species){
-  if(!species || !Array.isArray(species.baseStats))return;
-  var key=String(species.constant||'').replace(/^SPECIES_/,'');
-  var source=BRISK_SOURCE_STATS[key];
-  if(source)source.forEach(function(v,i){if(v!==null && Number(species.baseStats[i])===1)species.baseStats[i]=v;});
-}
 var CORE_BALL_DESCRIPTIONS=['A tool used for catching wild Pokémon.','A good Ball with a higher catch rate than a Poké Ball.','A better Ball with a higher catch rate than a Great Ball.','The best Ball that catches a Pokémon without fail.','A rare Ball made in commemoration of some event.'];
 function coreBallIcon(id){
   var colors=['#e33','#2879d9','#333','#9655bd','#fff'];
@@ -5416,11 +5383,11 @@ function writeSaveBag(items){
     plans.push(ids);
   }
   BAG_POCKETS.forEach(function(p,pi){for(var i=0;i<p.count;i++){var id=Number(plans[pi][i]||0),qty=id?items[id]:0;dv.setUint16(p.offset+i*4,id,true);dv.setUint16(p.offset+i*4+2,qty^(currentSave.securityKey&65535),true);}});
-  recomputeChecksum(currentSave,1);dirty=true;updateDirtyBanner();return true;
+  recomputeChecksum(currentSave,1);markDirty();return true;
 }
 var uiSettings={language:'en',theme:'system',zoom:'1'};
 try{Object.assign(uiSettings,JSON.parse(localStorage.getItem('briskdex_settings')||'{}'));}catch(e){}
-var UI_TRANSLATIONS={es:['Ajustes','Guardado','Ubicaciones','Pokédex','Entrenadores','Sets competitivos','Batallas online','Movimientos','Habilidades','Objetos','Bolsa','Guía','Cambios'],fr:['Paramètres','Sauvegarde','Lieux','Pokédex','Dresseurs','Sets compétitifs','Combats en ligne','Capacités','Talents','Objets','Sac','Guide','Changements'],de:['Einstellungen','Spielstand','Fundorte','Pokédex','Trainer','Strategien','Online-Kämpfe','Attacken','Fähigkeiten','Items','Beutel','Anleitung','Änderungen']};
+var UNUSED_UI_TRANSLATIONS={es:['Ajustes','Guardado','Ubicaciones','Pokédex','Entrenadores','Sets competitivos','Batallas online','Movimientos','Habilidades','Objetos','Bolsa','Guía','Cambios'],fr:['Paramètres','Sauvegarde','Lieux','Pokédex','Dresseurs','Sets compétitifs','Combats en ligne','Capacités','Talents','Objets','Sac','Guide','Changements'],de:['Einstellungen','Spielstand','Fundorte','Pokédex','Trainer','Strategien','Online-Kämpfe','Attacken','Fähigkeiten','Items','Beutel','Anleitung','Änderungen']};
 var uiTabNames=['settings','save','routes','dex','trainers','competitive','online','moves','abilities','items','bag','guide','changes'];
 var uiEnglish=uiTabNames.map(function(n){return document.getElementById('tab-'+n).textContent;});
 function applyUISettings(){
@@ -5428,7 +5395,7 @@ function applyUISettings(){
   var light=uiSettings.theme==='light'||(uiSettings.theme==='system'&&matchMedia('(prefers-color-scheme: light)').matches);
   document.documentElement.dataset.theme=light?'light':'dark';
   document.body.style.zoom=String(Number(uiSettings.zoom)||1);
-  uiTabNames.forEach(function(n,i){document.getElementById('tab-'+n).textContent=(UI_TRANSLATIONS[uiSettings.language]||uiEnglish)[i];});
+  if(window.BriskLocalization)window.BriskLocalization.setLanguage(uiSettings.language);
   ['language','theme','zoom'].forEach(function(k){document.getElementById('setting-'+k).value=uiSettings[k];});
 }
 document.getElementById('tab-settings').addEventListener('click',function(){setMainTab('settings');});
@@ -5436,6 +5403,7 @@ document.getElementById('tab-settings').addEventListener('click',function(){setM
 matchMedia('(prefers-color-scheme: light)').addEventListener('change',applyUISettings);
 applyUISettings();
 
+try{localStorage.removeItem('briskdex_namedata_overrides');}catch(e){}
 loadNameDataFromStorage();
 loadBagFromStorage();
 if(ONLINE_STATE.roomCode&&ONLINE_STATE.playerId){
@@ -5446,6 +5414,7 @@ if(ONLINE_STATE.roomCode&&ONLINE_STATE.playerId){
 updateDataStatus();
 var gameDataReady = loadBundledGameData();
 storageReady = loadExternalStorage();
+restoreLastSave();
 
 window.__briskDexDebug = function(){
   var party = currentSave ? currentSave.party.map(function(m){ return m.species; }) : [];
@@ -5467,3 +5436,4 @@ window.__briskDexDebug = function(){
 </script>
 </body>
 </html>
+

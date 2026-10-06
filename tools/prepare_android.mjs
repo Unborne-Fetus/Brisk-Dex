@@ -8,11 +8,11 @@ const webDir = path.join(root, 'www');
 await fs.rm(webDir, { recursive: true, force: true });
 await fs.mkdir(webDir, { recursive: true });
 
-for (const file of ['brisk-dex-data.json', 'brisk-dex-trainer-teams.json']) {
+for (const file of ['brisk-dex-data.json', 'brisk-dex-trainer-teams.json', 'localization.js', 'asset-loader.js']) {
   await fs.copyFile(path.join(root, file), path.join(webDir, file));
 }
 
-for (const dir of ['brisk-dex-icons', 'brisk-dex-trainers', 'brisk-dex-items', 'brisk-dex-trainer-pics', 'brisk-dex-sprites', 'brisk-dex-cries']) {
+for (const dir of ['brisk-dex-asset-patches', 'brisk-dex-icons', 'brisk-dex-trainers', 'brisk-dex-items', 'brisk-dex-trainer-pics', 'brisk-dex-sprites', 'brisk-dex-cries']) {
   try {
     await fs.cp(path.join(root, dir), path.join(webDir, dir), { recursive: true });
   } catch (err) {
@@ -51,3 +51,4 @@ html = html.replace(marker, '<script src="android-bridge.js"></script>\n' + mark
 await fs.writeFile(path.join(webDir, 'index.html'), html);
 
 console.log(`Prepared mobile web bundle with ${Object.keys(icons).length} normal and ${Object.keys(shinyIcons).length} shiny icons.`);
+
