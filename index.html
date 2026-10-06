@@ -1007,6 +1007,21 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
       </details>
 
       <details class="guide-card">
+        <summary>Current Brisk Emerald Progression</summary>
+        <div class="guide-body">
+          <p>Brisk Emerald's current gym progression level caps are:</p>
+          <p><strong>25 → 35 → 45 → 50 → 55 → 65 → 75 → 100</strong></p>
+          <ul>
+            <li>The current level cap is also shown in Brisk Emerald's pause menu.</li>
+            <li>Overworld Pok&eacute; Ball catches are restricted to Pok&eacute;mon at or below your current progression cap.</li>
+            <li>If every wild Pok&eacute;mon on the current route is above your cap, the game reports that the route is too high level.</li>
+            <li>The battle Bag shows catch chance beside the Pok&eacute; Ball pocket and rounds the displayed percentage to the nearest whole number.</li>
+          </ul>
+          <div class="guide-tip">These values reflect the current Brisk Emerald build and can be updated again as progression is rebalanced.</div>
+        </div>
+      </details>
+
+      <details class="guide-card">
         <summary>Route Encounters &amp; Locations</summary>
         <div class="guide-body">
           <p>Route Encounters shows where Pok&eacute;mon can be found in the current Brisk Emerald data.</p>
@@ -1984,6 +1999,28 @@ var selectedAbilityReferenceId = null;
 var MOVE_LEARNERS_INDEX = null;
 var ABILITY_USERS_INDEX = null;
 var CHANGE_DATA = [];
+var CURRENT_BRISK_CHANGES = [
+  {category:"Brisk-specific · Progression & Quality of Life",changes:[
+    "Gym progression level caps are currently 25, 35, 45, 50, 55, 65, 75 and 100.",
+    "The current progression level cap is displayed in Brisk Emerald's pause menu.",
+    "Overworld Poké Ball catches are limited to wild Pokémon at or below the current progression level cap; routes entirely above the cap report that the route is too high level."
+  ]},
+  {category:"Brisk-specific · Pokédex & Catching",changes:[
+    "The battle Bag displays catch chance beside the Poké Ball pocket and rounds the shown percentage to the nearest whole number.",
+    "Field-use catching is restricted to supported Poké Balls rather than every ball item."
+  ]}
+];
+function mergeCurrentBriskChanges(groups){
+  var out=(Array.isArray(groups)?groups:[]).map(function(group){
+    return {category:group.category,changes:Array.isArray(group.changes)?group.changes.slice():[]};
+  });
+  CURRENT_BRISK_CHANGES.forEach(function(current){
+    var group=out.find(function(row){return row.category===current.category;});
+    if(!group){group={category:current.category,changes:[]};out.push(group);}
+    current.changes.forEach(function(change){if(!group.changes.includes(change)) group.changes.push(change);});
+  });
+  return out;
+}
 var BAG_ITEMS = {};
 var BAG_ORDER = [];
 var ITEM_STORAGE = {};
@@ -2087,7 +2124,7 @@ async function loadBundledGameData(){
       itemDetails:data.itemDetails || {},
       changes:Array.isArray(data.changes) ? data.changes : []
     };
-    CHANGE_DATA = BUNDLED_DATA.changes;
+    CHANGE_DATA = mergeCurrentBriskChanges(BUNDLED_DATA.changes);
     ITEM_DETAILS = Object.assign({}, BUNDLED_DATA.itemDetails || {}, USER_DATA.itemDetails || {});
     normalizeBundledReferenceData();
     MOVE_DETAILS = Object.assign({}, BUNDLED_DATA.moveDetails || {}, USER_DATA.moveDetails || {});
