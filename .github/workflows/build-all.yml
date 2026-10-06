@@ -1,0 +1,113 @@
+name: Build Brisk Dex - Desktop + Android + iOS
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "README.md"
+      - "LICENSE"
+
+jobs:
+  windows:
+    name: Windows installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install dependencies
+        run: npm install
+      - name: Verify battle effect coverage
+        run: npm run battle:coverage
+      - name: Smoke test online battle relay
+        run: npm run battle:smoke
+      - name: Build normal desktop installer
+        run: npm run dist:win
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Brisk-Dex-Windows
+          path: dist/*.exe
+          if-no-files-found: error
+
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install dependencies
+        run: npm install
+      - name: Prepare web bundle
+        run: npm run android:prepare
+      - name: Create Android project
+        run: npx cap add android
+      - name: Patch native Android file picker
+        run: node tools/patch_android.mjs
+      - name: Sync Capacitor
+        run: npx cap sync android
+      - name: Build APK
+        shell: bash
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew assembleDebug
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk Brisk-Dex-Android.apk
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Brisk-Dex-Android
+          path: Brisk-Dex-Android.apk
+          if-no-files-found: error
+
+  ios:
+    name: iOS IPA
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install dependencies
+        run: npm install
+      - name: Prepare web bundle
+        run: npm run ios:prepare
+      - name: Create iOS project
+        run: npx cap add ios
+      - name: Sync Capacitor
+        run: npx cap sync ios
+      - name: Build unsigned iPhone app
+        run: |
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build-ios \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p Payload
+          cp -R build-ios/Build/Products/Release-iphoneos/App.app Payload/BriskDex.app
+          zip -qry Brisk-Dex-iOS-Unsigned.ipa Payload
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Brisk-Dex-iOS-Unsigned
+          path: Brisk-Dex-iOS-Unsigned.ipa
+          if-no-files-found: error
