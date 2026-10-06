@@ -1,254 +1,199 @@
-## License
+# Brisk Dex
 
-Brisk Dex's original source code is licensed under the **PolyForm Noncommercial License 1.0.0**.
+Brisk Dex is a companion app for [Pokémon Brisk Emerald](https://github.com/Unborne-Fetus/Pokemon-Brisk-Emerald). Browse the game's reference data, manage Pokémon and items across saves, and battle another player using Pokémon from your collection.
 
-You are free to study, modify, and redistribute the software for noncommercial purposes, including personal learning, research, experimentation, and hobby projects.
+Species, forms, stats, moves, abilities, items, encounters, and trainer teams come from Brisk Emerald's source. Brisk changes many things from the official games, so its bundled data is the reference used by this app.
 
-**Commercial use is not permitted under this license.** This includes using Brisk Dex or derivative works for commercial purposes or selling copies or derivative versions.
+## Features
 
-Pokémon-related names, assets, artwork, game data, trademarks, and other material belonging to third parties are **not** licensed by this notice and remain the property of their respective owners.
+- **Pokédex:** search Pokémon and forms, inspect stats and evolutions, look up encounters, view sprites, and play cries. Track None, Seen, Caught, and Shiny status from a save, with manual overrides.
+- **Reference tabs:** browse moves, abilities, items, locations, and trainer teams, plus competitive set suggestions.
+- **Save management:** inspect your party and PC boxes, move Pokémon into external storage, and edit supported Pokémon details.
+- **External Pokémon storage:** keep a collection independent of one save, search and sort it, and export or merge portable JSON archives.
+- **Bag storage:** move existing item stacks between the game Bag and external storage, choosing the quantity to transfer. Key items stay in the game.
+- **Online Battle:** host or join a private singles battle with up to six Pokémon selected from your party, PC boxes, or external storage.
+- **Settings:** light/dark mode, zoom, and eight language choices.
+- **Guides:** player instructions inside the app.
 
-See the `LICENSE` file for the complete license terms.
+## Install and play
 
+Players installing a packaged app do not need Node.js or npm.
 
+| Platform | Package | Notes |
+| --- | --- | --- |
+| Windows | EXE installer | Run the installer, then launch Brisk Dex. |
+| Android | APK | Transfer it to your device and install it. Android may ask you to allow installation from that source. |
+| iOS | Unsigned IPA | Requires signing before installation; it is not a ready-to-install App Store package. |
+| Linux | AppImage or DEB | Available through the separate Linux build workflow. |
+| macOS | DMG | Build locally on a Mac using the commands below. |
 
-Made with Claude vibe coding
+Download packages from a successful run in the repository's [Actions tab](https://github.com/Unborne-Fetus/Brisk-Dex/actions). The combined workflow provides **Brisk-Dex-Windows**, **Brisk-Dex-Android**, and **Brisk-Dex-iOS-Unsigned** artifacts. Extract the downloaded ZIP to get the installer.
 
+### First launch
 
-# Brisk Dex Desktop
+1. Open your Brisk Emerald save file.
+2. Check the trainer, party, boxes, and Bag before making changes.
+3. Use the reference tabs or Guides as needed.
 
-The desktop build of Brisk Dex — the companion app for Pokémon Brisk Emerald.
-This reads and edits `.sav` files directly on disk (with automatic timestamped
-backups) and keeps an external Pokémon storage file independent of any single save.
+Bundled game data and graphics load automatically. The app also attempts to reopen your last-used save when launched.
 
-External storage is available before opening a save file. It can be searched and
-sorted, exported as a portable JSON archive, and merged from a previously exported
-archive. Deposits are written to the archive before the source Pokémon is removed.
-Desktop withdrawals remain archived until the updated save has been written; in
-the browser build the archive copy is retained after download so it can be removed
-after the downloaded save is safely in place.
+Keep a separate copy of your save and export your external storage periodically. Close the game/emulator before editing its save so the emulator does not overwrite your changes.
 
-## What you need first
+## Autosave and external storage
 
-- **Node.js** (LTS, v18 or newer). If you don't have it: https://nodejs.org
-  Check you have it with:
-  ```
-  node -v
-  ```
+Changes save automatically; there is no separate confirmation step for every edit.
 
-## Build it (one click)
+| Version | How save changes are stored |
+| --- | --- |
+| Desktop | Writes to the opened save file and makes timestamped backups beside it. |
+| Android | Writes to the selected document when its access permission is available, with a recovery backup in app storage. |
+| Browser / iOS fallback | Keeps a recovery copy internally. Use **Export saved copy** to put the updated save back into your emulator. |
 
-- **Windows:** double-click `build.bat`.
-- **Mac/Linux:** double-click `build.sh` (or run `./build.sh` in a terminal —
-  you may need to right-click → "Open" the first time on macOS to get past
-  Gatekeeper, or run `chmod +x build.sh` once on Linux).
+Reopening a save depends on the original file still being available and the app retaining access. A browser recovery copy is specific to that browser and site; clearing its data can remove it.
 
-Either script installs everything needed and builds the installer for you —
-no typing npm commands required. The finished installer lands in `dist/`.
-Remember: this build step is only for you, the developer. The players who
-download the resulting `.exe` never need Node, npm, or any of this — they
-just run the installer.
+External storage is separate from the game save. Export it before uninstalling the app, clearing app data, or changing devices. Desktop Pokémon storage is stored as `briskdex-storage.json` in the app's user-data directory.
 
-## Build it manually (if you'd rather run the steps yourself)
+Item transfers use items already present in the Bag or external storage. Transfers must fit the game's pocket and stack limits. Important key items cannot be moved into external storage.
 
-Open a terminal in this folder and run:
+## Languages and offline use
 
-```bash
-npm install
-```
+Settings includes **English, Spanish, Italian, French, Russian, Japanese, Mandarin Chinese, and Arabic**. Arabic uses right-to-left layout.
 
-That downloads Electron and electron-builder (this step needs internet access
-and may take a few minutes the first time).
+English and bundled reference data work offline. Other languages use an online translation service for uncached text; previously cached translations remain available offline. Service limits or connection failures can leave some text in English. These are automatic translations, not fully reviewed translation packs.
 
-To just try the app without building an installer:
+Multiplayer needs a connection to the relay. Building and downloading app packages also needs internet access.
 
-```bash
-npm start
-```
+## Build Windows, Android, and iOS together
 
-To build the actual installer:
+On Windows:
 
-```bash
-npm run dist
-```
+1. Download or pull the **complete repository**, including the `tools` folder.
+2. Double-click **build.bat**.
+3. Sign in to GitHub if prompted.
+4. Leave the window open while the builds finish.
 
-The output lands in `dist/`. On Windows this produces an NSIS installer
-(`Brisk Dex Setup 1.0.0.exe`) — run it to install the app like any other
-Windows program, with a Start Menu shortcut and everything.
+The script uses GitHub Actions to compile all three platforms and download their outputs. It installs GitHub CLI through winget if available and needed; otherwise install [GitHub CLI](https://cli.github.com/) first. Your GitHub account must have access to the repository and permission to run its workflow.
 
-### Building the Windows .exe from macOS or Linux
+**It builds the latest committed `main` branch on GitHub. Local uncommitted changes are not included.**
 
-`electron-builder` can cross-build a Windows installer from macOS or Linux,
-but it needs **Wine** installed on that machine:
+Finished installers are copied into `dist`. The original downloads are also kept under `dist/build-<run-id>`. If one platform fails, available outputs from successful platforms are still downloaded.
 
-```bash
-npm run dist:win
-```
+The iOS build runs on a Mac runner and produces an **unsigned IPA**. Signing and installation are separate steps.
 
-If you're on Windows itself, `npm run dist` (or `npm run dist:win`) just works
-with no extra setup.
+## Run or build locally
 
-### Other platforms
-
-```bash
-npm run dist:mac     # macOS .dmg (must be run on macOS)
-npm run dist:linux    # Linux AppImage
-```
-
-## Getting your real Brisk Emerald data (species, moves, abilities, items, icons)
-
-Brisk Dex includes a species, move, ability, item, growth-rate, and icon snapshot
-extracted from the Brisk Emerald source. The Electron app loads this data on
-startup, so the displayed species and ability names match the game. Rebuild the
-snapshot after changing game data with:
-
-```bash
-python3 tools/extract_data.py /path/to/your/Pokemon-Brisk-Emerald/checkout
-```
-
-(No dependencies beyond Python 3 — it only reads the game source.) It updates
-these files in the Brisk Dex folder:
-
-- `brisk-dex-data.json` — species names/types/abilities/growth rates, move names,
-  ability names, and item names, all pulled straight from `include/constants/*.h`
-  and `src/data/*.h` files.
-- `brisk-dex-icons/` — icon art selected from each species' `.iconSprite` field,
-  plus form-specific shiny sprite sheets generated from Brisk Emerald's palettes.
-- `brisk-dex-trainers/` — male and female player sprite sheets used for the save's
-  trainer portrait.
-
-Desktop builds bundle those files and load them on startup. In the browser version:
-
-1. **Load species/move data** → pick `brisk-dex-data.json`. This overrides/extends
-   the built-in vanilla baseline with your real data (custom species keep their
-   real name/types/abilities; move and item names appear instead of "Move #45").
-2. **Load icon folder** → pick the `brisk-dex-icons` folder. Do this *after*
-   step 1, so icon files get matched to the right species IDs. (You can also
-   point this directly at your repo's `graphics/pokemon` folder instead of the
-   extracted copy — Brisk Dex will match subfolder names to species constants
-   on its own.)
-
-If your repo's file layout doesn't quite match what the script expects (e.g.
-you've moved `species_info.h` somewhere nonstandard, or a version of expansion
-changed the struct field names), it'll still write out whatever it could match
-and print counts + a warning — share those details and I can adjust the script.
-
-The app crops the first frame from each two-frame animated icon sheet. It uses
-separate icons for forms when the source provides them. Shiny icon files named
-`<speciesId>_shiny.png` are used when available; otherwise the app applies a shiny
-tint. Brisk Emerald's current source does not include separate shiny icon sheets.
-
-Box Pokémon levels use the species growth curve from this data. The parser also
-handles Brisk Emerald's packed species, item, experience, move, and ability fields.
-
-
-
-- `main.js` — the Electron main process. Opens native file dialogs, reads/writes
-  the `.sav` file on disk, and stores external Pokémon storage as a JSON file
-  in your OS's app-data folder.
-- `preload.js` — exposes a small, safe `window.briskDexAPI` to the app (no raw
-  Node/filesystem access is given to the page itself).
-- `index.html` — the entire app (UI + Gen III save parser). This is the exact
-  same file used by the browser/web version of Brisk Dex, so both stay in sync.
-
-## Safety notes
-
-- Every time you save changes to a `.sav` file, the app first copies your
-  existing file to `<name>.backup-<timestamp>.sav` in the same folder, then
-  writes the new version. If anything ever looks wrong, restore from that
-  backup.
-- External storage lives at (OS-dependent app data folder)/Brisk Dex/briskdex-storage.json,
-  independent of any game save — that's what lets you deposit from one save
-  file and withdraw into a different one for cross-save trading.
-
-
-## Linux
-
-Brisk Dex can be built as either a portable AppImage or a Debian package.
-
-### Download from GitHub Actions
-
-Open the repository's **Actions** tab, select **Build Linux**, open the latest successful run, and download the **Brisk-Dex-Linux** artifact. It contains:
-
-- `Brisk Dex-1.0.0-linux-x64.AppImage`
-- `Brisk Dex-1.0.0-linux-x64.deb`
-
-For the AppImage:
-
-```bash
-chmod +x "Brisk Dex-1.0.0-linux-x64.AppImage"
-./"Brisk Dex-1.0.0-linux-x64.AppImage"
-```
-
-For Debian/Ubuntu-based systems:
-
-```bash
-sudo apt install ./"Brisk Dex-1.0.0-linux-x64.deb"
-```
-
-### Build locally on Linux
-
-Install Node.js 20 or newer, then run:
+Use Node.js **22 or newer** and run these commands from the repository folder:
 
 ```bash
 npm ci
+npm start
+```
+
+To build a desktop installer:
+
+```bash
+npm run dist:win
+npm run dist:mac
 npm run dist:linux
 ```
 
-The generated AppImage and Debian package will be placed in `dist/`.
+Choose the command for your platform. macOS packaging requires a Mac. Linux produces an AppImage and DEB. Outputs go into `dist`.
 
+In Windows PowerShell, use **npm.cmd** in place of **npm** if you get “running scripts is disabled”:
 
-## Online Battles
-
-Brisk Dex includes a private Host / Join battle mode that uses the party from each player's loaded Brisk Emerald save.
-
-### Local test
-
-Run the app and battle relay in separate terminals:
-
-```bash
-npm start
-npm run battle-server
+```powershell
+npm.cmd ci
+npm.cmd start
 ```
 
-The default relay is `http://localhost:8787`. Open a second Brisk Dex window, host a room in one window, and join its six-character code in the other.
+Android local builds require Java and the Android SDK. iOS compilation requires macOS and Xcode; `npm run ios:build` prepares and syncs the project rather than producing an IPA by itself. The combined GitHub workflow handles native compilation and IPA packaging.
 
-### Internet play
+The browser interface is `index.html`. Serve the complete app folder through a local web server so its JSON and graphics can load; copying only the HTML file is not enough. Browser hosting does not start a battle relay automatically.
 
-The relay in `battle-server.js` must be hosted at a publicly reachable HTTPS address. Both players enter that same address in the Online Battle tab. The relay is server-authoritative: clients submit choices while the server resolves turn order, RNG, damage, status, field effects, switching, and victory.
+## Multiplayer: PC and Android on the same network
 
-The current advanced simulator supports singles, six-Pokémon teams, PP, priority, accuracy/evasion stages, stat stages, major status conditions, confusion, flinching, Protect-family moves, common setup/recovery moves, recoil/draining moves, hazards, screens, Tailwind, weather, terrain, STAB, type effectiveness, critical hits, switching, common ability effects, and common held-item effects. Mechanics without a handler are reported in the battle log rather than silently pretending to work.
+Use the latest build on both devices.
 
-Room/player tokens are kept in session storage so an accidental tab refresh can reconnect while the relay still holds the room. Relay rooms expire after six hours of inactivity.
+1. Connect the PC and Android device to the same Wi-Fi/LAN.
+2. On the PC, open **Online Battle**, choose your team, and set **Battle relay URL** to `http://localhost:8787`.
+3. Click **Host Battle**. The desktop app starts a local relay when needed and creates a six-character room code.
+4. Allow Brisk Dex through Windows Firewall on **private networks** if prompted.
+5. On Android, enter the PC's network relay address, then enter the generated room code and click **Join Battle**.
+6. Both players mark themselves ready to begin.
 
+For example, if the PC's IPv4 address is `192.168.1.50`, Android uses:
 
-### Advanced battle engine v18
+```text
+http://192.168.1.50:8787
+```
 
-Online battles now use a selectable team of up to six Pokémon drawn from the loaded save's Party, any PC box, or Brisk Dex External Storage. Boxed and external Pokémon have battle stats reconstructed from their Brisk species data plus their actual IVs, EVs, nature, experience/level, moves, ability slot, held item, and Tera Type. The team picker includes storage-source filters and search.
+To find that address, run `ipconfig` on Windows and look under the active Wi-Fi or Ethernet adapter. Use its **IPv4 Address**, not a disconnected adapter or WSL virtual adapter.
 
-Pokédex animated sprites replay every 1 second.
+**localhost means the device you are currently using.** Entering localhost on Android will not connect to your PC.
 
-The simulator is server-authoritative and increasingly source-driven. Brisk Dex extracts move effect names, move flags, critical-hit stages, multi-hit metadata, and secondary MOVE_EFFECT data directly from Pokémon Brisk Emerald's current source. `brisk-battle-effects.json` is regenerated from Brisk Emerald and provides a finite parity checklist for 934 moves and their primary/secondary effect families.
+### Start a relay manually
 
-The v18 engine includes the previous damage/status/weather/terrain/hazard/gimmick systems plus broad primary and secondary effect handling, variable-power/type/category families, called-move mechanics, Transform/Imposter, rooms, move locks, trapping, delayed effects, common competitive items and abilities, Counter/Mirror Coat tracking, Magic Coat, Imprison, Mimic, Last Resort, Snore, Synchronoise, Upper Hand, and many signature move families.
+For browser testing or builds without automatic hosting, leave this running in a terminal:
 
-The manifest makes remaining parity work measurable, but exact 100% pokeemerald-expansion/Brisk Emerald parity should only be claimed after every manifest effect plus ability/item interaction is verified by tests against the game engine.
+```powershell
+npm.cmd run battle-server
+```
 
-The generated Brisk battle manifest currently contains 279 primary move-effect families and 87 secondary MOVE_EFFECT families. The v18 server has direct coverage for all of those effect-family names; this is used as a coverage gate, while behavioral parity still requires interaction testing.
+The relay listens on port **8787** by default. To check it on the host PC, open:
 
+```text
+http://localhost:8787/health
+```
 
-### Battle coverage target
+A working relay returns JSON containing `"ok":true`. Check the same endpoint from Android using the PC's IPv4 address. If it works on PC but not Android, check the firewall and whether the network isolates devices, such as on guest Wi-Fi.
 
-The online simulator is checked against `brisk-battle-effects.json`, generated directly from Brisk Emerald's move table. The current manifest contains **279 primary effect families and 87 secondary effect families**, and all **366/366 are explicitly accounted for** by the battle server.
+### Play across different networks
 
-Run:
+Both players need to reach the **same publicly accessible relay**, preferably through HTTPS. A local Wi-Fi address does not provide internet hosting on its own. Run `battle-server.js` on a reachable server and enter its relay URL on both devices.
+
+Rooms live in relay memory and are lost when it restarts. They expire after six hours of inactivity. Session tokens can reconnect a refreshed page while the room still exists.
+
+### Battle engine scope
+
+The relay resolves battles on the server, including turn order, damage, RNG, switching, status, field effects, and supported gimmicks. Teams can use Pokémon from the loaded save or external storage.
+
+The engine's effect-family coverage check accounts for all families in its generated Brisk move manifest. **Effect-family coverage is not proof of exact parity with every ROM mechanic or interaction.** PC-to-Android connectivity and complex battle interactions still need device and gameplay testing.
+
+## Troubleshooting
+
+| Problem | What to check |
+| --- | --- |
+| Host Battle appears to do nothing | Check the connection status beside the buttons and any error at the top of the page. Verify the relay health endpoint. |
+| Android cannot join | Use the PC's IPv4 address, the correct six-character code, the same network, and a private-network firewall allowance. |
+| Instructions still say to start the relay manually | You may be running an older installed build. Rebuild and install the new EXE/APK. |
+| PowerShell blocks npm.ps1 | Run `npm.cmd` instead. |
+| build.bat reports a missing PowerShell file | Pull or extract the entire repository, including `tools/build_all.ps1`. |
+| One platform build fails | Open the run URL printed by the script and inspect that platform's failed step. Successful platform artifacts may still be available. |
+| Save changes are not in the emulator | On browser/iOS fallback, export the updated save and replace the emulator's copy. Also check that the emulator did not overwrite it. |
+| Some translated text stays English | Connect to the internet; uncached translations depend on service availability and limits. |
+
+## Updating Brisk reference data
+
+For contributors changing the ROM's data, run the extractor from the Brisk Dex folder against a Brisk Emerald checkout:
+
+```bash
+python3 -m pip install Pillow
+python3 tools/extract_data.py /path/to/Pokemon-Brisk-Emerald
+```
+
+Commit the regenerated data and graphics, then rebuild the app. The extractor reads the ROM source; it does not substitute official-game stats for Brisk's changes.
+
+Useful battle checks:
 
 ```bash
 npm run battle:coverage
+npm run battle:smoke
 ```
 
-The Brisk data-refresh GitHub Action also runs this check automatically. If a future Brisk Emerald update introduces a new extracted move-effect family, the refresh fails until the simulator accounts for it.
+## License and credits
 
-Battle teams can be selected from the loaded save's Party, any PC Box, or Brisk Dex External Storage. Pokédex sprite animations replay every 1 second.
+Brisk Dex's original source code is licensed under the **PolyForm Noncommercial License 1.0.0**. Study, modification, and redistribution are permitted for noncommercial purposes under its terms. Commercial use, including selling copies or derivative versions, is not permitted. See [LICENSE](LICENSE) for the complete terms.
 
-“366/366 effect-family coverage” means every effect family extracted from Brisk's move metadata is accounted for. It does not claim that every possible compound interaction, historical-generation quirk, or frame-by-frame pokeemerald-expansion behavior is mathematically proven identical; those require differential battle testing against the ROM engine.
+Pokémon names, graphics, game data, trademarks, and other third-party material remain the property of their respective owners and are not licensed by this notice.
+
+Originally made with Claude-assisted coding, with subsequent development and fixes assisted by Codex.
