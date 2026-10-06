@@ -109,7 +109,7 @@ public class SaveFilePickerPlugin extends Plugin {
                             if (found.get() != null || System.currentTimeMillis() >= deadline) return;
                             HttpURLConnection conn = null;
                             try {
-                                conn = (HttpURLConnection) new URL(candidate + "/").openConnection();
+                                conn = (HttpURLConnection) new URL(candidate + "/health").openConnection();
                                 conn.setConnectTimeout(180);
                                 conn.setReadTimeout(250);
                                 conn.setRequestMethod("GET");
