@@ -31,7 +31,7 @@ try {
     Invoke-Gh workflow run build-all.yml --repo $repo --ref main -f "request_id=$requestId"
     $run = $null
     for ($attempt = 0; $attempt -lt 60; $attempt++) {
-        $runs = Invoke-Gh run list --repo $repo --workflow build-all.yml --event workflow_dispatch --limit 30 --json databaseId,displayTitle,url | ConvertFrom-Json
+        $runs = Invoke-Gh run list --repo $repo --workflow build-all.yml --event workflow_dispatch --limit 30 --json "databaseId,displayTitle,url" | ConvertFrom-Json
         $run = $runs | Where-Object { $_.displayTitle -eq "Build all - $requestId" } | Select-Object -First 1
         if ($run) { break }
         Start-Sleep -Seconds 5
