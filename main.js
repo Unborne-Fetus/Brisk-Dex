@@ -194,16 +194,38 @@ ipcMain.handle('load-asset-patch', async (_, file) => {
  return fs.readFile(path.join(__dirname,file),'utf8');
 });
 
+function battleRelayAddresses(port){
+  const interfaces=require('os').networkInterfaces();
+  const candidates=[];
+  for(const [name,entries] of Object.entries(interfaces)){
+    for(const entry of entries||[]){
+      if(entry.family!=='IPv4'||entry.internal)continue;
+      const address=entry.address;
+      const privateAddress=/^192\.168\./.test(address)||/^10\./.test(address)||/^172\.(1[6-9]|2\d|3[01])\./.test(address);
+      const virtual=/virtual|vmware|vbox|hyper-v|vethernet|tailscale|zerotier|hamachi|docker|wsl/i.test(name);
+      let score=privateAddress?100:25;
+      if(/^192\.168\./.test(address))score+=20;
+      if(/wi-?fi|wireless|ethernet|lan/i.test(name))score+=15;
+      if(virtual)score-=80;
+      candidates.push({name,address,url:'http://'+address+':'+port,score});
+    }
+  }
+  candidates.sort((a,b)=>b.score-a.score||a.name.localeCompare(b.name));
+  const lanUrls=candidates.map(item=>item.url);
+  return {url:lanUrls[0]||('http://127.0.0.1:'+port),localUrl:'http://127.0.0.1:'+port,lanUrls};
+}
+
+ipcMain.handle('get-battle-relay-info',async()=>{
+  const port=Number(process.env.PORT||8787);
+  return battleRelayAddresses(port);
+});
+
 let localBattleRelay=null;
 ipcMain.handle('start-battle-relay',async()=>{
   try{
     if(!localBattleRelay)localBattleRelay=require('./battle-server');
     const address=await localBattleRelay.ready;
-    const urls=[];
-    for(const entries of Object.values(require('os').networkInterfaces())){
-      for(const entry of entries||[])if(entry.family==='IPv4'&&!entry.internal)urls.push('http://'+entry.address+':'+address.port);
-    }
-    return {ok:true,url:'http://127.0.0.1:'+address.port,lanUrls:urls};
+    return Object.assign({ok:true},battleRelayAddresses(address.port));
   }catch(err){return {ok:false,error:err.message};}
 });
 app.on('before-quit',()=>{if(localBattleRelay)localBattleRelay.server.close();});
