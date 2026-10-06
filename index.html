@@ -602,6 +602,33 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
 .bag-quantity-input{width:100%;min-width:0;text-align:center;background:#0c0c0c;color:var(--text);border:1px solid var(--line);border-radius:5px;padding:6px 4px;font:inherit;font-size:11px;font-weight:700;}
 .bag-remove{position:absolute;right:5px;top:5px;width:25px;height:25px!important;min-width:25px!important;padding:0!important;font-size:14px!important;opacity:.7;}
 @media(max-width:520px){.bag-add .bag-item-input,.bag-add .bag-qty-input{width:100%;min-width:0}.bag-list{grid-template-columns:repeat(2,minmax(0,1fr));}}
+
+/* ---------- responsive ultrawide layout + categorized item storage ---------- */
+.wrap{max-width:none;width:min(100%,3600px);margin:0 auto;padding-left:clamp(16px,2vw,42px);padding-right:clamp(16px,2vw,42px);}
+@media (min-width:1600px){
+  .dex-layout,.trainer-layout,.item-layout,.reference-layout,.comp-layout{grid-template-columns:minmax(300px,420px) minmax(0,1fr);}
+  .route-layout{grid-template-columns:minmax(280px,380px) minmax(0,1fr);}
+  .dex-detail,.trainer-detail,.item-detail,.reference-detail,.comp-detail,.route-detail{min-width:0;}
+  .dex-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .dex-card.full{grid-column:1/-1;}
+}
+@media (min-width:2400px){
+  .dex-layout,.trainer-layout,.item-layout,.reference-layout,.comp-layout{grid-template-columns:minmax(340px,470px) minmax(0,1fr);}
+  .route-layout{grid-template-columns:minmax(320px,420px) minmax(0,1fr);}
+}
+.bag-subtabs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:thin;margin:0 0 12px;padding-bottom:2px;}
+.bag-subtabs button{flex:none;padding:8px 12px;background:var(--panel-2);border-color:var(--line);color:var(--muted);}
+.bag-subtabs button.active{color:var(--leaf-bright);border-color:#285448;background:#142721;}
+.bag-transfer-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,34%);gap:14px;align-items:start;}
+.bag-pane{border:1px solid var(--line);background:var(--panel-2);padding:12px;border-radius:8px;min-width:0;}
+.bag-pane h4{margin:0 0 4px;font-size:14px;color:var(--leaf-bright);}
+.bag-pane-note{margin:0 0 10px;color:var(--muted);font-size:11.5px;}
+.item-storage-drop{min-height:190px;transition:border-color .15s ease,background .15s ease;}
+.item-storage-drop.drag-over,#bag-list.drag-over{border-color:var(--leaf-bright);background:#132a22;}
+.external-item-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:9px;}
+.bag-entry-qty{font-size:11px;font-weight:700;color:var(--text);background:#0c0c0c;border:1px solid var(--line);border-radius:5px;padding:6px 10px;min-width:54px;}
+@media(max-width:900px){.bag-transfer-layout{grid-template-columns:1fr;}}
+
 </style>
 </head>
 <body>
@@ -840,7 +867,7 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
 
   <section id="bag-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-bag" style="display:none;">
     <div class="section-heading"><h3>Bag</h3><span class="count" id="bag-count"></span></div>
-    <p class="route-intro">Unlimited Brisk Dex item storage. This bag is stored by Brisk Dex itself, so it is not restricted by Emerald save-file pocket sizes or slot limits.</p>
+    <p class="route-intro">Stored items are organized by pocket. Drag item stacks between the Bag and External Item Storage; Brisk Dex no longer creates items or increases quantities.</p>
     <div class="bag-tools">
       <input id="bag-search" type="search" placeholder="Search stored items by name or #ID…" aria-label="Search stored bag items">
       <select id="bag-order" aria-label="Sort Brisk Dex bag">
@@ -849,19 +876,30 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
         <option value="numeric">Item #</option>
       </select>
     </div>
-    <div class="bag-add">
-      <label class="bag-item-input">Item
-        <input id="bag-add-item" list="bag-item-options" placeholder="Item name or #ID" autocomplete="off">
-        <datalist id="bag-item-options"></datalist>
-      </label>
-      <label>Quantity
-        <input class="bag-qty-input" id="bag-add-qty" type="number" min="1" step="1" value="1" inputmode="numeric">
-      </label>
-      <button class="primary" id="btn-bag-add">Add to Bag</button>
+    <div class="bag-subtabs" id="bag-subtabs" role="tablist" aria-label="Bag item categories">
+      <button class="active" data-bag-category="all">All</button>
+      <button data-bag-category="balls">Pok&eacute; Balls</button>
+      <button data-bag-category="medicine">Medicine</button>
+      <button data-bag-category="berries">Berries</button>
+      <button data-bag-category="tms">TMs / HMs</button>
+      <button data-bag-category="battle">Battle Items</button>
+      <button data-bag-category="held">Held Items</button>
+      <button data-bag-category="key">Key Items</button>
+      <button data-bag-category="other">Other</button>
     </div>
-    <div class="bag-list" id="bag-list"></div>
+    <div class="bag-transfer-layout">
+      <section class="bag-pane">
+        <h4>Bag</h4>
+        <p class="bag-pane-note">Drag a stack to External Item Storage to move it out of the Bag.</p>
+        <div class="bag-list" id="bag-list"></div>
+      </section>
+      <section class="bag-pane item-storage-drop" id="item-storage-drop">
+        <h4>External Item Storage</h4>
+        <p class="bag-pane-note">Drop Bag items here. Drag a stored stack back onto the Bag to return it.</p>
+        <div class="external-item-list" id="external-item-list"></div>
+      </section>
+    </div>
   </section>
-
 
   <section id="guide-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-guide" style="display:none;">
     <div class="guide-hero">
@@ -1911,6 +1949,8 @@ var ABILITY_USERS_INDEX = null;
 var CHANGE_DATA = [];
 var BAG_ITEMS = {};
 var BAG_ORDER = [];
+var ITEM_STORAGE = {};
+var BAG_CATEGORY = 'all';
 var currentMainTab = 'save';
 var ONLINE_STATE = {
   relayUrl: localStorage.getItem('briskdex_battle_relay') || 'http://localhost:8787',
@@ -1958,6 +1998,31 @@ function loadNameDataFromStorage(){
 function saveNameDataToStorage(){
   try{ localStorage.setItem('briskdex_namedata_overrides', JSON.stringify(USER_DATA)); }catch(e){}
 }
+
+function normalizeBundledReferenceData(){
+  var coreBalls={
+    '1':['Master Ball','ITEM_MASTER_BALL'],
+    '2':['Ultra Ball','ITEM_ULTRA_BALL'],
+    '3':['Great Ball','ITEM_GREAT_BALL'],
+    '4':['Poké Ball','ITEM_POKE_BALL'],
+    '5':['Safari Ball','ITEM_SAFARI_BALL']
+  };
+  Object.keys(coreBalls).forEach(function(id){
+    var info=coreBalls[id], detail=Object.assign({},(ITEM_DETAILS||{})[id]||{});
+    detail.name=info[0]; detail.constant=info[1];
+    if(!detail.icon) detail.icon='brisk-dex-items/'+id+'.png';
+    ITEM_DETAILS[id]=detail;
+    BUNDLED_DATA.items[id]=info[0];
+  });
+  Object.keys(BUNDLED_DATA.species||{}).forEach(function(id){
+    var species=BUNDLED_DATA.species[id];
+    // Compatibility for data bundles extracted before conditional stat
+    // expressions were supported. Future extracts are fixed at the source.
+    if(species && species.constant==='CHARMELEON' && Array.isArray(species.baseStats) && Number(species.baseStats[4])===1)
+      species.baseStats[4]=80;
+  });
+}
+
 async function loadBundledGameData(){
   if (!IS_ELECTRON && !IS_ANDROID && !IS_IOS) return;
   try{
@@ -1990,6 +2055,7 @@ async function loadBundledGameData(){
     };
     CHANGE_DATA = BUNDLED_DATA.changes;
     ITEM_DETAILS = Object.assign({}, BUNDLED_DATA.itemDetails || {}, USER_DATA.itemDetails || {});
+    normalizeBundledReferenceData();
     MOVE_DETAILS = Object.assign({}, BUNDLED_DATA.moveDetails || {}, USER_DATA.moveDetails || {});
     ABILITY_DETAILS = Object.assign({}, BUNDLED_DATA.abilityDetails || {}, USER_DATA.abilityDetails || {});
     ROUTE_DATA = Array.isArray(data.routeEncounters) ? data.routeEncounters : [];
@@ -3206,7 +3272,12 @@ function renderRouteEncounters(){
 }
 
 function dexSpeciesData(){
-  return Object.assign({}, BUNDLED_DATA.species || {}, USER_DATA.species || {});
+  var merged=Object.assign({}, BUNDLED_DATA.species || {}, USER_DATA.species || {});
+  Object.keys(merged).forEach(function(id){
+    var constant=String((merged[id]||{}).constant||'');
+    if(/(^|_)TOTEM(?:_|$)/.test(constant)) delete merged[id];
+  });
+  return merged;
 }
 function dexTitleCase(value){
   return String(value || '').replace(/^(EVO|ITEM|MOVE|TYPE|MAPSEC)_/, '').toLowerCase().replace(/(^|_)([a-z])/g, function(_,space,ch){ return (space ? ' ' : '') + ch.toUpperCase(); });
@@ -3279,10 +3350,16 @@ function renderDexTypeOptions(allSpecies){
 function dexSpeciesDisplayName(entry){
   if (!entry) return 'Unknown';
   var base = entry.name || entry.constant || 'Unknown';
-  return entry.formLabel ? base + ' · ' + entry.formLabel : base;
+  if(!entry.formLabel) return base;
+  var normalizedBase=String(base).toLowerCase().replace(/[^a-z0-9]+/g,' ');
+  var normalizedForm=String(entry.formLabel).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+  return normalizedForm && normalizedBase.includes(normalizedForm) ? base : base + ' · ' + entry.formLabel;
 }
 function dexFormBadge(entry){
   if (!entry || !entry.formLabel) return null;
+  var base=String(entry.name||entry.constant||'').toLowerCase().replace(/[^a-z0-9]+/g,' ');
+  var form=String(entry.formLabel).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+  if(form && base.includes(form)) return null;
   return el('span', {
     class:'type-pill',
     text:entry.formLabel,
@@ -4218,75 +4295,50 @@ function loadBagFromStorage(){
     var orderRaw=localStorage.getItem('briskdex_unlimited_bag_order');
     BAG_ORDER=orderRaw?JSON.parse(orderRaw):[];
     if(!Array.isArray(BAG_ORDER)) BAG_ORDER=[];
+    var storageRaw=localStorage.getItem('briskdex_external_item_storage');
+    ITEM_STORAGE=storageRaw?JSON.parse(storageRaw):{};
+    if(!ITEM_STORAGE || Array.isArray(ITEM_STORAGE) || typeof ITEM_STORAGE!=='object') ITEM_STORAGE={};
     Object.keys(BAG_ITEMS).forEach(function(id){if(!BAG_ORDER.includes(String(id)))BAG_ORDER.push(String(id));});
     BAG_ORDER=BAG_ORDER.filter(function(id){return Object.prototype.hasOwnProperty.call(BAG_ITEMS,String(id));});
-  }catch(e){ BAG_ITEMS={}; BAG_ORDER=[]; }
+  }catch(e){ BAG_ITEMS={}; BAG_ORDER=[]; ITEM_STORAGE={}; }
 }
 function saveBagToStorage(){
   try{
     localStorage.setItem('briskdex_unlimited_bag',JSON.stringify(BAG_ITEMS));
     localStorage.setItem('briskdex_unlimited_bag_order',JSON.stringify(BAG_ORDER));
-  }
-  catch(e){showError('Could not save the Brisk Dex Bag on this device: '+e.message);}
+    localStorage.setItem('briskdex_external_item_storage',JSON.stringify(ITEM_STORAGE));
+  }catch(e){showError('Could not save item storage on this device: '+e.message);}
 }
 function bagItemData(id){
   return (ITEM_DETAILS||{})[String(id)] || {name:itemName(Number(id)),icon:null};
 }
-function resolveBagItemId(value){
-  var raw=String(value||'').trim();
-  if(!raw) return null;
-  var numeric=raw.match(/^#?(\d+)$/);
-  if(numeric){
-    var id=Number(numeric[1]);
-    if((ITEM_DETAILS||{})[String(id)] || (NAME_DATA.items||{})[String(id)]) return id;
-  }
-  var target=raw.toLowerCase();
-  var ids=Object.keys(ITEM_DETAILS||{}).length?Object.keys(ITEM_DETAILS):Object.keys(NAME_DATA.items||{});
-  for(var i=0;i<ids.length;i++){
-    var data=bagItemData(ids[i]);
-    if(String(data.name||'').toLowerCase()===target) return Number(ids[i]);
-  }
-  var labelMatch=raw.match(/#(\d+)\s*$/);
-  if(labelMatch) return resolveBagItemId(labelMatch[1]);
-  return null;
+function bagItemCategory(id){
+  var item=bagItemData(id), pocket=String(item.pocket||'').toUpperCase(), constant=String(item.constant||'').toUpperCase(), name=String(item.name||'').toUpperCase();
+  if(pocket.includes('BALL') || /_BALL\b/.test(constant) || name.includes(' BALL')) return 'balls';
+  if(pocket.includes('BERR') || constant.includes('BERRY')) return 'berries';
+  if(pocket.includes('TM') || /^ITEM_(TM|HM)/.test(constant) || /^(TM|HM)\d+/.test(name)) return 'tms';
+  if(pocket.includes('KEY')) return 'key';
+  if(pocket.includes('MEDICINE') || /(POTION|HEAL|REVIVE|ETHER|ELIXIR|ANTIDOTE|AWAKENING|PARALYZE|BURN HEAL|ICE HEAL|FULL RESTORE)/.test(name)) return 'medicine';
+  if(pocket.includes('BATTLE') || /(X ATTACK|X DEFENSE|X SPEED|X ACCURACY|DIRE HIT|GUARD SPEC)/.test(name)) return 'battle';
+  if(pocket.includes('HELD') || /(BAND|SCARF|SPECS|ORB|LEFTOVERS|FOCUS SASH|VEST|HELMET|LIFE ORB|CHOICE|PLATE|INCENSE|STONE)$/.test(name)) return 'held';
+  return 'other';
 }
-function refreshBagItemOptions(){
-  var datalist=document.getElementById('bag-item-options');
-  if(!datalist) return;
-  datalist.innerHTML='';
-  var ids=Object.keys(ITEM_DETAILS||{}).length?Object.keys(ITEM_DETAILS):Object.keys(NAME_DATA.items||{});
-  ids.sort(function(a,b){return String(bagItemData(a).name||'').localeCompare(String(bagItemData(b).name||''));});
-  var frag=document.createDocumentFragment();
-  ids.forEach(function(id){
-    var item=bagItemData(id), option=document.createElement('option');
-    option.value=(item.name||itemName(Number(id)))+' #'+Number(id);
-    frag.appendChild(option);
-  });
-  datalist.appendChild(frag);
+function setBagCategory(category){
+  BAG_CATEGORY=category||'all';
+  document.querySelectorAll('#bag-subtabs [data-bag-category]').forEach(function(btn){btn.classList.toggle('active',btn.dataset.bagCategory===BAG_CATEGORY);});
+  renderBag();
 }
-function addBagItem(){
-  var input=document.getElementById('bag-add-item'), qtyInput=document.getElementById('bag-add-qty');
-  var id=resolveBagItemId(input.value), qty=Math.floor(Number(qtyInput.value));
-  if(id==null){showError('Choose a valid Brisk Emerald item by name or #ID.');return;}
-  if(!Number.isFinite(qty)||qty<1){showError('Bag quantity must be at least 1.');return;}
-  var key=String(id), current=Number(BAG_ITEMS[key])||0;
-  BAG_ITEMS[key]=Math.min(Number.MAX_SAFE_INTEGER,current+qty);
-  if(!BAG_ORDER.includes(key)) BAG_ORDER.push(key);
-  saveBagToStorage(); input.value=''; qtyInput.value='1'; clearError(); renderBag();
-}
-function changeBagItem(id,delta){
-  var key=String(id), next=(Number(BAG_ITEMS[key])||0)+delta;
-  if(next<=0) delete BAG_ITEMS[key]; else BAG_ITEMS[key]=Math.min(Number.MAX_SAFE_INTEGER,next);
-  saveBagToStorage(); renderBag();
-}
-function removeBagItem(id){
-  var key=String(id); delete BAG_ITEMS[key]; BAG_ORDER=BAG_ORDER.filter(function(x){return String(x)!==key;});
+function moveItemStack(id,from,to){
+  id=String(id);
+  var source=from==='external'?ITEM_STORAGE:BAG_ITEMS;
+  var target=to==='external'?ITEM_STORAGE:BAG_ITEMS;
+  var qty=Math.floor(Number(source[id])||0);
+  if(qty<=0 || source===target) return;
+  target[id]=(Number(target[id])||0)+qty;
+  delete source[id];
+  if(to==='bag'&&!BAG_ORDER.includes(id)) BAG_ORDER.push(id);
+  if(from==='bag') BAG_ORDER=BAG_ORDER.filter(function(x){return String(x)!==id;});
   saveBagToStorage();renderBag();
-}
-function setBagQuantity(id,value){
-  var key=String(id),qty=Math.floor(Number(value));
-  if(!Number.isFinite(qty)||qty<=0){removeBagItem(key);return;}
-  BAG_ITEMS[key]=Math.min(Number.MAX_SAFE_INTEGER,qty);saveBagToStorage();renderBag();
 }
 function reorderBagItem(sourceId,targetId){
   sourceId=String(sourceId);targetId=String(targetId);
@@ -4296,57 +4348,83 @@ function reorderBagItem(sourceId,targetId){
   var orderEl=document.getElementById('bag-order');if(orderEl)orderEl.value='custom';
   renderBag();
 }
+function makeStoredItemCard(id,qty,source){
+  var item=bagItemData(id), row=el('article',{class:'bag-entry',draggable:'true'}), info=el('div',{class:'bag-entry-info'});
+  if(item.icon){
+    var shell=el('span',{class:'asset-icon-shell'});
+    var icon=el('img',{src:item.icon,alt:'',style:'width:54px;height:54px;'});icon.loading='lazy';icon.decoding='async';icon.addEventListener('error',function(){shell.style.display='none';});shell.appendChild(icon);info.appendChild(shell);
+  }
+  var txt=el('div',{class:'bag-entry-text'});
+  txt.appendChild(el('strong',{text:item.name||itemName(Number(id))}));
+  txt.appendChild(el('small',{text:'#'+Number(id)}));info.appendChild(txt);row.appendChild(info);
+  row.appendChild(el('div',{class:'bag-entry-qty',text:'× '+Number(qty).toLocaleString()}));
+  row.addEventListener('dragstart',function(e){
+    row.classList.add('dragging');e.dataTransfer.effectAllowed='move';
+    e.dataTransfer.setData('application/x-briskdex-item',String(id));
+    e.dataTransfer.setData('application/x-briskdex-item-source',source);
+    e.dataTransfer.setData('text/plain',String(id));
+  });
+  row.addEventListener('dragend',function(){row.classList.remove('dragging');document.querySelectorAll('.drag-over').forEach(function(x){x.classList.remove('drag-over');});});
+  if(source==='bag'){
+    row.addEventListener('dragover',function(e){
+      var src=e.dataTransfer.getData('application/x-briskdex-item-source');
+      var srcId=e.dataTransfer.getData('application/x-briskdex-item');
+      if(src==='bag'&&srcId&&String(srcId)!==String(id)){e.preventDefault();row.classList.add('drag-over');}
+    });
+    row.addEventListener('dragleave',function(){row.classList.remove('drag-over');});
+    row.addEventListener('drop',function(e){
+      var src=e.dataTransfer.getData('application/x-briskdex-item-source');
+      var srcId=e.dataTransfer.getData('application/x-briskdex-item');
+      if(src==='bag'&&srcId&&String(srcId)!==String(id)){e.preventDefault();e.stopPropagation();row.classList.remove('drag-over');reorderBagItem(srcId,id);}
+    });
+  }
+  return row;
+}
 function renderBag(){
-  var list=document.getElementById('bag-list'); if(!list) return;
-  refreshBagItemOptions();
+  var list=document.getElementById('bag-list'), external=document.getElementById('external-item-list'), drop=document.getElementById('item-storage-drop');
+  if(!list||!external||!drop) return;
   var q=(document.getElementById('bag-search').value||'').trim().toLowerCase();
   var order=(document.getElementById('bag-order')||{}).value||'custom';
   var allIds=Object.keys(BAG_ITEMS).filter(function(id){return Number(BAG_ITEMS[id])>0;});
   allIds.forEach(function(id){if(!BAG_ORDER.includes(String(id)))BAG_ORDER.push(String(id));});
   var ids=allIds.filter(function(id){
-    if(!q) return true;
     var item=bagItemData(id);
-    return [item.name,item.constant,item.description,id,'#'+id].filter(Boolean).join(' ').toLowerCase().includes(q);
+    if(BAG_CATEGORY!=='all'&&bagItemCategory(id)!==BAG_CATEGORY) return false;
+    return !q || [item.name,item.constant,item.description,id,'#'+id].filter(Boolean).join(' ').toLowerCase().includes(q);
   });
   if(order==='alphabetical') ids.sort(function(a,b){return String(bagItemData(a).name||'').localeCompare(String(bagItemData(b).name||''))||Number(a)-Number(b);});
   else if(order==='numeric') ids.sort(function(a,b){return Number(a)-Number(b);});
   else ids.sort(function(a,b){return BAG_ORDER.indexOf(String(a))-BAG_ORDER.indexOf(String(b));});
-  document.getElementById('bag-count').textContent=ids.length+(q?' of '+allIds.length:'')+' item type'+(allIds.length===1?'':'s')+' · no capacity limit';
-  list.innerHTML='';
-  if(!ids.length){
-    list.appendChild(el('div',{class:'route-empty',text:allIds.length?'No stored items match this search.':'Your Brisk Dex Bag is empty. Add an item above; there is no slot limit.'}));
-    return;
-  }
-  ids.forEach(function(id){
-    var item=bagItemData(id),row=el('article',{class:'bag-entry',draggable:'true'}),info=el('div',{class:'bag-entry-info'});
-    if(item.icon){
-      var shell=el('span',{class:'asset-icon-shell'});
-      var icon=el('img',{src:item.icon,alt:'',style:'width:54px;height:54px;'});icon.loading='lazy';icon.decoding='async';shell.appendChild(icon);info.appendChild(shell);
-    }
-    var txt=el('div',{class:'bag-entry-text'});
-    txt.appendChild(el('strong',{text:item.name||itemName(Number(id))}));
-    txt.appendChild(el('small',{text:'#'+Number(id)}));info.appendChild(txt);row.appendChild(info);
-    var remove=el('button',{class:'ghost bag-remove',text:'×','aria-label':'Remove '+(item.name||'item')});
-    remove.addEventListener('click',function(e){e.stopPropagation();removeBagItem(id);});row.appendChild(remove);
-    var controls=el('div',{class:'bag-entry-controls'});
-    var minus=el('button',{class:'ghost',text:'−','aria-label':'Remove one'});
-    minus.addEventListener('click',function(){changeBagItem(id,-1);});
-    var qty=el('input',{class:'bag-quantity-input',type:'number',min:'1',step:'1',value:String(Number(BAG_ITEMS[id])),'aria-label':'Quantity'});
-    qty.addEventListener('change',function(){setBagQuantity(id,qty.value);});
-    qty.addEventListener('keydown',function(e){if(e.key==='Enter'){qty.blur();}});
-    var plus=el('button',{class:'ghost',text:'+','aria-label':'Add one'});
-    plus.addEventListener('click',function(){changeBagItem(id,1);});
-    controls.appendChild(minus);controls.appendChild(qty);controls.appendChild(plus);row.appendChild(controls);
-    row.addEventListener('dragstart',function(e){
-      row.classList.add('dragging');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('application/x-briskdex-item',String(id));e.dataTransfer.setData('text/plain',String(id));
-    });
-    row.addEventListener('dragend',function(){row.classList.remove('dragging');document.querySelectorAll('.bag-entry.drag-over').forEach(function(x){x.classList.remove('drag-over');});});
-    row.addEventListener('dragover',function(e){var src=e.dataTransfer.getData('application/x-briskdex-item')||e.dataTransfer.getData('text/plain');if(!src||String(src)===String(id))return;e.preventDefault();row.classList.add('drag-over');});
-    row.addEventListener('dragleave',function(){row.classList.remove('drag-over');});
-    row.addEventListener('drop',function(e){var src=e.dataTransfer.getData('application/x-briskdex-item')||e.dataTransfer.getData('text/plain');if(!src||String(src)===String(id))return;e.preventDefault();row.classList.remove('drag-over');reorderBagItem(src,id);});
-    list.appendChild(row);
-  });
+  document.getElementById('bag-count').textContent=allIds.length+' bag item type'+(allIds.length===1?'':'s')+' · '+Object.keys(ITEM_STORAGE).length+' externally stored';
+  list.innerHTML='';external.innerHTML='';
+  if(!ids.length) list.appendChild(el('div',{class:'route-empty',text:allIds.length?'No Bag items match this category/search.':'The Brisk Dex Bag is empty.'}));
+  ids.forEach(function(id){list.appendChild(makeStoredItemCard(id,BAG_ITEMS[id],'bag'));});
+
+  var externalIds=Object.keys(ITEM_STORAGE).filter(function(id){return Number(ITEM_STORAGE[id])>0;}).filter(function(id){
+    var item=bagItemData(id);
+    return !q || [item.name,item.constant,item.description,id,'#'+id].filter(Boolean).join(' ').toLowerCase().includes(q);
+  }).sort(function(a,b){return String(bagItemData(a).name||'').localeCompare(String(bagItemData(b).name||''));});
+  if(!externalIds.length) external.appendChild(el('div',{class:'route-empty',text:'External Item Storage is empty.'}));
+  externalIds.forEach(function(id){external.appendChild(makeStoredItemCard(id,ITEM_STORAGE[id],'external'));});
+
+  drop.ondragover=function(e){
+    if(e.dataTransfer.getData('application/x-briskdex-item-source')==='bag'){e.preventDefault();drop.classList.add('drag-over');}
+  };
+  drop.ondragleave=function(){drop.classList.remove('drag-over');};
+  drop.ondrop=function(e){
+    var src=e.dataTransfer.getData('application/x-briskdex-item-source'),id=e.dataTransfer.getData('application/x-briskdex-item');
+    if(src==='bag'&&id){e.preventDefault();drop.classList.remove('drag-over');moveItemStack(id,'bag','external');}
+  };
+  list.ondragover=function(e){
+    if(e.dataTransfer.getData('application/x-briskdex-item-source')==='external'){e.preventDefault();list.classList.add('drag-over');}
+  };
+  list.ondragleave=function(){list.classList.remove('drag-over');};
+  list.ondrop=function(e){
+    var src=e.dataTransfer.getData('application/x-briskdex-item-source'),id=e.dataTransfer.getData('application/x-briskdex-item');
+    if(src==='external'&&id){e.preventDefault();list.classList.remove('drag-over');moveItemStack(id,'external','bag');}
+  };
 }
+
 function renderChanges(){
   var root=document.getElementById('changes-grid');
   if(!root) return;
@@ -5101,6 +5179,7 @@ function handleDataFile(file){
       USER_DATA.moveDetails = Object.assign({}, USER_DATA.moveDetails || {}, parsed.moveDetails || {});
       USER_DATA.abilityDetails = Object.assign({}, USER_DATA.abilityDetails || {}, parsed.abilityDetails || {});
       ITEM_DETAILS = Object.assign({}, BUNDLED_DATA.itemDetails || {}, USER_DATA.itemDetails || {});
+      normalizeBundledReferenceData();
       MOVE_DETAILS = Object.assign({}, BUNDLED_DATA.moveDetails || {}, USER_DATA.moveDetails || {});
       ABILITY_DETAILS = Object.assign({}, BUNDLED_DATA.abilityDetails || {}, USER_DATA.abilityDetails || {});
       if (Array.isArray(parsed.routeEncounters)) ROUTE_DATA = parsed.routeEncounters;
@@ -5159,9 +5238,7 @@ document.getElementById('item-search').addEventListener('input', renderItemsDebo
 document.getElementById('item-order').addEventListener('change', renderItems);
 document.getElementById('bag-search').addEventListener('input', renderBag);
 document.getElementById('bag-order').addEventListener('change', renderBag);
-document.getElementById('btn-bag-add').addEventListener('click', addBagItem);
-document.getElementById('bag-add-item').addEventListener('keydown', function(e){if(e.key==='Enter') addBagItem();});
-document.getElementById('bag-add-qty').addEventListener('keydown', function(e){if(e.key==='Enter') addBagItem();});
+document.querySelectorAll('#bag-subtabs [data-bag-category]').forEach(function(btn){btn.addEventListener('click',function(){setBagCategory(btn.dataset.bagCategory);});});
 document.getElementById('trainer-search').addEventListener('input', renderTrainerTeamsDebounced);
 document.getElementById('trainer-class').addEventListener('change', renderTrainerTeams);
 document.getElementById('trainer-size').addEventListener('change', renderTrainerTeams);
