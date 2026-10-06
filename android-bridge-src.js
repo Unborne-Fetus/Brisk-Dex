@@ -46,8 +46,20 @@ const mobileAPI = {
   isAndroid: Capacitor.isNativePlatform() && platform === 'android',
   isIOS: Capacitor.isNativePlatform() && platform === 'ios',
   async battleRequest(url, options) {
-    const parsed=new URL(url);
+    let parsed=new URL(url);
     if(!['http:','https:'].includes(parsed.protocol))throw new Error('Use an HTTP or HTTPS relay address.');
+    if (['localhost','127.0.0.1','[::1]'].includes(parsed.hostname)) {
+      const found=await SaveFilePicker.discoverBattleRelay({port:Number(parsed.port)||8787,timeoutMs:2200});
+      if(!found||!found.url)throw new Error('No Brisk battle relay was found on this Wi-Fi network. Start Host Battle on another device, or enter its relay address manually.');
+      const base=new URL(found.url);
+      parsed.protocol=base.protocol; parsed.hostname=base.hostname; parsed.port=base.port;
+      url=parsed.toString();
+      try{
+        localStorage.setItem('briskdex_battle_relay',found.url);
+        const relay=document.getElementById('online-relay');
+        if(relay)relay.value=found.url;
+      }catch(_){}
+    }
     const response=await CapacitorHttp.request({url,method:options.method||'GET',headers:{'Content-Type':'application/json'},data:options.body?JSON.parse(options.body):undefined,connectTimeout:10000,readTimeout:15000});
     const data=typeof response.data==='string'?JSON.parse(response.data):response.data;
     if(response.status<200||response.status>=300)throw new Error(data.error||('Battle server returned '+response.status));
