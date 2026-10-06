@@ -143,7 +143,7 @@ input[type=file]{ display:none; }
   border:1px solid #55a887;
   flex-shrink:0;
 }
-.trainer-badge::after{content:"";position:absolute;width:26px;height:52px;left:50%;bottom:0;transform:translateX(-50%);background-image:var(--trainer-sprite);background-repeat:no-repeat;background-size:200% 400%;background-position:0 0;image-rendering:pixelated;}
+.trainer-badge img{width:100%;height:100%;object-fit:contain;object-position:center bottom;display:block;image-rendering:pixelated;background:transparent;}
 .trainer-id h2{ margin:0 0 4px; font-size:19px; }
 .trainer-id span{ color:var(--muted); font-size:12.5px; }
 .trainer-stats{
@@ -199,7 +199,7 @@ input[type=file]{ display:none; }
 }
 .icon-frame{position:absolute;top:0;left:0;width:100%;height:auto;image-rendering:pixelated;}
 .mon-card .name{ font-weight:600; font-size:14.5px; }
-.mon-card .species{ font-size:11.5px; color:var(--muted); }
+.mon-card .species{ font-size:12px; color:#f0f0f0; font-weight:600; text-shadow:0 1px 2px #000; }
 .mon-card .lvl{
   font-size:11px; font-weight:700; color:#101010; background:#d9a936;
   border-radius:3px; padding:3px 7px; flex-shrink:0;
@@ -212,7 +212,7 @@ input[type=file]{ display:none; }
   font-size:10px; font-weight:700; letter-spacing:.03em; text-transform:uppercase;
   padding:2.5px 8px; border-radius:2px; color:#fff; background:var(--muted-2);
 }
-.mon-card .moves-mini{ margin-top:8px; font-size:11px; color:#fff; }
+.mon-card .moves-mini{ margin-top:8px; font-size:11.5px; line-height:1.45; color:#fff; font-weight:600; text-shadow:0 1px 2px #000; }
 
 /* ---------- PC boxes ---------- */
 .pc-panel{ background:#101010; border:1px solid #2c2c2c; border-radius:2px; overflow:hidden; }
@@ -577,24 +577,31 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
 @media(max-width:720px){.guide-grid{grid-template-columns:1fr;}}
 
 /* ---------- unlimited item bag ---------- */
-.bag-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
-.bag-tools input{min-height:38px;color:var(--text);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:8px 11px;font:inherit;}
+.bag-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+.bag-tools input,.bag-tools select{min-height:38px;color:var(--text);background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:8px 11px;font:inherit;}
 .bag-tools input[type="search"]{flex:1 1 260px;min-width:180px;}
-.bag-add{display:flex;gap:8px;flex-wrap:wrap;align-items:end;background:var(--panel);border:1px solid var(--line);padding:14px;margin-bottom:14px;}
+.bag-tools select{flex:0 1 170px;}
+.bag-add{display:flex;gap:8px;flex-wrap:wrap;align-items:end;background:var(--panel-2);border:1px solid var(--line);padding:10px 12px;margin-bottom:12px;border-radius:8px;}
 .bag-add label{display:flex;flex-direction:column;gap:5px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em;}
-.bag-add input{min-height:38px;color:var(--text);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:8px 11px;font:inherit;}
-.bag-add .bag-item-input{min-width:260px;flex:1 1 320px;}
-.bag-add .bag-qty-input{width:130px;}
-.bag-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;}
-.bag-entry{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);padding:11px 12px;min-width:0;}
-.bag-entry-info{display:flex;align-items:center;gap:10px;min-width:0;flex:1;}
-.bag-entry-text{min-width:0;display:flex;flex-direction:column;}
-.bag-entry-text strong{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.bag-entry-text small{font-size:10px;color:var(--muted-2);}
-.bag-entry-controls{display:flex;align-items:center;gap:5px;flex:none;}
-.bag-entry-controls button{padding:6px 9px;min-width:32px;justify-content:center;}
-.bag-quantity{min-width:72px;text-align:center;font-size:12px;font-weight:700;}
-@media(max-width:520px){.bag-add .bag-item-input,.bag-add .bag-qty-input{width:100%;min-width:0}.bag-entry{align-items:flex-start;flex-direction:column}.bag-entry-controls{width:100%;justify-content:flex-end}}
+.bag-add input{min-height:36px;color:var(--text);background:#0d0d0d;border:1px solid var(--line);border-radius:6px;padding:7px 10px;font:inherit;}
+.bag-add .bag-item-input{min-width:240px;flex:1 1 300px;}
+.bag-add .bag-qty-input{width:120px;}
+.bag-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px;align-items:stretch;}
+.bag-entry{position:relative;min-height:148px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;background:linear-gradient(145deg,#12251f,#111 70%);border:1px solid var(--line);border-radius:9px;padding:11px 9px;min-width:0;cursor:grab;}
+.bag-entry:hover{border-color:var(--leaf);}
+.bag-entry.dragging{opacity:.45;cursor:grabbing;}
+.bag-entry.drag-over{outline:2px solid var(--leaf-bright);outline-offset:2px;}
+.bag-entry-info{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0;width:100%;}
+.bag-entry-info .asset-icon-shell{width:54px!important;height:54px!important;}
+.bag-entry-info .asset-icon-shell img{width:54px!important;height:54px!important;}
+.bag-entry-text{min-width:0;width:100%;display:flex;flex-direction:column;gap:2px;}
+.bag-entry-text strong{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.bag-entry-text small{font-size:10px;color:#c8c8c8;}
+.bag-entry-controls{display:grid;grid-template-columns:30px minmax(56px,1fr) 30px;gap:5px;align-items:center;width:100%;}
+.bag-entry-controls button{padding:6px 7px;min-width:30px;justify-content:center;}
+.bag-quantity-input{width:100%;min-width:0;text-align:center;background:#0c0c0c;color:var(--text);border:1px solid var(--line);border-radius:5px;padding:6px 4px;font:inherit;font-size:11px;font-weight:700;}
+.bag-remove{position:absolute;right:5px;top:5px;width:25px;height:25px!important;min-width:25px!important;padding:0!important;font-size:14px!important;opacity:.7;}
+@media(max-width:520px){.bag-add .bag-item-input,.bag-add .bag-qty-input{width:100%;min-width:0}.bag-list{grid-template-columns:repeat(2,minmax(0,1fr));}}
 </style>
 </head>
 <body>
@@ -819,7 +826,11 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
     <div class="section-heading"><h3>Items</h3><span class="count" id="item-count"></span></div>
     <p class="route-intro">Descriptions and obtain locations are extracted from Brisk Emerald's own item tables, maps, shops, hidden items, and reward scripts.</p>
     <div class="item-tools">
-      <input id="item-search" type="search" placeholder="Search item, description, constant, or location…" aria-label="Search Brisk Emerald items">
+      <input id="item-search" type="search" placeholder="Search item name, #ID, description, or location…" aria-label="Search Brisk Emerald items">
+      <select id="item-order" aria-label="Sort Brisk Emerald items">
+        <option value="alphabetical">Alphabetical</option>
+        <option value="numeric">Item #</option>
+      </select>
     </div>
     <div class="item-layout">
       <aside class="item-list" id="item-list" aria-label="Brisk Emerald items"></aside>
@@ -831,7 +842,12 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
     <div class="section-heading"><h3>Bag</h3><span class="count" id="bag-count"></span></div>
     <p class="route-intro">Unlimited Brisk Dex item storage. This bag is stored by Brisk Dex itself, so it is not restricted by Emerald save-file pocket sizes or slot limits.</p>
     <div class="bag-tools">
-      <input id="bag-search" type="search" placeholder="Search stored items…" aria-label="Search stored bag items">
+      <input id="bag-search" type="search" placeholder="Search stored items by name or #ID…" aria-label="Search stored bag items">
+      <select id="bag-order" aria-label="Sort Brisk Dex bag">
+        <option value="custom">Custom order</option>
+        <option value="alphabetical">Alphabetical</option>
+        <option value="numeric">Item #</option>
+      </select>
     </div>
     <div class="bag-add">
       <label class="bag-item-input">Item
@@ -1894,6 +1910,7 @@ var MOVE_LEARNERS_INDEX = null;
 var ABILITY_USERS_INDEX = null;
 var CHANGE_DATA = [];
 var BAG_ITEMS = {};
+var BAG_ORDER = [];
 var currentMainTab = 'save';
 var ONLINE_STATE = {
   relayUrl: localStorage.getItem('briskdex_battle_relay') || 'http://localhost:8787',
@@ -2029,10 +2046,15 @@ function abilityDisplayName(id, abilitySlot){
   }
   return null;
 }
+function formatMoveDisplayName(name){
+  return String(name||'')
+    .replace(/\b10000000\s*Volt Thunderbolt\b/gi,'10,000,000 Volt Thunderbolt')
+    .replace(/\b10[ _,-]?000[ _,-]?000\s*Volt Thunderbolt\b/gi,'10,000,000 Volt Thunderbolt');
+}
 function moveName(id){
   if (id === 0) return "—";
   var entry = NAME_DATA.moves[String(id)];
-  if (entry) return entry;
+  if (entry) return formatMoveDisplayName(entry);
   return "Move #" + id;
 }
 function itemName(id){
@@ -2358,28 +2380,46 @@ function wireStoragePokemonDrag(node, storageId){
     document.querySelectorAll('.drag-over').forEach(function(target){ target.classList.remove('drag-over'); });
   });
 }
-function wireEmptyBoxDrop(node, boxIndex, slotIndex){
+function moveBoxPokemon(fromBox,fromSlot,toBox,toSlot){
+  if(!currentSave || (fromBox===toBox && fromSlot===toSlot)) return false;
+  var source=currentSave.boxes[fromBox]&&currentSave.boxes[fromBox][fromSlot];
+  if(!source || source.empty) return false;
+  var target=currentSave.boxes[toBox]&&currentSave.boxes[toBox][toSlot];
+  var sourceRaw=source.rawRecord ? source.rawRecord.subarray(0,80) : new Uint8Array(80);
+  var targetRaw=(target && !target.empty && target.rawRecord) ? target.rawRecord.subarray(0,80) : new Uint8Array(80);
+  var touched=new Set();
+  writeLogicalPCBytes(currentSave,4+(toBox*30+toSlot)*80,sourceRaw).forEach(function(id){touched.add(id);});
+  writeLogicalPCBytes(currentSave,4+(fromBox*30+fromSlot)*80,targetRaw).forEach(function(id){touched.add(id);});
+  touched.forEach(function(id){recomputeChecksum(currentSave,id);});
+  currentSave.boxes[toBox][toSlot]=decodePokemon(sourceRaw,false);
+  currentSave.boxes[fromBox][fromSlot]=(target && !target.empty)?decodePokemon(targetRaw,false):{empty:true};
+  markDirty();
+  return true;
+}
+function wireBoxSlotDrop(node, boxIndex, slotIndex){
   node.addEventListener('dragover', function(event){
-    var data = pokemonDragData(event);
-    if (!data || data.source !== 'storage') return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-    node.classList.add('drag-over');
+    var data=pokemonDragData(event);
+    var canStorage=data&&data.source==='storage'&&(!currentSave.boxes[boxIndex][slotIndex]||currentSave.boxes[boxIndex][slotIndex].empty);
+    var canBox=data&&data.source==='save'&&data.loc&&data.loc.type==='box';
+    if(!canStorage&&!canBox) return;
+    event.preventDefault(); event.dataTransfer.dropEffect='move'; node.classList.add('drag-over');
   });
-  node.addEventListener('dragleave', function(event){
-    if (!node.contains(event.relatedTarget)) node.classList.remove('drag-over');
-  });
-  node.addEventListener('drop', function(event){
-    var data = pokemonDragData(event);
-    if (!data || data.source !== 'storage') return;
-    event.preventDefault(); event.stopPropagation();
-    node.classList.remove('drag-over');
-    if (currentSave.boxes[boxIndex][slotIndex] && !currentSave.boxes[boxIndex][slotIndex].empty) return;
-    if (withdrawToSlot(data.storageId, boxIndex, slotIndex)){
-      lastPokemonDropAt = Date.now();
-      document.getElementById('modal-root').innerHTML = '';
+  node.addEventListener('dragleave',function(event){if(!node.contains(event.relatedTarget))node.classList.remove('drag-over');});
+  node.addEventListener('drop',async function(event){
+    var data=pokemonDragData(event); if(!data) return;
+    var canStorage=data.source==='storage'&&(!currentSave.boxes[boxIndex][slotIndex]||currentSave.boxes[boxIndex][slotIndex].empty);
+    var canBox=data.source==='save'&&data.loc&&data.loc.type==='box';
+    if(!canStorage&&!canBox) return;
+    event.preventDefault(); event.stopPropagation(); node.classList.remove('drag-over');
+    var changed=false;
+    if(canStorage) changed=withdrawToSlot(data.storageId,boxIndex,slotIndex);
+    else changed=moveBoxPokemon(data.loc.box,data.loc.slot,boxIndex,slotIndex);
+    if(changed){
+      lastPokemonDropAt=Date.now();
+      document.getElementById('modal-root').innerHTML='';
       renderAll();
-      showNotice('Moved Pokémon into ' + currentSave.boxNames[boxIndex] + '. Save the updated file to keep the change.');
+      if(IS_ELECTRON&&currentSave.filePath) await saveChangesToFile();
+      showNotice('Pokémon moved. Save the updated file to keep the box layout.');
     }
   });
 }
@@ -2397,6 +2437,42 @@ function el(tag, attrs, children){
   (children||[]).forEach(function(c){ if (c) e.appendChild(c); });
   return e;
 }
+
+function cleanSpriteBackground(img){
+  if(!img || img.dataset.briskTransparencyDone==='1') return;
+  if(!img.complete || !img.naturalWidth || !img.naturalHeight) return;
+  img.dataset.briskTransparencyDone='1';
+  try{
+    var w=img.naturalWidth,h=img.naturalHeight,canvas=document.createElement('canvas');
+    canvas.width=w; canvas.height=h;
+    var ctx=canvas.getContext('2d',{willReadFrequently:true});
+    ctx.drawImage(img,0,0);
+    var frame=ctx.getImageData(0,0,w,h),d=frame.data;
+    var corners=[[0,0],[w-1,0],[0,h-1],[w-1,h-1]];
+    var refs=corners.map(function(p){var o=(p[1]*w+p[0])*4;return [d[o],d[o+1],d[o+2],d[o+3]];}).filter(function(c){return c[3]>245;});
+    if(!refs.length) return;
+    var ref=refs[0],sameCorners=refs.filter(function(c){return Math.abs(c[0]-ref[0])<=4&&Math.abs(c[1]-ref[1])<=4&&Math.abs(c[2]-ref[2])<=4;}).length;
+    if(sameCorners<2) return;
+    function match(x,y){
+      var o=(y*w+x)*4;
+      return d[o+3]>0 && Math.abs(d[o]-ref[0])<=6 && Math.abs(d[o+1]-ref[1])<=6 && Math.abs(d[o+2]-ref[2])<=6;
+    }
+    var seen=new Uint8Array(w*h),q=[],head=0;
+    for(var x=0;x<w;x++){ if(match(x,0))q.push([x,0]); if(h>1&&match(x,h-1))q.push([x,h-1]); }
+    for(var y=1;y<h-1;y++){ if(match(0,y))q.push([0,y]); if(w>1&&match(w-1,y))q.push([w-1,y]); }
+    while(head<q.length){
+      var p=q[head++],x=p[0],y=p[1],idx=y*w+x;
+      if(seen[idx]||!match(x,y)) continue;
+      seen[idx]=1; d[idx*4+3]=0;
+      if(x>0)q.push([x-1,y]); if(x+1<w)q.push([x+1,y]); if(y>0)q.push([x,y-1]); if(y+1<h)q.push([x,y+1]);
+    }
+    ctx.putImageData(frame,0,0);
+    img.src=canvas.toDataURL('image/png');
+  }catch(e){}
+}
+document.addEventListener('load',function(event){
+  if(event.target && event.target.tagName==='IMG') cleanSpriteBackground(event.target);
+},true);
 
 function showError(msg){
   var area = document.getElementById('error-area');
@@ -2474,7 +2550,10 @@ function renderTrainerCard(save){
   c.innerHTML = '';
   var t = save.trainer;
   var badge = el('div', {class:'trainer-badge'});
-  badge.style.setProperty('--trainer-sprite', 'url("' + trainerSpritePath(t) + '")');
+  var trainerImg=el('img',{src:trainerSpritePath(t),alt:t.name+' trainer sprite'});
+  trainerImg.decoding='async';
+  trainerImg.addEventListener('error',function(){ trainerImg.remove(); });
+  badge.appendChild(trainerImg);
   var idBlock = el('div', {class:'trainer-id'}, [
     badge,
     el('div', {}, [
@@ -2596,7 +2675,7 @@ function renderBoxGrid(save){
   box.forEach(function(mon, slotIndex){
     if (!mon || mon.empty){
       var emptySlot = el('div', {class:'slot empty'});
-      wireEmptyBoxDrop(emptySlot, activeBoxIndex, slotIndex);
+      wireBoxSlotDrop(emptySlot, activeBoxIndex, slotIndex);
       grid.appendChild(emptySlot);
       return;
     }
@@ -2610,6 +2689,7 @@ function renderBoxGrid(save){
     slot.appendChild(el('div', {class:'mini-lvl', text:'Lv' + mon.level}));
     if (mon.isShiny) slot.appendChild(el('div', {class:'shiny-star', text:'★'}));
     wireSavePokemonDrag(slot, mon, {type:'box', box:activeBoxIndex, slot:slotIndex});
+    wireBoxSlotDrop(slot, activeBoxIndex, slotIndex);
     slot.addEventListener('click', function(){ if (Date.now()-lastPokemonDropAt > 800) openModal(mon, {type:'box', box:activeBoxIndex, slot:slotIndex}); });
     grid.appendChild(slot);
   });
@@ -2997,6 +3077,16 @@ function canonicalLocationName(area, allAreas){
   }
   return name;
 }
+function routeListDisplayName(name){
+  var value=String(name||'');
+  if(/^Ever Grande City\s+/i.test(value)) return value.replace(/^Ever Grande City\s+/i,'');
+  if(/^Route 119\s+Weather Institute\s*/i.test(value)){
+    var rest=value.replace(/^Route 119\s+/i,'');
+    return rest||'Weather Institute';
+  }
+  return value;
+}
+
 function consolidateRouteAreas(areas){
   var groups=[], byKey=Object.create(null);
   (areas||[]).forEach(function(area){
@@ -3065,7 +3155,7 @@ function renderRouteEncounters(){
     var speciesCount = new Set();
     methods.forEach(function(method){ method.slots.forEach(function(slot){ speciesCount.add(slot.species); }); });
     var btn = el('button', {class:'route-location' + (area.id === selectedRouteId ? ' active' : '')});
-    btn.appendChild(el('span', {text:area.name}));
+    btn.appendChild(el('span', {text:routeListDisplayName(area.name)}));
     btn.appendChild(el('small', {text:speciesCount.size + ' species'}));
     btn.addEventListener('click', function(){ selectedRouteId = area.id; renderRouteEncounters(); });
     list.appendChild(btn);
@@ -3816,7 +3906,8 @@ function renderTrainerTeams(){
     var fields=el('div',{class:'trainer-mon-fields'});
     var speciesData=sid ? (dexSpeciesData()[String(sid)]||{}) : {};
     var explicitAbility=(m.fields||{}).Ability;
-    var abilityText=explicitAbility || (speciesData.abilities||[]).filter(Boolean).join(' / ');
+    var defaultAbilities=(speciesData.abilities||[]).filter(Boolean);
+    var abilityText=explicitAbility || defaultAbilities[0] || '';
     if(abilityText){
       fields.appendChild(el('span',{class:'k',text:'Ability'}));
       fields.appendChild(el('span',{text:abilityText}));
@@ -3836,20 +3927,15 @@ function renderTrainerTeams(){
     });
     if(fields.children.length) card.appendChild(fields);
 
-    var moveNames=(m.moves||[]).slice();
-    if(!moveNames.length && sid){
-      moveNames=(speciesData.learnableMoves||[]).map(function(moveId){return moveName(Number(moveId));}).filter(Boolean);
-    }
-    var moveSection=el('div',{style:'margin-top:10px;'});
-    moveSection.appendChild(el('div',{class:'dex-id',text:'Movepool'}));
+    var moveNames=(m.moves||[]).slice().map(formatMoveDisplayName);
     if(moveNames.length){
+      var moveSection=el('div',{style:'margin-top:10px;'});
+      moveSection.appendChild(el('div',{class:'dex-id',text:'Moves'}));
       var moves=el('div',{class:'trainer-moves'});
       moveNames.forEach(function(move){moves.appendChild(el('div',{class:'trainer-move',text:move}));});
       moveSection.appendChild(moves);
-    } else {
-      moveSection.appendChild(el('div',{class:'dex-muted',text:'No movepool data is available for this Pokémon.'}));
+      card.appendChild(moveSection);
     }
-    card.appendChild(moveSection);
     team.appendChild(card);
   });
   detail.appendChild(team);
@@ -3860,11 +3946,15 @@ function renderItems(){
   if(!list||!detail) return;
   var all=Object.keys(ITEM_DETAILS||{}).length ? ITEM_DETAILS : Object.fromEntries(Object.keys(NAME_DATA.items||{}).map(function(id){return [id,{name:NAME_DATA.items[id],constant:'',description:'',locations:[]}];}));
   var q=(document.getElementById('item-search').value||'').trim().toLowerCase();
+  var order=(document.getElementById('item-order')||{}).value||'alphabetical';
   var ids=Object.keys(all).filter(function(id){
     var it=all[id]||{}, hay=[it.name,it.constant,it.description,id,'#'+id];
     (it.locations||[]).forEach(function(loc){hay.push(loc.location,loc.method);});
     return !q || hay.filter(Boolean).join(' ').toLowerCase().includes(q);
-  }).sort(function(a,b){return String((all[a]||{}).name||'').localeCompare(String((all[b]||{}).name||''));});
+  }).sort(function(a,b){
+    if(order==='numeric') return Number(a)-Number(b);
+    return String((all[a]||{}).name||'').localeCompare(String((all[b]||{}).name||'')) || Number(a)-Number(b);
+  });
   document.getElementById('item-count').textContent=ids.length+' of '+Object.keys(all).length+' items';
   list.innerHTML=''; detail.innerHTML='';
   if(!ids.length){list.appendChild(el('div',{class:'route-empty',text:Object.keys(all).length?'No items match this search.':'No item data is loaded.'}));return;}
@@ -3963,7 +4053,7 @@ function moveLearners(moveId){
 }
 function abilityUsers(abilityId){
   if(!ABILITY_USERS_INDEX) buildReferenceIndexes();
-  return ABILITY_USERS_INDEX[String(Number(abilityId))]||[];
+  return Array.from(new Set(ABILITY_USERS_INDEX[String(Number(abilityId))]||[]));
 }
 
 function renderMoveTypeOptions(details){
@@ -3983,6 +4073,7 @@ function renderMoves(){
   var all=Object.keys(MOVE_DETAILS||{}).length ? MOVE_DETAILS : Object.fromEntries(Object.keys(NAME_DATA.moves||{}).map(function(id){
     return [id,{name:NAME_DATA.moves[id],constant:'MOVE_'+id,description:'',pp:(BUNDLED_DATA.movePP||{})[id]||0,flags:[]}];
   }));
+  Object.keys(all).forEach(function(id){if(all[id]&&all[id].name)all[id].name=formatMoveDisplayName(all[id].name);});
   renderMoveTypeOptions(all);
   var q=(document.getElementById('move-search').value||'').trim().toLowerCase();
   var type=document.getElementById('move-type').value;
@@ -4124,10 +4215,18 @@ function loadBagFromStorage(){
     var raw=localStorage.getItem('briskdex_unlimited_bag');
     BAG_ITEMS=raw?JSON.parse(raw):{};
     if(!BAG_ITEMS || Array.isArray(BAG_ITEMS) || typeof BAG_ITEMS!=='object') BAG_ITEMS={};
-  }catch(e){ BAG_ITEMS={}; }
+    var orderRaw=localStorage.getItem('briskdex_unlimited_bag_order');
+    BAG_ORDER=orderRaw?JSON.parse(orderRaw):[];
+    if(!Array.isArray(BAG_ORDER)) BAG_ORDER=[];
+    Object.keys(BAG_ITEMS).forEach(function(id){if(!BAG_ORDER.includes(String(id)))BAG_ORDER.push(String(id));});
+    BAG_ORDER=BAG_ORDER.filter(function(id){return Object.prototype.hasOwnProperty.call(BAG_ITEMS,String(id));});
+  }catch(e){ BAG_ITEMS={}; BAG_ORDER=[]; }
 }
 function saveBagToStorage(){
-  try{localStorage.setItem('briskdex_unlimited_bag',JSON.stringify(BAG_ITEMS));}
+  try{
+    localStorage.setItem('briskdex_unlimited_bag',JSON.stringify(BAG_ITEMS));
+    localStorage.setItem('briskdex_unlimited_bag_order',JSON.stringify(BAG_ORDER));
+  }
   catch(e){showError('Could not save the Brisk Dex Bag on this device: '+e.message);}
 }
 function bagItemData(id){
@@ -4172,6 +4271,7 @@ function addBagItem(){
   if(!Number.isFinite(qty)||qty<1){showError('Bag quantity must be at least 1.');return;}
   var key=String(id), current=Number(BAG_ITEMS[key])||0;
   BAG_ITEMS[key]=Math.min(Number.MAX_SAFE_INTEGER,current+qty);
+  if(!BAG_ORDER.includes(key)) BAG_ORDER.push(key);
   saveBagToStorage(); input.value=''; qtyInput.value='1'; clearError(); renderBag();
 }
 function changeBagItem(id,delta){
@@ -4179,39 +4279,74 @@ function changeBagItem(id,delta){
   if(next<=0) delete BAG_ITEMS[key]; else BAG_ITEMS[key]=Math.min(Number.MAX_SAFE_INTEGER,next);
   saveBagToStorage(); renderBag();
 }
-function removeBagItem(id){delete BAG_ITEMS[String(id)];saveBagToStorage();renderBag();}
+function removeBagItem(id){
+  var key=String(id); delete BAG_ITEMS[key]; BAG_ORDER=BAG_ORDER.filter(function(x){return String(x)!==key;});
+  saveBagToStorage();renderBag();
+}
+function setBagQuantity(id,value){
+  var key=String(id),qty=Math.floor(Number(value));
+  if(!Number.isFinite(qty)||qty<=0){removeBagItem(key);return;}
+  BAG_ITEMS[key]=Math.min(Number.MAX_SAFE_INTEGER,qty);saveBagToStorage();renderBag();
+}
+function reorderBagItem(sourceId,targetId){
+  sourceId=String(sourceId);targetId=String(targetId);
+  BAG_ORDER=BAG_ORDER.filter(function(id){return id!==sourceId;});
+  var at=BAG_ORDER.indexOf(targetId); if(at<0)at=BAG_ORDER.length;
+  BAG_ORDER.splice(at,0,sourceId);saveBagToStorage();
+  var orderEl=document.getElementById('bag-order');if(orderEl)orderEl.value='custom';
+  renderBag();
+}
 function renderBag(){
   var list=document.getElementById('bag-list'); if(!list) return;
   refreshBagItemOptions();
   var q=(document.getElementById('bag-search').value||'').trim().toLowerCase();
+  var order=(document.getElementById('bag-order')||{}).value||'custom';
   var allIds=Object.keys(BAG_ITEMS).filter(function(id){return Number(BAG_ITEMS[id])>0;});
+  allIds.forEach(function(id){if(!BAG_ORDER.includes(String(id)))BAG_ORDER.push(String(id));});
   var ids=allIds.filter(function(id){
     if(!q) return true;
     var item=bagItemData(id);
     return [item.name,item.constant,item.description,id,'#'+id].filter(Boolean).join(' ').toLowerCase().includes(q);
-  }).sort(function(a,b){return String(bagItemData(a).name||'').localeCompare(String(bagItemData(b).name||''));});
+  });
+  if(order==='alphabetical') ids.sort(function(a,b){return String(bagItemData(a).name||'').localeCompare(String(bagItemData(b).name||''))||Number(a)-Number(b);});
+  else if(order==='numeric') ids.sort(function(a,b){return Number(a)-Number(b);});
+  else ids.sort(function(a,b){return BAG_ORDER.indexOf(String(a))-BAG_ORDER.indexOf(String(b));});
   document.getElementById('bag-count').textContent=ids.length+(q?' of '+allIds.length:'')+' item type'+(allIds.length===1?'':'s')+' · no capacity limit';
   list.innerHTML='';
   if(!ids.length){
-    list.appendChild(el('div',{class:'route-empty',text:allIds.length?'No stored items match this search.':'Your Brisk Dex Bag is empty. Add any item above; there is no slot limit.'}));
+    list.appendChild(el('div',{class:'route-empty',text:allIds.length?'No stored items match this search.':'Your Brisk Dex Bag is empty. Add an item above; there is no slot limit.'}));
     return;
   }
   ids.forEach(function(id){
-    var item=bagItemData(id), row=el('article',{class:'bag-entry'}), info=el('div',{class:'bag-entry-info'});
+    var item=bagItemData(id),row=el('article',{class:'bag-entry',draggable:'true'}),info=el('div',{class:'bag-entry-info'});
     if(item.icon){
-      var shell=el('span',{class:'asset-icon-shell',style:'width:40px;height:40px;flex:none;'});
-      var icon=el('img',{src:item.icon,alt:'',style:'width:40px;height:40px;'}); icon.loading='lazy'; icon.decoding='async'; shell.appendChild(icon); info.appendChild(shell);
+      var shell=el('span',{class:'asset-icon-shell'});
+      var icon=el('img',{src:item.icon,alt:'',style:'width:54px;height:54px;'});icon.loading='lazy';icon.decoding='async';shell.appendChild(icon);info.appendChild(shell);
     }
-    var txt=el('div',{class:'bag-entry-text'}); txt.appendChild(el('strong',{text:item.name||itemName(Number(id))})); txt.appendChild(el('small',{text:'#'+Number(id)})); info.appendChild(txt); row.appendChild(info);
+    var txt=el('div',{class:'bag-entry-text'});
+    txt.appendChild(el('strong',{text:item.name||itemName(Number(id))}));
+    txt.appendChild(el('small',{text:'#'+Number(id)}));info.appendChild(txt);row.appendChild(info);
+    var remove=el('button',{class:'ghost bag-remove',text:'×','aria-label':'Remove '+(item.name||'item')});
+    remove.addEventListener('click',function(e){e.stopPropagation();removeBagItem(id);});row.appendChild(remove);
     var controls=el('div',{class:'bag-entry-controls'});
-    var minus=el('button',{class:'ghost',text:'−','aria-label':'Remove one'}); minus.addEventListener('click',function(){changeBagItem(id,-1);});
-    var qty=el('span',{class:'bag-quantity',text:'× '+Number(BAG_ITEMS[id]).toLocaleString()});
-    var plus=el('button',{class:'ghost',text:'+','aria-label':'Add one'}); plus.addEventListener('click',function(){changeBagItem(id,1);});
-    var remove=el('button',{class:'ghost',text:'Remove'}); remove.addEventListener('click',function(){removeBagItem(id);});
-    controls.appendChild(minus); controls.appendChild(qty); controls.appendChild(plus); controls.appendChild(remove); row.appendChild(controls); list.appendChild(row);
+    var minus=el('button',{class:'ghost',text:'−','aria-label':'Remove one'});
+    minus.addEventListener('click',function(){changeBagItem(id,-1);});
+    var qty=el('input',{class:'bag-quantity-input',type:'number',min:'1',step:'1',value:String(Number(BAG_ITEMS[id])),'aria-label':'Quantity'});
+    qty.addEventListener('change',function(){setBagQuantity(id,qty.value);});
+    qty.addEventListener('keydown',function(e){if(e.key==='Enter'){qty.blur();}});
+    var plus=el('button',{class:'ghost',text:'+','aria-label':'Add one'});
+    plus.addEventListener('click',function(){changeBagItem(id,1);});
+    controls.appendChild(minus);controls.appendChild(qty);controls.appendChild(plus);row.appendChild(controls);
+    row.addEventListener('dragstart',function(e){
+      row.classList.add('dragging');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('application/x-briskdex-item',String(id));e.dataTransfer.setData('text/plain',String(id));
+    });
+    row.addEventListener('dragend',function(){row.classList.remove('dragging');document.querySelectorAll('.bag-entry.drag-over').forEach(function(x){x.classList.remove('drag-over');});});
+    row.addEventListener('dragover',function(e){var src=e.dataTransfer.getData('application/x-briskdex-item')||e.dataTransfer.getData('text/plain');if(!src||String(src)===String(id))return;e.preventDefault();row.classList.add('drag-over');});
+    row.addEventListener('dragleave',function(){row.classList.remove('drag-over');});
+    row.addEventListener('drop',function(e){var src=e.dataTransfer.getData('application/x-briskdex-item')||e.dataTransfer.getData('text/plain');if(!src||String(src)===String(id))return;e.preventDefault();row.classList.remove('drag-over');reorderBagItem(src,id);});
+    list.appendChild(row);
   });
 }
-
 function renderChanges(){
   var root=document.getElementById('changes-grid');
   if(!root) return;
@@ -5021,7 +5156,9 @@ document.getElementById('move-type').addEventListener('change', renderMoves);
 document.getElementById('move-category').addEventListener('change', renderMoves);
 document.getElementById('ability-search').addEventListener('input', renderAbilitiesDebounced);
 document.getElementById('item-search').addEventListener('input', renderItemsDebounced);
+document.getElementById('item-order').addEventListener('change', renderItems);
 document.getElementById('bag-search').addEventListener('input', renderBag);
+document.getElementById('bag-order').addEventListener('change', renderBag);
 document.getElementById('btn-bag-add').addEventListener('click', addBagItem);
 document.getElementById('bag-add-item').addEventListener('keydown', function(e){if(e.key==='Enter') addBagItem();});
 document.getElementById('bag-add-qty').addEventListener('keydown', function(e){if(e.key==='Enter') addBagItem();});
