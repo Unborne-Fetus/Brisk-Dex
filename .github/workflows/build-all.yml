@@ -1,7 +1,14 @@
 name: Build Brisk Dex - Desktop + Android + iOS
 
+run-name: "Build all - ${{ inputs.request_id || github.sha }}"
+
 on:
   workflow_dispatch:
+    inputs:
+      request_id:
+        description: Identifier used by build.bat
+        required: false
+        type: string
   push:
     branches: [main]
     paths-ignore:
@@ -19,7 +26,7 @@ jobs:
           node-version: "22"
           cache: npm
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       - name: Verify battle effect coverage
         run: npm run battle:coverage
       - name: Smoke test online battle relay
@@ -47,7 +54,7 @@ jobs:
           distribution: temurin
           java-version: "21"
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       - name: Prepare web bundle
         run: npm run android:prepare
       - name: Create Android project
@@ -81,7 +88,7 @@ jobs:
           node-version: "22"
           cache: npm
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       - name: Prepare web bundle
         run: npm run ios:prepare
       - name: Create iOS project
