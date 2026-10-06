@@ -4826,20 +4826,18 @@ async function hostOnlineBattle(){
   if(ONLINE_STATE.busy) return;
   var team=battlePartySnapshot();
   if(!team.length){showError('Select at least one Pokémon for your battle team before hosting.');return;}
-  var relay=document.getElementById('online-relay'), name=document.getElementById('online-name');
-  ONLINE_STATE.relayUrl=(relay&&relay.value.trim())||ONLINE_STATE.relayUrl;
-  localStorage.setItem('briskdex_battle_relay',ONLINE_STATE.relayUrl);
+  var name=document.getElementById('online-name');
   ONLINE_STATE.busy=true;
-  battleConnectionStatus('Connecting to battle relay…');
+  battleConnectionStatus('Starting local battle relay…');
   try{
-    var hostUrl=new URL(battleRelayUrl());
-    if(window.briskDexAPI&&window.briskDexAPI.startBattleRelay&&['localhost','127.0.0.1','[::1]'].includes(hostUrl.hostname)){
-      var existing=false;
-      try{var health=await battleRequest('/health',{method:'GET'});existing=health.ok===true&&health.engine==='advanced-v18';}catch(err){}
-      var started=existing?{ok:true,url:battleRelayUrl(),lanUrls:[]}:await window.briskDexAPI.startBattleRelay();
+    if(window.briskDexAPI&&window.briskDexAPI.startBattleRelay){
+      var started=await window.briskDexAPI.startBattleRelay();
       if(!started.ok)throw new Error('Local relay could not start: '+started.error);
-      ONLINE_STATE.relayUrl=started.url;ONLINE_STATE.lanUrls=started.lanUrls;
+      ONLINE_STATE.relayUrl=started.url;
+      ONLINE_STATE.lanUrls=started.lanUrls||[];
       localStorage.setItem('briskdex_battle_relay',started.url);
+      var relay=document.getElementById('online-relay');
+      if(relay)relay.value=started.url;
     }
     var data=await battleRequest('/rooms',{method:'POST',body:JSON.stringify({
       name:(name&&name.value.trim())||(currentSave&&currentSave.trainer&&currentSave.trainer.name)||'Host',
@@ -4905,7 +4903,17 @@ function renderOnlineBattle(){
     setup.appendChild(el('h4',{text:'Host or join'}));
     var form=el('div',{class:'online-form'});
     var relayLabel=el('label',{text:'Battle relay URL'});
-    relayLabel.appendChild(el('input',{id:'online-relay',value:ONLINE_STATE.relayUrl,placeholder:'https://battle.example.com'}));form.appendChild(relayLabel);
+    var relayInput=el('input',{id:'online-relay',value:ONLINE_STATE.relayUrl,placeholder:'https://battle.example.com'});
+    relayLabel.appendChild(relayInput);form.appendChild(relayLabel);
+    if(window.briskDexAPI&&window.briskDexAPI.getBattleRelayInfo){
+      window.briskDexAPI.getBattleRelayInfo().then(function(info){
+        if(!info||!info.url)return;
+        ONLINE_STATE.relayUrl=info.url;
+        ONLINE_STATE.lanUrls=info.lanUrls||[];
+        relayInput.value=info.url;
+        localStorage.setItem('briskdex_battle_relay',info.url);
+      }).catch(function(){});
+    }
     var nameLabel=el('label',{text:'Trainer name'});
     nameLabel.appendChild(el('input',{id:'online-name',value:(currentSave&&currentSave.trainer&&currentSave.trainer.name)||'',maxlength:'24'}));form.appendChild(nameLabel);
     var codeLabel=el('label',{text:'Room code'});
@@ -4915,7 +4923,7 @@ function renderOnlineBattle(){
     var join=el('button',{text:'Join Battle'});join.addEventListener('click',joinOnlineBattle);
     actions.appendChild(host);actions.appendChild(join);form.appendChild(actions);setup.appendChild(form);
     setup.appendChild(el('div',{id:'online-connection-status',class:'online-status',role:'status','aria-live':'polite',text:'Ready to connect.'}));
-    setup.appendChild(el('div',{class:'online-status',text:'On Windows, Host Battle starts a local relay automatically. On Android, enter the PC network address shown by the host. Both devices must use the same Wi-Fi/LAN; allow Brisk Dex through Windows Firewall on private networks. For internet play, use a publicly reachable relay.'}));
+    setup.appendChild(el('div',{class:'online-status',text:'On desktop, Brisk Dex detects your network address and Host Battle starts the local relay automatically. With a loaded save, your party is selected by default, so hosting is normally one click. Joiners on the same Wi-Fi/LAN use the shown relay address and room code; allow Brisk Dex through Windows Firewall on private networks.'}));
     shell.appendChild(setup);
     var teamCard=el('section',{class:'online-card'});teamCard.appendChild(el('h4',{text:'Choose battle team · '+snapshot.length+'/6'}));
     var candidates=ensureBattleTeamSelection();
