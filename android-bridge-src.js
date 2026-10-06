@@ -45,6 +45,9 @@ const mobileAPI = {
   isNative: Capacitor.isNativePlatform(),
   isAndroid: Capacitor.isNativePlatform() && platform === 'android',
   isIOS: Capacitor.isNativePlatform() && platform === 'ios',
+  async discoverBattleRelay() {
+    return SaveFilePicker.discoverBattleRelay({port:8787,timeoutMs:2600});
+  },
   async battleRequest(url, options) {
     let parsed=new URL(url);
     if(!['http:','https:'].includes(parsed.protocol))throw new Error('Use an HTTP or HTTPS relay address.');
