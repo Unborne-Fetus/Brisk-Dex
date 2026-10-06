@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0"
 echo ===================================
 echo   Brisk Dex - build the .exe
 echo ===================================
@@ -10,11 +11,11 @@ if %errorlevel% neq 0 (
     pause
     exit /b 1
 )
-echo Installing dependencies (first run only, this can take a few minutes)...
-call npm install
+echo Installing verified dependency versions (this can take a few minutes)...
+call npm ci
 if %errorlevel% neq 0 (
     echo.
-    echo npm install failed - see the errors above.
+    echo npm ci failed - see the errors above.
     pause
     exit /b 1
 )
@@ -30,3 +31,4 @@ if %errorlevel% neq 0 (
 echo.
 echo Done! Find the installer in the "dist" folder.
 pause
+
