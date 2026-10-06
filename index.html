@@ -2031,7 +2031,8 @@ var ONLINE_STATE = {
   roomCode: sessionStorage.getItem('briskdex_room_code') || '',
   playerId: sessionStorage.getItem('briskdex_player_id') || '',
   playerIndex: Number(sessionStorage.getItem('briskdex_player_index') || -1),
-  room: null, polling: null, busy: false, gimmickChoice:null, selectedTeamKeys:[], teamSearch:'', teamSource:'all'
+  room: null, polling: null, busy: false, gimmickChoice:null, selectedTeamKeys:[], teamSearch:'', teamSource:'all',
+  lanScanning:false, lanScanDone:false, lanRelay:null, lanRooms:[], lanError:''
 };
 function persistOnlineSession(){
   if(ONLINE_STATE.roomCode&&ONLINE_STATE.playerId){
@@ -4818,6 +4819,46 @@ function battlePartySnapshot(){
     var copy=Object.assign({},c);delete copy.key;delete copy.sourceLabel;delete copy.personality;delete copy.otId;return copy;
   });
 }
+async function scanLanBattles(force){
+  if(ONLINE_STATE.lanScanning)return;
+  if(ONLINE_STATE.lanScanDone&&!force)return;
+  ONLINE_STATE.lanScanning=true;ONLINE_STATE.lanError='';
+  renderOnlineBattle();
+  try{
+    var found=null;
+    if(window.briskMobileAPI&&window.briskMobileAPI.discoverBattleRelay){
+      found=await window.briskMobileAPI.discoverBattleRelay();
+    }else if(window.briskDexAPI&&window.briskDexAPI.getBattleRelayInfo){
+      var info=await window.briskDexAPI.getBattleRelayInfo();
+      if(info&&info.url)found={found:true,url:info.url};
+    }
+    if(!found||!found.url)throw new Error('No Brisk battle host was found on this network.');
+    ONLINE_STATE.lanRelay=found.url;
+    ONLINE_STATE.relayUrl=found.url;
+    localStorage.setItem('briskdex_battle_relay',found.url);
+    var relay=document.getElementById('online-relay');if(relay)relay.value=found.url;
+    try{
+      var response=await battleRequest('/rooms',{method:'GET'});
+      ONLINE_STATE.lanRooms=Array.isArray(response.rooms)?response.rooms:[];
+    }catch(e){ONLINE_STATE.lanRooms=[];}
+    ONLINE_STATE.lanScanDone=true;
+  }catch(err){
+    ONLINE_STATE.lanError=err.message||String(err);
+    ONLINE_STATE.lanRooms=[];
+    ONLINE_STATE.lanScanDone=true;
+  }finally{
+    ONLINE_STATE.lanScanning=false;
+    renderOnlineBattle();
+  }
+}
+async function joinLanRoom(code){
+  var relay=document.getElementById('online-relay');
+  if(relay&&ONLINE_STATE.lanRelay)relay.value=ONLINE_STATE.lanRelay;
+  ONLINE_STATE.relayUrl=ONLINE_STATE.lanRelay||ONLINE_STATE.relayUrl;
+  var input=document.getElementById('online-code-input');
+  if(input)input.value=code;
+  await joinOnlineBattle();
+}
 function battleRelayUrl(){
   return String(ONLINE_STATE.relayUrl||'').replace(/\/+$/,'');
 }
@@ -5007,7 +5048,46 @@ function renderOnlineBattle(){
         sec.appendChild(grid);teamCard.appendChild(sec);
       });
     }else teamCard.appendChild(el('div',{class:'route-empty',text:'Load a save or add Pokémon to External Storage to build a battle team.'}));
-    shell.appendChild(teamCard);root.appendChild(shell);return;
+
+    shell.appendChild(teamCard);
+    var lanCard=el('section',{class:'online-card',id:'lan-battles-card',style:'grid-column:1 / -1;'});
+    var lanHead=el('div',{style:'display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;'});
+    var lanTitle=el('div');lanTitle.appendChild(el('h4',{text:'LAN Battles',style:'margin:0;'}));
+    lanTitle.appendChild(el('div',{class:'dex-muted',text:'Find Brisk Dex battles on the same Wi-Fi or local network automatically.'}));
+    lanHead.appendChild(lanTitle);
+    var scanBtn=el('button',{class:'primary',text:ONLINE_STATE.lanScanning?'Scanning…':'Scan LAN'});
+    scanBtn.disabled=ONLINE_STATE.lanScanning;
+    scanBtn.addEventListener('click',function(){scanLanBattles(true);});
+    lanHead.appendChild(scanBtn);lanCard.appendChild(lanHead);
+    if(ONLINE_STATE.lanScanning){
+      lanCard.appendChild(el('div',{class:'online-status',text:'Searching this network for Brisk battle hosts…'}));
+    }else if(ONLINE_STATE.lanRelay){
+      lanCard.appendChild(el('div',{class:'online-status',text:'Found battle host: '+ONLINE_STATE.lanRelay}));
+      if(ONLINE_STATE.lanRooms.length){
+        var roomsWrap=el('div',{class:'online-source'});
+        roomsWrap.appendChild(el('h5',{text:'Open rooms'}));
+        var roomGrid=el('div',{class:'online-picker-grid'});
+        ONLINE_STATE.lanRooms.forEach(function(room){
+          var card=el('button',{class:'online-pick'});
+          var txt=el('span');
+          txt.appendChild(el('strong',{text:room.host+' · '+room.code}));
+          txt.appendChild(el('small',{text:(room.teamSize||0)+' Pokémon · tap to join'}));
+          card.appendChild(txt);
+          card.addEventListener('click',function(){joinLanRoom(room.code);});
+          roomGrid.appendChild(card);
+        });
+        roomsWrap.appendChild(roomGrid);lanCard.appendChild(roomsWrap);
+      }else{
+        lanCard.appendChild(el('div',{class:'route-empty',text:'A Brisk relay was found, but there are no open LAN battle rooms yet.'}));
+      }
+    }else if(ONLINE_STATE.lanError){
+      lanCard.appendChild(el('div',{class:'route-empty',text:ONLINE_STATE.lanError+' Make sure both devices are on the same Wi-Fi and the host has started a battle.'}));
+    }else{
+      lanCard.appendChild(el('div',{class:'route-empty',text:'No scan yet. Press Scan LAN to find nearby Brisk Dex battle hosts.'}));
+    }
+    shell.appendChild(lanCard);root.appendChild(shell);
+    if((IS_ANDROID||IS_IOS)&&!ONLINE_STATE.lanScanDone&&!ONLINE_STATE.lanScanning)setTimeout(function(){scanLanBattles(false);},100);
+    return;
   }
   if(ONLINE_STATE.playerIndex===0&&ONLINE_STATE.lanUrls&&ONLINE_STATE.lanUrls.length){
     root.appendChild(el('div',{class:'online-card',text:'Join from Android using relay: '+ONLINE_STATE.lanUrls.join(' or ')+' · Use the room code below. Keep both devices on the same network and allow Brisk Dex through Windows Firewall on private networks.'}));
