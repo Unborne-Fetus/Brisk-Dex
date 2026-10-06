@@ -1,63 +1,109 @@
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path $PSScriptRoot -Parent)
-$repo = 'Unborne-Fetus/Brisk-Dex'
-function Invoke-Gh {
-    & $script:gh @args
-    if ($LASTEXITCODE -ne 0) { throw "GitHub CLI failed (exit $LASTEXITCODE)." }
-}
-try {
-    $command = Get-Command gh -ErrorAction SilentlyContinue
-    if (-not $command) {
-        $installed = Join-Path $env:ProgramFiles 'GitHub CLI\gh.exe'
-        if (Test-Path $installed) { $script:gh = $installed }
-        else {
-            if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-                throw 'Install GitHub CLI from https://cli.github.com and run build.bat again.'
-            }
-            & winget install --id GitHub.cli --exact --source winget --accept-package-agreements --accept-source-agreements
-            if ($LASTEXITCODE -ne 0 -or -not (Test-Path $installed)) {
-                throw 'GitHub CLI installation failed. Install it from https://cli.github.com.'
-            }
-            $script:gh = $installed
-        }
-    } else { $script:gh = $command.Source }
-    & $script:gh auth status --hostname github.com
+
+function Invoke-Step {
+    param(
+        [string]$Name,
+        [scriptblock]$Action
+    )
+    Write-Host ""
+    Write-Host "== $Name ==" -ForegroundColor Cyan
+    & $Action
     if ($LASTEXITCODE -ne 0) {
-        Write-Host 'Sign in to GitHub to build your private repository.'
-        Invoke-Gh auth login --hostname github.com --web --git-protocol https
+        throw "$Name failed with exit code $LASTEXITCODE."
     }
-    $requestId = [Guid]::NewGuid().ToString()
-    Write-Host 'Building the latest main branch on GitHub (local uncommitted edits are not included).'
-    Invoke-Gh workflow run build-all.yml --repo $repo --ref main -f "request_id=$requestId"
-    $run = $null
-    for ($attempt = 0; $attempt -lt 60; $attempt++) {
-        $runs = Invoke-Gh run list --repo $repo --workflow build-all.yml --event workflow_dispatch --limit 30 --json "databaseId,displayTitle,url" | ConvertFrom-Json
-        $run = $runs | Where-Object { $_.displayTitle -eq "Build all - $requestId" } | Select-Object -First 1
-        if ($run) { break }
-        Start-Sleep -Seconds 5
+}
+
+try {
+    if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+        throw 'Node.js is required. Install Node.js 22 or newer and run build.bat again.'
     }
-    if (-not $run) { throw 'Build was requested but could not be located. Check the GitHub Actions page.' }
-    Write-Host $run.url
-    & $script:gh run watch $run.databaseId --repo $repo --exit-status --interval 15
-    $buildResult = $LASTEXITCODE
-    # Keep successful platform outputs even if another platform fails.
-    $outputDir = Join-Path (Get-Location) ("dist\build-" + $run.databaseId)
-    New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
-    & $script:gh run download $run.databaseId --repo $repo --dir $outputDir
-    if ($LASTEXITCODE -ne 0) { throw "Could not download build outputs. See $($run.url)" }
-    Get-ChildItem $outputDir -Recurse -File | Where-Object { $_.Extension -in '.exe','.apk','.ipa' } | ForEach-Object {
-        Copy-Item -LiteralPath $_.FullName -Destination (Join-Path (Get-Location) 'dist') -Force
+    if (-not (Get-Command npm.cmd -ErrorAction SilentlyContinue)) {
+        throw 'npm was not found. Reinstall Node.js and run build.bat again.'
     }
-    Write-Host "Downloaded files to $outputDir and copied installers into dist."
-    Write-Host 'The iOS IPA is unsigned; sign it before installing on an iPhone.'
-    if ($buildResult -ne 0) { throw "One or more platforms failed. Successful outputs were downloaded. See $($run.url)" }
-    foreach ($extension in '.exe','.apk','.ipa') {
-        if (-not (Get-ChildItem $outputDir -Recurse -File | Where-Object { $_.Extension -eq $extension })) {
-            throw "Build did not produce $extension. See $($run.url)"
+    if (-not (Get-Command java -ErrorAction SilentlyContinue)) {
+        throw 'Java 21 is required for the Android build. Install JDK 21 and run build.bat again.'
+    }
+
+    $sdkRoot = $env:ANDROID_SDK_ROOT
+    if (-not $sdkRoot) { $sdkRoot = $env:ANDROID_HOME }
+    if (-not $sdkRoot) {
+        $defaultSdk = Join-Path $env:LOCALAPPDATA 'Android\Sdk'
+        if (Test-Path $defaultSdk) {
+            $sdkRoot = $defaultSdk
+            $env:ANDROID_SDK_ROOT = $sdkRoot
+            $env:ANDROID_HOME = $sdkRoot
         }
     }
+    if (-not $sdkRoot -or -not (Test-Path $sdkRoot)) {
+        throw 'Android SDK was not found. Install Android Studio / Android SDK, then run build.bat again.'
+    }
+
+    New-Item -ItemType Directory -Force -Path 'dist' | Out-Null
+
+    Invoke-Step 'Install dependencies' {
+        & npm.cmd ci
+    }
+
+    Invoke-Step 'Verify battle effect coverage' {
+        & npm.cmd run battle:coverage
+    }
+
+    Invoke-Step 'Smoke test online battle relay' {
+        & npm.cmd run battle:smoke
+    }
+
+    Invoke-Step 'Build Windows installer' {
+        & npm.cmd run dist:win
+    }
+
+    Invoke-Step 'Prepare Android web bundle' {
+        & npm.cmd run android:prepare
+    }
+
+    if (-not (Test-Path 'android')) {
+        Invoke-Step 'Create Android project' {
+            & npx.cmd cap add android
+        }
+    }
+
+    Invoke-Step 'Sync Android project' {
+        & npx.cmd cap sync android
+    }
+
+    Invoke-Step 'Patch Android native integration' {
+        & node tools/patch_android.mjs
+    }
+
+    Invoke-Step 'Build Android APK' {
+        Push-Location android
+        try {
+            & .\gradlew.bat assembleDebug
+        } finally {
+            Pop-Location
+        }
+    }
+
+    $apk = 'android\app\build\outputs\apk\debug\app-debug.apk'
+    if (-not (Test-Path $apk)) {
+        throw "Android build completed but APK was not found at $apk."
+    }
+
+    Copy-Item -LiteralPath $apk -Destination 'dist\Brisk-Dex-Android.apk' -Force
+
+    $exe = Get-ChildItem 'dist' -Filter '*.exe' -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if (-not $exe) {
+        throw 'Windows build completed but no .exe installer was found in dist.'
+    }
+
+    Write-Host ""
+    Write-Host 'Build complete.' -ForegroundColor Green
+    Write-Host "Windows: $($exe.FullName)"
+    Write-Host "Android: $((Resolve-Path 'dist\Brisk-Dex-Android.apk').Path)"
     exit 0
-} catch {
+}
+catch {
+    Write-Host ""
     Write-Host $_.Exception.Message -ForegroundColor Red
     exit 1
 }
