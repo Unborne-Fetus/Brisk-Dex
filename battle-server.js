@@ -54,16 +54,16 @@ function profileKeyForToken(token){
 function ensureProfile(token,name){
   const key=profileKeyForToken(token);if(!key)return null;
   let p=PROFILE_DB.profiles[key];
-  if(!p)p=PROFILE_DB.profiles[key]={key,name:cleanText(name,24)||'Trainer',wins:0,lifetimeWins:0,lifetimeLosses:0,rating:1000,rankedWins:0,rankedLosses:0,rankedGames:0,purchases:[],gachaPokemon:[],equipped:{title:'',accent:'default',arena:'stadium'},createdAt:Date.now(),updatedAt:Date.now()};
+  if(!p)p=PROFILE_DB.profiles[key]={key,name:cleanText(name,24)||'Trainer',wins:0,lifetimeWins:0,lifetimeLosses:0,winStreak:0,bestWinStreak:0,rating:1000,rankedWins:0,rankedLosses:0,rankedGames:0,purchases:[],gachaPokemon:[],equipped:{title:'',accent:'default',arena:'stadium'},createdAt:Date.now(),updatedAt:Date.now()};
   if(name)p.name=cleanText(name,24)||p.name;
-  p.wins=Math.max(0,Number(p.wins)||0);p.lifetimeWins=Math.max(0,Number(p.lifetimeWins)||0);p.lifetimeLosses=Math.max(0,Number(p.lifetimeLosses)||0);p.rating=Math.max(100,Math.round(Number(p.rating)||1000));
+  p.wins=Math.max(0,Number(p.wins)||0);p.lifetimeWins=Math.max(0,Number(p.lifetimeWins)||0);p.lifetimeLosses=Math.max(0,Number(p.lifetimeLosses)||0);p.winStreak=Math.max(0,Number(p.winStreak)||0);p.bestWinStreak=Math.max(p.winStreak,Math.max(0,Number(p.bestWinStreak)||0));p.rating=Math.max(100,Math.round(Number(p.rating)||1000));
   p.rankedWins=Math.max(0,Number(p.rankedWins)||0);p.rankedLosses=Math.max(0,Number(p.rankedLosses)||0);p.rankedGames=Math.max(0,Number(p.rankedGames)||0);
   if(!Array.isArray(p.purchases))p.purchases=[];if(!Array.isArray(p.gachaPokemon))p.gachaPokemon=[];if(!p.equipped)p.equipped={title:'',accent:'default',arena:'stadium'};
   p.updatedAt=Date.now();return p;
 }
 function publicProfile(p){
   if(!p)return null;
-  return {name:p.name,wins:p.wins,lifetimeWins:p.lifetimeWins,lifetimeLosses:p.lifetimeLosses,rating:p.rating,rankedWins:p.rankedWins,rankedLosses:p.rankedLosses,rankedGames:p.rankedGames,purchases:p.purchases.slice(),gachaPokemon:p.gachaPokemon.slice(-50),equipped:Object.assign({},p.equipped)};
+  return {name:p.name,wins:p.wins,lifetimeWins:p.lifetimeWins,lifetimeLosses:p.lifetimeLosses,winStreak:p.winStreak,bestWinStreak:p.bestWinStreak,rating:p.rating,rankedWins:p.rankedWins,rankedLosses:p.rankedLosses,rankedGames:p.rankedGames,purchases:p.purchases.slice(),gachaPokemon:p.gachaPokemon.slice(-50),equipped:Object.assign({},p.equipped)};
 }
 function shopItem(id){return SHOP_CATALOG.find(x=>x.id===id)||null;}
 function ratingDelta(winnerRating,loserRating){
@@ -76,7 +76,19 @@ function recordBattleResult(room,winnerIndex,awardWinCurrency){
   const winner=room.players[winnerIndex],loser=room.players[other(winnerIndex)];
   const wp=winner&&!winner.isBot&&winner.profileKey?PROFILE_DB.profiles[winner.profileKey]:null;
   const lp=loser&&!loser.isBot&&loser.profileKey?PROFILE_DB.profiles[loser.profileKey]:null;
-  if(awardWinCurrency&&wp){wp.wins=(Number(wp.wins)||0)+1;wp.lifetimeWins=(Number(wp.lifetimeWins)||0)+1;wp.updatedAt=Date.now();}if(awardWinCurrency&&lp){lp.lifetimeLosses=(Number(lp.lifetimeLosses)||0)+1;lp.updatedAt=Date.now();}
+  if(awardWinCurrency&&wp){
+    wp.winStreak=(Number(wp.winStreak)||0)+1;
+    wp.bestWinStreak=Math.max(Number(wp.bestWinStreak)||0,wp.winStreak);
+    wp.wins=(Number(wp.wins)||0)+wp.winStreak;
+    wp.lifetimeWins=(Number(wp.lifetimeWins)||0)+1;
+    room.winAward={winnerIndex,amount:wp.winStreak,streak:wp.winStreak};
+    wp.updatedAt=Date.now();
+  }
+  if(lp){
+    lp.winStreak=0;
+    if(awardWinCurrency)lp.lifetimeLosses=(Number(lp.lifetimeLosses)||0)+1;
+    lp.updatedAt=Date.now();
+  }
   if(room.rules&&room.rules.ranked&&wp&&lp){
     const wr=Number(wp.rating)||1000,lr=Number(lp.rating)||1000,delta=ratingDelta(wr,lr);
     wp.rating=wr+delta;lp.rating=Math.max(100,lr-delta);
@@ -748,7 +760,7 @@ function publicRoom(room,viewerIndex){
     ? {id:room.reward.id,species:room.reward.species,name:room.reward.name,level:room.reward.level,sourceTrainer:room.reward.sourceTrainer,raw80:room.reward.raw80}
     : null;
   return {
-    code:room.code, phase:room.phase, rules:room.rules, turn:room.turn, winner:room.winner, reward:reward, ratingChanges:room.ratingChanges||null, profileUpdates:room.profileUpdates||null,
+    code:room.code, phase:room.phase, rules:room.rules, turn:room.turn, winner:room.winner, reward:reward, ratingChanges:room.ratingChanges||null, winAward:room.winAward||null, profileUpdates:room.profileUpdates||null,
     weather:room.weather, weatherTurns:room.weatherTurns, terrain:room.terrain, terrainTurns:room.terrainTurns,
     trickRoom:room.trickRoom, trickRoomTurns:room.trickRoomTurns,gravity:room.gravity,gravityTurns:room.gravityTurns,
     magicRoom:room.magicRoom,magicRoomTurns:room.magicRoomTurns,wonderRoom:room.wonderRoom,wonderRoomTurns:room.wonderRoomTurns,
