@@ -13,6 +13,7 @@ const matchmaking = new Map();
 const matchmakingTickets = new Map();
 const wonderBoxDeposits = new Map();
 const gtsListings = new Map();
+const gtsCompleted = new Map();
 const linkTradeRooms = new Map();
 
 function tradePokemon(value){
@@ -1885,7 +1886,19 @@ const server=http.createServer(async (req,res)=>{
       if(!gtsMatches(listing.request,verified.mon))return json(res,409,{error:'That Pokémon does not meet the requested GTS conditions.'});
       if(listing.ownerToken===cleanText(body.ownerToken,96))return json(res,409,{error:'You cannot trade with your own GTS listing.'});
       gtsListings.delete(listing.id);
+      gtsCompleted.set(listing.id,{ownerToken:listing.ownerToken,received:verified.raw,receivedMon:publicTradeMon(verified),completedAt:Date.now()});
       return json(res,200,{ok:true,received:listing.raw,receivedMon:publicTradeMon(listing),sentMon:publicTradeMon(verified)});
+    }
+    if(req.method==='GET'&&url.pathname==='/trades/gts/mine'){
+      const ownerToken=cleanText(url.searchParams.get('ownerToken'),96),active=[],completed=[];
+      for(const x of gtsListings.values())if(x.ownerToken===ownerToken)active.push({listingId:x.id,offered:publicTradeMon(x),request:x.request,createdAt:x.createdAt});
+      for(const [listingId,x] of gtsCompleted)if(x.ownerToken===ownerToken)completed.push({listingId,receivedMon:x.receivedMon,completedAt:x.completedAt});
+      return json(res,200,{ok:true,active,completed});
+    }
+    if(req.method==='POST'&&url.pathname==='/trades/gts/claim'){
+      const body=await readBody(req),listingId=String(body.listingId||''),x=gtsCompleted.get(listingId);
+      if(!x||x.ownerToken!==cleanText(body.ownerToken,96))return json(res,404,{error:'Completed GTS trade not found.'});
+      gtsCompleted.delete(listingId);return json(res,200,{ok:true,received:x.received,receivedMon:x.receivedMon});
     }
     if(req.method==='POST'&&url.pathname==='/trades/link/host'){
       const body=await readBody(req),verified=tradePokemon(body.raw80);
