@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://briskdex.local/schemas/emerald-compat-profile.schema.json",
+  "title": "Brisk Dex Emerald Compatibility Pack",
+  "type": "object",
+  "anyOf": [
+    { "required": ["profile"] },
+    { "required": ["profiles"] },
+    { "required": ["id", "name"] }
+  ],
+  "properties": {
+    "meta": { "type": "object" },
+    "data": { "type": "object" },
+    "gameData": { "type": "object" },
+    "profile": { "$ref": "#/$defs/profile" },
+    "profiles": { "type": "array", "items": { "$ref": "#/$defs/profile" } },
+    "id": { "type": "string" },
+    "name": { "type": "string" }
+  },
+  "$defs": {
+    "profile": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "schemaVersion": { "type": "integer", "minimum": 1 },
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{1,63}$" },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "family": { "const": "emerald" },
+        "baseGame": { "const": "emerald" },
+        "writePolicy": { "enum": ["full", "readonly"] },
+        "pokemonEncoding": { "type": "string" },
+        "speciesMapping": { "enum": ["emerald-internal", "national-direct"] },
+        "idLimits": {
+          "type": "object",
+          "properties": {
+            "species": { "type": "integer", "minimum": 1 },
+            "moves": { "type": "integer", "minimum": 1 },
+            "items": { "type": "integer", "minimum": 1 },
+            "abilities": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "idMaps": {
+          "type": "object",
+          "properties": {
+            "species": { "type": "object" },
+            "moves": { "type": "object" },
+            "items": { "type": "object" },
+            "abilities": { "type": "object" }
+          }
+        },
+        "save": {
+          "type": "object",
+          "properties": {
+            "minimumSize": { "type": "integer", "minimum": 1 },
+            "blockOffsets": { "type": "array", "minItems": 2, "items": { "type": "integer", "minimum": 0 } },
+            "sectionSize": { "type": "integer", "minimum": 1 },
+            "sectionDataSize": { "type": "integer", "minimum": 1 },
+            "sectionCount": { "type": "integer", "minimum": 1 },
+            "signature": { "type": "integer", "minimum": 0 },
+            "partyCountOffset": { "type": "integer", "minimum": 0 },
+            "partyOffset": { "type": "integer", "minimum": 0 },
+            "partyRecordSize": { "type": "integer", "minimum": 80 },
+            "moneyOffset": { "type": "integer", "minimum": 0 },
+            "encryptionKeyOffset": { "type": "integer", "minimum": 0 },
+            "checksumSizes": { "type": "object" }
+          }
+        },
+        "pokemon": {
+          "type": "object",
+          "properties": {
+            "boxRecordSize": { "type": "integer", "minimum": 80 },
+            "partyRecordSize": { "type": "integer", "minimum": 80 },
+            "speciesMask": { "type": "integer", "minimum": 0 },
+            "heldItemMask": { "type": "integer", "minimum": 0 },
+            "experienceMask": { "type": "integer", "minimum": 0 },
+            "moveMask": { "type": "integer", "minimum": 0 },
+            "ppMask": { "type": "integer", "minimum": 0 },
+            "teraShift": { "type": ["integer", "null"] },
+            "teraMask": { "type": "integer", "minimum": 0 },
+            "abilityMode": { "enum": ["vanilla-bit31", "expansion-bits29-30"] },
+            "provenanceBit": { "type": ["integer", "null"] },
+            "shinyOverrideBit": { "type": ["integer", "null"] },
+            "shinyThreshold": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "pc": {
+          "type": "object",
+          "properties": {
+            "boxCount": { "type": "integer", "minimum": 1, "maximum": 255 },
+            "slotsPerBox": { "type": "integer", "minimum": 1, "maximum": 255 },
+            "mainSectionIds": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+            "sectionSize": { "type": "integer", "minimum": 1 },
+            "lastSectionSize": { "type": "integer", "minimum": 1 },
+            "extension": {
+              "type": ["object", "null"],
+              "properties": {
+                "physicalSectors": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+                "ids": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+                "sizes": { "type": "array", "items": { "type": "integer", "minimum": 1 } }
+              }
+            }
+          }
+        },
+        "bag": {
+          "type": "object",
+          "properties": {
+            "quantityEncrypted": { "type": "boolean" },
+            "maxStack": { "type": "integer", "minimum": 1 },
+            "pockets": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["offset", "count", "category"],
+                "properties": {
+                  "offset": { "type": "integer", "minimum": 0 },
+                  "count": { "type": "integer", "minimum": 0 },
+                  "category": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "dex": {
+          "type": "object",
+          "properties": {
+            "kind": { "enum": ["saveblock2", "saveblock1-linear", "unknown"] },
+            "flagBytes": { "type": "integer", "minimum": 0 },
+            "ownedOffset": { "type": "integer", "minimum": 0 },
+            "seenOffset": { "type": "integer", "minimum": 0 },
+            "caughtOffset": { "type": "integer", "minimum": 0 },
+            "sectionIds": { "type": "array", "items": { "type": "integer", "minimum": 0 } }
+          }
+        },
+        "trainer": {
+          "type": "object",
+          "properties": { "outfitOffset": { "type": ["integer", "null"], "minimum": 0 } }
+        },
+        "features": { "type": "object" },
+        "fingerprints": { "type": "array", "items": { "type": "object" } }
+      }
+    }
+  }
+}
