@@ -2032,7 +2032,8 @@ var ONLINE_STATE = {
   playerId: sessionStorage.getItem('briskdex_player_id') || '',
   playerIndex: Number(sessionStorage.getItem('briskdex_player_index') || -1),
   room: null, polling: null, busy: false, gimmickChoice:null, selectedTeamKeys:[], teamSearch:'', teamSource:'all',
-  lanScanning:false, lanScanDone:false, lanRelay:null, lanRooms:[], lanError:''
+  lanScanning:false, lanScanDone:false, lanRelay:null, lanRooms:[], lanError:'',
+  rewardProcessing:false, rewardMessage:''
 };
 function persistOnlineSession(){
   if(ONLINE_STATE.roomCode&&ONLINE_STATE.playerId){
@@ -4765,6 +4766,7 @@ function battleCandidateFromMon(mon,key,sourceLabel){
   });
   return {
     key:key,sourceLabel:sourceLabel,personality:Number(mon.personality)||0,otId:Number(mon.otId)||0,
+    rewardRaw80:(mon.rawRecord&&mon.rawRecord.length>=80)?bytesToBase64(mon.rawRecord.subarray(0,80)):'',
     species:Number(mon.species),name:mon.nickname||speciesName(mon.species),level:stats.level,friendship:Number(mon.friendship)||0,
     weight:Number(species.weight||species.weightHg||0),ivs:Object.assign({},mon.ivs||{}),
     types:(species.types||[]).filter(Boolean).slice(0,2),ability:ability,item:itemName(mon.heldItem||0),
@@ -4818,6 +4820,71 @@ function battlePartySnapshot(){
   return ONLINE_STATE.selectedTeamKeys.map(function(k){return byKey[k];}).filter(Boolean).map(function(c){
     var copy=Object.assign({},c);delete copy.key;delete copy.sourceLabel;delete copy.personality;delete copy.otId;return copy;
   });
+}
+function firstEmptyBattleRewardSlot(){
+  if(!currentSave||!Array.isArray(currentSave.boxes))return null;
+  for(var bi=0;bi<currentSave.boxes.length;bi++){
+    for(var si=0;si<currentSave.boxes[bi].length;si++){
+      var mon=currentSave.boxes[bi][si];
+      if(!mon||mon.empty)return {box:bi,slot:si};
+    }
+  }
+  return null;
+}
+function onlineBattleRewardClaimKey(reward){
+  return 'briskdex_battle_reward_claimed_'+String(reward&&reward.id||'');
+}
+async function receiveOnlineBattleReward(room){
+  if(!room||room.phase!=='finished'||room.winner!==ONLINE_STATE.playerIndex||!room.reward||!room.reward.raw80||ONLINE_STATE.rewardProcessing)return;
+  var reward=room.reward,claimKey=onlineBattleRewardClaimKey(reward);
+  if(localStorage.getItem(claimKey)){
+    ONLINE_STATE.rewardMessage='Reward already received: '+(reward.name||speciesName(reward.species))+'.';
+    return;
+  }
+  ONLINE_STATE.rewardProcessing=true;
+  try{
+    var raw80=base64ToBytes(reward.raw80);
+    if(raw80.length!==80)throw new Error('The battle server returned an invalid Pokémon reward.');
+    var decoded=decodePokemon(raw80,false);
+    if(!decoded||decoded.empty)throw new Error('The battle reward Pokémon could not be decoded.');
+    var destination='';
+    var emptySlot=firstEmptyBattleRewardSlot();
+    if(currentSave&&emptySlot){
+      var logicalOffset=4+(emptySlot.box*30+emptySlot.slot)*80;
+      var touched=writeLogicalPCBytes(currentSave,logicalOffset,raw80);
+      touched.forEach(function(id){recomputeChecksum(currentSave,id);});
+      currentSave.boxes[emptySlot.box][emptySlot.slot]=decodePokemon(raw80,false);
+      markDirty();
+      var saved=await saveChangesToFile();
+      if(!saved)throw new Error('The Pokémon was added in memory, but the save could not be written safely.');
+      destination=(currentSave.boxNames&&currentSave.boxNames[emptySlot.box]?currentSave.boxNames[emptySlot.box]:'Box '+(emptySlot.box+1))+' slot '+(emptySlot.slot+1);
+    }else{
+      await storageReady;
+      assertStorageReadable();
+      var entry={
+        id:genId(),raw80:bytesToBase64(raw80),depositedAt:Date.now(),
+        sourceTrainer:reward.sourceTrainer||'Online opponent',sourceId:null,
+        sourceBattle:room.code,rewardId:reward.id
+      };
+      externalStorage.push(entry);
+      try{await persistExternalStorage();}
+      catch(err){
+        externalStorage=externalStorage.filter(function(item){return item.id!==entry.id;});
+        throw err;
+      }
+      renderStoragePanel();
+      destination='External Storage';
+    }
+    localStorage.setItem(claimKey,String(Date.now()));
+    ONLINE_STATE.rewardMessage='You received '+(decoded.nickname||reward.name||speciesName(decoded.species))+' from '+(reward.sourceTrainer||'your opponent')+'! Added to '+destination+'.';
+    showNotice(ONLINE_STATE.rewardMessage);
+    if(currentSave)renderAll();
+  }catch(err){
+    ONLINE_STATE.rewardMessage='Could not receive battle reward: '+(err.message||String(err));
+    showError(ONLINE_STATE.rewardMessage);
+  }finally{
+    ONLINE_STATE.rewardProcessing=false;
+  }
 }
 async function scanLanBattles(force){
   if(ONLINE_STATE.lanScanning)return;
@@ -4892,8 +4959,9 @@ function startBattlePolling(){
     if(!ONLINE_STATE.roomCode||!ONLINE_STATE.playerId||ONLINE_STATE.busy) return;
     try{
       var data=await battleRequest('/rooms/'+ONLINE_STATE.roomCode+'?playerId='+encodeURIComponent(ONLINE_STATE.playerId),{method:'GET'});
-      ONLINE_STATE.room=data.room; ONLINE_STATE.playerIndex=data.playerIndex; renderOnlineBattle();
-      if(data.room.phase==='finished') stopBattlePolling();
+      ONLINE_STATE.room=data.room; ONLINE_STATE.playerIndex=data.playerIndex;
+      if(data.room.phase==='finished'){await receiveOnlineBattleReward(data.room);stopBattlePolling();}
+      renderOnlineBattle();
     }catch(err){
       var status=document.getElementById('online-live-status');
       if(status) status.textContent='Connection problem: '+err.message;
@@ -4951,13 +5019,15 @@ async function battleAction(type,payload){
   try{
     var body=Object.assign({playerId:ONLINE_STATE.playerId,type:type},payload||{});
     var data=await battleRequest('/rooms/'+ONLINE_STATE.roomCode+'/action',{method:'POST',body:JSON.stringify(body)});
-    ONLINE_STATE.room=data.room;ONLINE_STATE.playerIndex=data.playerIndex;renderOnlineBattle();
+    ONLINE_STATE.room=data.room;ONLINE_STATE.playerIndex=data.playerIndex;
+    if(data.room.phase==='finished')await receiveOnlineBattleReward(data.room);
+    renderOnlineBattle();
   }catch(err){showError('Battle action failed: '+err.message);}
   finally{ONLINE_STATE.busy=false;}
 }
 function leaveOnlineBattle(){
   stopBattlePolling();
-  ONLINE_STATE.roomCode='';ONLINE_STATE.playerId='';ONLINE_STATE.playerIndex=-1;ONLINE_STATE.room=null;ONLINE_STATE.gimmickChoice=null;persistOnlineSession();
+  ONLINE_STATE.roomCode='';ONLINE_STATE.playerId='';ONLINE_STATE.playerIndex=-1;ONLINE_STATE.room=null;ONLINE_STATE.gimmickChoice=null;ONLINE_STATE.rewardMessage='';persistOnlineSession();
   renderOnlineBattle();
 }
 function appendOnlineTeam(parent,team){
@@ -5095,6 +5165,17 @@ function renderOnlineBattle(){
   var room=ONLINE_STATE.room, me=room.players[ONLINE_STATE.playerIndex], foe=room.players[ONLINE_STATE.playerIndex===0?1:0];
   var top=el('section',{class:'online-card'});
   top.appendChild(el('div',{class:'dex-muted',text:'Room code'}));top.appendChild(el('div',{class:'online-code',text:room.code}));
+  if(room.phase==='finished'){
+    var won=room.winner===ONLINE_STATE.playerIndex;
+    top.appendChild(el('h3',{text:won?'Victory!':'Defeat'}));
+    if(won&&room.reward){
+      var rewardCard=el('div',{class:'online-status'});
+      rewardCard.appendChild(makeIconEl({species:room.reward.species,isShiny:false},'encounter-icon'));
+      rewardCard.appendChild(el('strong',{text:' Prize: '+(room.reward.name||speciesName(room.reward.species))+' · Lv'+room.reward.level}));
+      top.appendChild(rewardCard);
+    }
+    if(ONLINE_STATE.rewardMessage)top.appendChild(el('div',{class:'online-status',text:ONLINE_STATE.rewardMessage}));
+  }
   var fieldBits=[];if(room.weather)fieldBits.push('Weather: '+room.weather);if(room.terrain)fieldBits.push('Terrain: '+room.terrain);if(room.trickRoom)fieldBits.push('Trick Room: '+room.trickRoomTurns);top.appendChild(el('div',{id:'online-live-status',class:'online-status',text:room.phase==='lobby'?(foe?'Opponent connected. Ready up when your team is set.':'Waiting for opponent to join…'):room.phase==='finished'?'Battle finished.':'Turn '+room.turn+(fieldBits.length?' · '+fieldBits.join(' · '):'')}));
   var topActions=el('div',{class:'online-actions',style:'margin-top:10px;'});
   if(room.phase==='lobby'){
