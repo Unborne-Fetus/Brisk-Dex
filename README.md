@@ -194,6 +194,45 @@ npm run battle:smoke
 
 Brisk Dex's original source code is licensed under the **PolyForm Noncommercial License 1.0.0**. Study, modification, and redistribution are permitted for noncommercial purposes under its terms. Commercial use, including selling copies or derivative versions, is not permitted. See [LICENSE](LICENSE) for the complete terms.
 
-Pokémon names, graphics, game data, trademarks, and other third-party material remain the property of their respective owners and are not licensed by this notice.
+### Project, game-data, and engine credits
 
-Originally made with Claude-assisted coding, with subsequent development and fixes assisted by Codex.
+- **Pokémon Brisk Emerald** supplies Brisk Dex's species, form, move, ability, item, encounter, trainer, sprite, cry, and save-format reference data.
+- **ROM Hacking Hideout / pokeemerald-expansion contributors** created and maintain the engine Brisk Emerald is built on. Brisk Emerald currently tracks the 1.17.x expansion line.
+- **pret / pokeemerald contributors** created the Pokémon Emerald decompilation that pokeemerald-expansion and Brisk Emerald ultimately build from.
+- The many additional programmers, researchers, data contributors, artists, testers, and documentation writers credited by Brisk Emerald and pokeemerald-expansion remain credited for the systems and material inherited through those projects. See Brisk Emerald's `CREDITS.md` for the full upstream contributor list.
+
+### Imported art and resource credits
+
+Some graphics displayed by Brisk Dex are extracted from Brisk Emerald, so the original creators of those resources are also part of Brisk Dex's credit chain.
+
+- **Team Aqua's Asset Repo** and its contributors for imported community resources used by Brisk Emerald.
+- **PurrfectDoodle (Eva)**, **RavePossum**, **Ruki**, and **LeoB (leob0505)** for battle-background work and related source material used in Brisk Emerald.
+- **Coffee Cup** for trainer-customization source resources.
+- **FM**, **Zeikaro**, and **Rahtak** for greenery resources and ports.
+- **KyuZee** for fence resources.
+- **Oomer** for plant and decoration resources.
+- **yoshord** for Secret Base furniture resources.
+- **Horo** (commissioned by Paccy), **Kasen**, **spilledpizza**, **TheWiggliestJiggliest**, **RichardPT**, **robloxmaster376**, **The Spriters Resource**, and **The Radiant Quartz / Prismatic Platinum team** for visiting-Champion overworld sprite material credited in Brisk Emerald.
+- Additional tileset and asset authors are preserved in Brisk Emerald under `resources/team_aqua` and its `CREDITS.md`; those per-pack credits and permissions still apply when their work appears in Brisk Dex.
+
+### App, build, and service credits
+
+Brisk Dex is built with open-source tooling and services maintained by their respective creators and communities:
+
+- **Electron** for the desktop application runtime.
+- **electron-builder** for desktop packaging.
+- **Ionic / Capacitor** for Android and iOS packaging and native bridges.
+- **esbuild**, created by Evan Wallace, for JavaScript build tooling.
+- **Pillow** and its contributors for image processing used by the Brisk data/asset extraction tools.
+- **MyMemory Translation API** for optional online translation of uncached non-English interface text.
+- **GitHub Actions** and **GitHub CLI** for the project's automated multi-platform build workflow.
+
+### Pokémon ownership
+
+Pokémon names, characters, graphics, game data, trademarks, and other official third-party material remain the property of **Nintendo, Creatures Inc., and GAME FREAK inc.** and are not licensed by this notice. Brisk Dex is a non-commercial fan project and is not affiliated with or endorsed by those companies.
+
+### Development assistance
+
+Brisk Dex was originally made with Claude-assisted coding, with subsequent development and fixes assisted by OpenAI Codex/ChatGPT.
+
+If a third-party system, asset pack, or contributor has been unintentionally omitted, that credit should be added rather than removed from the original source material.
