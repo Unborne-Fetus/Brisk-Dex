@@ -1,0 +1,56 @@
+{
+  "$schema": "./emerald-compat-profile.schema.json",
+  "meta": {
+    "name": "Example Emerald expansion pack",
+    "version": 1
+  },
+  "profile": {
+    "schemaVersion": 1,
+    "id": "example-emerald-expansion",
+    "name": "Example Emerald Expansion Hack",
+    "family": "emerald",
+    "baseGame": "emerald",
+    "writePolicy": "readonly",
+    "pokemonEncoding": "expansion",
+    "speciesMapping": "national-direct",
+    "idLimits": {
+      "species": 1200,
+      "moves": 1000,
+      "items": 900,
+      "abilities": 400
+    },
+    "pokemon": {
+      "speciesMask": 2047,
+      "heldItemMask": 1023,
+      "experienceMask": 2097151,
+      "moveMask": 2047,
+      "ppMask": 127,
+      "abilityMode": "expansion-bits29-30",
+      "teraShift": null,
+      "teraMask": 0,
+      "provenanceBit": null,
+      "shinyOverrideBit": null,
+      "shinyThreshold": 8
+    },
+    "pc": {
+      "boxCount": 14,
+      "slotsPerBox": 30
+    },
+    "dex": {
+      "kind": "unknown",
+      "flagBytes": 0
+    },
+    "features": {
+      "tera": false,
+      "provenance": false,
+      "shinyOverride": false,
+      "expandedBoxes": false
+    }
+  },
+  "data": {
+    "species": {},
+    "moves": {},
+    "items": {},
+    "abilities": {}
+  }
+}
