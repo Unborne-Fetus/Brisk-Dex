@@ -5361,7 +5361,7 @@ function renderOnlineBattle(){
   var logPanel=el('aside',{class:'battle-log-panel'});logPanel.appendChild(el('div',{class:'battle-log-title',text:'Battle log'}));
   var log=el('div',{class:'battle-log'});(room.log||[]).slice(-80).forEach(function(line){log.appendChild(el('div',{class:'battle-log-line',text:line}));});if(!(room.log||[]).length)log.appendChild(el('div',{class:'battle-log-line',text:'Battle log is empty.'}));
   logPanel.appendChild(log);bottom.appendChild(logPanel);sim.appendChild(bottom);root.appendChild(sim);
-}}
+}
 
 function renderCurrentReferenceTab(){
   if(currentMainTab==='routes') renderRouteEncounters();
