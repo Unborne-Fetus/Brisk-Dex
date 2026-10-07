@@ -1032,7 +1032,30 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
 
   <section id="online-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-online" style="display:none;">
     <div class="section-heading"><h3>Online Battle</h3><span class="count" id="online-count">Host / Join</span></div>
-    <p class="route-intro">Private Brisk battles using your loaded save-file party. Host a six-character room or join a friend's room. The first prototype supports singles, switching, damaging moves, STAB, accuracy, priority, and type effectiveness.</p>
+    <p class="route-intro">Private Brisk battles using Pokémon from your loaded save, plus offline-style Bot Battles against Brisk trainers or generated teams.</p>
+    <div class="online-card" id="bot-battle-card" style="margin-bottom:14px;">
+      <h4>Bot Trainer Battle</h4>
+      <p class="route-intro">Battle an AI-controlled opponent using either an actual party from Brisk Emerald, a generated Brisk team, or a mix of both. Your currently selected Online Battle team is used.</p>
+      <div class="online-form">
+        <label>Opponent
+          <select id="bot-battle-source">
+            <option value="mixed">Mixed — Brisk trainer or random</option>
+            <option value="trainer">Brisk Emerald trainer</option>
+            <option value="random">Random generated team</option>
+          </select>
+        </label>
+        <label>Difficulty
+          <select id="bot-battle-difficulty">
+            <option value="easy">Easy</option>
+            <option value="normal" selected>Normal</option>
+            <option value="hard">Hard</option>
+            <option value="expert">Expert</option>
+          </select>
+        </label>
+        <div class="online-actions"><button class="primary" id="bot-battle-start">Battle Bot</button></div>
+        <div id="bot-battle-status" class="online-status">Select your battle team below, then start a Bot Battle.</div>
+      </div>
+    </div>
     <div id="online-root"></div>
   </section>
 
@@ -5310,6 +5333,31 @@ async function cancelMysteryBattle(){
   if(ticket){try{await battleRequest('/matchmaking/cancel',{method:'POST',body:JSON.stringify({ticket:ticket})});}catch(e){}}
   ONLINE_STATE.matchmakingTicket='';ONLINE_STATE.matchmakingMode='';ONLINE_STATE.matchmakingStartedAt=0;renderOnlineBattle();
 }
+async function startBotBattle(){
+  if(ONLINE_STATE.busy)return;
+  var status=document.getElementById('bot-battle-status');
+  try{
+    var team=battlePartySnapshot();
+    if(!team.length)throw new Error('Select at least one verified Pokémon in the Online Battle team picker first.');
+    ONLINE_STATE.busy=true;
+    if(status)status.textContent='Starting Bot Battle…';
+    await ensureMysteryBattleRelay();
+    var source=document.getElementById('bot-battle-source').value;
+    var difficulty=document.getElementById('bot-battle-difficulty').value;
+    var name=(currentSave&&currentSave.trainer&&currentSave.trainer.name)||'Trainer';
+    var data=await battleRequest('/bot-battle',{method:'POST',body:JSON.stringify({source:source,difficulty:difficulty,name:name,trainer:onlineTrainerAppearance(),team:team})});
+    ONLINE_STATE.roomCode=data.code;ONLINE_STATE.playerId=data.playerId;ONLINE_STATE.playerIndex=0;ONLINE_STATE.room=data.room;
+    ONLINE_STATE.lastAnimationSeq=Number(data.room&&data.room.animationSeq||0);
+    ONLINE_STATE.doubleActorPos=0;ONLINE_STATE.doubleTargetPos=0;
+    persistOnlineSession();startBattlePolling();renderOnlineBattle();
+    var botName=data.room&&data.room.rules&&data.room.rules.botTrainer||'Bot Trainer';
+    if(status)status.textContent='Battling '+botName+' · '+difficulty.charAt(0).toUpperCase()+difficulty.slice(1);
+    showNotice('Bot Battle started against '+botName+'.');
+  }catch(err){
+    if(status)status.textContent=err.message;
+    showError('Could not start Bot Battle: '+err.message);
+  }finally{ONLINE_STATE.busy=false;}
+}
 async function startMysteryBattle(mode){
   if(ONLINE_STATE.busy||ONLINE_STATE.matchmakingTicket)return;
   var team;
@@ -6289,6 +6337,7 @@ document.getElementById('tab-dex').addEventListener('click', function(){ setMain
 document.getElementById('tab-trainers').addEventListener('click', function(){ setMainTab('trainers'); });
 document.getElementById('tab-competitive').addEventListener('click', function(){ setMainTab('competitive'); });
 document.getElementById('tab-online').addEventListener('click', function(){ setMainTab('online'); });
+document.getElementById('bot-battle-start').addEventListener('click',startBotBattle);
 document.getElementById('tab-trading').addEventListener('click', function(){ setMainTab('trading'); renderTrading(); });
 document.getElementById('tab-moves').addEventListener('click', function(){ setMainTab('moves'); });
 document.getElementById('tab-abilities').addEventListener('click', function(){ setMainTab('abilities'); });
