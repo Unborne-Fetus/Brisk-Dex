@@ -967,6 +967,7 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
       <button class="primary" id="btn-load-sav">Load .sav / .srm file</button>
       <input type="file" id="file-sav" accept=".sav,.srm">
       <input type="file" id="file-data" accept=".json">
+      <input type="file" id="file-compat-profile" accept=".json">
     </div>
   </header>
 
@@ -1237,8 +1238,14 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
       <div id="translation-status" translate="no" class="dex-muted" role="status"></div>
       <label>Appearance <select id="setting-theme"><option value="system">System</option><option value="dark">Dark</option><option value="light">Light</option></select></label>
       <label>Zoom <select id="setting-zoom"><option value="0.8">80%</option><option value="1">100%</option><option value="1.25">125%</option><option value="1.5">150%</option><option value="2">200%</option></select></label>
-      <label>Emerald save profile <select id="setting-emerald-profile" translate="no"><option value="auto">Auto detect</option><option value="emerald">Standard Emerald / Emerald-based hack</option><option value="brisk-emerald">Brisk expanded format</option></select></label>
-      <p class="dex-muted">Use Standard Emerald for vanilla Emerald and hacks that keep its Pokémon/save structures. Use Brisk expanded format only for hacks that intentionally use Brisk's expanded Pokémon record conventions.</p>
+      <label>Emerald save profile <select id="setting-emerald-profile" translate="no"><option value="auto">Auto detect</option></select></label>
+      <p class="dex-muted">Auto-detected unknown Emerald saves open read-only unless a profile can be identified exactly. Explicitly choosing a trusted profile enables the write policy defined by that profile.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button type="button" class="ghost" id="btn-import-compat-profile">Import compatibility pack</button>
+        <button type="button" class="ghost" id="btn-import-game-data">Import game-data pack</button>
+        <button type="button" class="ghost" id="btn-export-original-backup">Export untouched backup</button>
+      </div>
+      <div id="compat-profile-status" class="dex-muted" role="status"></div>
     </div>
   </section>
   <section id="bag-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-bag" style="display:none;">
@@ -3031,8 +3038,11 @@ function renderTrainerCard(save){
   ]);
   c.appendChild(idBlock);
   c.appendChild(stats);
-  if(save.profileId && save.profileId !== 'brisk-emerald'){
-    c.appendChild(el('div',{class:'notice-banner',text:'Compatibility mode: standard Emerald save structures are active. Brisk-only Pokémon metadata is disabled for this save.'}));
+  var report=save.compatibility||window.EmeraldCompat&&EmeraldCompat.compatibilityReport(save.profile);
+  if(report){
+    var message='Compatibility: '+report.name+' · confidence '+report.confidence+' · '+(report.writeSafe?'editing enabled':'read-only');
+    if(report.readOnlyReason)message+=' — '+report.readOnlyReason;
+    c.appendChild(el('div',{class:report.writeSafe?'notice-banner':'error-banner',text:message}));
   }
 }
 function statBlock(label, value){
@@ -6364,35 +6374,57 @@ async function handleSavFromElectron(){
   }
 }
 
+function applyGameDataPack(parsed){
+  parsed=parsed&&parsed.data&&(!parsed.species&&!parsed.moves)?parsed.data:parsed;
+  if(!parsed||typeof parsed!=='object')throw new Error('Game-data pack must be a JSON object.');
+  USER_DATA.species=Object.assign({},USER_DATA.species,parsed.species||{});
+  USER_DATA.moves=Object.assign({},USER_DATA.moves,parsed.moves||{});
+  USER_DATA.items=Object.assign({},USER_DATA.items,parsed.items||{});
+  USER_DATA.abilities=Object.assign({},USER_DATA.abilities,parsed.abilities||{});
+  USER_DATA.itemDetails=Object.assign({},USER_DATA.itemDetails||{},parsed.itemDetails||{});
+  USER_DATA.moveDetails=Object.assign({},USER_DATA.moveDetails||{},parsed.moveDetails||{});
+  USER_DATA.abilityDetails=Object.assign({},USER_DATA.abilityDetails||{},parsed.abilityDetails||{});
+  ITEM_DETAILS=Object.assign({},BUNDLED_DATA.itemDetails||{},USER_DATA.itemDetails||{});normalizeBundledReferenceData();
+  MOVE_DETAILS=Object.assign({},BUNDLED_DATA.moveDetails||{},USER_DATA.moveDetails||{});
+  ABILITY_DETAILS=Object.assign({},BUNDLED_DATA.abilityDetails||{},USER_DATA.abilityDetails||{});
+  if(Array.isArray(parsed.routeEncounters))ROUTE_DATA=parsed.routeEncounters;
+  if(Array.isArray(parsed.changes))CHANGE_DATA=parsed.changes;
+  if(Array.isArray(parsed.trainerTeams))TRAINER_DATA=parsed.trainerTeams;
+  MOVE_LEARNERS_INDEX=null;ABILITY_USERS_INDEX=null;rebuildNameData();refreshBoxLevels();saveNameDataToStorage();updateDataStatus();renderCurrentReferenceTab();
+  if(currentSave)renderAll();
+}
 function handleDataFile(file){
-  var reader = new FileReader();
-  reader.onload = function(e){
+  var reader=new FileReader();
+  reader.onload=function(e){try{applyGameDataPack(JSON.parse(e.target.result));showNotice('Game-data pack imported.');}catch(err){showError('Could not parse that game-data pack: '+err.message);}};
+  reader.readAsText(file);
+}
+function refreshCompatibilityProfileOptions(){
+  var select=document.getElementById('setting-emerald-profile');if(!select||!window.EmeraldCompat)return;
+  var selected=uiSettings&&uiSettings.emeraldProfile||selectedEmeraldProfileOverride()||'auto';
+  select.innerHTML='';select.appendChild(el('option',{value:'auto',text:'Auto detect'}));
+  EmeraldCompat.listProfiles().forEach(function(p){select.appendChild(el('option',{value:p.id,text:p.name+(p.writePolicy==='readonly'?' (read-only)':'')}));});
+  select.value=EmeraldCompat.profileForId(selected)?selected:'auto';
+}
+function handleCompatibilityPackFile(file){
+  var reader=new FileReader();
+  reader.onload=function(e){
     try{
-      var parsed = JSON.parse(e.target.result);
-      USER_DATA.species = Object.assign({}, USER_DATA.species, parsed.species || {});
-      USER_DATA.moves = Object.assign({}, USER_DATA.moves, parsed.moves || {});
-      USER_DATA.items = Object.assign({}, USER_DATA.items, parsed.items || {});
-      USER_DATA.itemDetails = Object.assign({}, USER_DATA.itemDetails || {}, parsed.itemDetails || {});
-      USER_DATA.moveDetails = Object.assign({}, USER_DATA.moveDetails || {}, parsed.moveDetails || {});
-      USER_DATA.abilityDetails = Object.assign({}, USER_DATA.abilityDetails || {}, parsed.abilityDetails || {});
-      ITEM_DETAILS = Object.assign({}, BUNDLED_DATA.itemDetails || {}, USER_DATA.itemDetails || {});
-      normalizeBundledReferenceData();
-      MOVE_DETAILS = Object.assign({}, BUNDLED_DATA.moveDetails || {}, USER_DATA.moveDetails || {});
-      ABILITY_DETAILS = Object.assign({}, BUNDLED_DATA.abilityDetails || {}, USER_DATA.abilityDetails || {});
-      if (Array.isArray(parsed.routeEncounters)) ROUTE_DATA = parsed.routeEncounters;
-      if (Array.isArray(parsed.changes)) CHANGE_DATA = parsed.changes;
-      MOVE_LEARNERS_INDEX = null; ABILITY_USERS_INDEX = null;
-      rebuildNameData();
-      refreshBoxLevels();
-      saveNameDataToStorage();
-      updateDataStatus();
-      renderCurrentReferenceTab();
-      if (currentSave) renderAll();
-    }catch(err){
-      showError('Could not parse that JSON file: ' + err.message);
-    }
+      var parsed=JSON.parse(e.target.result),result=EmeraldCompat.importPack(parsed);
+      refreshCompatibilityProfileOptions();
+      if(result.data)applyGameDataPack(result.data);
+      var status=document.getElementById('compat-profile-status');
+      if(status)status.textContent='Imported: '+result.profileIds.join(', ');
+      showNotice('Compatibility pack imported.');
+    }catch(err){showError('Could not import compatibility pack: '+err.message);}
   };
   reader.readAsText(file);
+}
+function exportOriginalBackup(){
+  if(!currentSave||!currentSave._internal)return;
+  var bytes=currentSave._internal.originalBytes||currentSave._internal.rawBytes;
+  var blob=new Blob([bytes],{type:'application/octet-stream'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=(currentSave.trainer.name||'emerald').replace(/[^a-z0-9_-]/gi,'')+'-untouched-backup.'+(currentSave.fileExtension||'sav');
+  document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},1000);
 }
 
 function debounce(fn,wait){
@@ -6594,9 +6626,11 @@ document.getElementById('file-storage').addEventListener('change', function(e){
 document.getElementById('file-sav').addEventListener('change', function(e){
   if (e.target.files[0]) handleSavFile(e.target.files[0]);
 });
-document.getElementById('file-data').addEventListener('change', function(e){
-  if (e.target.files[0]) handleDataFile(e.target.files[0]);
-});
+document.getElementById('file-data').addEventListener('change',function(e){if(e.target.files[0])handleDataFile(e.target.files[0]);e.target.value='';});
+document.getElementById('file-compat-profile').addEventListener('change',function(e){if(e.target.files[0])handleCompatibilityPackFile(e.target.files[0]);e.target.value='';});
+document.getElementById('btn-import-compat-profile').addEventListener('click',function(){document.getElementById('file-compat-profile').click();});
+document.getElementById('btn-import-game-data').addEventListener('click',function(){document.getElementById('file-data').click();});
+document.getElementById('btn-export-original-backup').addEventListener('click',exportOriginalBackup);
 
 var storageDropTarget = document.getElementById('storage-section');
 storageDropTarget.addEventListener('dragover', function(event){
@@ -6702,11 +6736,14 @@ function applyUISettings(){
   if(window.BriskLocalization)window.BriskLocalization.setLanguage(uiSettings.language);
   ['language','theme','zoom'].forEach(function(k){document.getElementById('setting-'+k).value=uiSettings[k];});
   var profileSetting=document.getElementById('setting-emerald-profile');
-  if(profileSetting) profileSetting.value=uiSettings.emeraldProfile||'auto';
+  if(profileSetting)profileSetting.value=uiSettings.emeraldProfile||'auto';
+  var status=document.getElementById('compat-profile-status');
+  if(status&&currentSave&&currentSave.compatibility)status.textContent=currentSave.compatibility.name+' · '+currentSave.compatibility.confidence+' confidence · '+(currentSave.compatibility.writeSafe?'writable':'read-only');
 }
 document.getElementById('tab-settings').addEventListener('click',function(){setMainTab('settings');});
 ['language','theme','zoom'].forEach(function(k){document.getElementById('setting-'+k).addEventListener('change',function(e){uiSettings[k]=e.target.value;localStorage.setItem('briskdex_settings',JSON.stringify(uiSettings));applyUISettings();});});
 document.getElementById('setting-emerald-profile').addEventListener('change',function(e){
+  if(dirty){showError('Save or reload the current edits before changing compatibility profiles.');e.target.value=uiSettings.emeraldProfile||'auto';return;}
   uiSettings.emeraldProfile=e.target.value||'auto';
   localStorage.setItem('briskdex_settings',JSON.stringify(uiSettings));
   localStorage.setItem('briskdex_emerald_profile',uiSettings.emeraldProfile);
@@ -6726,6 +6763,7 @@ document.getElementById('setting-emerald-profile').addEventListener('change',fun
   }
 });
 matchMedia('(prefers-color-scheme: light)').addEventListener('change',applyUISettings);
+refreshCompatibilityProfileOptions();
 applyUISettings();
 
 try{localStorage.removeItem('briskdex_namedata_overrides');}catch(e){}
