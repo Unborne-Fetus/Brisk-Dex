@@ -386,8 +386,8 @@ function makeMatchedRoom(mode,a,b){
   const room={code,phase:'battle',turn:0,winner:null,reward:null,kickedIds:[],animationSeq:0,animations:[],createdAt:Date.now(),updatedAt:Date.now(),log:[],weather:null,weatherTurns:0,terrain:null,terrainTurns:0,
     rules:{format,teamSize:6,mystery:true,mysteryMode:mode,noPrize:true,hostByLatency:true},
     players:[
-      {id:better.playerId,name:better.name,trainer:better.trainer,team:cleanTeam(better.team),ready:true,active:0,choice:null,side:{},latency:better.latency},
-      {id:otherEntry.playerId,name:otherEntry.name,trainer:otherEntry.trainer,team:cleanTeam(otherEntry.team),ready:true,active:0,choice:null,side:{},latency:otherEntry.latency}
+      {id:better.playerId,name:better.name,trainer:better.trainer,team:cleanTeam(better.team),ready:true,active:0,choice:null,side:{},latency:better.latency,lastSeen:Date.now()},
+      {id:otherEntry.playerId,name:otherEntry.name,trainer:otherEntry.trainer,team:cleanTeam(otherEntry.team),ready:true,active:0,choice:null,side:{},latency:otherEntry.latency,lastSeen:Date.now()}
     ]};
   rooms.set(code,room);beginBattle(room);
   [better,otherEntry].forEach((entry,index)=>{const t=matchmakingTickets.get(entry.ticket);if(t){t.status='matched';t.roomCode=code;t.playerId=entry.playerId;t.playerIndex=index;t.hostIndex=0;t.updatedAt=Date.now();}});
@@ -1737,6 +1737,20 @@ function resolveTurn(room){
 }
 
 setInterval(()=>{
+  const now=Date.now(),grace=12000;
+  for(const room of rooms.values()){
+    if(room.phase!=='battle'||room.players.length<2)continue;
+    const stale=room.players.map(p=>now-(p.lastSeen||room.updatedAt||now)>grace);
+    if(stale[0]&&stale[1]){
+      room.phase='finished';room.winner=null;room.players.forEach(p=>p.choice=null);log(room,'Battle ended because both players disconnected.');room.updatedAt=now;
+    }else if(stale[0]||stale[1]){
+      const loser=stale[0]?0:1,winner=other(loser);
+      finishBattle(room,winner,room.players[loser].name+' disconnected. '+room.players[winner].name+' won the battle!');room.updatedAt=now;
+    }
+  }
+},2000).unref();
+
+setInterval(()=>{
   const cutoff=Date.now()-6*60*60*1000,queueCutoff=Date.now()-10*60*1000;
   for(const [key,room] of rooms) if(room.updatedAt<cutoff) rooms.delete(key);
   for(const [ticket,state] of matchmakingTickets) if((state.updatedAt||state.createdAt||0)<queueCutoff) matchmakingTickets.delete(ticket);
@@ -1787,7 +1801,7 @@ const server=http.createServer(async (req,res)=>{
       if(!team.length) return json(res,400,{error:'Choose at least one verified Pokémon for competitive play.'});
       const room={code,phase:'lobby',turn:0,winner:null,reward:null,kickedIds:[],animationSeq:0,animations:[],createdAt:Date.now(),updatedAt:Date.now(),log:[],weather:null,weatherTurns:0,terrain:null,terrainTurns:0,
         rules:{format:'singles',teamSize:Math.max(1,Math.min(6,Number(body.rules&&body.rules.teamSize)||6))},
-        players:[{id:playerId,name:cleanText(body.name,24)||'Host',trainer:cleanTrainerAppearance(body.trainer),team,ready:false,active:0,choice:null,side:{}}]};
+        players:[{id:playerId,name:cleanText(body.name,24)||'Host',trainer:cleanTrainerAppearance(body.trainer),team,ready:false,active:0,choice:null,side:{},lastSeen:Date.now()}]};
       rooms.set(code,room); return json(res,200,{code,playerId,playerIndex:0,room:publicRoom(room,0)});
     }
     const match=url.pathname.match(/^\/rooms\/([A-Z0-9]{6})(?:\/(join|action))?$/);
@@ -1798,6 +1812,7 @@ const server=http.createServer(async (req,res)=>{
       const playerId=url.searchParams.get('playerId'); const pi=playerIndex(room,playerId);
       if(pi<0&&Array.isArray(room.kickedIds)&&room.kickedIds.includes(playerId)) return json(res,410,{error:'You were removed from the room by the host.'});
       if(pi<0) return json(res,403,{error:'Invalid player token.'});
+      room.players[pi].lastSeen=Date.now();room.updatedAt=Date.now();
       return json(res,200,{room:publicRoom(room,pi),playerIndex:pi});
     }
     if(req.method==='POST'&&match[2]==='join'){
@@ -1806,14 +1821,14 @@ const server=http.createServer(async (req,res)=>{
       const body=await readBody(req), verified=cleanVerifiedTeam(body.team), team=verified.team;
       if(verified.errors.length) return json(res,400,{error:'Competitive team rejected: '+verified.errors.join(' ')});
       if(!team.length) return json(res,400,{error:'Choose at least one verified Pokémon for competitive play.'});
-      const playerId=id(); room.players.push({id:playerId,name:cleanText(body.name,24)||'Challenger',trainer:cleanTrainerAppearance(body.trainer),team,ready:false,active:0,choice:null,side:{}});
+      const playerId=id(); room.players.push({id:playerId,name:cleanText(body.name,24)||'Challenger',trainer:cleanTrainerAppearance(body.trainer),team,ready:false,active:0,choice:null,side:{},lastSeen:Date.now()});
       log(room,room.players[1].name+' joined the room.'); return json(res,200,{code:room.code,playerId,playerIndex:1,room:publicRoom(room,1)});
     }
     if(req.method==='POST'&&match[2]==='action'){
       const body=await readBody(req), pi=playerIndex(room,body.playerId);
       if(pi<0&&Array.isArray(room.kickedIds)&&room.kickedIds.includes(body.playerId)) return json(res,410,{error:'You were removed from the room by the host.'});
       if(pi<0) return json(res,403,{error:'Invalid player token.'});
-      const p=room.players[pi];
+      const p=room.players[pi];p.lastSeen=Date.now();room.updatedAt=Date.now();
       if(body.type==='kick'&&room.phase==='lobby'){
         if(pi!==0) return json(res,403,{error:'Only the host can remove players.'});
         if(room.players.length<2) return json(res,400,{error:'There is no opponent to remove.'});
