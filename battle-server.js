@@ -129,6 +129,207 @@ function cleanTeam(team){
   })).filter(mon=>mon.species>0);
 }
 
+
+const GEN3_SUB_ORDERS=[
+  'GAEM','GAME','GEAM','GEMA','GMAE','GMEA',
+  'AGEM','AGME','AEGM','AEMG','AMGE','AMEG',
+  'EGAM','EGMA','EAGM','EAMG','EMGA','EMAG',
+  'MGAE','MGEA','MAGE','MAEG','MEGA','MEAG'
+];
+const TERA_TYPE_NAMES={1:'Normal',2:'Fighting',3:'Flying',4:'Poison',5:'Ground',6:'Rock',7:'Bug',8:'Ghost',9:'Steel',10:'Mystery',11:'Fire',12:'Water',13:'Grass',14:'Electric',15:'Psychic',16:'Ice',17:'Dragon',18:'Dark',19:'Fairy',20:'Stellar'};
+
+function expForLevel(level,growthRate){
+  const n=level;
+  switch(growthRate){
+    case 'fast': return Math.floor(4*n*n*n/5);
+    case 'medium_slow': return Math.max(0,Math.floor(6*n*n*n/5-15*n*n+100*n-140));
+    case 'slow': return Math.floor(5*n*n*n/4);
+    case 'erratic':
+      if(n<=50)return Math.floor(n*n*n*(100-n)/50);
+      if(n<=68)return Math.floor(n*n*n*(150-n)/100);
+      if(n<=98)return Math.floor(n*n*n*Math.floor((1911-10*n)/3)/500);
+      return Math.floor(n*n*n*(160-n)/100);
+    case 'fluctuating':
+      if(n<=15)return Math.floor(n*n*n*(Math.floor((n+1)/3)+24)/50);
+      if(n<=36)return Math.floor(n*n*n*(n+14)/50);
+      return Math.floor(n*n*n*(Math.floor(n/2)+32)/50);
+    default:return n*n*n;
+  }
+}
+function levelFromExp(exp,growthRate){
+  let level=1;
+  for(let candidate=2;candidate<=100;candidate++){
+    if(expForLevel(candidate,growthRate)>exp)break;
+    level=candidate;
+  }
+  return level;
+}
+function natureMultiplierForPid(pid,statIndex){
+  if(statIndex===0)return 1;
+  const natureIndex=(pid>>>0)%25;
+  const raised=natureIndex<=4?0:natureIndex<=9?1:natureIndex<=14?2:natureIndex<=19?3:4;
+  const lowered=natureIndex%5;
+  const nonHp=statIndex-1;
+  if(nonHp===raised)return 1.1;
+  if(nonHp===lowered)return .9;
+  return 1;
+}
+function statsFromVerifiedRecord(mon,species){
+  const base=Array.isArray(species.baseStats)?species.baseStats.map(Number):[1,1,1,1,1,1];
+  const iv=[mon.ivs.hp,mon.ivs.atk,mon.ivs.def,mon.ivs.spd,mon.ivs.spa,mon.ivs.spdef];
+  const ev=[mon.evs.hp,mon.evs.atk,mon.evs.def,mon.evs.spd,mon.evs.spa,mon.evs.spdef];
+  const level=mon.level,stats=[];
+  stats[0]=species.constant==='SHEDINJA'?1:Math.floor(((2*base[0]+iv[0]+Math.floor(ev[0]/4))*level)/100)+level+10;
+  for(let i=1;i<6;i++){
+    const raw=Math.floor(((2*base[i]+iv[i]+Math.floor(ev[i]/4))*level)/100)+5;
+    stats[i]=Math.floor(raw*natureMultiplierForPid(mon.personality,i));
+  }
+  return {maxHP:stats[0],atk:stats[1],def:stats[2],speed:stats[3],spAtk:stats[4],spDef:stats[5]};
+}
+function decodeVerifiedRaw80(value){
+  const raw=cleanRewardRaw80(value);
+  if(!raw)return {ok:false,reason:'Missing or malformed raw Pokémon record.'};
+  const bytes=Buffer.from(raw,'base64');
+  const personality=bytes.readUInt32LE(0),otId=bytes.readUInt32LE(4);
+  if(personality===0&&otId===0)return {ok:false,reason:'Empty Pokémon record.'};
+
+  const storedChecksum=bytes.readUInt16LE(0x1c);
+  const flags=bytes.readUInt16LE(0x1e);
+  const competitiveLegal=((flags>>>15)&1)===1;
+  if(!competitiveLegal)return {ok:false,reason:'Unverified acquisition provenance.'};
+
+  const key=(otId^personality)>>>0;
+  const plain=Buffer.from(bytes.subarray(0x20,0x50));
+  for(let w=0;w<12;w++)plain.writeUInt32LE((plain.readUInt32LE(w*4)^key)>>>0,w*4);
+  let checksum=0;
+  for(let i=0;i<24;i++)checksum=(checksum+plain.readUInt16LE(i*2))&0xffff;
+  if(checksum!==storedChecksum)return {ok:false,reason:'Invalid Pokémon checksum.'};
+
+  const order=GEN3_SUB_ORDERS[personality%24],offsets={};
+  for(let i=0;i<4;i++)offsets[order[i]]=i*12;
+  const g=offsets.G,a=offsets.A,e=offsets.E,m=offsets.M;
+  const speciesAndTera=plain.readUInt16LE(g);
+  const speciesId=speciesAndTera&0x07ff;
+  const teraType=(speciesAndTera>>>11)&0x1f;
+  const heldItem=plain.readUInt16LE(g+2)&0x03ff;
+  const experience=plain.readUInt32LE(g+4)&0x001fffff;
+  const friendship=plain.readUInt8(g+9);
+  const moveIds=[0,2,4,6].map(off=>plain.readUInt16LE(a+off)&0x07ff);
+  const pp=[0,1,2,3].map(off=>plain.readUInt8(a+8+off)&0x7f);
+  const evs={hp:plain.readUInt8(e),atk:plain.readUInt8(e+1),def:plain.readUInt8(e+2),spd:plain.readUInt8(e+3),spa:plain.readUInt8(e+4),spdef:plain.readUInt8(e+5)};
+  const ivWord=plain.readUInt32LE(m+4);
+  const misc=plain.readUInt32LE(m+8);
+  const ivs={
+    hp:ivWord&31,atk:(ivWord>>>5)&31,def:(ivWord>>>10)&31,
+    spd:(ivWord>>>15)&31,spa:(ivWord>>>20)&31,spdef:(ivWord>>>25)&31
+  };
+  const isEgg=((ivWord>>>30)&1)===1;
+  const abilitySlot=(misc>>>29)&3;
+  const species=(BRISK_DATA.species||{})[String(speciesId)];
+  if(!species||typeof species!=='object')return {ok:false,reason:'Unknown or unavailable species.'};
+  if(isEgg)return {ok:false,reason:'Eggs cannot be used in competitive play.'};
+
+  const level=levelFromExp(experience,species.growthRate);
+  if(level<1||level>100)return {ok:false,reason:'Invalid level or experience.'};
+
+  const evValues=Object.values(evs);
+  if(evValues.some(v=>v>252))return {ok:false,reason:'A stat exceeds 252 EVs.'};
+  if(evValues.reduce((sum,v)=>sum+v,0)>510)return {ok:false,reason:'Total EVs exceed 510.'};
+
+  const abilities=Array.isArray(species.abilities)?species.abilities.filter(Boolean):[];
+  if(!abilities.length||abilitySlot>=abilities.length)return {ok:false,reason:'Invalid ability slot for this species.'};
+
+  if(heldItem&&!(BRISK_DATA.items||{})[String(heldItem)])
+    return {ok:false,reason:'Unknown held item.'};
+
+  const legalMoves=Array.isArray(species.learnableMoves)&&species.learnableMoves.length
+    ? new Set(species.learnableMoves.map(Number)):null;
+  const actualMoves=moveIds.filter(id=>id>0);
+  if(!actualMoves.length)return {ok:false,reason:'Competitive Pokémon must know at least one move.'};
+  for(const moveId of actualMoves){
+    if(!catalogMove(moveId))return {ok:false,reason:'Unknown move in Pokémon record.'};
+    if(legalMoves&&!legalMoves.has(moveId))
+      return {ok:false,reason:(BRISK_DATA.moves||{})[String(moveId)]+' is not legal for '+(species.name||species.constant||('Species '+speciesId))+'.'};
+  }
+
+  const shinyOdds=Number(BRISK_DATA.shinyOdds)||8;
+  const shinyValue=(personality&0xffff)^(personality>>>16)^(otId&0xffff)^(otId>>>16);
+  const shinyModifier=(flags>>>14)&1;
+  const isShiny=(shinyValue<shinyOdds)!==(shinyModifier===1);
+
+  return {ok:true,raw,mon:{
+    personality,otId,species:speciesId,speciesData:species,teraType,heldItem,experience,friendship,
+    moves:actualMoves,pp,evs,ivs,abilitySlot,level,isShiny
+  }};
+}
+function transformationFormIds(speciesId){
+  const all=BRISK_DATA.species||{},base=all[String(speciesId)]||{};
+  const baseConstant=String(base.constant||''),nat=Number(base.nationalDex||0);
+  return Object.keys(all).filter(id=>{
+    const form=all[id]||{};
+    if(!form.isMega&&!form.isGmax)return false;
+    const constant=String(form.constant||'');
+    const direct=constant.replace(/_(?:MEGA(?:_[XY])?|GMAX|GIGANTAMAX)$/,'')===baseConstant;
+    return direct||(nat&&Number(form.nationalDex||0)===nat&&constant.indexOf(baseConstant+'_')===0);
+  }).map(Number);
+}
+function verifiedTransformations(mon,stats){
+  const all=BRISK_DATA.species||{},base=mon.speciesData,baseStats=Array.isArray(base.baseStats)?base.baseStats.map(Number):[];
+  return transformationFormIds(mon.species).map(formId=>{
+    const form=all[String(formId)]||{},fb=Array.isArray(form.baseStats)?form.baseStats.map(Number):[];
+    const adjusted=(current,index)=>{
+      const delta=(Number(fb[index])||0)-(Number(baseStats[index])||0);
+      return Math.max(1,Math.floor(Number(current||1)+(2*delta*mon.level/100)));
+    };
+    const abilities=Array.isArray(form.abilities)?form.abilities.filter(Boolean):[];
+    return {
+      kind:form.isGmax?'Gigantamax':'Mega',species:formId,name:form.name||form.constant||('Species '+formId),
+      types:Array.isArray(form.types)?form.types.filter(Boolean).slice(0,2):[],
+      ability:abilities[0]||'',maxHP:adjusted(stats.maxHP,0),atk:adjusted(stats.atk,1),def:adjusted(stats.def,2),
+      speed:adjusted(stats.speed,3),spAtk:adjusted(stats.spAtk,4),spDef:adjusted(stats.spDef,5)
+    };
+  });
+}
+function verifiedBattleMon(input,index){
+  const decoded=decodeVerifiedRaw80(input&&input.rewardRaw80);
+  if(!decoded.ok)return {ok:false,reason:decoded.reason};
+  const mon=decoded.mon,species=mon.speciesData,stats=statsFromVerifiedRecord(mon,species);
+  const abilities=species.abilities.filter(Boolean);
+  const rawMoves=mon.moves.map((id,i)=>{
+    const canonical=catalogMove(id);
+    const currentPP=Number(mon.pp[i])||canonical.pp||1;
+    return Object.assign({},canonical,{pp:Math.max(1,currentPP),maxPP:Math.max(Number(canonical.pp)||1,currentPP)});
+  });
+  const teraName=TERA_TYPE_NAMES[mon.teraType]||(Array.isArray(species.types)&&species.types[0])||'Normal';
+  const itemName=(BRISK_DATA.items||{})[String(mon.heldItem)]||'';
+  const result={
+    slot:index,rewardRaw80:decoded.raw,species:mon.species,
+    name:cleanText(input&&input.name,40)||species.name||species.constant||('Pokémon '+(index+1)),
+    level:mon.level,friendship:mon.friendship,weight:Math.max(0,Number(species.weight||species.weightHg)||0),
+    ivs:Object.assign({},mon.ivs),types:Array.isArray(species.types)?species.types.filter(Boolean).slice(0,2):[],
+    ability:abilities[mon.abilitySlot]||abilities[0]||'',item:itemName,teraType:teraName,
+    transformations:verifiedTransformations(mon,stats),transformed:false,transformedKind:null,originalTypes:null,
+    choiceLock:null,lastMoveIndex:null,maxHP:stats.maxHP,atk:stats.atk,def:stats.def,speed:stats.speed,spAtk:stats.spAtk,spDef:stats.spDef,
+    status:null,statusTurns:0,toxicCounter:0,
+    stages:{atk:0,def:0,spa:0,spd:0,spe:0,acc:0,eva:0},
+    volatile:{protect:false,protectCounter:0,flinch:false,confusion:0,seeded:false,taunt:0,encore:0,encoreMove:null,substitute:0,
+      disabledMove:null,disableTurns:0,torment:false,trapped:false,recharge:false,charging:null,destinyBond:false,perish:0,yawn:0,
+      aquaRing:false,ingrain:false,healBlock:0,saltCure:false,rageFistHits:0,lastDamageTaken:0,lastDamagedTurn:0,noRetreat:false,focusEnergy:0,lockOn:false,magnetRise:0,tarShot:false,octolock:false,recycledItem:'',actedTurn:0,statsLoweredTurn:0,smackedDown:false,endure:false,laserFocus:0,nightmare:false,infatuated:false,stockpile:0,rollout:0,uproar:0,throatChop:0,grudge:false,embargo:0,telekinesis:0,switchInTurn:0,beakBlast:false,magicCoat:false,imprison:false,usedMoves:[],lastDamageCategory:null,bideTurns:0,bideDamage:0,identified:false,miracleEye:false,snatch:false,skyDrop:false,glaiveRush:0},
+    moves:rawMoves,isShiny:mon.isShiny
+  };
+  return {ok:true,mon:result};
+}
+function cleanVerifiedTeam(team){
+  if(!Array.isArray(team))return {team:[],errors:['No team was supplied.']};
+  const out=[],errors=[];
+  team.slice(0,6).forEach((input,index)=>{
+    const checked=verifiedBattleMon(input,index);
+    if(!checked.ok)errors.push('Slot '+(index+1)+': '+checked.reason);
+    else out.push(checked.mon);
+  });
+  return {team:out,errors};
+}
+
 const TYPE_CHART = {
   Normal:{Rock:.5,Ghost:0,Steel:.5},
   Fire:{Fire:.5,Water:.5,Grass:2,Ice:2,Bug:2,Rock:.5,Dragon:.5,Steel:2},
@@ -1581,8 +1782,9 @@ const server=http.createServer(async (req,res)=>{
       return json(res,200,{ok:true,rooms:openRooms});
     }
     if(req.method==='POST'&&url.pathname==='/rooms'){
-      const body=await readBody(req), code=roomCode(), playerId=id(), team=cleanTeam(body.team);
-      if(!team.length) return json(res,400,{error:'Load a save with at least one party Pokémon first.'});
+      const body=await readBody(req), code=roomCode(), playerId=id(), verified=cleanVerifiedTeam(body.team), team=verified.team;
+      if(verified.errors.length) return json(res,400,{error:'Competitive team rejected: '+verified.errors.join(' ')});
+      if(!team.length) return json(res,400,{error:'Choose at least one verified Pokémon for competitive play.'});
       const room={code,phase:'lobby',turn:0,winner:null,reward:null,kickedIds:[],animationSeq:0,animations:[],createdAt:Date.now(),updatedAt:Date.now(),log:[],weather:null,weatherTurns:0,terrain:null,terrainTurns:0,
         rules:{format:'singles',teamSize:Math.max(1,Math.min(6,Number(body.rules&&body.rules.teamSize)||6))},
         players:[{id:playerId,name:cleanText(body.name,24)||'Host',trainer:cleanTrainerAppearance(body.trainer),team,ready:false,active:0,choice:null,side:{}}]};
@@ -1601,7 +1803,9 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==='POST'&&match[2]==='join'){
       if(room.players.length>=2) return json(res,409,{error:'This room is full.'});
       if(room.phase!=='lobby') return json(res,409,{error:'This battle already started.'});
-      const body=await readBody(req), team=cleanTeam(body.team); if(!team.length) return json(res,400,{error:'Load a save with at least one party Pokémon first.'});
+      const body=await readBody(req), verified=cleanVerifiedTeam(body.team), team=verified.team;
+      if(verified.errors.length) return json(res,400,{error:'Competitive team rejected: '+verified.errors.join(' ')});
+      if(!team.length) return json(res,400,{error:'Choose at least one verified Pokémon for competitive play.'});
       const playerId=id(); room.players.push({id:playerId,name:cleanText(body.name,24)||'Challenger',trainer:cleanTrainerAppearance(body.trainer),team,ready:false,active:0,choice:null,side:{}});
       log(room,room.players[1].name+' joined the room.'); return json(res,200,{code:room.code,playerId,playerIndex:1,room:publicRoom(room,1)});
     }
