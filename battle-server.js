@@ -1465,7 +1465,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==='GET'&&!match[2]){
       const playerId=url.searchParams.get('playerId'); const pi=playerIndex(room,playerId);
       if(pi<0) return json(res,403,{error:'Invalid player token.'});
-      return json(res,200,{room:publicRoom(room),playerIndex:pi});
+      return json(res,200,{room:publicRoom(room,pi),playerIndex:pi});
     }
     if(req.method==='POST'&&match[2]==='join'){
       if(room.players.length>=2) return json(res,409,{error:'This room is full.'});
@@ -1499,7 +1499,7 @@ const server=http.createServer(async (req,res)=>{
         if(!Number.isInteger(slot)||!p.team[slot]||p.team[slot].hp<=0||slot===p.active) return json(res,400,{error:'Invalid switch.'});
         p.choice={type:'switch',slot}; resolveTurn(room);
       }else return json(res,400,{error:'That action is not available right now.'});
-      return json(res,200,{room:publicRoom(room),playerIndex:pi});
+      return json(res,200,{room:publicRoom(room,pi),playerIndex:pi});
     }
     return json(res,405,{error:'Method not allowed'});
   }catch(err){ return json(res,400,{error:err.message||String(err)}); }
