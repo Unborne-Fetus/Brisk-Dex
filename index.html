@@ -428,6 +428,48 @@ input[type=file]{ display:none; }
 .battle-active-picker{display:flex;gap:7px;margin:0 0 9px}.battle-active-picker button{padding:7px 10px;font-size:10px}.battle-active-picker button.selected{outline:2px solid #4b89d0}
 @media(max-width:700px){.mystery-mode-grid{grid-template-columns:1fr}.battle-combatant.pos1.me{left:26%}.battle-combatant.pos1.foe{right:26%}.battle-hud.pos1{display:none}}
 
+
+/* ---------- Battle simulator responsive/theme pass ---------- */
+.online-team-selected{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.online-team-chip{min-width:0;display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center}
+.online-team-chip-name{min-width:0}.online-team-chip-name strong,.online-team-chip-name small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.online-team-chip-name small{font-size:9px;color:var(--muted)}
+.online-team-chip-tools{display:flex;gap:4px}.online-team-chip-tools button{padding:4px 6px;font-size:8px}
+.battle-sim{width:min(100%,1320px);margin:12px auto 0;background:var(--panel);color:var(--text);border-color:var(--line);box-shadow:0 12px 34px #0005}
+.battle-sim-topbar{background:var(--panel-2);color:var(--muted);border-color:var(--line)}.battle-sim-topbar strong{color:var(--text)}
+.battle-sim-field{height:clamp(360px,36vw,570px);min-height:0;margin:0 88px;border-color:var(--line);background-image:linear-gradient(#00000012,#00000012),url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACABAMAAAAxEHz4AAAAkFBMVEUAAADm9ubexZT23qzm3r3mzZzV5s3u1aT23qzuzaTm1aRBrJxixbSL1dWk5t7F7uYAAADm9ubNrIPu1aTu3r3VtIvu5t7exZTmzZzevZTm1aRBrJxixbSL1dWk5t7F7uYAAAD/1UH/9sX/1VL/5nP/9oMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAE9D3AAAB80lEQVRoge2WsU7DMBCG/QqVEA8QCYnOBDojoq5IoKgzauW1A0LZmTp367PwCrwCr8BUdQ0+XxyfY6c4Dggq3TdZUe73fxfnzkIoJh5SysJBPfDfAiBe1JSDLO6uguSFXNddOgKyCMdaCtkvcFi1W1dV2aGqWiPzdVcA0242n72UD1mQi3LxbGx4NTjg5lVfsBVBJ/naTWGFe5vo6U6xvdwoXukaNdDHnAro7Uu7D8TsMojZBNZZVoJEjgKQB8S/EJ99BnCtX1mAgq6BEoF4J/XvDOhEGg8iEB9HoyDqPcZrcbqdb6BjAxTuVQ2UgWtMe0vz9Svg1eERyiCSDTQWxDLZgLZwIzCDNCAHInD869P1tHGhBZatwPGvT9emDDqFvTkFww1gEWuTQ5KBXJ2Ds7SDiAZuJ52jPLXbod9Me2+ee/H6KDsKNl/0u82wD9Cv78Rrgbr9neMNLExDwH4ICjPTUCIMYEOZmH5Qey3tePHclmZaenJT9WZKXFu3c4GMufPYwfJEZ6M7qBJGmzcthw5X7wk6CYz38JuBu8EwehzE8w8EfqkGA76C92TcOUg4iSSdkf9C6t9oMh/ZD0ZcsnQiaZcsW4PUS5ZJ4Y8vWc65TgHy+FC8KU5U4Edq8Kl4V5yoAMMwDMMwDMMwDMMwDMNE8AXd/04rStmMSAAAAABJRU5ErkJggg==");background-repeat:repeat;background-size:256px 256px;image-rendering:pixelated}
+:root[data-theme="light"] .battle-sim-field{filter:brightness(1.16) saturate(.9)}
+:root:not([data-theme="light"]) .battle-sim-field{filter:brightness(.78) saturate(1.05)}
+.battle-sim-field:before{background:linear-gradient(180deg,transparent 0 58%,#0002 59% 100%);inset:0;height:auto}
+.battle-side-panel{background:var(--panel-2);color:var(--text);border-color:var(--line);width:88px;bottom:240px}.battle-side-panel.left{border-color:var(--line)}.battle-side-panel.right{border-color:var(--line)}
+.battle-sprite{width:clamp(130px,13vw,220px);height:clamp(130px,13vw,220px)}.battle-combatant.me .battle-sprite{width:clamp(145px,14vw,235px);height:clamp(145px,14vw,235px)}
+.battle-combatant.foe{right:12%;top:8%;width:clamp(180px,20vw,260px);height:48%}.battle-combatant.me{left:10%;bottom:1%;width:clamp(190px,22vw,280px);height:50%}
+.battle-hud{width:clamp(220px,32%,390px);color:var(--text)}.battle-hud.foe{left:4%;top:17%}.battle-hud.me{right:4%;bottom:18%}
+.battle-hud-name,.battle-hud-level{color:var(--text);text-shadow:0 1px var(--panel)}.battle-hud-hp-text{color:var(--muted)}
+.battle-sim-bottom{grid-template-columns:minmax(0,1.65fr) minmax(280px,.75fr);min-height:220px;background:var(--panel);border-color:var(--line)}
+.battle-command{background:var(--panel);color:var(--text);padding:12px}.battle-command h4{color:var(--text)}
+.battle-move-button{background:var(--panel-2)!important;color:var(--text);border-color:var(--line)}.battle-move-button strong,.battle-move-button .battle-move-pp{color:var(--text)}.battle-move-button small{color:var(--muted)}
+.battle-log-panel{background:var(--panel);color:var(--text);border-color:var(--line)}.battle-log-title{background:var(--panel-2);color:var(--muted);border-color:var(--line)}.battle-log{background:var(--panel);color:var(--text)}.battle-log-line{border-color:var(--line-soft)}.battle-log-line:last-child{color:var(--text)}
+.battle-switch{background:var(--panel-2);color:var(--text);border-color:var(--line)}.battle-switch small{color:var(--muted)}
+.battle-result-card{background:var(--panel);color:var(--text);border-color:var(--line)}
+@media(max-width:900px){
+  .battle-sim{width:100%;border-left:0;border-right:0}
+  .battle-sim-field{margin:0 64px;height:430px}
+  .battle-side-panel{width:64px;bottom:0;height:430px;top:auto;padding:6px 3px}.battle-side-name{font-size:9px}.battle-side-trainer-wrap{height:72px}.battle-trainer-sprite{max-width:52px;max-height:70px}.battle-side-team{grid-template-columns:repeat(2,14px);gap:5px}.battle-side-ball{width:10px;height:10px}
+  .battle-combatant.foe{right:4%;top:12%}.battle-combatant.me{left:1%;bottom:2%}.battle-hud.foe{left:3%;top:14%;width:44%}.battle-hud.me{right:3%;bottom:14%;width:44%}
+  .battle-sim-bottom{grid-template-columns:1fr}.battle-log-panel{border-left:0;border-top:1px solid var(--line)}.battle-log{max-height:170px}
+}
+@media(max-width:600px){
+  .online-team-selected{grid-template-columns:1fr}.online-team-chip{grid-template-columns:30px minmax(0,1fr)}.online-team-chip-tools{grid-column:1/-1;justify-content:flex-end}
+  .battle-sim-topbar{font-size:9px;padding:6px 8px}.battle-sim-field{margin:0;height:330px}.battle-side-panel,.battle-field-trainer{display:none}
+  .battle-turn-badge{font-size:12px;padding:3px 6px}.battle-combatant.foe{right:-1%;top:14%;width:48%;height:42%}.battle-combatant.me{left:-2%;bottom:0;width:50%;height:46%}
+  .battle-sprite{width:clamp(105px,34vw,150px);height:clamp(105px,34vw,150px)}.battle-combatant.me .battle-sprite{width:clamp(115px,38vw,165px);height:clamp(115px,38vw,165px)}
+  .battle-hud{width:52%;font-size:10px}.battle-hud.foe{left:2%;top:10%}.battle-hud.me{right:2%;bottom:10%}.battle-hud-name{font-size:11px}.battle-hud-level{font-size:9px}
+  .battle-move-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.battle-move-button{min-height:64px;padding:8px}.battle-move-button strong{font-size:11px}.battle-move-button small,.battle-move-button .battle-move-pp,.battle-effect{font-size:7px}
+  .battle-switch-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.battle-switch{grid-template-columns:30px 1fr;padding:5px}.battle-switch .encounter-icon{width:30px;height:30px}
+  .battle-command{padding:8px}.battle-log{max-height:130px;font-size:9px}.battle-log-title{padding:8px}
+}
+@media(max-width:390px){.battle-move-grid,.battle-switch-grid{grid-template-columns:1fr}.battle-sim-field{height:300px}}
+
 /* ---------- Battle move animations ---------- */
 .battle-combatant{will-change:transform,filter,opacity}
 .battle-attack-fx{position:absolute;z-index:10;pointer-events:none;left:0;top:0;transform:translate(-50%,-50%);}
@@ -4698,6 +4740,23 @@ function competitivePickAttacks(moves,category,types,count,exclude){
     typeUsed.add(move.type); used.add(move.name); return true;
   }).slice(0,count);
 }
+function competitiveDamagingMoves(moves,preferredCategory,types,exclude){
+  var used=new Set((exclude||[]).map(function(move){return move&&move.name;}));
+  return moves.filter(function(move){return move.power>0&&!used.has(move.name);}).sort(function(a,b){
+    var sa=competitiveAttackScore(a,a.category,types)+(a.category===preferredCategory?35:0);
+    var sb=competitiveAttackScore(b,b.category,types)+(b.category===preferredCategory?35:0);
+    return sb-sa;
+  });
+}
+function competitiveFillAttacks(chosen,moves,preferredCategory,types,minAttacks,targetSize){
+  chosen=chosen.slice();
+  function attackCount(){return chosen.filter(function(m){return m&&m.power>0;}).length;}
+  var pool=competitiveDamagingMoves(moves,preferredCategory,types,chosen);
+  while(attackCount()<minAttacks&&chosen.length<targetSize&&pool.length){
+    var move=pool.shift();if(!chosen.some(function(x){return x.name===move.name;}))chosen.push(move);
+  }
+  return chosen;
+}
 
 function competitiveNature(stats,kind){
   var atk=Number(stats[1]||0), def=Number(stats[2]||0), spe=Number(stats[3]||0), spa=Number(stats[4]||0), spd=Number(stats[5]||0);
@@ -4713,8 +4772,8 @@ function competitiveItem(species,kind,hasSetup){
   var hp=Number(stats[0]||0), def=Number(stats[2]||0), spd=Number(stats[5]||0), spe=Number(stats[3]||0);
   if((species.evolutions||[]).length) return 'Eviolite';
   if(kind==='bulky') return 'Leftovers';
-  if(hp+def+spd<190 && spe>=80) return 'Focus Sash';
   if(hasSetup) return 'Life Orb';
+  if(hp+def+spd<190 && spe>=80) return 'Focus Sash';
   return kind==='physical'?'Choice Band':kind==='special'?'Choice Specs':'Life Orb';
 }
 
@@ -4732,17 +4791,15 @@ function competitiveBuilds(species){
   utilityNames.forEach(function(name){var m=moves.find(function(x){return x.name===name;});if(m&&!utility.some(function(x){return x.name===m.name;})) utility.push(m);});
 
   function offensive(kind){
-    var setup=kind==='physical'?setupPhysical:setupSpecial;
+    var preferred=kind==='physical'?'Physical':'Special',setup=kind==='physical'?setupPhysical:setupSpecial;
     var chosen=[];
     if(setup) chosen.push(setup);
-    chosen=chosen.concat(competitivePickAttacks(moves,kind==='physical'?'Physical':'Special',types,4-chosen.length,chosen));
+    chosen=chosen.concat(competitivePickAttacks(moves,preferred,types,4-chosen.length,chosen));
+    chosen=competitiveFillAttacks(chosen,moves,preferred,types,setup?3:4,4);
     if(chosen.length<4){
-      var other=competitivePickAttacks(moves,kind==='physical'?'Special':'Physical',types,4-chosen.length,chosen);
-      chosen=chosen.concat(other);
+      utility.forEach(function(m){if(chosen.length<4&&!chosen.some(function(x){return x.name===m.name;}))chosen.push(m);});
     }
-    if(chosen.length<4){
-      utility.forEach(function(m){if(chosen.length<4&&!chosen.some(function(x){return x.name===m.name;})) chosen.push(m);});
-    }
+    chosen=competitiveFillAttacks(chosen,moves,preferred,types,Math.min(3,moves.filter(function(m){return m.power>0;}).length),4);
     return {
       role:kind==='physical'?'Physical Attacker':'Special Attacker',
       ability:ability,
@@ -4755,12 +4812,12 @@ function competitiveBuilds(species){
   }
 
   function bulky(){
-    var chosen=[];
-    if(recovery) chosen.push(recovery);
-    utility.forEach(function(m){if(chosen.length<3&&!chosen.some(function(x){return x.name===m.name;})) chosen.push(m);});
-    var attackCategory=atk>=spa?'Physical':'Special';
-    chosen=chosen.concat(competitivePickAttacks(moves,attackCategory,types,4-chosen.length,chosen));
-    if(chosen.length<4) chosen=chosen.concat(competitivePickAttacks(moves,attackCategory==='Physical'?'Special':'Physical',types,4-chosen.length,chosen));
+    var attackCategory=atk>=spa?'Physical':'Special',chosen=[];
+    if(recovery)chosen.push(recovery);
+    chosen=chosen.concat(competitivePickAttacks(moves,attackCategory,types,2,chosen));
+    chosen=competitiveFillAttacks(chosen,moves,attackCategory,types,Math.min(2,moves.filter(function(m){return m.power>0;}).length),4);
+    utility.forEach(function(m){if(chosen.length<4&&!chosen.some(function(x){return x.name===m.name;}))chosen.push(m);});
+    chosen=competitiveFillAttacks(chosen,moves,attackCategory,types,1,4);
     return {
       role:'Bulky Utility',
       ability:ability,
@@ -5002,6 +5059,10 @@ function toggleBattleTeamPokemon(key){
   else{showNotice('Battle teams can contain at most 6 Pokémon.');return;}
   renderOnlineBattle();
 }
+function setBattleLead(key,pos){
+  var keys=ONLINE_STATE.selectedTeamKeys.slice(),idx=keys.indexOf(key);if(idx<0)return;
+  keys.splice(idx,1);keys.splice(Math.max(0,Math.min(pos,keys.length)),0,key);ONLINE_STATE.selectedTeamKeys=keys;renderOnlineBattle();
+}
 function battlePartySnapshot(){
   var candidates=ensureBattleTeamSelection(),byKey={};
   candidates.forEach(function(c){byKey[c.key]=c;});
@@ -5098,6 +5159,7 @@ function mysterySpeciesPools(){
   Object.keys(all).forEach(function(id){
     var sp=all[id]||{},constant=String(sp.constant||'');
     if(!constant||sp.isMega||sp.isGmax||!Array.isArray(sp.baseStats)||sp.baseStats.length!==6||!Array.isArray(sp.learnableMoves)||!sp.learnableMoves.length)return;
+    if(Array.isArray(sp.evolutions)&&sp.evolutions.length)return;
     if(mysteryIsMythicalConstant(constant))mythical.push(Number(id));
     else if(mysteryIsLegendaryConstant(constant))legendary.push(Number(id));
     else ordinary.push(Number(id));
@@ -5488,12 +5550,19 @@ function renderOnlineBattle(){
       sourceSelect.addEventListener('change',function(){ONLINE_STATE.teamSource=sourceSelect.value;renderOnlineBattle();});
       pickerTools.appendChild(search);pickerTools.appendChild(sourceSelect);teamCard.appendChild(pickerTools);
       var selectedWrap=el('div',{class:'online-team-selected'});
-      ONLINE_STATE.selectedTeamKeys.forEach(function(key){
+      ONLINE_STATE.selectedTeamKeys.forEach(function(key,index){
         var c=candidates.find(function(x){return x.key===key;});if(!c)return;
-        var chip=el('button',{class:'online-team-chip',title:'Remove from team'});
+        var chip=el('div',{class:'online-team-chip'});
         chip.appendChild(makeIconEl({species:c.species,isShiny:c.isShiny},'encounter-icon'));
-        chip.appendChild(el('span',{text:c.name+' Lv'+c.level}));chip.addEventListener('click',function(){toggleBattleTeamPokemon(key);});
-        selectedWrap.appendChild(chip);
+        var info=el('span',{class:'online-team-chip-name'});info.appendChild(el('strong',{text:c.name+' Lv'+c.level}));
+        if(index===0)info.appendChild(el('small',{text:'Lead 1 · Singles lead'}));
+        else if(index===1)info.appendChild(el('small',{text:'Lead 2 · Doubles partner'}));
+        chip.appendChild(info);
+        var tools=el('span',{class:'online-team-chip-tools'});
+        var lead1=el('button',{class:index===0?'primary':'ghost',text:'Lead 1'});lead1.addEventListener('click',function(){setBattleLead(key,0);});tools.appendChild(lead1);
+        var lead2=el('button',{class:index===1?'primary':'ghost',text:'Lead 2'});lead2.addEventListener('click',function(){setBattleLead(key,1);});tools.appendChild(lead2);
+        var remove=el('button',{class:'ghost',text:'×',title:'Remove'});remove.addEventListener('click',function(){toggleBattleTeamPokemon(key);});tools.appendChild(remove);
+        chip.appendChild(tools);selectedWrap.appendChild(chip);
       });
       teamCard.appendChild(selectedWrap);
       var q=String(ONLINE_STATE.teamSearch||'').trim().toLowerCase();
