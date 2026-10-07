@@ -5036,13 +5036,21 @@ var MYSTERY_LEGENDARIES=new Set([
   'REGIELEKI','REGIDRAGO','GLASTRIER','SPECTRIER','CALYREX','ENAMORUS','WO_CHIEN','CHIEN_PAO','TING_LU','CHI_YU',
   'KORAIDON','MIRAIDON','OKIDOGI','MUNKIDORI','FEZANDIPITI','OGERPON','TERAPAGOS'
 ]);
+function mysteryIsMythicalConstant(constant){
+  if(MYSTERY_MYTHICALS.has(constant))return true;
+  return ['DEOXYS_','SHAYMIN_','ARCEUS_','HOOPA_','MAGEARNA_','ZARUDE_'].some(function(prefix){return constant.indexOf(prefix)===0;});
+}
+function mysteryIsLegendaryConstant(constant){
+  if(MYSTERY_LEGENDARIES.has(constant))return true;
+  return ['ARTICUNO_','ZAPDOS_','MOLTRES_','DIALGA_','PALKIA_','GIRATINA_','TORNADUS_','THUNDURUS_','LANDORUS_','ENAMORUS_','KYUREM_','ZYGARDE_','NECROZMA_','ZACIAN_','ZAMAZENTA_','ETERNATUS_','URSHIFU_','CALYREX_','OGERPON_','TERAPAGOS_'].some(function(prefix){return constant.indexOf(prefix)===0;});
+}
 function mysterySpeciesPools(){
   var all=dexSpeciesData(),ordinary=[],legendary=[],mythical=[];
   Object.keys(all).forEach(function(id){
     var sp=all[id]||{},constant=String(sp.constant||'');
-    if(!constant||sp.isMega||sp.isGmax||sp.isForm||!Array.isArray(sp.baseStats)||sp.baseStats.length!==6||!Array.isArray(sp.learnableMoves)||!sp.learnableMoves.length)return;
-    if(MYSTERY_MYTHICALS.has(constant))mythical.push(Number(id));
-    else if(MYSTERY_LEGENDARIES.has(constant))legendary.push(Number(id));
+    if(!constant||sp.isMega||sp.isGmax||!Array.isArray(sp.baseStats)||sp.baseStats.length!==6||!Array.isArray(sp.learnableMoves)||!sp.learnableMoves.length)return;
+    if(mysteryIsMythicalConstant(constant))mythical.push(Number(id));
+    else if(mysteryIsLegendaryConstant(constant))legendary.push(Number(id));
     else ordinary.push(Number(id));
   });
   return {ordinary:ordinary,legendary:legendary,mythical:mythical};
@@ -5467,7 +5475,7 @@ function renderOnlineBattle(){
     shell.appendChild(teamCard);
     var mysteryCard=el('section',{class:'online-card',style:'grid-column:1 / -1;'});
     mysteryCard.appendChild(el('h4',{text:'Mystery Battles'}));
-    mysteryCard.appendChild(el('div',{class:'dex-muted',text:'Automatic 6-Pokémon matchmaking. Mystery battles never award an opponent Pokémon.'}));
+    mysteryCard.appendChild(el('div',{class:'dex-muted',text:'Automatic 6-Pokémon matchmaking. The player with the lower measured relay latency becomes host. Mystery battles never award an opponent Pokémon.'}));
     if(ONLINE_STATE.matchmakingTicket){
       var elapsed=Math.max(0,Math.floor((Date.now()-ONLINE_STATE.matchmakingStartedAt)/1000));
       mysteryCard.appendChild(el('div',{class:'mystery-searching',text:'Searching for a '+(ONLINE_STATE.matchmakingMode==='doubles'?'Doubles 6v6':ONLINE_STATE.matchmakingMode==='random'?'Random 6v6':'Singles 6v6')+' opponent… '+elapsed+'s'}));
@@ -5620,7 +5628,9 @@ function renderOnlineBattle(){
   var sim=el('div',{class:'battle-sim'});
   var simTop=el('div',{class:'battle-sim-topbar'});
   simTop.appendChild(el('strong',{text:me.name+' vs '+foe.name}));
-  simTop.appendChild(el('span',{text:room.phase==='finished'?'Battle complete':'Turn '+room.turn+' · '+(isDoubles?'Doubles':'Singles')+(room.rules&&room.rules.mystery?' · Mystery':'')}));
+  var topStatus=room.phase==='finished'?'Battle complete':'Turn '+room.turn+' · '+(isDoubles?'Doubles':'Singles')+(room.rules&&room.rules.mystery?' · Mystery':'');
+  if(room.rules&&room.rules.hostByLatency)topStatus+=' · Host: '+room.players[0].name+' ('+(room.players[0].latency||'?')+' ms)';
+  simTop.appendChild(el('span',{text:topStatus}));
   sim.appendChild(simTop);
   var scene=el('div',{class:'battle-sim-field'+battleWeatherClass(room.weather)});
   scene.appendChild(el('div',{class:'battle-turn-badge',text:'Turn '+room.turn}));
