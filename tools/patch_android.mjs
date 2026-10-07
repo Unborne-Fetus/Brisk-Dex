@@ -238,6 +238,9 @@ console.log('Installed native Android save-file picker.');
 // Local multiplayer relays use HTTP on the player's LAN.
 const manifestPath=path.join(root,'android','app','src','main','AndroidManifest.xml');
 let manifest=await fs.readFile(manifestPath,'utf8');
+if(!manifest.includes('android.permission.ACCESS_NETWORK_STATE')){
+  manifest=manifest.replace('<application','<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />\n    <application');
+}
 if(/android:usesCleartextTraffic=/.test(manifest))manifest=manifest.replace(/android:usesCleartextTraffic="[^"]*"/,'android:usesCleartextTraffic="true"');
 else manifest=manifest.replace('<application','<application android:usesCleartextTraffic="true"');
 await fs.writeFile(manifestPath,manifest);
