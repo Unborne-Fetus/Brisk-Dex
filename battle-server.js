@@ -4,7 +4,9 @@ const fs = require('fs');
 const path = require('path');
 
 let BRISK_DATA={moveDetails:{},moves:{},movePP:{}};
+let BRISK_TRAINERS={trainers:[]};
 try{BRISK_DATA=JSON.parse(fs.readFileSync(path.join(__dirname,'brisk-dex-data.json'),'utf8'));}catch(err){console.warn('Battle server could not load brisk-dex-data.json:',err.message);}
+try{BRISK_TRAINERS=JSON.parse(fs.readFileSync(path.join(__dirname,'brisk-dex-trainer-teams.json'),'utf8'));}catch(err){console.warn('Battle server could not load brisk-dex-trainer-teams.json:',err.message);}
 
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -101,6 +103,157 @@ function randomCatalogMove(filterFn){
   const ids=Object.keys(BRISK_DATA.moveDetails||{}).filter(id=>Number(id)>0);
   const candidates=ids.map(catalogMove).filter(Boolean).filter(filterFn||(()=>true));
   return candidates.length?choose(candidates):null;
+}
+
+function botDifficultyKey(value){return ['easy','normal','hard','expert'].includes(String(value||'').toLowerCase())?String(value).toLowerCase():'normal';}
+function botSourceKey(value){return ['trainer','random','mixed'].includes(String(value||'').toLowerCase())?String(value).toLowerCase():'mixed';}
+function speciesIdByName(name){
+  const wanted=normalizeName(name);
+  for(const [id,s] of Object.entries(BRISK_DATA.species||{})){
+    if(!s||typeof s!=='object')continue;
+    if(normalizeName(s.name)===wanted||normalizeName(s.constant)===wanted)return Number(id);
+  }
+  return 0;
+}
+function botIvForDifficulty(diff){return diff==='easy'?6:diff==='normal'?16:diff==='hard'?26:31;}
+function botLevelOffset(diff){return diff==='easy'?-5:diff==='normal'?0:diff==='hard'?3:6;}
+function botMoveScore(move,species,diff){
+  if(!move)return -999;
+  let score=(Number(move.power)||0)*(Number(move.accuracy||100)/100);
+  if((species.types||[]).includes(move.type))score*=1.5;
+  if(move.category==='Status')score=diff==='easy'?12:diff==='normal'?24:diff==='hard'?34:42;
+  if(Number(move.priority)>0)score+=8;
+  return score;
+}
+function botMovesForSpecies(species,diff,explicitNames){
+  const explicit=(explicitNames||[]).map(name=>{
+    const wanted=normalizeName(name);
+    return Object.keys(BRISK_DATA.moveDetails||{}).map(catalogMove).find(m=>m&&normalizeName(m.name)===wanted);
+  }).filter(Boolean);
+  if(explicit.length)return explicit.slice(0,4);
+  let pool=(Array.isArray(species.learnableMoves)?species.learnableMoves:[]).map(Number).filter(id=>id>0).map(catalogMove).filter(Boolean);
+  if(!pool.length)pool=Object.keys(BRISK_DATA.moveDetails||{}).slice(0,200).map(catalogMove).filter(Boolean);
+  pool.sort((a,b)=>botMoveScore(b,species,diff)-botMoveScore(a,species,diff));
+  if(diff==='easy'){
+    const shuffled=pool.slice(0,Math.min(24,pool.length)).sort(()=>Math.random()-.5);
+    return shuffled.slice(0,4);
+  }
+  if(diff==='normal'){
+    const top=pool.slice(0,Math.min(12,pool.length)).sort(()=>Math.random()-.5);
+    return top.slice(0,4);
+  }
+  if(diff==='hard'){
+    const damaging=pool.filter(m=>m.category!=='Status').slice(0,3),status=pool.find(m=>m.category==='Status');
+    return damaging.concat(status?[status]:[]).slice(0,4);
+  }
+  return pool.slice(0,4);
+}
+function neutralBotStats(species,level,iv){
+  const base=Array.isArray(species.baseStats)?species.baseStats.map(Number):[50,50,50,50,50,50];
+  const hp=species.constant==='SHEDINJA'?1:Math.floor(((2*base[0]+iv)*level)/100)+level+10;
+  const calc=i=>Math.floor(((2*base[i]+iv)*level)/100)+5;
+  return {maxHP:hp,atk:calc(1),def:calc(2),speed:calc(3),spAtk:calc(4),spDef:calc(5)};
+}
+function makeBotMon(speciesId,level,diff,options){
+  const species=(BRISK_DATA.species||{})[String(speciesId)];
+  if(!species)return null;
+  level=clamp(Math.round(Number(level)||50),1,100);
+  const iv=botIvForDifficulty(diff),stats=neutralBotStats(species,level,iv);
+  const abilities=Array.isArray(species.abilities)?species.abilities.filter(Boolean):[];
+  const moves=botMovesForSpecies(species,diff,options&&options.moves);
+  return cleanTeam([{
+    species:speciesId,name:(options&&options.nickname)||species.name||species.constant||('Pokémon '+speciesId),level,
+    friendship:255,weight:Number(species.weight||species.weightHg||0),
+    ivs:{hp:iv,atk:iv,def:iv,spd:iv,spa:iv,spdef:iv},
+    types:Array.isArray(species.types)?species.types.filter(Boolean).slice(0,2):[],
+    ability:abilities[Math.min(abilities.length-1,diff==='expert'?abilities.length-1:0)]||'',
+    item:(options&&options.item)||'',teraType:(species.types&&species.types[0])||'Normal',
+    transformations:[],maxHP:stats.maxHP,atk:stats.atk,def:stats.def,speed:stats.speed,spAtk:stats.spAtk,spDef:stats.spDef,
+    moves:moves.map(m=>Object.assign({},m,{pp:m.pp,maxPP:m.maxPP||m.pp}))
+  }])[0];
+}
+function eligibleBotSpecies(){
+  return Object.entries(BRISK_DATA.species||{}).filter(([id,s])=>{
+    if(!s||typeof s!=='object'||Number(id)<=0)return false;
+    if(s.isMega||s.isGmax||normalizeName(s.constant)==='egg')return false;
+    return Array.isArray(s.baseStats)&&s.baseStats.length===6&&Array.isArray(s.learnableMoves)&&s.learnableMoves.length>0;
+  }).map(([id])=>Number(id));
+}
+function randomBotTeam(playerTeam,diff){
+  const avg=Math.round(playerTeam.reduce((sum,m)=>sum+(Number(m.level)||50),0)/Math.max(1,playerTeam.length));
+  const size=Math.max(1,Math.min(6,playerTeam.length||3)),pool=eligibleBotSpecies().sort(()=>Math.random()-.5),team=[];
+  for(const speciesId of pool){
+    const mon=makeBotMon(speciesId,avg+botLevelOffset(diff),diff,{});
+    if(mon)team.push(mon);
+    if(team.length>=size)break;
+  }
+  return team;
+}
+function trainerBotTeam(playerTeam,diff){
+  const avg=Math.round(playerTeam.reduce((sum,m)=>sum+(Number(m.level)||50),0)/Math.max(1,playerTeam.length));
+  const trainers=(BRISK_TRAINERS.trainers||[]).filter(t=>Array.isArray(t.party)&&t.party.length>0&&t.name);
+  const scored=trainers.map(t=>{
+    const levels=t.party.map(p=>Number(p.fields&&p.fields.Level)||avg);
+    const tAvg=levels.reduce((a,b)=>a+b,0)/levels.length;
+    return {t,score:Math.abs((tAvg-botLevelOffset(diff))-avg)+Math.abs(t.party.length-playerTeam.length)*2};
+  }).sort((a,b)=>a.score-b.score);
+  const pick=choose(scored.slice(0,Math.min(20,scored.length)))||scored[0];
+  if(!pick)return {name:'Brisk Trainer',team:randomBotTeam(playerTeam,diff),constant:''};
+  const team=[];
+  for(const p of pick.t.party.slice(0,6)){
+    const speciesId=speciesIdByName(p.species);if(!speciesId)continue;
+    const baseLevel=Number(p.fields&&p.fields.Level)||avg;
+    const level=clamp(baseLevel+botLevelOffset(diff),1,100);
+    const moves=Array.isArray(p.moves)?p.moves.map(x=>typeof x==='string'?x:(x&&x.name)||'').filter(Boolean):[];
+    const mon=makeBotMon(speciesId,level,diff,{nickname:p.nickname||'',item:p.item||'',moves});
+    if(mon)team.push(mon);
+  }
+  return {name:(pick.t.class?pick.t.class+' ':'')+pick.t.name,team:team.length?team:randomBotTeam(playerTeam,diff),constant:pick.t.constant||''};
+}
+function botOffenseScore(attacker,defender,move){
+  if(!move||move.pp<=0)return -9999;
+  if(move.category==='Status'||!move.power)return 24+(defender.status?0:8);
+  const stab=(attacker.types||[]).includes(move.type)?1.5:1;
+  const eff=effectiveness(move.type,defender.types||[]);
+  const acc=Math.max(.2,Number(move.accuracy||100)/100);
+  const offensive=move.category==='Physical'?attacker.atk:attacker.spAtk;
+  const defensive=move.category==='Physical'?defender.def:defender.spDef;
+  return Number(move.power)*stab*eff*acc*(offensive/Math.max(1,defensive))+(Number(move.priority)||0)*8;
+}
+function bestBotMoveIndex(mon,target){
+  let best=0,bestScore=-Infinity;
+  (mon.moves||[]).forEach((m,i)=>{const s=botOffenseScore(mon,target,m);if(s>bestScore){bestScore=s;best=i;}});
+  return {index:best,score:bestScore};
+}
+function botChoice(room,pi){
+  const p=room.players[pi],target=active(room.players[other(pi)]),mon=active(p),diff=botDifficultyKey(p.botDifficulty);
+  if(!mon||!target)return null;
+  const usable=(mon.moves||[]).map((m,i)=>({m,i})).filter(x=>x.m.pp>0);
+  if(!usable.length)return {type:'move',moveIndex:0};
+  if(diff==='easy')return {type:'move',moveIndex:choose(usable).i};
+  const best=bestBotMoveIndex(mon,target);
+  if((diff==='hard'||diff==='expert')&&!switchBlocked(room,pi)){
+    const bench=p.team.map((m,i)=>({m,i})).filter(x=>x.i!==p.active&&x.m.hp>0);
+    let bestBench=null,bestBenchScore=best.score;
+    for(const b of bench){
+      const s=bestBotMoveIndex(b.m,target).score;
+      if(s>bestBenchScore*(diff==='expert'?1.2:1.45)){bestBench=b;bestBenchScore=s;}
+    }
+    if(bestBench&&(diff==='expert'||chance(45)))return {type:'switch',slot:bestBench.i};
+  }
+  let idx=best.index;
+  if(diff==='normal'&&chance(35))idx=choose(usable).i;
+  if(diff==='hard'&&chance(12))idx=choose(usable).i;
+  let gimmick=null;
+  if(!p.usedTera&&(diff==='expert'||(diff==='hard'&&chance(45))))gimmick='Tera';
+  return {type:'move',moveIndex:idx,gimmick,formIndex:0};
+}
+function ensureBotChoice(room){
+  if(room.phase!=='battle')return;
+  const pi=room.players.findIndex(p=>p.isBot);
+  if(pi<0)return;
+  const p=room.players[pi];if(p.choice)return;
+  p.choice=botChoice(room,pi);
 }
 
 function cleanRewardRaw80(value){
@@ -1780,7 +1933,7 @@ setInterval(()=>{
   const now=Date.now(),grace=12000;
   for(const room of rooms.values()){
     if(room.phase!=='battle'||room.players.length<2)continue;
-    const stale=room.players.map(p=>now-(p.lastSeen||room.updatedAt||now)>grace);
+    const stale=room.players.map(p=>p.isBot?false:now-(p.lastSeen||room.updatedAt||now)>grace);
     if(stale[0]&&stale[1]){
       room.phase='finished';room.winner=null;room.players.forEach(p=>p.choice=null);log(room,'Battle ended because both players disconnected.');room.updatedAt=now;
     }else if(stale[0]||stale[1]){
@@ -1802,6 +1955,24 @@ const server=http.createServer(async (req,res)=>{
   const url=new URL(req.url,'http://localhost');
   try{
     if(req.method==='GET'&&url.pathname==='/health') return json(res,200,{ok:true,rooms:rooms.size,engine:'advanced-v18'});
+    if(req.method==='POST'&&url.pathname==='/bot-battle'){
+      const body=await readBody(req),verified=cleanVerifiedTeam(body.team),team=verified.team;
+      if(verified.errors.length)return json(res,400,{error:'Bot battle team rejected: '+verified.errors.join(' ')});
+      if(!team.length)return json(res,400,{error:'Choose at least one verified Pokémon for a Bot Battle.'});
+      const difficulty=botDifficultyKey(body.difficulty),requestedSource=botSourceKey(body.source);
+      const source=requestedSource==='mixed'?(chance(50)?'trainer':'random'):requestedSource;
+      const built=source==='trainer'?trainerBotTeam(team,difficulty):{name:'Random Brisk Bot',team:randomBotTeam(team,difficulty),constant:''};
+      if(!built.team.length)return json(res,500,{error:'Could not build a bot team from Brisk data.'});
+      const code=roomCode(),playerId=id();
+      const room={code,phase:'battle',turn:0,winner:null,reward:null,kickedIds:[],animationSeq:0,animations:[],createdAt:Date.now(),updatedAt:Date.now(),log:[],weather:null,weatherTurns:0,terrain:null,terrainTurns:0,
+        rules:{format:'singles',teamSize:Math.max(team.length,built.team.length),botBattle:true,botDifficulty:difficulty,botSource:source,botTrainer:built.name,botTrainerConstant:built.constant,noPrize:true},
+        players:[
+          {id:playerId,name:cleanText(body.name,24)||'Trainer',trainer:cleanTrainerAppearance(body.trainer),team,ready:true,active:0,choice:null,side:{},lastSeen:Date.now()},
+          {id:'bot-'+id(),name:built.name,trainer:{gender:'Male',outfitId:1},team:built.team,ready:true,active:0,choice:null,side:{},lastSeen:Date.now(),isBot:true,botDifficulty:difficulty}
+        ]};
+      rooms.set(code,room);beginBattle(room);
+      return json(res,200,{ok:true,code,playerId,playerIndex:0,room:publicRoom(room,0)});
+    }
     if(req.method==='POST'&&url.pathname==='/matchmaking/join'){
       const body=await readBody(req),mode=mysteryKey(body.mode);if(!mode)return json(res,400,{error:'Invalid Mystery Battle mode.'});
       const team=cleanTeam(body.team);if(team.length!==6)return json(res,400,{error:'Mystery Battles require exactly 6 Pokémon.'});
@@ -1981,7 +2152,7 @@ const server=http.createServer(async (req,res)=>{
         if(mon.volatile.disabledMove===idx&&mon.volatile.disableTurns>0)return json(res,400,{error:'That move is disabled.'});
         if(mon.volatile.torment&&mon.lastMoveIndex===idx)return json(res,400,{error:'Torment prevents repeating that move.'});
         const gimmick=['Mega','Gigantamax','Tera'].includes(body.gimmick)?body.gimmick:null;
-        p.choice={type:'move',moveIndex:idx,gimmick:gimmick,formIndex:Number(body.formIndex)||0}; resolveTurn(room);
+        p.choice={type:'move',moveIndex:idx,gimmick:gimmick,formIndex:Number(body.formIndex)||0}; ensureBotChoice(room); resolveTurn(room);
       }else if(body.type==='switch'&&room.phase==='battle'){
         if(room.rules&&room.rules.format==='doubles'){
           const actorPos=Number(body.actorPos)===1?1:0;p.choice=p.choice||{};if(p.choice[actorPos])return json(res,409,{error:'That Pokémon already selected an action this turn.'});
@@ -1992,7 +2163,7 @@ const server=http.createServer(async (req,res)=>{
         const slot=Number(body.slot);
         if(switchBlocked(room,pi))return json(res,400,{error:'This Pokémon is trapped and cannot switch.'});
         if(!Number.isInteger(slot)||!p.team[slot]||p.team[slot].hp<=0||slot===p.active) return json(res,400,{error:'Invalid switch.'});
-        p.choice={type:'switch',slot}; resolveTurn(room);
+        p.choice={type:'switch',slot}; ensureBotChoice(room); resolveTurn(room);
       }else return json(res,400,{error:'That action is not available right now.'});
       return json(res,200,{room:publicRoom(room,pi),playerIndex:pi});
     }
