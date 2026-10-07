@@ -2653,7 +2653,7 @@ async function removeFromStorage(storageId){
   return true;
 }
 
-function markDirty(){ dirty=true;saveRevision++;updateDirtyBanner(); }
+function markDirty(){assertSaveWritable(currentSave);dirty=true;saveRevision++;updateDirtyBanner();}
 function clearDirty(){ dirty = false; updateDirtyBanner(); }
 
 async function depositFromBox(boxIndex, slotIndex){
@@ -2738,25 +2738,65 @@ async function finalizeWithdrawalsAfterDiskSave(){
 
 var saveRevision=0,autoSaveTimer=null,autoSaveQueue=Promise.resolve();
 function scheduleAutoSave(){clearTimeout(autoSaveTimer);autoSaveTimer=setTimeout(function(){saveChangesToFile();},400);}
-function snapshotDB(){return new Promise(function(resolve,reject){var r=indexedDB.open('briskdex-saves',1);r.onupgradeneeded=function(){r.result.createObjectStore('snapshots');};r.onsuccess=function(){resolve(r.result);};r.onerror=function(){reject(r.error);};});}
+function snapshotDB(){return new Promise(function(resolve,reject){var r=indexedDB.open('briskdex-saves',1);r.onupgradeneeded=function(){if(!r.result.objectStoreNames.contains('snapshots'))r.result.createObjectStore('snapshots');};r.onsuccess=function(){resolve(r.result);};r.onerror=function(){reject(r.error);};});}
 async function storeSnapshot(save){
- var db=await snapshotDB();try{await new Promise(function(resolve,reject){var tx=db.transaction('snapshots','readwrite');tx.objectStore('snapshots').put({bytes:new Uint8Array(save._internal.rawBytes),filePath:save.filePath,uri:save.uri||null,fileExtension:save.fileExtension},'last');tx.oncomplete=resolve;tx.onerror=function(){reject(tx.error);};});}finally{db.close();}
+ var db=await snapshotDB();try{await new Promise(function(resolve,reject){var tx=db.transaction('snapshots','readwrite');tx.objectStore('snapshots').put({bytes:new Uint8Array(save._internal.rawBytes),filePath:save.filePath,uri:save.uri||null,fileExtension:save.fileExtension,profileId:save.profileId},'last');tx.oncomplete=resolve;tx.onerror=function(){reject(tx.error);};});}finally{db.close();}
+}
+async function storeOriginalBackup(save){
+ if(!save||!save._internal||save._internal.backupStored)return;
+ var original=new Uint8Array(save._internal.originalBytes||save._internal.rawBytes).slice();
+ var key='backup:'+(save.profileId||'emerald')+':'+save.trainer.publicId+':'+save.trainer.secretId+':'+(saveSessionId||genId());
+ var db=await snapshotDB();try{await new Promise(function(resolve,reject){var tx=db.transaction('snapshots','readwrite');tx.objectStore('snapshots').put({bytes:original,profileId:save.profileId,createdAt:Date.now()},key);tx.oncomplete=resolve;tx.onerror=function(){reject(tx.error);};});}finally{db.close();}
+ save._internal.backupStored=true;save._internal.backupKey=key;
 }
 async function readSnapshot(){var db=await snapshotDB();try{return await new Promise(function(resolve,reject){var r=db.transaction('snapshots').objectStore('snapshots').get('last');r.onsuccess=function(){resolve(r.result);};r.onerror=function(){reject(r.error);};});}finally{db.close();}}
+
+function validateSectionChecksums(save,bytes){
+ var profile=save.profile,cfg=profileSaveConfig(profile),sectionSize=Number(cfg.sectionSize)||4096,blockOffsets=cfg.blockOffsets||[0,0xE000];
+ var a=readBlock(bytes,Number(blockOffsets[0]),profile),b=readBlock(bytes,Number(blockOffsets[1]),profile),block=a.valid&&b.valid?(a.saveIndex>b.saveIndex?a:b):(a.valid?a:b);
+ if(!block||!block.valid)throw new Error('Round-trip validation could not find the active save block.');
+ Object.keys(block.sections).forEach(function(idText){
+   var id=Number(idText),off=block.fileOffsets[id],data=block.sections[id],full=new DataView(bytes.buffer,bytes.byteOffset+off,sectionSize);
+   var expected=full.getUint16(sectionSize-10,true),size=profileChecksumSize(save,id);
+   if(save._internal.hasStorageExtension&&profile.pc&&profile.pc.mainSectionIds&&profile.pc.mainSectionIds.indexOf(id)>=0)size=Number(profile.pc.sectionSize)||3968;
+   var actual=computeSectionChecksum(new DataView(data.buffer,data.byteOffset,data.byteLength),size);
+   if(expected!==actual)throw new Error('Section '+id+' checksum failed after editing.');
+ });
+ if(save._internal.hasStorageExtension&&!readStorageExtension(bytes,profile).present)throw new Error('Expanded PC storage failed checksum validation.');
+}
+function validateSaveForWrite(save,bytes){
+ assertSaveWritable(save);validateSectionChecksums(save,bytes);
+ var previousOverride=selectedEmeraldProfileOverride(),previousActive=window.ACTIVE_EMERALD_PROFILE;
+ try{
+   localStorage.setItem('briskdex_emerald_profile',save.profileId);
+   var parsed=parseSav(bytes.slice().buffer);
+   if(parsed.trainer.publicId!==save.trainer.publicId||parsed.trainer.secretId!==save.trainer.secretId)throw new Error('Trainer identity changed during round-trip validation.');
+   if(parsed.party.length!==save.party.length)throw new Error('Party count changed during round-trip validation.');
+   if(parsed.boxes.length!==save.boxes.length)throw new Error('PC box count changed during round-trip validation.');
+   var invalid=[];
+   parsed.party.forEach(function(mon,i){if(mon&&!mon.empty&&!mon.checksumValid)invalid.push('party '+(i+1));});
+   parsed.boxes.forEach(function(box,bi){box.forEach(function(mon,si){if(mon&&!mon.empty&&!mon.checksumValid&&invalid.length<5)invalid.push('box '+(bi+1)+' slot '+(si+1));});});
+   if(invalid.length)throw new Error('Pokémon checksum validation failed: '+invalid.join(', ')+'.');
+ }finally{
+   localStorage.setItem('briskdex_emerald_profile',previousOverride);window.ACTIVE_EMERALD_PROFILE=previousActive;
+ }
+ return true;
+}
 function saveChangesToFile(){
  clearTimeout(autoSaveTimer);if(!currentSave)return Promise.resolve(false);
  var save=currentSave,revision=saveRevision,bytes=new Uint8Array(save._internal.rawBytes);
  autoSaveQueue=autoSaveQueue.catch(function(){}).then(async function(){
   try{
-   if(IS_ELECTRON && save.filePath){var res=await window.briskDexAPI.writeSav(save.filePath,bytes);if(!res||!res.ok)throw new Error(res&&res.error||'Could not write save');}
-   else if(IS_ANDROID && save.uri && MOBILE_API.writeSaveFile){await MOBILE_API.writeSaveFile(save.uri,bytes);}
+   assertSaveWritable(save);await storeOriginalBackup(save);validateSaveForWrite(save,bytes);
+   if(IS_ELECTRON&&save.filePath){var res=await window.briskDexAPI.writeSav(save.filePath,bytes);if(!res||!res.ok)throw new Error(res&&res.error||'Could not write save');}
+   else if(IS_ANDROID&&save.uri&&MOBILE_API.writeSaveFile){await MOBILE_API.writeSaveFile(save.uri,bytes);}
    await storeSnapshot(Object.assign({},save,{_internal:Object.assign({},save._internal,{rawBytes:bytes})}));
-   if(save===currentSave && revision===saveRevision){
-    if(IS_ELECTRON || (IS_ANDROID&&save.uri))await finalizeWithdrawalsAfterDiskSave();
+   if(save===currentSave&&revision===saveRevision){
+    if(IS_ELECTRON||(IS_ANDROID&&save.uri))await finalizeWithdrawalsAfterDiskSave();
     clearDirty();
    }
    return true;
-  }catch(err){showError('Automatic save failed: '+err.message);return false;}
+  }catch(err){showError('Save write blocked: '+err.message);return false;}
  });return autoSaveQueue;
 }
 async function restoreLastSave(){
