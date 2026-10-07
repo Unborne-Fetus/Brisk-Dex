@@ -666,10 +666,11 @@ function tryMatchmake(mode){
   }
   matchmaking.set(mode,q);
 }
+function rankedModeKey(value){return ['singles','doubles','mystery'].includes(String(value||'').toLowerCase())?String(value).toLowerCase():'singles';}
 function makeRankedRoom(a,b){
-  const better=a.latency<=b.latency?a:b,otherEntry=better===a?b:a,code=roomCode();
+  const better=a.latency<=b.latency?a:b,otherEntry=better===a?b:a,code=roomCode(),mode=rankedModeKey(a.mode),format=mode==='doubles'?'doubles':'singles';
   const room={code,phase:'preview',turn:0,winner:null,reward:null,kickedIds:[],animationSeq:0,animations:[],createdAt:Date.now(),updatedAt:Date.now(),log:[],weather:null,weatherTurns:0,terrain:null,terrainTurns:0,
-    rules:{format:'singles',teamSize:6,ranked:true,hostByLatency:true},
+    rules:{format,teamSize:6,ranked:true,rankedMode:mode,mystery:mode==='mystery',noPrize:true,hostByLatency:true},
     players:[
       {id:better.playerId,name:better.name,trainer:better.trainer,profileKey:better.profileKey,rating:better.rating,team:better.team,ready:true,active:0,leadSelected:null,previewReady:false,choice:null,side:{},latency:better.latency,lastSeen:Date.now()},
       {id:otherEntry.playerId,name:otherEntry.name,trainer:otherEntry.trainer,profileKey:otherEntry.profileKey,rating:otherEntry.rating,team:otherEntry.team,ready:true,active:0,leadSelected:null,previewReady:false,choice:null,side:{},latency:otherEntry.latency,lastSeen:Date.now()}
@@ -698,7 +699,7 @@ function tryRankedMatch(){
       const a=rankedQueue[i],ta=rankedTickets.get(a.ticket);if(!ta||ta.status!=='searching')continue;
       const rangeA=rankedSearchRange(a,now);
       for(let j=i+1;j<rankedQueue.length;j++){
-        const b=rankedQueue[j],tb=rankedTickets.get(b.ticket);if(!tb||tb.status!=='searching'||a.profileKey===b.profileKey)continue;
+        const b=rankedQueue[j],tb=rankedTickets.get(b.ticket);if(!tb||tb.status!=='searching'||a.profileKey===b.profileKey||rankedModeKey(a.mode)!==rankedModeKey(b.mode))continue;
         const rangeB=rankedSearchRange(b,now),diff=Math.abs(a.rating-b.rating);
         // Both players must currently accept the rating gap.
         if(diff>Math.min(rangeA,rangeB))continue;
@@ -753,10 +754,10 @@ function publicRoom(room,viewerIndex){
     magicRoom:room.magicRoom,magicRoomTurns:room.magicRoomTurns,wonderRoom:room.wonderRoom,wonderRoomTurns:room.wonderRoomTurns,
     animationSeq:room.animationSeq||0, animations:(room.animations||[]).slice(-24),
     log:room.log.slice(-100),
-    players:room.players.map(p=>({
+    players:room.players.map((p,playerPos)=>({
       name:p.name,trainer:p.trainer||{gender:'Male',outfitId:1},leadSelected:Number.isInteger(p.leadSelected)?p.leadSelected:null,previewReady:!!p.previewReady,rating:p.profileKey&&PROFILE_DB.profiles[p.profileKey]?PROFILE_DB.profiles[p.profileKey].rating:(p.rating||null),title:p.profileKey&&PROFILE_DB.profiles[p.profileKey]?(PROFILE_DB.profiles[p.profileKey].equipped.title||''):'',ready:p.ready,connected:true,active:p.active,active2:Number.isInteger(p.active2)?p.active2:null,latency:p.latency||null,choiceSlots:room.rules&&room.rules.format==='doubles'?[!!(p.choice&&p.choice[0]),!!(p.choice&&p.choice[1])]:null,hasChoice:room.rules&&room.rules.format==='doubles'?doublesActionReady(p):!!p.choice,
       usedMega:p.usedMega,usedGmax:p.usedGmax,usedTera:p.usedTera,
-      side:p.side, team:p.team.map(publicMon)
+      side:p.side, team:(room.rules&&room.rules.rankedMode==='mystery'&&room.phase==='preview'&&playerPos!==viewerIndex)?[]:p.team.map(publicMon)
     }))
   };
 }
@@ -2132,13 +2133,13 @@ const server=http.createServer(async (req,res)=>{
       return json(res,200,{ok:true,profile:publicProfile(profile)});
     }
     if(req.method==='POST'&&url.pathname==='/ranked/join'){
-      const body=await readBody(req),verified=cleanVerifiedTeam(body.team),team=verified.team,profile=ensureProfile(body.profileToken,body.name);
+      const body=await readBody(req),mode=rankedModeKey(body.mode),verified=cleanVerifiedTeam(body.team),team=verified.team,profile=ensureProfile(body.profileToken,body.name);
       if(!profile)return json(res,400,{error:'Missing ranked player profile.'});
       if(verified.errors.length)return json(res,400,{error:'Ranked team rejected: '+verified.errors.join(' ')});
-      if(team.length!==6)return json(res,400,{error:'Ranked requires exactly 6 verified Pokémon.'});
+      if(team.length!==6)return json(res,400,{error:'Ranked '+(mode==='doubles'?'Doubles':mode==='mystery'?'Mystery':'Singles')+' requires exactly 6 verified Pokémon.'});
       if(rankedQueue.some(x=>x.profileKey===profile.key))return json(res,409,{error:'You are already in the Ranked queue.'});
-      const ticket=id(),playerId=id(),entry={ticket,playerId,profileKey:profile.key,rating:profile.rating,name:cleanText(body.name,24)||profile.name,trainer:cleanTrainerAppearance(body.trainer),team,latency:cleanLatency(body.latency),createdAt:Date.now()};
-      rankedTickets.set(ticket,{ticket,status:'searching',playerId,createdAt:entry.createdAt,updatedAt:entry.createdAt,rating:profile.rating,searchRange:75,waitSeconds:0,skillBased:true});rankedQueue.push(entry);tryRankedMatch();
+      const ticket=id(),playerId=id(),entry={ticket,playerId,mode,profileKey:profile.key,rating:profile.rating,name:cleanText(body.name,24)||profile.name,trainer:cleanTrainerAppearance(body.trainer),team,latency:cleanLatency(body.latency),createdAt:Date.now()};
+      rankedTickets.set(ticket,{ticket,status:'searching',mode,playerId,createdAt:entry.createdAt,updatedAt:entry.createdAt,rating:profile.rating,searchRange:75,waitSeconds:0,skillBased:true});rankedQueue.push(entry);tryRankedMatch();
       return json(res,200,rankedTickets.get(ticket));
     }
     if(req.method==='GET'&&url.pathname==='/ranked/status'){
