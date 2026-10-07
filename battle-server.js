@@ -647,13 +647,13 @@ function mysteryKey(mode){return ['singles','doubles','random'].includes(mode)?m
 function makeMatchedRoom(mode,a,b){
   const better=a.latency<=b.latency?a:b,otherEntry=better===a?b:a;
   const code=roomCode(),format=mode==='doubles'?'doubles':'singles';
-  const room={code,phase:'battle',turn:0,winner:null,reward:null,kickedIds:[],animationSeq:0,animations:[],createdAt:Date.now(),updatedAt:Date.now(),log:[],weather:null,weatherTurns:0,terrain:null,terrainTurns:0,
+  const room={code,phase:'preview',turn:0,winner:null,reward:null,kickedIds:[],animationSeq:0,animations:[],createdAt:Date.now(),updatedAt:Date.now(),log:[],weather:null,weatherTurns:0,terrain:null,terrainTurns:0,
     rules:{format,teamSize:6,mystery:true,mysteryMode:mode,noPrize:true,hostByLatency:true},
     players:[
-      {id:better.playerId,name:better.name,trainer:better.trainer,profileKey:better.profileKey,team:cleanTeam(better.team),ready:true,active:0,choice:null,side:{},latency:better.latency,lastSeen:Date.now()},
-      {id:otherEntry.playerId,name:otherEntry.name,trainer:otherEntry.trainer,profileKey:otherEntry.profileKey,team:cleanTeam(otherEntry.team),ready:true,active:0,choice:null,side:{},latency:otherEntry.latency,lastSeen:Date.now()}
+      {id:better.playerId,name:better.name,trainer:better.trainer,profileKey:better.profileKey,team:cleanTeam(better.team),ready:true,active:0,leadSelected:null,previewReady:false,choice:null,side:{},latency:better.latency,lastSeen:Date.now()},
+      {id:otherEntry.playerId,name:otherEntry.name,trainer:otherEntry.trainer,profileKey:otherEntry.profileKey,team:cleanTeam(otherEntry.team),ready:true,active:0,leadSelected:null,previewReady:false,choice:null,side:{},latency:otherEntry.latency,lastSeen:Date.now()}
     ]};
-  rooms.set(code,room);beginBattle(room);
+  rooms.set(code,room);
   [better,otherEntry].forEach((entry,index)=>{const t=matchmakingTickets.get(entry.ticket);if(t){t.status='matched';t.roomCode=code;t.playerId=entry.playerId;t.playerIndex=index;t.hostIndex=0;t.updatedAt=Date.now();}});
   return room;
 }
@@ -668,13 +668,13 @@ function tryMatchmake(mode){
 }
 function makeRankedRoom(a,b){
   const better=a.latency<=b.latency?a:b,otherEntry=better===a?b:a,code=roomCode();
-  const room={code,phase:'battle',turn:0,winner:null,reward:null,kickedIds:[],animationSeq:0,animations:[],createdAt:Date.now(),updatedAt:Date.now(),log:[],weather:null,weatherTurns:0,terrain:null,terrainTurns:0,
+  const room={code,phase:'preview',turn:0,winner:null,reward:null,kickedIds:[],animationSeq:0,animations:[],createdAt:Date.now(),updatedAt:Date.now(),log:[],weather:null,weatherTurns:0,terrain:null,terrainTurns:0,
     rules:{format:'singles',teamSize:6,ranked:true,hostByLatency:true},
     players:[
-      {id:better.playerId,name:better.name,trainer:better.trainer,profileKey:better.profileKey,rating:better.rating,team:better.team,ready:true,active:0,choice:null,side:{},latency:better.latency,lastSeen:Date.now()},
-      {id:otherEntry.playerId,name:otherEntry.name,trainer:otherEntry.trainer,profileKey:otherEntry.profileKey,rating:otherEntry.rating,team:otherEntry.team,ready:true,active:0,choice:null,side:{},latency:otherEntry.latency,lastSeen:Date.now()}
+      {id:better.playerId,name:better.name,trainer:better.trainer,profileKey:better.profileKey,rating:better.rating,team:better.team,ready:true,active:0,leadSelected:null,previewReady:false,choice:null,side:{},latency:better.latency,lastSeen:Date.now()},
+      {id:otherEntry.playerId,name:otherEntry.name,trainer:otherEntry.trainer,profileKey:otherEntry.profileKey,rating:otherEntry.rating,team:otherEntry.team,ready:true,active:0,leadSelected:null,previewReady:false,choice:null,side:{},latency:otherEntry.latency,lastSeen:Date.now()}
     ]};
-  rooms.set(code,room);beginBattle(room);
+  rooms.set(code,room);
   [better,otherEntry].forEach((entry,index)=>{const t=rankedTickets.get(entry.ticket);if(t){t.status='matched';t.roomCode=code;t.playerId=entry.playerId;t.playerIndex=index;t.hostIndex=0;t.updatedAt=Date.now();}});
   return room;
 }
@@ -732,7 +732,7 @@ function publicRoom(room,viewerIndex){
     animationSeq:room.animationSeq||0, animations:(room.animations||[]).slice(-24),
     log:room.log.slice(-100),
     players:room.players.map(p=>({
-      name:p.name,trainer:p.trainer||{gender:'Male',outfitId:1},rating:p.profileKey&&PROFILE_DB.profiles[p.profileKey]?PROFILE_DB.profiles[p.profileKey].rating:(p.rating||null),title:p.profileKey&&PROFILE_DB.profiles[p.profileKey]?(PROFILE_DB.profiles[p.profileKey].equipped.title||''):'',ready:p.ready,connected:true,active:p.active,active2:Number.isInteger(p.active2)?p.active2:null,latency:p.latency||null,choiceSlots:room.rules&&room.rules.format==='doubles'?[!!(p.choice&&p.choice[0]),!!(p.choice&&p.choice[1])]:null,hasChoice:room.rules&&room.rules.format==='doubles'?doublesActionReady(p):!!p.choice,
+      name:p.name,trainer:p.trainer||{gender:'Male',outfitId:1},leadSelected:Number.isInteger(p.leadSelected)?p.leadSelected:null,previewReady:!!p.previewReady,rating:p.profileKey&&PROFILE_DB.profiles[p.profileKey]?PROFILE_DB.profiles[p.profileKey].rating:(p.rating||null),title:p.profileKey&&PROFILE_DB.profiles[p.profileKey]?(PROFILE_DB.profiles[p.profileKey].equipped.title||''):'',ready:p.ready,connected:true,active:p.active,active2:Number.isInteger(p.active2)?p.active2:null,latency:p.latency||null,choiceSlots:room.rules&&room.rules.format==='doubles'?[!!(p.choice&&p.choice[0]),!!(p.choice&&p.choice[1])]:null,hasChoice:room.rules&&room.rules.format==='doubles'?doublesActionReady(p):!!p.choice,
       usedMega:p.usedMega,usedGmax:p.usedGmax,usedTera:p.usedTera,
       side:p.side, team:p.team.map(publicMon)
     }))
@@ -2290,7 +2290,18 @@ const server=http.createServer(async (req,res)=>{
       if(pi<0&&Array.isArray(room.kickedIds)&&room.kickedIds.includes(body.playerId)) return json(res,410,{error:'You were removed from the room by the host.'});
       if(pi<0) return json(res,403,{error:'Invalid player token.'});
       const p=room.players[pi];p.lastSeen=Date.now();room.updatedAt=Date.now();
-      if(body.type==='kick'&&room.phase==='lobby'){
+      if(body.type==='lead'&&room.phase==='preview'){
+        const slot=Number(body.slot);
+        if(!Number.isInteger(slot)||slot<0||slot>=p.team.length)return json(res,400,{error:'Invalid lead Pokémon.'});
+        if(p.previewReady)return json(res,409,{error:'Your lead is already locked.'});
+        p.leadSelected=slot;p.active=slot;p.previewReady=true;log(room,p.name+' locked in a lead Pokémon.');
+        if(room.players.length===2&&room.players.every(x=>x.previewReady)){
+          if(room.rules&&room.rules.format==='doubles'){
+            room.players.forEach(x=>{x.active2=x.team.findIndex((m,idx)=>idx!==x.active&&m.hp>0);});
+          }
+          beginBattle(room);
+        }
+      }else if(body.type==='kick'&&room.phase==='lobby'){
         if(pi!==0) return json(res,403,{error:'Only the host can remove players.'});
         if(room.players.length<2) return json(res,400,{error:'There is no opponent to remove.'});
         const removed=room.players[1];
