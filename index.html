@@ -6006,12 +6006,12 @@ function renderOnlineBattle(){
         var publicLeaders=el('div',{class:'ranked-leaderboard'});publicLeaders.appendChild(el('h5',{text:'Public Wins Leaderboard'}));
         ONLINE_STATE.winsLeaderboard.slice(0,25).forEach(function(row){
           var ratio=row.winLossRatio===null?'∞':Number(row.winLossRatio||0).toFixed(2);
-          publicLeaders.appendChild(el('div',{class:'ranked-leader-row',text:'#'+row.rank+' · '+row.name+' · '+row.wins+' wins · '+row.record+' · '+ratio+' W/L'}));
+          publicLeaders.appendChild(el('div',{class:'ranked-leader-row',text:'#'+row.rank+' · '+row.name+' · '+row.wins+' wins · '+row.record+' · '+ratio+' W/L · Streak '+(row.winStreak||0)+' · Best '+(row.bestWinStreak||0)}));
         });progressionCard.appendChild(publicLeaders);
       }
       if((ONLINE_STATE.leaderboard||[]).length){
         var leaders=el('div',{class:'ranked-leaderboard'});leaders.appendChild(el('h5',{text:'Ranked Rating Leaderboard'}));
-        ONLINE_STATE.leaderboard.slice(0,10).forEach(function(row){leaders.appendChild(el('div',{class:'ranked-leader-row',text:'#'+row.rank+' · '+row.name+' · '+row.rating+' · '+row.rankedWins+'–'+row.rankedLosses}));});progressionCard.appendChild(leaders);
+        ONLINE_STATE.leaderboard.slice(0,10).forEach(function(row){leaders.appendChild(el('div',{class:'ranked-leader-row',text:'#'+row.rank+' · '+row.name+' · '+row.rating+' · '+row.rankedWins+'–'+row.rankedLosses+' · Streak '+(row.winStreak||0)+' · Best '+(row.bestWinStreak||0)}));});progressionCard.appendChild(leaders);
       }
     }
     shell.appendChild(progressionCard);
