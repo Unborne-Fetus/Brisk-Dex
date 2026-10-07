@@ -6112,13 +6112,14 @@ function renderOnlineBattle(){
   }
   if(!me||!foe)return;
   if(room.phase==='preview'){
-    var preview=el('div',{class:'battle-preview'});
-    preview.appendChild(el('h3',{text:'Team Preview · Choose your lead'}));
-    preview.appendChild(el('p',{class:'online-status',text:'Matchmaking succeeded. Both full teams are visible. Choose your lead before the battle starts.'}));
+    var preview=el('div',{class:'battle-preview'}),rankedMystery=!!(room.rules&&room.rules.ranked&&room.rules.rankedMode==='mystery');
+    preview.appendChild(el('h3',{text:(rankedMystery?'Mystery Preview':'Team Preview')+' · Choose your lead'}));
+    preview.appendChild(el('p',{class:'online-status',text:rankedMystery?'Matchmaking succeeded. Your opponent’s team is hidden until the battle begins. Choose your lead blind.':'Matchmaking succeeded. Both full teams are visible. Choose your lead before the battle starts.'}));
     var cols=el('div',{class:'online-shell'});
     function previewTeam(player,isMe){
       var card=el('section',{class:'online-card'});card.appendChild(el('h4',{text:(isMe?'Your team · ':'Opponent · ')+player.name}));
       var grid=el('div',{class:'battle-preview-team'});
+      if(!isMe&&rankedMystery&&!player.team.length)grid.appendChild(el('div',{class:'route-empty',text:'Opponent team hidden in Ranked Mystery.'}));
       (player.team||[]).forEach(function(mon,index){
         var row=el('div',{class:'battle-preview-mon'+(isMe&&player.leadSelected===index?' selected':'')});
         row.appendChild(makeIconEl({species:mon.species,isShiny:false},'encounter-icon'));
