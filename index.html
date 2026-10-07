@@ -2156,7 +2156,8 @@ var ONLINE_STATE = {
   playerIndex: Number(sessionStorage.getItem('briskdex_player_index') || -1),
   room: null, polling: null, busy: false, gimmickChoice:null, selectedTeamKeys:[], teamSearch:'', teamSource:'all',
   lanScanning:false, lanScanDone:false, lanRelay:null, lanRooms:[], lanError:'',
-  rewardProcessing:false, rewardMessage:'', lastAnimationSeq:0, animationQueue:[], animationPlaying:false
+  rewardProcessing:false, rewardMessage:'', lastAnimationSeq:0, animationQueue:[], animationPlaying:false,
+  matchmakingTicket:'', matchmakingMode:'', matchmakingTimer:null, matchmakingStartedAt:0, doubleActorPos:0, doubleTargetPos:0
 };
 function persistOnlineSession(){
   if(ONLINE_STATE.roomCode&&ONLINE_STATE.playerId){
@@ -5012,6 +5013,98 @@ async function receiveOnlineBattleReward(room){
   }finally{
     ONLINE_STATE.rewardProcessing=false;
   }
+}
+var MYSTERY_MYTHICALS=new Set(['MEW','CELEBI','JIRACHI','DEOXYS','PHIONE','MANAPHY','DARKRAI','SHAYMIN','ARCEUS','VICTINI','KELDEO','MELOETTA','GENESECT','DIANCIE','HOOPA','VOLCANION','MAGEARNA','MARSHADOW','ZERAORA','MELTAN','MELMETAL','ZARUDE','PECHARUNT']);
+var MYSTERY_LEGENDARIES=new Set([
+  'ARTICUNO','ZAPDOS','MOLTRES','MEWTWO','RAIKOU','ENTEI','SUICUNE','LUGIA','HO_OH',
+  'REGIROCK','REGICE','REGISTEEL','LATIAS','LATIOS','KYOGRE','GROUDON','RAYQUAZA',
+  'UXIE','MESPRIT','AZELF','DIALGA','PALKIA','HEATRAN','REGIGIGAS','GIRATINA','CRESSELIA',
+  'COBALION','TERRAKION','VIRIZION','TORNADUS','THUNDURUS','RESHIRAM','ZEKROM','LANDORUS','KYUREM',
+  'XERNEAS','YVELTAL','ZYGARDE','TYPE_NULL','SILVALLY','TAPU_KOKO','TAPU_LELE','TAPU_BULU','TAPU_FINI',
+  'COSMOG','COSMOEM','SOLGALEO','LUNALA','NECROZMA','ZACIAN','ZAMAZENTA','ETERNATUS','KUBFU','URSHIFU',
+  'REGIELEKI','REGIDRAGO','GLASTRIER','SPECTRIER','CALYREX','ENAMORUS','WO_CHIEN','CHIEN_PAO','TING_LU','CHI_YU',
+  'KORAIDON','MIRAIDON','OKIDOGI','MUNKIDORI','FEZANDIPITI','OGERPON','TERAPAGOS'
+]);
+function mysterySpeciesPools(){
+  var all=dexSpeciesData(),ordinary=[],legendary=[],mythical=[];
+  Object.keys(all).forEach(function(id){
+    var sp=all[id]||{},constant=String(sp.constant||'');
+    if(!constant||sp.isMega||sp.isGmax||sp.isForm||!Array.isArray(sp.baseStats)||sp.baseStats.length!==6||!Array.isArray(sp.learnableMoves)||!sp.learnableMoves.length)return;
+    if(MYSTERY_MYTHICALS.has(constant))mythical.push(Number(id));
+    else if(MYSTERY_LEGENDARIES.has(constant))legendary.push(Number(id));
+    else ordinary.push(Number(id));
+  });
+  return {ordinary:ordinary,legendary:legendary,mythical:mythical};
+}
+function mysteryCompetitiveMon(speciesId){
+  var species=NAME_DATA.species[String(speciesId)]||{},builds=competitiveBuilds(species),build=builds.length?randomChoice(builds):null;
+  if(!build)throw new Error('No competitive set is available for '+speciesName(speciesId)+'.');
+  var base=(species.baseStats||[1,1,1,1,1,1]).map(Number),evText=String(build.evs||''),evs=[0,0,0,0,0,0];
+  [['HP',0],['Atk',1],['Def',2],['Spe',3],['SpA',4],['SpD',5]].forEach(function(pair){
+    var match=evText.match(new RegExp('(\\d+)\\s*'+pair[0]+'\\b','i'));if(match)evs[pair[1]]=Math.min(252,Number(match[1])||0);
+  });
+  var level=100,stats=[];
+  stats[0]=species.constant==='SHEDINJA'?1:Math.floor(((2*base[0]+31+Math.floor(evs[0]/4))*level)/100)+level+10;
+  for(var i=1;i<6;i++)stats[i]=Math.floor(((2*base[i]+31+Math.floor(evs[i]/4))*level)/100)+5;
+  var moveList=(build.moves||[]).slice(0,4).map(function(m){
+    var id=Number(m.id)||0,d=MOVE_DETAILS[String(id)]||MOVE_DETAILS[id]||{},pp=Number(d.pp||BUNDLED_DATA.movePP[String(id)]||10);
+    return {id:id,name:m.name||d.name||moveName(id),type:d.type||m.type||'Normal',category:d.category||m.category||'Status',
+      power:Number(d.power||m.power||0),accuracy:Number(d.accuracy===0?0:(d.accuracy||m.accuracy||100)),priority:Number(d.priority||0),pp:pp,
+      effect:d.effect||'',target:d.target||'',flags:Array.isArray(d.flags)?d.flags.slice():[],criticalHitStage:Number(d.criticalHitStage||0),multiHit:!!d.multiHit,moveEffects:Array.isArray(d.moveEffects)?d.moveEffects.slice():[]};
+  });
+  return {species:Number(speciesId),name:speciesName(speciesId),level:100,friendship:255,weight:Number(species.weight||species.weightHg||0),
+    ivs:{hp:31,atk:31,def:31,spd:31,spa:31,spdef:31},types:(species.types||[]).filter(Boolean).slice(0,2),ability:build.ability||((species.abilities||[])[0]||''),
+    item:build.item||'',teraType:build.tera||((species.types||[])[0]||'Normal'),transformations:[],maxHP:stats[0],atk:stats[1],def:stats[2],speed:stats[3],spAtk:stats[4],spDef:stats[5],
+    isShiny:false,moves:moveList};
+}
+function generateMysteryRandomTeam(){
+  var pools=mysterySpeciesPools();
+  if(!pools.legendary.length||!pools.mythical.length||pools.ordinary.length<4)throw new Error('Bundled Brisk data does not contain enough eligible Pokémon for Random Mystery Battle.');
+  var picked=[randomChoice(pools.legendary),randomChoice(pools.mythical)],ordinary=shuffled(pools.ordinary);
+  while(picked.length<6&&ordinary.length){var id=ordinary.shift();if(!picked.includes(id))picked.push(id);}
+  return shuffled(picked.map(mysteryCompetitiveMon));
+}
+async function measureBattleLatency(){
+  var samples=[];
+  for(var i=0;i<3;i++){
+    var at=performance.now();
+    try{await battleRequest('/health',{method:'GET'});samples.push(performance.now()-at);}catch(e){}
+  }
+  if(!samples.length)return 9999;
+  samples.sort(function(a,b){return a-b;});return Math.round(samples[Math.floor(samples.length/2)]);
+}
+function stopMysteryPolling(){
+  if(ONLINE_STATE.matchmakingTimer){clearInterval(ONLINE_STATE.matchmakingTimer);ONLINE_STATE.matchmakingTimer=null;}
+}
+async function cancelMysteryBattle(){
+  var ticket=ONLINE_STATE.matchmakingTicket;stopMysteryPolling();
+  if(ticket){try{await battleRequest('/matchmaking/cancel',{method:'POST',body:JSON.stringify({ticket:ticket})});}catch(e){}}
+  ONLINE_STATE.matchmakingTicket='';ONLINE_STATE.matchmakingMode='';ONLINE_STATE.matchmakingStartedAt=0;renderOnlineBattle();
+}
+async function startMysteryBattle(mode){
+  if(ONLINE_STATE.busy||ONLINE_STATE.matchmakingTicket)return;
+  var team;
+  try{team=mode==='random'?generateMysteryRandomTeam():battlePartySnapshot();}catch(err){showError(err.message);return;}
+  if(team.length!==6){showError('Mystery '+(mode==='doubles'?'Doubles':'Singles')+' requires exactly 6 Pokémon. Select six Pokémon first.');return;}
+  ONLINE_STATE.busy=true;
+  try{
+    var latency=await measureBattleLatency(),name=(currentSave&&currentSave.trainer&&currentSave.trainer.name)||'Trainer';
+    var data=await battleRequest('/matchmaking/join',{method:'POST',body:JSON.stringify({mode:mode,name:name,trainer:onlineTrainerAppearance(),team:team,latency:latency})});
+    ONLINE_STATE.matchmakingTicket=data.ticket;ONLINE_STATE.matchmakingMode=mode;ONLINE_STATE.matchmakingStartedAt=Date.now();
+    function checkMatch(){
+      if(!ONLINE_STATE.matchmakingTicket)return;
+      battleRequest('/matchmaking/status?ticket='+encodeURIComponent(ONLINE_STATE.matchmakingTicket),{method:'GET'}).then(function(state){
+        if(state.status==='matched'&&state.room){
+          stopMysteryPolling();ONLINE_STATE.roomCode=state.roomCode;ONLINE_STATE.playerId=state.playerId;ONLINE_STATE.playerIndex=state.playerIndex;ONLINE_STATE.room=state.room;
+          ONLINE_STATE.matchmakingTicket='';ONLINE_STATE.matchmakingMode='';ONLINE_STATE.doubleActorPos=0;ONLINE_STATE.doubleTargetPos=0;ONLINE_STATE.lastAnimationSeq=Number(state.room.animationSeq||0);
+          persistOnlineSession();startBattlePolling();renderOnlineBattle();
+          showNotice(state.playerIndex===0?'Match found — your lower latency made you the host.':'Match found — your opponent had the lower latency and is hosting.');
+        }else renderOnlineBattle();
+      }).catch(function(err){stopMysteryPolling();ONLINE_STATE.matchmakingTicket='';ONLINE_STATE.matchmakingMode='';showError('Mystery matchmaking failed: '+err.message);renderOnlineBattle();});
+    }
+    checkMatch();ONLINE_STATE.matchmakingTimer=setInterval(checkMatch,900);renderOnlineBattle();
+  }catch(err){showError('Could not enter Mystery Battle matchmaking: '+err.message);}
+  finally{ONLINE_STATE.busy=false;}
 }
 async function scanLanBattles(force){
   if(ONLINE_STATE.lanScanning)return;
