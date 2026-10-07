@@ -1237,6 +1237,8 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
       <div id="translation-status" translate="no" class="dex-muted" role="status"></div>
       <label>Appearance <select id="setting-theme"><option value="system">System</option><option value="dark">Dark</option><option value="light">Light</option></select></label>
       <label>Zoom <select id="setting-zoom"><option value="0.8">80%</option><option value="1">100%</option><option value="1.25">125%</option><option value="1.5">150%</option><option value="2">200%</option></select></label>
+      <label>Emerald save profile <select id="setting-emerald-profile" translate="no"><option value="auto">Auto detect</option><option value="emerald">Standard Emerald / Emerald-based hack</option><option value="brisk-emerald">Brisk expanded format</option></select></label>
+      <p class="dex-muted">Use Standard Emerald for vanilla Emerald and hacks that keep its Pokémon/save structures. Use Brisk expanded format only for hacks that intentionally use Brisk's expanded Pokémon record conventions.</p>
     </div>
   </section>
   <section id="bag-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-bag" style="display:none;">
@@ -1759,8 +1761,10 @@ function parseSav(arrayBuffer){
   }
 
   var storageExtension = readStorageExtension(bytes);
+  var profileOverride='auto';
+  try{ profileOverride=localStorage.getItem('briskdex_emerald_profile')||'auto'; }catch(e){}
   var profile = window.EmeraldCompat
-    ? EmeraldCompat.detectProfile({storageExtensionPresent:storageExtension.present, bytes:bytes})
+    ? EmeraldCompat.detectProfile({storageExtensionPresent:storageExtension.present, bytes:bytes, override:profileOverride})
     : {id:'emerald',name:'Pokémon Emerald',brisk:false,boxCount:14,features:{}};
   window.ACTIVE_EMERALD_PROFILE = profile;
 
@@ -6768,8 +6772,9 @@ function writeSaveBag(items){
   BAG_POCKETS.forEach(function(p,pi){for(var i=0;i<p.count;i++){var id=Number(plans[pi][i]||0),qty=id?items[id]:0;dv.setUint16(p.offset+i*4,id,true);dv.setUint16(p.offset+i*4+2,qty^(currentSave.securityKey&65535),true);}});
   recomputeChecksum(currentSave,1);markDirty();return true;
 }
-var uiSettings={language:'en',theme:'system',zoom:'1'};
+var uiSettings={language:'en',theme:'system',zoom:'1',emeraldProfile:'auto'};
 try{Object.assign(uiSettings,JSON.parse(localStorage.getItem('briskdex_settings')||'{}'));}catch(e){}
+try{if(localStorage.getItem('briskdex_emerald_profile'))uiSettings.emeraldProfile=localStorage.getItem('briskdex_emerald_profile');}catch(e){}
 var UNUSED_UI_TRANSLATIONS={es:['Ajustes','Guardado','Ubicaciones','Pokédex','Entrenadores','Sets competitivos','Batallas online','Movimientos','Habilidades','Objetos','Bolsa','Guía','Cambios'],fr:['Paramètres','Sauvegarde','Lieux','Pokédex','Dresseurs','Sets compétitifs','Combats en ligne','Capacités','Talents','Objets','Sac','Guide','Changements'],de:['Einstellungen','Spielstand','Fundorte','Pokédex','Trainer','Strategien','Online-Kämpfe','Attacken','Fähigkeiten','Items','Beutel','Anleitung','Änderungen']};
 var uiTabNames=['settings','save','routes','dex','trainers','competitive','online','moves','abilities','items','bag','guide','changes'];
 var uiEnglish=uiTabNames.map(function(n){return document.getElementById('tab-'+n).textContent;});
@@ -6780,9 +6785,30 @@ function applyUISettings(){
   document.body.style.zoom=String(Number(uiSettings.zoom)||1);
   if(window.BriskLocalization)window.BriskLocalization.setLanguage(uiSettings.language);
   ['language','theme','zoom'].forEach(function(k){document.getElementById('setting-'+k).value=uiSettings[k];});
+  var profileSetting=document.getElementById('setting-emerald-profile');
+  if(profileSetting) profileSetting.value=uiSettings.emeraldProfile||'auto';
 }
 document.getElementById('tab-settings').addEventListener('click',function(){setMainTab('settings');});
 ['language','theme','zoom'].forEach(function(k){document.getElementById('setting-'+k).addEventListener('change',function(e){uiSettings[k]=e.target.value;localStorage.setItem('briskdex_settings',JSON.stringify(uiSettings));applyUISettings();});});
+document.getElementById('setting-emerald-profile').addEventListener('change',function(e){
+  uiSettings.emeraldProfile=e.target.value||'auto';
+  localStorage.setItem('briskdex_settings',JSON.stringify(uiSettings));
+  localStorage.setItem('briskdex_emerald_profile',uiSettings.emeraldProfile);
+  if(currentSave){
+    try{
+      var previous=currentSave;
+      var reparsed=parseSav(previous._internal.rawBytes.slice().buffer);
+      reparsed.filePath=previous.filePath||null;
+      reparsed.uri=previous.uri||null;
+      reparsed.fileExtension=previous.fileExtension||'sav';
+      currentSave=reparsed;
+      loadDexStatusOverrides(reparsed);
+      dirty=false;
+      renderAll();
+      showNotice('Emerald compatibility profile changed to '+reparsed.profileName+'.');
+    }catch(err){showError('Could not apply that compatibility profile: '+err.message);}
+  }
+});
 matchMedia('(prefers-color-scheme: light)').addEventListener('change',applyUISettings);
 applyUISettings();
 
