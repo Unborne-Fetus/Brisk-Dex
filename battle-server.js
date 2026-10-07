@@ -1536,8 +1536,10 @@ function resolveTurn(room){
 }
 
 setInterval(()=>{
-  const cutoff=Date.now()-6*60*60*1000;
+  const cutoff=Date.now()-6*60*60*1000,queueCutoff=Date.now()-10*60*1000;
   for(const [key,room] of rooms) if(room.updatedAt<cutoff) rooms.delete(key);
+  for(const [ticket,state] of matchmakingTickets) if((state.updatedAt||state.createdAt||0)<queueCutoff) matchmakingTickets.delete(ticket);
+  for(const [mode,q] of matchmaking) matchmaking.set(mode,q.filter(entry=>matchmakingTickets.has(entry.ticket)));
 },15*60*1000).unref();
 
 const server=http.createServer(async (req,res)=>{
