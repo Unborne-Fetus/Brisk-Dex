@@ -2764,7 +2764,8 @@ async function addToStorage(mon){
     raw80: bytesToBase64(raw80),
     depositedAt: Date.now(),
     sourceTrainer: currentSave.trainer.name,
-    sourceId: currentSave.trainer.publicId
+    sourceId: currentSave.trainer.publicId,
+    profileId: currentSave.profileId || 'brisk-emerald'
   };
   externalStorage.push(entry);
   try{ await persistExternalStorage(); }
@@ -2819,7 +2820,7 @@ async function depositFromParty(partyIndex){
   }
   var view1 = currentSave._internal.sectionView[1];
   var dv1 = new DataView(view1.buffer, view1.byteOffset, view1.length);
-  dv1.setUint32(0x0234, newParty.length, true);
+  dv1.setUint8(0x0234, newParty.length);
   recomputeChecksum(currentSave, 1);
   currentSave.party = newParty;
   markDirty();
@@ -2834,6 +2835,12 @@ function withdrawToSlot(storageId, boxIndex, slotIndex){
   if (idx === -1) return false;
   if (pendingWithdrawals[storageId] === saveSessionId){ showError('This Pokémon is already queued for the current save.'); return false; }
   var entry = externalStorage[idx];
+  var entryProfile = entry.profileId || 'brisk-emerald';
+  var saveProfile = currentSave.profileId || 'brisk-emerald';
+  if(entryProfile !== saveProfile){
+    showError('This stored Pokémon uses the '+entryProfile+' record profile and cannot be inserted byte-for-byte into a '+saveProfile+' save yet.');
+    return false;
+  }
   var raw80 = base64ToBytes(entry.raw80);
   var logicalOffset = 4 + (boxIndex*30 + slotIndex)*80;
   var touched = writeLogicalPCBytes(currentSave, logicalOffset, raw80);
@@ -3119,6 +3126,9 @@ function renderTrainerCard(save){
   ]);
   c.appendChild(idBlock);
   c.appendChild(stats);
+  if(save.profileId && save.profileId !== 'brisk-emerald'){
+    c.appendChild(el('div',{class:'notice-banner',text:'Compatibility mode: standard Emerald save structures are active. Brisk-only Pokémon metadata is disabled for this save.'}));
+  }
 }
 function statBlock(label, value){
   return el('div', {class:'stat'}, [
@@ -3270,7 +3280,8 @@ function openModal(mon, loc){
 
   var dg = el('div', {class:'detail-grid'});
   dg.appendChild(detailBlock('Held Item', itemName(mon.heldItem)));
-  dg.appendChild(detailBlock('Tera Type', teraTypeName(mon.teraType)));
+  if(currentSave && currentSave.profile && currentSave.profile.features && currentSave.profile.features.tera)
+    dg.appendChild(detailBlock('Tera Type', teraTypeName(mon.teraType)));
   dg.appendChild(detailBlock('Ability', abilityDisplayName(mon.species, mon.abilitySlot) || ('Slot ' + (mon.abilitySlot + 1) + ' (unknown \u2014 load ability data)')));
   dg.appendChild(detailBlock('OT', mon.otName + ' (' + mon.otGender + ')'));
   dg.appendChild(detailBlock('OT ID', String(mon.otId & 0xFFFF).padStart(5,'0')));
@@ -3326,7 +3337,7 @@ function openModal(mon, loc){
     modal.appendChild(el('div', {class:'v', text: strain > 0 ? ('Infected, strain ' + strain + ', ' + days + ' days left') : 'Cured'}));
   }
 
-  if (loc && (loc.type === 'party' || loc.type === 'box' || loc.type === 'storage')){
+  if (loc && currentSave && currentSave.profile && currentSave.profile.features && currentSave.profile.features.tera && (loc.type === 'party' || loc.type === 'box' || loc.type === 'storage')){
     var teraEditor = el('div', {style:'margin-top:18px; padding-top:16px; border-top:1px solid var(--line-soft);'});
     teraEditor.appendChild(el('div', {class:'k', text:'Change Tera Type'}));
     var teraControls = el('div', {style:'display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:7px;'});
@@ -3587,6 +3598,7 @@ function importExternalStorageFile(file){
 }
 
 function renderAll(){
+  window.ACTIVE_EMERALD_PROFILE=currentSave.profile || window.ACTIVE_EMERALD_PROFILE;
   BAG_ITEMS=currentSave.bag;
   renderBag();
   renderTrainerCard(currentSave);
