@@ -484,6 +484,17 @@ input[type=file]{ display:none; }
  .battle-trainer-sprite.trainer-battle-art{width:72px;height:72px}.battle-trainer-sprite.trainer-overworld-upscale{width:54px;height:81px}
 }
 
+
+/* ---------- Wins Shop & Ranked ---------- */
+.battle-profile-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0}
+.battle-profile-stat{padding:10px;border:1px solid var(--line);background:var(--panel-2);border-radius:7px}.battle-profile-stat span{display:block;font-size:9px;color:var(--muted);text-transform:uppercase}.battle-profile-stat strong{display:block;font-size:20px;margin-top:3px}
+.ranked-panel{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0}.ranked-panel h5,.ranked-leaderboard h5{margin:0 8px 0 0}
+.wins-shop-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}.wins-shop-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;align-items:center;padding:10px;border:1px solid var(--line);background:var(--panel-2);border-radius:7px}.wins-shop-item small{color:var(--muted)}.wins-shop-item button{grid-row:1/3;grid-column:2}
+.ranked-leaderboard{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}.ranked-leader-row{padding:4px 0;font-size:10px;border-bottom:1px solid var(--line-soft)}
+.ranked-rating-change{font-size:18px;font-weight:900;margin:10px 0;color:var(--battle-accent,var(--accent))}
+.battle-turn-badge{border-color:var(--battle-accent,#463f2d)}.battle-side-ball.active{box-shadow:0 0 0 2px var(--battle-accent,#e2b800)}
+@media(max-width:700px){.battle-profile-stats{grid-template-columns:repeat(2,1fr)}.wins-shop-grid{grid-template-columns:1fr}.wins-shop-item{grid-template-columns:1fr auto}}
+
 /* ---------- Battle move animations ---------- */
 .battle-combatant{will-change:transform,filter,opacity}
 .battle-attack-fx{position:absolute;z-index:10;pointer-events:none;left:0;top:0;transform:translate(-50%,-50%);}
@@ -5826,12 +5837,16 @@ function onlineTrainerImage(player,className){
   img.classList.add(trainerSpriteIsOverworld(appearance)?'trainer-overworld-upscale':'trainer-battle-art');
   img.decoding='async';img.addEventListener('error',function(){wrap.remove();});wrap.appendChild(img);return wrap;
 }
+var BATTLE_ARENA_IMAGES={cave:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAAAwBAMAAAAr2m+NAAAAMFBMVEX/AP+traWcpaWlpYScpWucnGuUjJSUlGN7lIR7hISEhEpahHtac2NaY1JSWloxIRAHfNMVAAAEtElEQVRIx5WWP2sjRxTA9yvMVjInDJpKoIsa93GzZfBW+QqGg5CUqc/VwpFA0g0sUp/OrhwW63BII24YQaqAsifkgLll17OFFxNhSZs3b2b2j6RzyCtkz+y837z35s174zggJ5+V1ePOxCkbtSeUvvMLyPcg3p6siuZIep7PwtaU9zLAZ83VZ9/+P0BZeP5o1gSA7orxA4Bdz7/8G70dn5xmeWM64Y8nK5bNGlPlIwLU7l+DWOr9d2g+K8543thsHc68BABeWbl4Pj4IeBrDz1fsTbEWsjK4LBkX2+k0m5WsNPJ0EFD+vlKANeN5JqRdW85//fn1hyQMpcjZc6Tl/ptwPwfWnM8yLjdmTRRQOjhiUyHlSsyolmTKkfEX5w4EN982T46DrEU60bpajn7qAiCT8kKPM86XxA2iDAH35+MWQHD+kHyY0Ib0aI8LwaX8hMMh7CHMXwA8vWke9pqLjIvpiN7RlhCSCbCiowFCAQaZAoDT08Zhl+C+5CIZuVewMggahOz2WN6SIHgLHgDgjl4qQxzPh2F9Vh85l1nGM75U+m+JEtQPCHGHt2roTkAxk3fgFkEAjCzAn8NHKcFWvuwERh8Jffs/Ia8IV4vkFXVpVzjlFuxYaHXvOTqGo0eBMNfSCWp94pIuJ1JGV2iZI/MSL/5Ypf/8WlrhKezcIwfEhdn+j6nWB4CMS8jtlToJP/6zAmSRsvwgASUILiwgjW7KkhtATymndCLTS50BnyUQtwZE0XueFwoQU6L04dTJsTTn/98AGkUTLlX128R/UPzSI27CVCoNpbTZuEcwgDSCnJrAtQMfNnF8ZVbTjEGu0ISxuyoXWyLhNtB+4MgIb4eQD8oHIBjEEBLqFnKOhZUNLdOzaSjVyDHXS8j0vWcIEca3K5eYc0IB+gFIUx+uA560AQxeZzK9UVE4VQREQBgGXZtzvZ3QKQMlvzSAfkCHQ/oQY0KjDXE8R0e6t12uc25HH4gSPXjlKH2c/kEDPL+MtYAZqg5IzDlrQqdxv0knimOHat8ojWN7pcqNQcTza2o3tSZcWMC7G1zi6Gvi0i/iRd0AVRG1EBPTpgn9qPpYOkZ/EMeLncZU1pYclgUs8Rx9xdWw2G+NLUtaor6ggmNicUi/suSA1L1RqZ+88EBgs5MXxVGxbBi9awcAvBfFiQ1Ad9HVePeBEPJDvvllE6DCf3Ze6A2LfYC/j6g28h0ICN6BN/jLwvajaMtCUWC93Hkp2XVbp/WY8cOqneMRlglYkK9GVfDNV9845m+yNmArZW5ODrvzhMGbYJaMbKeOFvoIoZcgYBNVgDVGGx4UCjC366EeQdsJeRo1BEqwegJgH4omzin0sVy9H8zna8j8S6Z2xv6npf9Of4SmNysf229EsEbkz5WuvuyMgO/QZj81+zNQMoCmCxsJ/UJbq0YJgIvmWpceIUC2Zim0bVVfIoswAGil/1SVpnpSkGOoer8tkaAqIvyZCCxwGMyiAmDVzOVSL6x37B3DYkI7gSmncONthRyoTvRoY4Bzko1crG1V2VPtXFe9uo3UFVIRisoCBUhGpKrbSAgONLK6QlIwYmEB+B5I2LK1uPGeaPaxqkIC4aZAwL/iEg1rxMpUBgAAAABJRU5ErkJggg==',sky:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAAAwBAMAAAAr2m+NAAAAMFBMVEX/AP/////v9//n9//W7//e5//O7//G5//O3vfG3v+t1v+l1v+Uzv9Sc4wAAAAAFi5UAAADiElEQVRIx6VWzWrjMBDWK4zqPoCUBvaSQsieCwk5BxwQxC+wr7DnLhh83UMOofQF9ri3YvoGe+neSlCgJFf7GXZGP7ZkO23KDm3tWvN9Go1G34gxtNl/GOHZH7TvaMvAAGDZNUh6n5bnCBAPSQcQcs79+3kCKfE3JpCieRfAoSXor2yKeLLoI5ccwL3jGIymVy4Hv9C+oTXh4Z+FvOkudyGFFG7iBQa3AC6SIQLgLaiOrZIT/BswwgABhFCtdVnuAitLre2Q5WjXj+uZ3VmILp/QVQ1Z9lCSA/odKVVXMxascVVXOLZ/2jbuKcC1efFPR/KMfgcbhCeAm6WBlzRx4eyeqiEFQyTHCoJIdjaQkycAfkux0+QbDy/ylJu9RCi90H9uNDdxUBgn5rd9gsFHcPSytSDHa+lt3HggR4YrOdgIQEz0q3KDYc5wzti4fVgSpR41M5sGDV5daBvPwERiqlxvMVNmbYFDPogtvINCh8zm4IXv1GY9bgBNHiJk7oHE8ZPLWY1hszlF8AZb/LgJZs/PTq02Of3gnmC16j1bUBIqGKsinmkAn7vaMi4ZTKjeK7acE4Hm6syKW7x1AM7HZjvkwVQvO9IhuMMcvkvQ7i8Iu7VSH60mHk5EVL2iD9jwzhDY+K85NwRycnCSpo3wrSgEkjHZLHPIAAhPPpk+OYIXK3y0I4Ut1pSO0PUwga9n9ehVhf2gLwbD5Xs5dAdL9frCth001E2wsMmD/K2lXXvW6wvmCKuQgFQkpWS39ZiCHcQj3MHPWe1EREl/8jAeARKz1RzrQETqGI+iOiMVfA0kkGZDARDyS3QcdqRjdR0nQACwRn9RSLfD+ct2D2UgxJ0cRB2giiXcyvihBw165IpFI6t6wE7dSefAb7x3dcHdAKYgRtQySLV7jYYtP7I51ditRe/7eWJ+OVMqxq+DBBIVz7SMrSmwLkHSXCiw1vDJez3ZSL6pN/LqCDWDkWkMrpjpOYouClxinex3dJJJRYKKt8LMbDr/ysCi+LFj6CfT21oLVKpgZvtxDjOi9W9pbgB+76TkmqSChxNEa2B62Kh6TquaOBF/b2Hr3qFFAn9psKBj/w74kbX17pp+cKH7DAHtUGaaPlKAEIbhEwSpE1Rz+XjjHO9zyYUEVi7SNju75xeSI7i6MAdOM8L8PtCmiUsjCG4jeBNZt+qNWbgwB0X/KmBCgOQS/D+e4dZEoiR4NAAAAABJRU5ErkJggg=='};
 function renderOnlineBattle(){
   var root=document.getElementById('online-root');if(!root)return;
   root.innerHTML='';
   var snapshot=battlePartySnapshot();
   if(!ONLINE_STATE.room){
     var shell=el('div',{class:'online-shell'});
+    if(!ONLINE_STATE.profile&&!ONLINE_STATE.profileLoading){
+      setTimeout(function(){refreshBattleProfile(true).then(function(){renderOnlineBattle();}).catch(function(){});},0);
+    }
     var setup=el('section',{class:'online-card'});
     setup.appendChild(el('h4',{text:'Host or join'}));
     var form=el('div',{class:'online-form'});
@@ -5919,6 +5934,36 @@ function renderOnlineBattle(){
     }
 
     shell.appendChild(teamCard);
+    var progressionCard=el('section',{class:'online-card battle-progression-card',style:'grid-column:1 / -1;'});
+    progressionCard.appendChild(el('h4',{text:'Wins · Ranked · Shop'}));
+    if(!ONLINE_STATE.profile){
+      progressionCard.appendChild(el('div',{class:'dex-muted',text:ONLINE_STATE.profileLoading?'Loading battle profile…':'Load your persistent battle profile to see Wins, rating, and shop unlocks.'}));
+      var loadProfile=el('button',{class:'primary',text:'Load Battle Profile'});loadProfile.disabled=ONLINE_STATE.profileLoading;
+      loadProfile.addEventListener('click',async function(){try{await refreshBattleProfile(true);renderOnlineBattle();}catch(err){showError('Battle profile: '+err.message);}});progressionCard.appendChild(loadProfile);
+    }else{
+      var p=ONLINE_STATE.profile,stats=el('div',{class:'battle-profile-stats'});
+      [['Wins',p.wins],['Lifetime Wins',p.lifetimeWins],['Rating',p.rating],['Ranked',p.rankedWins+'–'+p.rankedLosses]].forEach(function(row){var box=el('div',{class:'battle-profile-stat'});box.appendChild(el('span',{text:row[0]}));box.appendChild(el('strong',{text:String(row[1])}));stats.appendChild(box);});
+      progressionCard.appendChild(stats);
+      var ranked=el('div',{class:'ranked-panel'});ranked.appendChild(el('h5',{text:'Ranked Singles 6v6'}));
+      if(ONLINE_STATE.rankedTicket){
+        ranked.appendChild(el('div',{class:'mystery-searching',text:'Searching near rating '+p.rating+'… '+Math.floor((Date.now()-ONLINE_STATE.rankedStartedAt)/1000)+'s'}));
+        var cancelRanked=el('button',{class:'ghost',text:'Cancel Ranked Search'});cancelRanked.addEventListener('click',cancelRankedBattle);ranked.appendChild(cancelRanked);
+      }else{var rankedBtn=el('button',{class:'primary',text:'Find Ranked Match'});rankedBtn.addEventListener('click',startRankedBattle);ranked.appendChild(rankedBtn);}
+      progressionCard.appendChild(ranked);
+      var shop=el('div',{class:'wins-shop-grid'});
+      (ONLINE_STATE.shop||[]).forEach(function(item){
+        var owned=(p.purchases||[]).includes(item.id),equipped=p.equipped&&p.equipped[item.kind]===item.value,card=el('div',{class:'wins-shop-item'});
+        card.appendChild(el('strong',{text:item.name}));card.appendChild(el('small',{text:item.price+' Wins · '+item.kind}));
+        var btn=el('button',{class:equipped?'ghost':owned?'primary':'',text:equipped?'Equipped':owned?'Equip':'Buy · '+item.price});
+        btn.disabled=equipped||(!owned&&p.wins<item.price);btn.addEventListener('click',function(){owned?equipWinShopItem(item.id):purchaseWinShopItem(item.id);});card.appendChild(btn);shop.appendChild(card);
+      });
+      progressionCard.appendChild(shop);
+      if((ONLINE_STATE.leaderboard||[]).length){
+        var leaders=el('div',{class:'ranked-leaderboard'});leaders.appendChild(el('h5',{text:'Ranked Leaderboard'}));
+        ONLINE_STATE.leaderboard.slice(0,10).forEach(function(row){leaders.appendChild(el('div',{class:'ranked-leader-row',text:'#'+row.rank+' · '+row.name+' · '+row.rating+' · '+row.rankedWins+'–'+row.rankedLosses}));});progressionCard.appendChild(leaders);
+      }
+    }
+    shell.appendChild(progressionCard);
     var mysteryCard=el('section',{class:'online-card',style:'grid-column:1 / -1;'});
     mysteryCard.appendChild(el('h4',{text:'Mystery Battles'}));
     mysteryCard.appendChild(el('div',{class:'dex-muted',text:'Automatic 6-Pokémon matchmaking. The player with the lower measured relay latency becomes host. Mystery battles never award an opponent Pokémon.'}));
@@ -6064,7 +6109,7 @@ function renderOnlineBattle(){
   var active=me.team[actorPos===1?me.active2:me.active],foeActive=foe.team[targetPos===1?foe.active2:foe.active];
   function battleSidePanel(player,sideName){
     var panel=el('div',{class:'battle-side-panel '+sideName});
-    panel.appendChild(el('div',{class:'battle-side-name',text:player.name}));
+    panel.appendChild(el('div',{class:'battle-side-name',text:player.name+(player.title?' · '+player.title:'')+(player.rating?' · '+player.rating:'')}));
     var team=el('div',{class:'battle-side-team'});
     (player.team||[]).forEach(function(mon,index){team.appendChild(el('span',{class:'battle-side-ball'+(mon.hp<=0?' fainted':'')+((index===player.active||index===player.active2)?' active':''),title:mon.name}));});
     panel.appendChild(team);return panel;
@@ -6077,6 +6122,10 @@ function renderOnlineBattle(){
   simTop.appendChild(el('span',{text:topStatus}));
   sim.appendChild(simTop);
   var scene=el('div',{class:'battle-sim-field'+battleWeatherClass(room.weather)});
+  var equippedProfile=ONLINE_STATE.profile&&ONLINE_STATE.profile.equipped||{},arenaKey=equippedProfile.arena||'stadium';
+  if(BATTLE_ARENA_IMAGES[arenaKey])scene.style.backgroundImage='linear-gradient(#00000012,#00000012),url("'+BATTLE_ARENA_IMAGES[arenaKey]+'")';
+  if(equippedProfile.accent==='gold')sim.style.setProperty('--battle-accent','#d5ae37');
+  else if(equippedProfile.accent==='cyan')sim.style.setProperty('--battle-accent','#19d9d2');
   scene.appendChild(el('div',{class:'battle-turn-badge',text:'Turn '+room.turn}));
   scene.appendChild(el('div',{class:'battle-platform foe'}));scene.appendChild(el('div',{class:'battle-platform me'}));
   var myFieldTrainer=onlineTrainerImage(me,'battle-field-trainer me battle-trainer-enter-me'),foeFieldTrainer=onlineTrainerImage(foe,'battle-field-trainer foe battle-trainer-enter-foe');
@@ -6101,6 +6150,10 @@ function renderOnlineBattle(){
     var won=room.winner===ONLINE_STATE.playerIndex,overlay=el('div',{class:'battle-result-overlay'}),result=el('div',{class:'battle-result-card'});
     result.appendChild(el('h2',{text:won?'Victory!':'Defeat'}));
     result.appendChild(el('div',{class:'dex-muted',text:won?'You won the battle.':'Your opponent won the battle.'}));
+    if(room.rules&&room.rules.ranked&&room.ratingChanges){
+      var delta=Number(room.ratingChanges[ONLINE_STATE.playerIndex]||0);
+      result.appendChild(el('div',{class:'ranked-rating-change',text:'Ranked rating '+(delta>=0?'+':'')+delta}));
+    }
     if(won&&room.reward){
       result.appendChild(makeIconEl({species:room.reward.species,isShiny:false},'encounter-icon'));
       result.appendChild(el('strong',{text:'Prize · '+(room.reward.name||speciesName(room.reward.species))+' · Lv'+room.reward.level}));
