@@ -2392,7 +2392,7 @@ var ONLINE_STATE = {
   lanScanning:false, lanScanDone:false, lanRelay:null, lanRooms:[], lanError:'',
   rewardProcessing:false, rewardMessage:'', lastAnimationSeq:0, animationQueue:[], animationPlaying:false,
   matchmakingTicket:'', matchmakingMode:'', matchmakingTimer:null, matchmakingStartedAt:0, doubleActorPos:0, doubleTargetPos:0,
-  profile:null,shop:[],profileLoading:false,rankedTicket:'',rankedTimer:null,rankedStartedAt:0,leaderboard:[]
+  profile:null,shop:[],profileLoading:false,rankedTicket:'',rankedMode:'',rankedTimer:null,rankedStartedAt:0,rankedStatus:null,leaderboard:[]
 };
 function onlineProfileToken(){
   var token=localStorage.getItem('briskdex_battle_profile_token');
@@ -2436,28 +2436,31 @@ function stopRankedPolling(){if(ONLINE_STATE.rankedTimer){clearInterval(ONLINE_S
 async function cancelRankedBattle(){
   var ticket=ONLINE_STATE.rankedTicket;stopRankedPolling();
   if(ticket){try{await battleRequest('/ranked/cancel',{method:'POST',body:JSON.stringify({ticket:ticket})});}catch(e){}}
-  ONLINE_STATE.rankedTicket='';ONLINE_STATE.rankedStartedAt=0;renderOnlineBattle();
+  ONLINE_STATE.rankedTicket='';ONLINE_STATE.rankedMode='';ONLINE_STATE.rankedStatus=null;ONLINE_STATE.rankedStartedAt=0;renderOnlineBattle();
 }
-async function startRankedBattle(){
+async function startRankedBattle(mode){
   if(ONLINE_STATE.busy||ONLINE_STATE.rankedTicket)return;
-  var team=battlePartySnapshot();if(team.length!==6){showError('Ranked Singles requires exactly 6 Pokémon.');return;}
+  mode=['singles','doubles','mystery'].includes(mode)?mode:'singles';
+  var team=battlePartySnapshot(),label=mode==='doubles'?'Doubles':mode==='mystery'?'Mystery':'Singles';
+  if(team.length!==6){showError('Ranked '+label+' requires exactly 6 verified Pokémon.');return;}
   ONLINE_STATE.busy=true;
   try{
     await ensureMysteryBattleRelay();await refreshBattleProfile(false);
     var latency=await measureBattleLatency();if(latency>=9999)throw new Error('The relay stopped responding during the latency check.');
-    var data=await battleRequest('/ranked/join',{method:'POST',body:JSON.stringify({profileToken:onlineProfileToken(),name:onlineProfileName(),trainer:onlineTrainerAppearance(),team:team,latency:latency})});
-    ONLINE_STATE.rankedTicket=data.ticket;ONLINE_STATE.rankedStartedAt=Date.now();
+    var data=await battleRequest('/ranked/join',{method:'POST',body:JSON.stringify({mode:mode,profileToken:onlineProfileToken(),name:onlineProfileName(),trainer:onlineTrainerAppearance(),team:team,latency:latency})});
+    ONLINE_STATE.rankedTicket=data.ticket;ONLINE_STATE.rankedMode=mode;ONLINE_STATE.rankedStatus=data;ONLINE_STATE.rankedStartedAt=Date.now();
     function checkRanked(){
       if(!ONLINE_STATE.rankedTicket)return;
       battleRequest('/ranked/status?ticket='+encodeURIComponent(ONLINE_STATE.rankedTicket),{method:'GET'}).then(function(state){
+        ONLINE_STATE.rankedStatus=state;
         if(state.status==='matched'&&state.room){
           stopRankedPolling();ONLINE_STATE.roomCode=state.roomCode;ONLINE_STATE.playerId=state.playerId;ONLINE_STATE.playerIndex=state.playerIndex;ONLINE_STATE.room=state.room;
-          ONLINE_STATE.rankedTicket='';ONLINE_STATE.lastAnimationSeq=Number(state.room.animationSeq||0);persistOnlineSession();startBattlePolling();renderOnlineBattle();showNotice('Ranked match found.');
+          ONLINE_STATE.rankedTicket='';ONLINE_STATE.rankedMode='';ONLINE_STATE.rankedStatus=null;ONLINE_STATE.doubleActorPos=0;ONLINE_STATE.doubleTargetPos=0;ONLINE_STATE.lastAnimationSeq=Number(state.room.animationSeq||0);persistOnlineSession();startBattlePolling();renderOnlineBattle();showNotice('Ranked '+label+' match found.');
         }else renderOnlineBattle();
-      }).catch(function(err){stopRankedPolling();ONLINE_STATE.rankedTicket='';showError('Ranked matchmaking failed: '+err.message);renderOnlineBattle();});
+      }).catch(function(err){stopRankedPolling();ONLINE_STATE.rankedTicket='';ONLINE_STATE.rankedMode='';ONLINE_STATE.rankedStatus=null;showError('Ranked matchmaking failed: '+err.message);renderOnlineBattle();});
     }
     checkRanked();ONLINE_STATE.rankedTimer=setInterval(checkRanked,900);renderOnlineBattle();
-  }catch(err){showError('Could not enter Ranked matchmaking: '+err.message);}
+  }catch(err){showError('Could not enter Ranked '+label+' matchmaking: '+err.message);}
   finally{ONLINE_STATE.busy=false;}
 }
 function persistOnlineSession(){
@@ -5974,11 +5977,18 @@ function renderOnlineBattle(){
       var p=ONLINE_STATE.profile,stats=el('div',{class:'battle-profile-stats'});
       [['Wins',p.wins],['Lifetime Wins',p.lifetimeWins],['Rating',p.rating],['Ranked',p.rankedWins+'–'+p.rankedLosses]].forEach(function(row){var box=el('div',{class:'battle-profile-stat'});box.appendChild(el('span',{text:row[0]}));box.appendChild(el('strong',{text:String(row[1])}));stats.appendChild(box);});
       progressionCard.appendChild(stats);
-      var ranked=el('div',{class:'ranked-panel'});ranked.appendChild(el('h5',{text:'Ranked Singles 6v6'}));
+      var ranked=el('div',{class:'ranked-panel'});ranked.appendChild(el('h5',{text:'Ranked 6v6'}));
       if(ONLINE_STATE.rankedTicket){
-        ranked.appendChild(el('div',{class:'mystery-searching',text:'Searching near rating '+p.rating+'… '+Math.floor((Date.now()-ONLINE_STATE.rankedStartedAt)/1000)+'s'}));
+        var rmode=ONLINE_STATE.rankedMode==='doubles'?'Doubles':ONLINE_STATE.rankedMode==='mystery'?'Mystery':'Singles',rs=ONLINE_STATE.rankedStatus||{};
+        ranked.appendChild(el('div',{class:'mystery-searching',text:'Searching Ranked '+rmode+' near rating '+p.rating+' · ±'+(rs.searchRange||75)+' · '+Math.floor((Date.now()-ONLINE_STATE.rankedStartedAt)/1000)+'s'}));
         var cancelRanked=el('button',{class:'ghost',text:'Cancel Ranked Search'});cancelRanked.addEventListener('click',cancelRankedBattle);ranked.appendChild(cancelRanked);
-      }else{var rankedBtn=el('button',{class:'primary',text:'Find Ranked Match'});rankedBtn.addEventListener('click',startRankedBattle);ranked.appendChild(rankedBtn);}
+      }else{
+        [['singles','Singles','Standard 6v6 singles with team preview.'],['doubles','Doubles','6v6 doubles with two active Pokémon per side.'],['mystery','Mystery','6v6 singles; the opponent team stays hidden during lead selection.']].forEach(function(row){
+          var rankedBtn=el('button',{class:'mystery-mode'});
+          rankedBtn.appendChild(el('strong',{text:row[1]}));rankedBtn.appendChild(el('small',{text:row[2]}));
+          rankedBtn.addEventListener('click',function(){startRankedBattle(row[0]);});ranked.appendChild(rankedBtn);
+        });
+      }
       progressionCard.appendChild(ranked);
       var shop=el('div',{class:'wins-shop-grid'});
       (ONLINE_STATE.shop||[]).forEach(function(item){
