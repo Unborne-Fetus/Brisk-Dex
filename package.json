@@ -26,7 +26,8 @@
     "ios:build": "npm run ios:prepare && npx cap sync ios",
     "battle-server": "node battle-server.js",
     "battle:coverage": "node tools/check_battle_coverage.js",
-    "battle:smoke": "node tools/test_battle_server.js"
+    "battle:smoke": "node tools/test_battle_server.js",
+    "compat:test": "node tools/test_emerald_compat.js"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.0.0",
