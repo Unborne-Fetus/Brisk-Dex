@@ -6374,9 +6374,10 @@ async function handleSavFromElectron(){
   }
 }
 
-function applyGameDataPack(parsed){
+function applyGameDataPack(parsed,skipPersist){
   parsed=parsed&&parsed.data&&(!parsed.species&&!parsed.moves)?parsed.data:parsed;
   if(!parsed||typeof parsed!=='object')throw new Error('Game-data pack must be a JSON object.');
+  if(!skipPersist){try{localStorage.setItem('briskdex_compat_game_data_pack',JSON.stringify(parsed));}catch(e){}}
   USER_DATA.species=Object.assign({},USER_DATA.species,parsed.species||{});
   USER_DATA.moves=Object.assign({},USER_DATA.moves,parsed.moves||{});
   USER_DATA.items=Object.assign({},USER_DATA.items,parsed.items||{});
@@ -6766,7 +6767,6 @@ matchMedia('(prefers-color-scheme: light)').addEventListener('change',applyUISet
 refreshCompatibilityProfileOptions();
 applyUISettings();
 
-try{localStorage.removeItem('briskdex_namedata_overrides');}catch(e){}
 loadNameDataFromStorage();
 loadBagFromStorage();
 if(ONLINE_STATE.roomCode&&ONLINE_STATE.playerId){
@@ -6775,7 +6775,9 @@ if(ONLINE_STATE.roomCode&&ONLINE_STATE.playerId){
   }).catch(function(){leaveOnlineBattle();});
 }
 updateDataStatus();
-var gameDataReady = loadBundledGameData();
+var gameDataReady=loadBundledGameData().then(function(){
+  try{var savedPack=localStorage.getItem('briskdex_compat_game_data_pack');if(savedPack)applyGameDataPack(JSON.parse(savedPack),true);}catch(e){showError('Saved compatibility data pack could not be restored: '+e.message);}
+});
 storageReady = loadExternalStorage();
 restoreLastSave();
 
