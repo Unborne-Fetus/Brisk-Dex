@@ -66,6 +66,11 @@ function cleanRewardRaw80(value){
   if(typeof value!=='string'||value.length>256) return '';
   try{const bytes=Buffer.from(value,'base64');return bytes.length===80?bytes.toString('base64'):'';}catch(e){return '';}
 }
+function cleanTrainerAppearance(trainer){
+  const gender=trainer&&trainer.gender==='Female'?'Female':'Male';
+  const outfitId=Number(trainer&&trainer.outfitId)===2?2:1;
+  return {gender,outfitId};
+}
 function cleanTeam(team){
   if(!Array.isArray(team)) return [];
   return team.slice(0,6).map((mon,index)=>({
@@ -200,7 +205,7 @@ function publicRoom(room,viewerIndex){
     animationSeq:room.animationSeq||0, animations:(room.animations||[]).slice(-24),
     log:room.log.slice(-100),
     players:room.players.map(p=>({
-      name:p.name,ready:p.ready,connected:true,active:p.active,hasChoice:!!p.choice,
+      name:p.name,trainer:p.trainer||{gender:'Male',outfitId:1},ready:p.ready,connected:true,active:p.active,hasChoice:!!p.choice,
       usedMega:p.usedMega,usedGmax:p.usedGmax,usedTera:p.usedTera,
       side:p.side, team:p.team.map(publicMon)
     }))
@@ -1471,7 +1476,7 @@ const server=http.createServer(async (req,res)=>{
       if(!team.length) return json(res,400,{error:'Load a save with at least one party Pokémon first.'});
       const room={code,phase:'lobby',turn:0,winner:null,reward:null,kickedIds:[],animationSeq:0,animations:[],createdAt:Date.now(),updatedAt:Date.now(),log:[],weather:null,weatherTurns:0,terrain:null,terrainTurns:0,
         rules:{format:'singles',teamSize:Math.max(1,Math.min(6,Number(body.rules&&body.rules.teamSize)||6))},
-        players:[{id:playerId,name:cleanText(body.name,24)||'Host',team,ready:false,active:0,choice:null,side:{}}]};
+        players:[{id:playerId,name:cleanText(body.name,24)||'Host',trainer:cleanTrainerAppearance(body.trainer),team,ready:false,active:0,choice:null,side:{}}]};
       rooms.set(code,room); return json(res,200,{code,playerId,playerIndex:0,room:publicRoom(room,0)});
     }
     const match=url.pathname.match(/^\/rooms\/([A-Z0-9]{6})(?:\/(join|action))?$/);
@@ -1488,7 +1493,7 @@ const server=http.createServer(async (req,res)=>{
       if(room.players.length>=2) return json(res,409,{error:'This room is full.'});
       if(room.phase!=='lobby') return json(res,409,{error:'This battle already started.'});
       const body=await readBody(req), team=cleanTeam(body.team); if(!team.length) return json(res,400,{error:'Load a save with at least one party Pokémon first.'});
-      const playerId=id(); room.players.push({id:playerId,name:cleanText(body.name,24)||'Challenger',team,ready:false,active:0,choice:null,side:{}});
+      const playerId=id(); room.players.push({id:playerId,name:cleanText(body.name,24)||'Challenger',trainer:cleanTrainerAppearance(body.trainer),team,ready:false,active:0,choice:null,side:{}});
       log(room,room.players[1].name+' joined the room.'); return json(res,200,{code:room.code,playerId,playerIndex:1,room:publicRoom(room,1)});
     }
     if(req.method==='POST'&&match[2]==='action'){
