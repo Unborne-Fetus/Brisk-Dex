@@ -65,13 +65,13 @@ function ratingDelta(winnerRating,loserRating){
   const expected=1/(1+Math.pow(10,(loserRating-winnerRating)/400));
   return Math.max(8,Math.round(32*(1-expected)));
 }
-function recordCompletedWin(room,winnerIndex){
+function recordBattleResult(room,winnerIndex,awardWinCurrency){
   if(room._resultRecorded||winnerIndex<0||winnerIndex>=room.players.length)return;
   room._resultRecorded=true;
   const winner=room.players[winnerIndex],loser=room.players[other(winnerIndex)];
   const wp=winner&&!winner.isBot&&winner.profileKey?PROFILE_DB.profiles[winner.profileKey]:null;
   const lp=loser&&!loser.isBot&&loser.profileKey?PROFILE_DB.profiles[loser.profileKey]:null;
-  if(wp){wp.wins=(Number(wp.wins)||0)+1;wp.lifetimeWins=(Number(wp.lifetimeWins)||0)+1;wp.updatedAt=Date.now();}
+  if(awardWinCurrency&&wp){wp.wins=(Number(wp.wins)||0)+1;wp.lifetimeWins=(Number(wp.lifetimeWins)||0)+1;wp.updatedAt=Date.now();}
   if(room.rules&&room.rules.ranked&&wp&&lp){
     const wr=Number(wp.rating)||1000,lr=Number(lp.rating)||1000,delta=ratingDelta(wr,lr);
     wp.rating=wr+delta;lp.rating=Math.max(100,lr-delta);
@@ -1032,8 +1032,9 @@ function createBattleReward(room,winnerIndex){
 function finishBattle(room,winnerIndex,message,awardPrize=true){
   if(room.phase==='finished') return;
   room.phase='finished';room.winner=winnerIndex;room.players.forEach(x=>x.choice=null);
-  if(awardPrize!==false){createBattleReward(room,winnerIndex);recordCompletedWin(room,winnerIndex);}
+  if(awardPrize!==false)createBattleReward(room,winnerIndex);
   else room.reward=null;
+  recordBattleResult(room,winnerIndex,awardPrize!==false);
   if(message)log(room,message);
 }
 function faintCheck(room,pi){
