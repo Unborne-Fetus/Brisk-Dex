@@ -166,7 +166,7 @@ function stat(mon,key){
 }
 function active(player){ return player.team[player.active]; }
 function alive(mon){ return !!mon && mon.hp>0; }
-function nextAlive(player){ return player.team.findIndex(mon=>mon.hp>0); }
+function nextAlive(player){ return player.team.findIndex((mon,i)=>mon.hp>0&&i!==player.active&&i!==player.active2); }
 function other(i){ return i===0?1:0; }
 function playerIndex(room,playerId){ return room.players.findIndex(p=>p.id===playerId); }
 function activeAt(player,pos){return pos===1?player.team[player.active2]:player.team[player.active];}
@@ -550,6 +550,7 @@ function faintCheck(room,pi){
     log(room,mon.name+' fainted!');p.lastFaintTurn=room.turn;
     const next=nextAlive(p);
     if(next<0){
+      if(room.rules&&room.rules.format==='doubles'&&Number.isInteger(p.active2)&&alive(p.team[p.active2])) return true;
       const winner=other(pi);finishBattle(room,winner,room.players[winner].name+' won the battle!');
       return true;
     }
