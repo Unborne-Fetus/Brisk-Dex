@@ -957,7 +957,7 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
       </div>
       <div>
         <h1>BRISK DEX</h1>
-        <p>Companion app &middot; Pok&eacute;mon Brisk Emerald</p>
+        <p>Emerald compatibility build &middot; Brisk Dex</p>
       </div>
     </div>
     <div class="top-actions">
@@ -1000,9 +1000,9 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
   <div id="empty-state" class="dropzone">
     <div class="icon">&#128190;</div>
     <h2>Drop in a save file</h2>
-    <p>Drag a Brisk Emerald <code>.sav</code> or <code>.srm</code> file here, or use the load button above. Nothing leaves your browser &mdash; the file is read and parsed locally.</p>
+    <p>Drag a Pok&eacute;mon Emerald or Emerald-based <code>.sav</code> / <code>.srm</code> file here, or use the load button above. Nothing leaves your browser &mdash; the file is read and parsed locally.</p>
     <button class="primary" id="btn-load-sav-2">Choose .sav / .srm file</button>
-    <div class="hint">Standard Gen III save format (pokeemerald / pokeemerald-expansion)</div>
+    <div class="hint">Pok&eacute;mon Emerald save architecture &middot; vanilla + compatible Emerald-based hacks</div>
   </div>
 
   <div id="app-content" style="display:none;">
@@ -1475,6 +1475,7 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
 
 <script src="asset-loader.js"></script>
 <script src="localization.js"></script>
+<script src="emerald-compat.js"></script>
 <script>
 (function(){
 "use strict";
@@ -1757,14 +1758,20 @@ function parseSav(arrayBuffer){
     throw new Error("Save file is missing required sections (trainer info / team & items). It may be corrupted or from an unsupported game.");
   }
 
+  var storageExtension = readStorageExtension(bytes);
+  var profile = window.EmeraldCompat
+    ? EmeraldCompat.detectProfile({storageExtensionPresent:storageExtension.present, bytes:bytes})
+    : {id:'emerald',name:'Pokémon Emerald',brisk:false,boxCount:14,features:{}};
+  window.ACTIVE_EMERALD_PROFILE = profile;
+
   var s0 = sections[0], s1 = sections[1];
   var v0 = new DataView(s0.buffer, s0.byteOffset, s0.length);
   var v1 = new DataView(s1.buffer, s1.byteOffset, s1.length);
 
-  var trainer = parseTrainer(v0, s0);
+  var trainer = parseTrainer(v0, s0, profile);
   var securityKey = u32(v0, 0x00AC);
 
-  var teamSize = u32(v1, 0x0234);
+  var teamSize = u8(v1, 0x0234);
   if (teamSize > 6) teamSize = 6;
   var party = [];
   for (var i=0;i<teamSize;i++){
@@ -1779,7 +1786,6 @@ function parseSav(arrayBuffer){
 
   // PC storage. Legacy saves use 14 boxes in sections 5-13. Brisk Emerald's
   // 20-box saves continue PokemonStorage through fixed physical sectors 28-31.
-  var storageExtension = readStorageExtension(bytes);
   var pcParts = [];
   for (var pid=5; pid<=13; pid++){
     if (!sections[pid]) throw new Error("Save file is missing PC storage section " + pid + ".");
@@ -1818,20 +1824,18 @@ function parseSav(arrayBuffer){
     boxNames.push(name || ("BOX " + (b2+1)));
   }
 
-  // Brisk Emerald stores Gen IX Pokédex flags in SaveBlock1 after Mystery Gift.
-  // SaveBlock1 is split across save sections 1-4; rebuild its logical byte stream.
-  var saveBlock1Parts=[];
-  for(var sb1id=1;sb1id<=4;sb1id++){
-    if(!sections[sb1id]) throw new Error("Save file is missing SaveBlock1 section "+sb1id+".");
-    saveBlock1Parts.push(sections[sb1id]);
-  }
-  var saveBlock1Length=saveBlock1Parts.reduce(function(total,part){return total+part.length;},0);
-  var saveBlock1Bytes=new Uint8Array(saveBlock1Length), saveBlock1Pos=0;
-  saveBlock1Parts.forEach(function(part){saveBlock1Bytes.set(part,saveBlock1Pos);saveBlock1Pos+=part.length;});
-  var dexSeen=saveBlock1Bytes.slice(DEX_SEEN_OFFSET,DEX_SEEN_OFFSET+DEX_FLAG_BYTES);
-  var dexCaught=saveBlock1Bytes.slice(DEX_SEEN_OFFSET+DEX_FLAG_BYTES,DEX_SEEN_OFFSET+(DEX_FLAG_BYTES*2));
+  // Pokédex storage differs between vanilla Emerald and Brisk's expanded save.
+  // The compatibility profile owns that distinction so unknown Emerald hacks do
+  // not get interpreted with Brisk-only offsets.
+  var dexFlags = window.EmeraldCompat
+    ? EmeraldCompat.readDexFlags(profile, sections)
+    : {seen:new Uint8Array(0),caught:new Uint8Array(0)};
+  var dexSeen=dexFlags.seen, dexCaught=dexFlags.caught;
 
   return {
+    profileId: profile.id,
+    profileName: profile.name,
+    profile: profile,
     keyItemIds: Array.from({length:30},function(_,i){return v1.getUint16(0x5d8+i*4,true);}).filter(Boolean),
     bag: readSaveBag(v1,securityKey),
     securityKey: securityKey,
@@ -1849,6 +1853,7 @@ function parseSav(arrayBuffer){
       sectionView: block.sections,
       sectionFileOffset: block.fileOffsets,
       saveIndex: block.saveIndex,
+      profileId: profile.id,
       hasStorageExtension: storageExtension.present,
       storageExtensionViews: storageExtension.views,
       storageExtensionFileOffsets: storageExtension.fileOffsets
@@ -1856,7 +1861,7 @@ function parseSav(arrayBuffer){
   };
 }
 
-function parseTrainer(v0, s0){
+function parseTrainer(v0, s0, profile){
   var nameBytes = s0.subarray(0x0000, 0x0007);
   var name = decodeGen3String(nameBytes);
   var gender = u8(v0, 0x0008);
@@ -1866,7 +1871,7 @@ function parseTrainer(v0, s0){
   var hours = u16(v0, 0x000E);
   var minutes = u8(v0, 0x0010);
   var seconds = u8(v0, 0x0011);
-  var outfitId = u16(v0, 0x0090);
+  var outfitId = profile && profile.brisk ? u16(v0, 0x0090) : 1;
   if (outfitId !== 1 && outfitId !== 2) outfitId = 1;
   return {
     name: name || "TRAINER",
@@ -1881,6 +1886,8 @@ function parseTrainer(v0, s0){
 function decodePokemon(rec, isPartySlot){
   if (rec.length < 80) return null;
   var view = new DataView(rec.buffer, rec.byteOffset, rec.length);
+  var profile = (currentSave && currentSave.profile) || window.ACTIVE_EMERALD_PROFILE || (window.EmeraldCompat && EmeraldCompat.profiles.emerald);
+  var isBriskEncoding = !!(profile && profile.brisk);
   var personality = u32(view, 0x00);
   var otId = u32(view, 0x04);
 
@@ -1908,8 +1915,9 @@ function decodePokemon(rec, isPartySlot){
   var calculatedChecksum = 0;
   for (var cw=0; cw<24; cw++) calculatedChecksum = (calculatedChecksum + dataView.getUint16(cw*2, true)) & 0xFFFF;
   var checksumValid = calculatedChecksum === checksum;
-  // Bit 15 of the word at 0x1E is reserved by Brisk Emerald as the competitive provenance bit.
-  var competitiveLegal = ((u16(view, 0x1E) >>> 15) & 1) === 1;
+  // Bits in the party padding word are Brisk-only metadata. Vanilla Emerald
+  // leaves them out of the Pokémon format entirely.
+  var competitiveLegal = isBriskEncoding && (((u16(view, 0x1E) >>> 15) & 1) === 1);
 
   var order = SUB_ORDERS[personality % 24];
   var subOffsets = {};
@@ -1917,25 +1925,27 @@ function decodePokemon(rec, isPartySlot){
 
   var gOff = subOffsets['G'], aOff = subOffsets['A'], eOff = subOffsets['E'], mOff = subOffsets['M'];
 
-  var speciesAndTera = dataView.getUint16(gOff+0, true);
-  var species = speciesAndTera & 0x07FF;
-  var teraType = (speciesAndTera >>> 11) & 0x1F;
-  var heldItem = dataView.getUint16(gOff+2, true) & 0x03FF;
-  var experience = dataView.getUint32(gOff+4, true) & 0x001FFFFF;
+  var speciesWord = dataView.getUint16(gOff+0, true);
+  var rawSpecies = isBriskEncoding ? (speciesWord & 0x07FF) : speciesWord;
+  var species = isBriskEncoding ? rawSpecies
+    : (window.EmeraldCompat ? EmeraldCompat.emeraldInternalSpeciesToNational(rawSpecies) : rawSpecies);
+  var teraType = isBriskEncoding ? ((speciesWord >>> 11) & 0x1F) : null;
+  var heldItem = isBriskEncoding ? (dataView.getUint16(gOff+2, true) & 0x03FF) : dataView.getUint16(gOff+2, true);
+  var experience = isBriskEncoding ? (dataView.getUint32(gOff+4, true) & 0x001FFFFF) : dataView.getUint32(gOff+4, true);
   var ppBonuses = dataView.getUint8(gOff+8);
   var friendship = dataView.getUint8(gOff+9);
 
   var moves = [
-    dataView.getUint16(aOff+0, true) & 0x07FF,
-    dataView.getUint16(aOff+2, true) & 0x07FF,
-    dataView.getUint16(aOff+4, true) & 0x07FF,
-    dataView.getUint16(aOff+6, true) & 0x07FF
+    isBriskEncoding ? (dataView.getUint16(aOff+0, true) & 0x07FF) : dataView.getUint16(aOff+0, true),
+    isBriskEncoding ? (dataView.getUint16(aOff+2, true) & 0x07FF) : dataView.getUint16(aOff+2, true),
+    isBriskEncoding ? (dataView.getUint16(aOff+4, true) & 0x07FF) : dataView.getUint16(aOff+4, true),
+    isBriskEncoding ? (dataView.getUint16(aOff+6, true) & 0x07FF) : dataView.getUint16(aOff+6, true)
   ];
   var pp = [
-    dataView.getUint8(aOff+8) & 0x7F,
-    dataView.getUint8(aOff+9) & 0x7F,
-    dataView.getUint8(aOff+10) & 0x7F,
-    dataView.getUint8(aOff+11) & 0x7F
+    isBriskEncoding ? (dataView.getUint8(aOff+8) & 0x7F) : dataView.getUint8(aOff+8),
+    isBriskEncoding ? (dataView.getUint8(aOff+9) & 0x7F) : dataView.getUint8(aOff+9),
+    isBriskEncoding ? (dataView.getUint8(aOff+10) & 0x7F) : dataView.getUint8(aOff+10),
+    isBriskEncoding ? (dataView.getUint8(aOff+11) & 0x7F) : dataView.getUint8(aOff+11)
   ];
 
   var evs = {
@@ -1957,7 +1967,8 @@ function decodePokemon(rec, isPartySlot){
     spdef: (ivEggAbility >>> 25) & 0x1F
   };
   var isEgg = ((ivEggAbility >>> 30) & 1) === 1;
-  var abilitySlot = (dataView.getUint32(mOff+8, true) >>> 29) & 3;
+  var abilityBits = dataView.getUint32(mOff+8, true);
+  var abilitySlot = isBriskEncoding ? ((abilityBits >>> 29) & 3) : ((ivEggAbility >>> 31) & 1);
 
   var levelMet = originsInfo & 0x7F;
   var gameOfOrigin = (originsInfo >>> 7) & 0x0F;
@@ -1965,11 +1976,11 @@ function decodePokemon(rec, isPartySlot){
   var otGender = (originsInfo >>> 15) & 1;
 
   var nature = NATURES[personality % 25];
-  // Brisk Emerald stores an override bit alongside HP lost.
-  // The shiny result is the normal PID/Trainer ID check XOR that override.
   var shinyValue = (personality & 0xFFFF) ^ (personality >>> 16) ^ (otId & 0xFFFF) ^ (otId >>> 16);
-  var shinyModifier = (u16(view, 0x1E) >>> 14) & 1;
-  var isShiny = (shinyValue < GAME_SHINY_ODDS) !== (shinyModifier === 1);
+  var shinyModifier = isBriskEncoding ? ((u16(view, 0x1E) >>> 14) & 1) : 0;
+  var isShiny = isBriskEncoding
+    ? ((shinyValue < GAME_SHINY_ODDS) !== (shinyModifier === 1))
+    : (shinyValue < 8);
 
   var mon = {
     empty:false,
@@ -1977,7 +1988,7 @@ function decodePokemon(rec, isPartySlot){
     personality: personality, otId: otId,
     nickname: nickname, otName: otName, otGender: otGender === 1 ? "Female":"Male",
     language: language, markings: markings,
-    species: species, teraType: teraType, heldItem: heldItem, experience: experience,
+    species: species, rawSpecies: rawSpecies, teraType: teraType, heldItem: heldItem, experience: experience,
     friendship: friendship, moves: moves, pp: pp, ppBonuses: ppBonuses,
     evs: evs, ivs: ivs, isEgg: isEgg, abilitySlot: abilitySlot,
     nature: nature, isShiny: isShiny,
@@ -3103,7 +3114,8 @@ function renderTrainerCard(save){
     statBlock('Money', formatMoney(save.money)),
     statBlock('Play Time', formatPlaytime(t)),
     statBlock('Party', save.party.length + ' / 6'),
-    statBlock('Boxed', countBoxed(save) + ' / 420')
+    statBlock('Boxed', countBoxed(save) + ' / ' + (save.boxes.length * BOX_SLOTS)),
+    statBlock('Profile', save.profileName || 'Pokémon Emerald')
   ]);
   c.appendChild(idBlock);
   c.appendChild(stats);
@@ -3579,7 +3591,7 @@ function renderAll(){
   renderBag();
   renderTrainerCard(currentSave);
   renderParty(currentSave);
-  activeBoxIndex = Math.min(activeBoxIndex, 13);
+  activeBoxIndex = Math.min(activeBoxIndex, Math.max(0,currentSave.boxes.length-1));
   renderBoxTabs(currentSave);
   renderBoxGrid(currentSave);
   renderStoragePanel();
