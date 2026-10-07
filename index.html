@@ -5975,7 +5975,7 @@ function renderOnlineBattle(){
       loadProfile.addEventListener('click',async function(){try{await refreshBattleProfile(true);renderOnlineBattle();}catch(err){showError('Battle profile: '+err.message);}});progressionCard.appendChild(loadProfile);
     }else{
       var p=ONLINE_STATE.profile,stats=el('div',{class:'battle-profile-stats'});
-      [['Wins',p.wins],['Lifetime Wins',p.lifetimeWins],['Rating',p.rating],['Ranked',p.rankedWins+'–'+p.rankedLosses]].forEach(function(row){var box=el('div',{class:'battle-profile-stat'});box.appendChild(el('span',{text:row[0]}));box.appendChild(el('strong',{text:String(row[1])}));stats.appendChild(box);});
+      [['Wins',p.wins],['Win Streak',p.winStreak||0],['Best Streak',p.bestWinStreak||0],['Lifetime Wins',p.lifetimeWins],['Rating',p.rating],['Ranked',p.rankedWins+'–'+p.rankedLosses]].forEach(function(row){var box=el('div',{class:'battle-profile-stat'});box.appendChild(el('span',{text:row[0]}));box.appendChild(el('strong',{text:String(row[1])}));stats.appendChild(box);});
       progressionCard.appendChild(stats);
       var ranked=el('div',{class:'ranked-panel'});ranked.appendChild(el('h5',{text:'Ranked 6v6'}));
       if(ONLINE_STATE.rankedTicket){
@@ -6224,6 +6224,9 @@ function renderOnlineBattle(){
     if(room.rules&&room.rules.ranked&&room.ratingChanges){
       var delta=Number(room.ratingChanges[ONLINE_STATE.playerIndex]||0);
       result.appendChild(el('div',{class:'ranked-rating-change',text:'Ranked rating '+(delta>=0?'+':'')+delta}));
+    }
+    if(won&&room.winAward&&room.winAward.winnerIndex===ONLINE_STATE.playerIndex){
+      result.appendChild(el('div',{class:'ranked-rating-change',text:'+'+room.winAward.amount+' Wins · '+room.winAward.streak+' win streak'}));
     }
     if(won&&room.reward){
       result.appendChild(makeIconEl({species:room.reward.species,isShiny:false},'encounter-icon'));
