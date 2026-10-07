@@ -2,6 +2,7 @@ const http = require('http');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 let BRISK_DATA={moveDetails:{},moves:{},movePP:{}};
 let BRISK_TRAINERS={trainers:[]};
@@ -17,6 +18,72 @@ const wonderBoxDeposits = new Map();
 const gtsListings = new Map();
 const gtsCompleted = new Map();
 const linkTradeRooms = new Map();
+const rankedQueue = [];
+const rankedTickets = new Map();
+
+const SHOP_CATALOG=[
+  {id:'title_ace',kind:'title',name:'Ace Trainer',price:3,value:'Ace Trainer'},
+  {id:'title_elite',kind:'title',name:'Elite Battler',price:8,value:'Elite Battler'},
+  {id:'title_champion',kind:'title',name:'Brisk Champion',price:20,value:'Brisk Champion'},
+  {id:'accent_cyan',kind:'accent',name:'Cyan Battle Accent',price:5,value:'cyan'},
+  {id:'accent_gold',kind:'accent',name:'Gold Battle Accent',price:12,value:'gold'},
+  {id:'arena_cave',kind:'arena',name:'Cave Arena',price:8,value:'cave'},
+  {id:'arena_sky',kind:'arena',name:'Sky Arena',price:15,value:'sky'}
+];
+const PROFILE_DIR=process.env.BRISK_BATTLE_PROFILE_DIR||path.join(os.homedir(),'.brisk-dex');
+const PROFILE_PATH=path.join(PROFILE_DIR,'battle-profiles.json');
+let PROFILE_DB={profiles:{}};
+try{
+  fs.mkdirSync(PROFILE_DIR,{recursive:true});
+  if(fs.existsSync(PROFILE_PATH))PROFILE_DB=JSON.parse(fs.readFileSync(PROFILE_PATH,'utf8'));
+  if(!PROFILE_DB||typeof PROFILE_DB!=='object'||!PROFILE_DB.profiles)PROFILE_DB={profiles:{}};
+}catch(err){console.warn('Battle profiles could not be loaded:',err.message);PROFILE_DB={profiles:{}};}
+function saveProfiles(){
+  try{fs.mkdirSync(PROFILE_DIR,{recursive:true});fs.writeFileSync(PROFILE_PATH,JSON.stringify(PROFILE_DB,null,2));}
+  catch(err){console.warn('Battle profiles could not be saved:',err.message);}
+}
+function profileKeyForToken(token){
+  token=cleanText(token,160);if(!token)return '';
+  return crypto.createHash('sha256').update(token).digest('hex').slice(0,32);
+}
+function ensureProfile(token,name){
+  const key=profileKeyForToken(token);if(!key)return null;
+  let p=PROFILE_DB.profiles[key];
+  if(!p)p=PROFILE_DB.profiles[key]={key,name:cleanText(name,24)||'Trainer',wins:0,lifetimeWins:0,rating:1000,rankedWins:0,rankedLosses:0,rankedGames:0,purchases:[],equipped:{title:'',accent:'default',arena:'stadium'},createdAt:Date.now(),updatedAt:Date.now()};
+  if(name)p.name=cleanText(name,24)||p.name;
+  p.wins=Math.max(0,Number(p.wins)||0);p.lifetimeWins=Math.max(0,Number(p.lifetimeWins)||0);p.rating=Math.max(100,Math.round(Number(p.rating)||1000));
+  p.rankedWins=Math.max(0,Number(p.rankedWins)||0);p.rankedLosses=Math.max(0,Number(p.rankedLosses)||0);p.rankedGames=Math.max(0,Number(p.rankedGames)||0);
+  if(!Array.isArray(p.purchases))p.purchases=[];if(!p.equipped)p.equipped={title:'',accent:'default',arena:'stadium'};
+  p.updatedAt=Date.now();return p;
+}
+function publicProfile(p){
+  if(!p)return null;
+  return {name:p.name,wins:p.wins,lifetimeWins:p.lifetimeWins,rating:p.rating,rankedWins:p.rankedWins,rankedLosses:p.rankedLosses,rankedGames:p.rankedGames,purchases:p.purchases.slice(),equipped:Object.assign({},p.equipped)};
+}
+function shopItem(id){return SHOP_CATALOG.find(x=>x.id===id)||null;}
+function ratingDelta(winnerRating,loserRating){
+  const expected=1/(1+Math.pow(10,(loserRating-winnerRating)/400));
+  return Math.max(8,Math.round(32*(1-expected)));
+}
+function recordCompletedWin(room,winnerIndex){
+  if(room._resultRecorded||winnerIndex<0||winnerIndex>=room.players.length)return;
+  room._resultRecorded=true;
+  const winner=room.players[winnerIndex],loser=room.players[other(winnerIndex)];
+  const wp=winner&&!winner.isBot&&winner.profileKey?PROFILE_DB.profiles[winner.profileKey]:null;
+  const lp=loser&&!loser.isBot&&loser.profileKey?PROFILE_DB.profiles[loser.profileKey]:null;
+  if(wp){wp.wins=(Number(wp.wins)||0)+1;wp.lifetimeWins=(Number(wp.lifetimeWins)||0)+1;wp.updatedAt=Date.now();}
+  if(room.rules&&room.rules.ranked&&wp&&lp){
+    const wr=Number(wp.rating)||1000,lr=Number(lp.rating)||1000,delta=ratingDelta(wr,lr);
+    wp.rating=wr+delta;lp.rating=Math.max(100,lr-delta);
+    wp.rankedWins=(Number(wp.rankedWins)||0)+1;wp.rankedGames=(Number(wp.rankedGames)||0)+1;
+    lp.rankedLosses=(Number(lp.rankedLosses)||0)+1;lp.rankedGames=(Number(lp.rankedGames)||0)+1;
+    wp.updatedAt=lp.updatedAt=Date.now();
+    room.ratingChanges=[winnerIndex===0?delta:-delta,winnerIndex===1?delta:-delta];
+  }
+  if(wp||lp)saveProfiles();
+  room.profileUpdates=room.players.map(p=>p.profileKey?publicProfile(PROFILE_DB.profiles[p.profileKey]):null);
+}
+
 
 function tradePokemon(value){
   const decoded=decodeVerifiedRaw80(value);
@@ -578,8 +645,8 @@ function makeMatchedRoom(mode,a,b){
   const room={code,phase:'battle',turn:0,winner:null,reward:null,kickedIds:[],animationSeq:0,animations:[],createdAt:Date.now(),updatedAt:Date.now(),log:[],weather:null,weatherTurns:0,terrain:null,terrainTurns:0,
     rules:{format,teamSize:6,mystery:true,mysteryMode:mode,noPrize:true,hostByLatency:true},
     players:[
-      {id:better.playerId,name:better.name,trainer:better.trainer,team:cleanTeam(better.team),ready:true,active:0,choice:null,side:{},latency:better.latency,lastSeen:Date.now()},
-      {id:otherEntry.playerId,name:otherEntry.name,trainer:otherEntry.trainer,team:cleanTeam(otherEntry.team),ready:true,active:0,choice:null,side:{},latency:otherEntry.latency,lastSeen:Date.now()}
+      {id:better.playerId,name:better.name,trainer:better.trainer,profileKey:better.profileKey,team:cleanTeam(better.team),ready:true,active:0,choice:null,side:{},latency:better.latency,lastSeen:Date.now()},
+      {id:otherEntry.playerId,name:otherEntry.name,trainer:otherEntry.trainer,profileKey:otherEntry.profileKey,team:cleanTeam(otherEntry.team),ready:true,active:0,choice:null,side:{},latency:otherEntry.latency,lastSeen:Date.now()}
     ]};
   rooms.set(code,room);beginBattle(room);
   [better,otherEntry].forEach((entry,index)=>{const t=matchmakingTickets.get(entry.ticket);if(t){t.status='matched';t.roomCode=code;t.playerId=entry.playerId;t.playerIndex=index;t.hostIndex=0;t.updatedAt=Date.now();}});
@@ -593,6 +660,33 @@ function tryMatchmake(mode){
     makeMatchedRoom(mode,a,b);
   }
   matchmaking.set(mode,q);
+}
+function makeRankedRoom(a,b){
+  const better=a.latency<=b.latency?a:b,otherEntry=better===a?b:a,code=roomCode();
+  const room={code,phase:'battle',turn:0,winner:null,reward:null,kickedIds:[],animationSeq:0,animations:[],createdAt:Date.now(),updatedAt:Date.now(),log:[],weather:null,weatherTurns:0,terrain:null,terrainTurns:0,
+    rules:{format:'singles',teamSize:6,ranked:true,hostByLatency:true},
+    players:[
+      {id:better.playerId,name:better.name,trainer:better.trainer,profileKey:better.profileKey,rating:better.rating,team:better.team,ready:true,active:0,choice:null,side:{},latency:better.latency,lastSeen:Date.now()},
+      {id:otherEntry.playerId,name:otherEntry.name,trainer:otherEntry.trainer,profileKey:otherEntry.profileKey,rating:otherEntry.rating,team:otherEntry.team,ready:true,active:0,choice:null,side:{},latency:otherEntry.latency,lastSeen:Date.now()}
+    ]};
+  rooms.set(code,room);beginBattle(room);
+  [better,otherEntry].forEach((entry,index)=>{const t=rankedTickets.get(entry.ticket);if(t){t.status='matched';t.roomCode=code;t.playerId=entry.playerId;t.playerIndex=index;t.hostIndex=0;t.updatedAt=Date.now();}});
+  return room;
+}
+function tryRankedMatch(){
+  rankedQueue.sort((a,b)=>a.createdAt-b.createdAt);
+  for(let i=0;i<rankedQueue.length;i++){
+    const a=rankedQueue[i];if(!rankedTickets.has(a.ticket))continue;
+    const waited=Math.max(0,(Date.now()-a.createdAt)/1000),range=Math.min(500,100+Math.floor(waited/5)*25);
+    let best=-1,bestDiff=Infinity;
+    for(let j=i+1;j<rankedQueue.length;j++){
+      const b=rankedQueue[j];if(!rankedTickets.has(b.ticket)||a.profileKey===b.profileKey)continue;
+      const diff=Math.abs(a.rating-b.rating);if(diff<=range&&diff<bestDiff){best=j;bestDiff=diff;}
+    }
+    if(best>=0){
+      const b=rankedQueue[best];rankedQueue.splice(best,1);rankedQueue.splice(i,1);makeRankedRoom(a,b);i=-1;
+    }
+  }
 }
 function hasType(mon,type){ return (mon.types||[]).includes(type); }
 function hasAbility(mon,name){ return normalizeName(mon.ability)===normalizeName(name); }
@@ -626,14 +720,14 @@ function publicRoom(room,viewerIndex){
     ? {id:room.reward.id,species:room.reward.species,name:room.reward.name,level:room.reward.level,sourceTrainer:room.reward.sourceTrainer,raw80:room.reward.raw80}
     : null;
   return {
-    code:room.code, phase:room.phase, rules:room.rules, turn:room.turn, winner:room.winner, reward:reward,
+    code:room.code, phase:room.phase, rules:room.rules, turn:room.turn, winner:room.winner, reward:reward, ratingChanges:room.ratingChanges||null, profileUpdates:room.profileUpdates||null,
     weather:room.weather, weatherTurns:room.weatherTurns, terrain:room.terrain, terrainTurns:room.terrainTurns,
     trickRoom:room.trickRoom, trickRoomTurns:room.trickRoomTurns,gravity:room.gravity,gravityTurns:room.gravityTurns,
     magicRoom:room.magicRoom,magicRoomTurns:room.magicRoomTurns,wonderRoom:room.wonderRoom,wonderRoomTurns:room.wonderRoomTurns,
     animationSeq:room.animationSeq||0, animations:(room.animations||[]).slice(-24),
     log:room.log.slice(-100),
     players:room.players.map(p=>({
-      name:p.name,trainer:p.trainer||{gender:'Male',outfitId:1},ready:p.ready,connected:true,active:p.active,active2:Number.isInteger(p.active2)?p.active2:null,latency:p.latency||null,choiceSlots:room.rules&&room.rules.format==='doubles'?[!!(p.choice&&p.choice[0]),!!(p.choice&&p.choice[1])]:null,hasChoice:room.rules&&room.rules.format==='doubles'?doublesActionReady(p):!!p.choice,
+      name:p.name,trainer:p.trainer||{gender:'Male',outfitId:1},rating:p.profileKey&&PROFILE_DB.profiles[p.profileKey]?PROFILE_DB.profiles[p.profileKey].rating:(p.rating||null),title:p.profileKey&&PROFILE_DB.profiles[p.profileKey]?(PROFILE_DB.profiles[p.profileKey].equipped.title||''):'',ready:p.ready,connected:true,active:p.active,active2:Number.isInteger(p.active2)?p.active2:null,latency:p.latency||null,choiceSlots:room.rules&&room.rules.format==='doubles'?[!!(p.choice&&p.choice[0]),!!(p.choice&&p.choice[1])]:null,hasChoice:room.rules&&room.rules.format==='doubles'?doublesActionReady(p):!!p.choice,
       usedMega:p.usedMega,usedGmax:p.usedGmax,usedTera:p.usedTera,
       side:p.side, team:p.team.map(publicMon)
     }))
@@ -938,7 +1032,7 @@ function createBattleReward(room,winnerIndex){
 function finishBattle(room,winnerIndex,message,awardPrize=true){
   if(room.phase==='finished') return;
   room.phase='finished';room.winner=winnerIndex;room.players.forEach(x=>x.choice=null);
-  if(awardPrize!==false)createBattleReward(room,winnerIndex);
+  if(awardPrize!==false){createBattleReward(room,winnerIndex);recordCompletedWin(room,winnerIndex);}
   else room.reward=null;
   if(message)log(room,message);
 }
@@ -1948,6 +2042,8 @@ setInterval(()=>{
   for(const [key,room] of rooms) if(room.updatedAt<cutoff) rooms.delete(key);
   for(const [ticket,state] of matchmakingTickets) if((state.updatedAt||state.createdAt||0)<queueCutoff) matchmakingTickets.delete(ticket);
   for(const [mode,q] of matchmaking) matchmaking.set(mode,q.filter(entry=>matchmakingTickets.has(entry.ticket)));
+  for(let i=rankedQueue.length-1;i>=0;i--)if(!rankedTickets.has(rankedQueue[i].ticket)||(Date.now()-rankedQueue[i].createdAt)>10*60*1000)rankedQueue.splice(i,1);
+  for(const [ticket,state] of rankedTickets)if((state.updatedAt||state.createdAt||0)<queueCutoff)rankedTickets.delete(ticket);
 },15*60*1000).unref();
 
 const server=http.createServer(async (req,res)=>{
@@ -1955,6 +2051,51 @@ const server=http.createServer(async (req,res)=>{
   const url=new URL(req.url,'http://localhost');
   try{
     if(req.method==='GET'&&url.pathname==='/health') return json(res,200,{ok:true,rooms:rooms.size,engine:'advanced-v18'});
+    if(req.method==='GET'&&url.pathname==='/profile'){
+      const token=url.searchParams.get('profileToken'),profile=ensureProfile(token,'');
+      if(!profile)return json(res,400,{error:'Missing player profile token.'});
+      saveProfiles();return json(res,200,{ok:true,profile:publicProfile(profile),shop:SHOP_CATALOG});
+    }
+    if(req.method==='GET'&&url.pathname==='/ranked/leaderboard'){
+      const leaders=Object.values(PROFILE_DB.profiles).filter(p=>(Number(p.rankedGames)||0)>0).sort((a,b)=>(b.rating||1000)-(a.rating||1000)||(b.rankedWins||0)-(a.rankedWins||0)).slice(0,100).map((p,i)=>({rank:i+1,name:p.name,rating:p.rating,rankedWins:p.rankedWins,rankedLosses:p.rankedLosses}));
+      return json(res,200,{ok:true,leaders});
+    }
+    if(req.method==='POST'&&url.pathname==='/shop/purchase'){
+      const body=await readBody(req),profile=ensureProfile(body.profileToken,body.name),item=shopItem(String(body.itemId||''));
+      if(!profile||!item)return json(res,400,{error:'Invalid profile or shop item.'});
+      if(profile.purchases.includes(item.id))return json(res,409,{error:'You already own this shop item.'});
+      if(profile.wins<item.price)return json(res,409,{error:'Not enough Wins.'});
+      profile.wins-=item.price;profile.purchases.push(item.id);profile.updatedAt=Date.now();saveProfiles();
+      return json(res,200,{ok:true,profile:publicProfile(profile)});
+    }
+    if(req.method==='POST'&&url.pathname==='/shop/equip'){
+      const body=await readBody(req),profile=ensureProfile(body.profileToken,body.name),item=shopItem(String(body.itemId||''));
+      if(!profile||!item)return json(res,400,{error:'Invalid profile or shop item.'});
+      if(!profile.purchases.includes(item.id))return json(res,403,{error:'Purchase this item before equipping it.'});
+      profile.equipped[item.kind]=item.value;profile.updatedAt=Date.now();saveProfiles();
+      return json(res,200,{ok:true,profile:publicProfile(profile)});
+    }
+    if(req.method==='POST'&&url.pathname==='/ranked/join'){
+      const body=await readBody(req),verified=cleanVerifiedTeam(body.team),team=verified.team,profile=ensureProfile(body.profileToken,body.name);
+      if(!profile)return json(res,400,{error:'Missing ranked player profile.'});
+      if(verified.errors.length)return json(res,400,{error:'Ranked team rejected: '+verified.errors.join(' ')});
+      if(team.length!==6)return json(res,400,{error:'Ranked requires exactly 6 verified Pokémon.'});
+      if(rankedQueue.some(x=>x.profileKey===profile.key))return json(res,409,{error:'You are already in the Ranked queue.'});
+      const ticket=id(),playerId=id(),entry={ticket,playerId,profileKey:profile.key,rating:profile.rating,name:cleanText(body.name,24)||profile.name,trainer:cleanTrainerAppearance(body.trainer),team,latency:cleanLatency(body.latency),createdAt:Date.now()};
+      rankedTickets.set(ticket,{ticket,status:'searching',playerId,createdAt:Date.now(),updatedAt:Date.now(),rating:profile.rating});rankedQueue.push(entry);tryRankedMatch();
+      return json(res,200,rankedTickets.get(ticket));
+    }
+    if(req.method==='GET'&&url.pathname==='/ranked/status'){
+      const ticket=url.searchParams.get('ticket'),state=rankedTickets.get(ticket);if(!state)return json(res,404,{error:'Ranked ticket expired.'});
+      tryRankedMatch();
+      if(state.status==='matched'){const room=rooms.get(state.roomCode);if(!room)return json(res,404,{error:'Ranked room expired.'});return json(res,200,Object.assign({},state,{room:publicRoom(room,state.playerIndex)}));}
+      return json(res,200,state);
+    }
+    if(req.method==='POST'&&url.pathname==='/ranked/cancel'){
+      const body=await readBody(req),state=rankedTickets.get(body.ticket);
+      if(state&&state.status==='searching'){const idx=rankedQueue.findIndex(x=>x.ticket===body.ticket);if(idx>=0)rankedQueue.splice(idx,1);state.status='cancelled';state.updatedAt=Date.now();}
+      return json(res,200,{ok:true});
+    }
     if(req.method==='POST'&&url.pathname==='/bot-battle'){
       const body=await readBody(req),verified=cleanVerifiedTeam(body.team),team=verified.team;
       if(verified.errors.length)return json(res,400,{error:'Bot battle team rejected: '+verified.errors.join(' ')});
@@ -1967,7 +2108,7 @@ const server=http.createServer(async (req,res)=>{
       const room={code,phase:'battle',turn:0,winner:null,reward:null,kickedIds:[],animationSeq:0,animations:[],createdAt:Date.now(),updatedAt:Date.now(),log:[],weather:null,weatherTurns:0,terrain:null,terrainTurns:0,
         rules:{format:'singles',teamSize:Math.max(team.length,built.team.length),botBattle:true,botDifficulty:difficulty,botSource:source,botTrainer:built.name,botTrainerConstant:built.constant,noPrize:true},
         players:[
-          {id:playerId,name:cleanText(body.name,24)||'Trainer',trainer:cleanTrainerAppearance(body.trainer),team,ready:true,active:0,choice:null,side:{},lastSeen:Date.now()},
+          {id:playerId,name:cleanText(body.name,24)||'Trainer',trainer:cleanTrainerAppearance(body.trainer),profileKey:(ensureProfile(body.profileToken,body.name)||{}).key||'',team,ready:true,active:0,choice:null,side:{},lastSeen:Date.now()},
           {id:'bot-'+id(),name:built.name,trainer:{gender:'Male',outfitId:1},team:built.team,ready:true,active:0,choice:null,side:{},lastSeen:Date.now(),isBot:true,botDifficulty:difficulty}
         ]};
       rooms.set(code,room);beginBattle(room);
@@ -1976,7 +2117,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==='POST'&&url.pathname==='/matchmaking/join'){
       const body=await readBody(req),mode=mysteryKey(body.mode);if(!mode)return json(res,400,{error:'Invalid Mystery Battle mode.'});
       const team=cleanTeam(body.team);if(team.length!==6)return json(res,400,{error:'Mystery Battles require exactly 6 Pokémon.'});
-      const ticket=id(),playerId=id(),entry={ticket,playerId,mode,name:cleanText(body.name,24)||'Trainer',trainer:cleanTrainerAppearance(body.trainer),team,latency:cleanLatency(body.latency),createdAt:Date.now()};
+      const profile=ensureProfile(body.profileToken,body.name),ticket=id(),playerId=id(),entry={ticket,playerId,mode,profileKey:profile&&profile.key||'',name:cleanText(body.name,24)||'Trainer',trainer:cleanTrainerAppearance(body.trainer),team,latency:cleanLatency(body.latency),createdAt:Date.now()};
       matchmakingTickets.set(ticket,{ticket,status:'searching',mode,playerId,createdAt:Date.now(),updatedAt:Date.now()});
       const q=matchmaking.get(mode)||[];q.push(entry);matchmaking.set(mode,q);tryMatchmake(mode);
       return json(res,200,matchmakingTickets.get(ticket));
@@ -2012,7 +2153,7 @@ const server=http.createServer(async (req,res)=>{
       if(!team.length) return json(res,400,{error:'Choose at least one verified Pokémon for competitive play.'});
       const room={code,phase:'lobby',turn:0,winner:null,reward:null,kickedIds:[],animationSeq:0,animations:[],createdAt:Date.now(),updatedAt:Date.now(),log:[],weather:null,weatherTurns:0,terrain:null,terrainTurns:0,
         rules:{format:'singles',teamSize:Math.max(1,Math.min(6,Number(body.rules&&body.rules.teamSize)||6))},
-        players:[{id:playerId,name:cleanText(body.name,24)||'Host',trainer:cleanTrainerAppearance(body.trainer),team,ready:false,active:0,choice:null,side:{},lastSeen:Date.now()}]};
+        players:[{id:playerId,name:cleanText(body.name,24)||'Host',trainer:cleanTrainerAppearance(body.trainer),profileKey:(ensureProfile(body.profileToken,body.name)||{}).key||'',team,ready:false,active:0,choice:null,side:{},lastSeen:Date.now()}]};
       rooms.set(code,room); return json(res,200,{code,playerId,playerIndex:0,room:publicRoom(room,0)});
     }
     if(req.method==='POST'&&url.pathname==='/trades/wonder-box/deposit'){
@@ -2113,7 +2254,7 @@ const server=http.createServer(async (req,res)=>{
       const body=await readBody(req), verified=cleanVerifiedTeam(body.team), team=verified.team;
       if(verified.errors.length) return json(res,400,{error:'Competitive team rejected: '+verified.errors.join(' ')});
       if(!team.length) return json(res,400,{error:'Choose at least one verified Pokémon for competitive play.'});
-      const playerId=id(); room.players.push({id:playerId,name:cleanText(body.name,24)||'Challenger',trainer:cleanTrainerAppearance(body.trainer),team,ready:false,active:0,choice:null,side:{},lastSeen:Date.now()});
+      const playerId=id(); room.players.push({id:playerId,name:cleanText(body.name,24)||'Challenger',trainer:cleanTrainerAppearance(body.trainer),profileKey:(ensureProfile(body.profileToken,body.name)||{}).key||'',team,ready:false,active:0,choice:null,side:{},lastSeen:Date.now()});
       log(room,room.players[1].name+' joined the room.'); return json(res,200,{code:room.code,playerId,playerIndex:1,room:publicRoom(room,1)});
     }
     if(req.method==='POST'&&match[2]==='action'){
