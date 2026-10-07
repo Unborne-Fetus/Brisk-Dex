@@ -854,7 +854,7 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
 /* ---------- Battle readability / spacing polish ---------- */
 .battle-sim-bottom{position:relative;z-index:20}
 .battle-side-panel{justify-content:flex-end;padding-bottom:18px}
-.battle-side-trainer-wrap,.battle-side-panel .battle-trainer-sprite{display:none!important}
+.battle-side-trainer-wrap{display:flex!important}.battle-side-panel .battle-trainer-sprite{display:block!important}.battle-field-trainer{display:none!important}
 
 /* Pull the player's Pokémon farther back so large back sprites stay fully on-screen. */
 .battle-combatant.me{left:4%!important;bottom:3%!important;width:clamp(180px,21vw,270px)!important;height:48%!important}
@@ -930,6 +930,21 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
   .battle-log{font-size:11px!important;max-height:160px!important}
 }
 
+
+/* Team preview + narrow-screen battle fixes */
+.battle-preview{margin-top:12px}.battle-preview h3{margin:0 0 6px}.battle-preview-team{display:grid;gap:8px;margin-top:10px}
+.battle-preview-mon{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:9px;align-items:center;padding:8px;border:1px solid var(--line);background:var(--panel-2);min-width:0}
+.battle-preview-mon.selected{border-color:var(--leaf-bright)}.battle-preview-mon span{min-width:0}.battle-preview-mon strong,.battle-preview-mon small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.battle-preview-mon small{font-size:10px;color:var(--muted)}
+.battle-move-button strong,.battle-move-button small,.battle-command h4{overflow-wrap:normal!important;word-break:normal!important;hyphens:none!important}
+@media(max-width:600px){
+ .battle-side-panel{display:flex!important;width:48px!important;padding:4px 2px 8px!important}.battle-sim-field{margin:0 48px!important}
+ .battle-side-name{font-size:clamp(6px,1.7vw,8px)!important;line-height:1.05!important;word-break:normal!important;overflow-wrap:normal!important;writing-mode:horizontal-tb!important}
+ .battle-side-trainer-wrap{height:62px!important}.battle-side-panel .battle-trainer-sprite{max-width:42px!important;max-height:58px!important}
+ .battle-side-team{grid-template-columns:repeat(2,10px)!important;gap:3px!important}.battle-side-ball{width:8px!important;height:8px!important}
+ .battle-move-button strong{font-size:clamp(9px,2.8vw,12px)!important;white-space:nowrap!important;text-overflow:ellipsis!important;overflow:hidden!important}
+ .battle-move-button small{font-size:clamp(7px,2.2vw,10px)!important;white-space:nowrap!important;text-overflow:ellipsis!important;overflow:hidden!important}
+}
+@media(max-width:390px){.battle-move-grid,.battle-switch-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.battle-side-panel{width:42px!important}.battle-sim-field{margin:0 42px!important}.battle-preview-mon{grid-template-columns:34px minmax(0,1fr)}.battle-preview-mon button{grid-column:1/-1}}
 </style>
 </head>
 <body>
@@ -6081,6 +6096,26 @@ function renderOnlineBattle(){
     lobby.appendChild(b);root.appendChild(lobby);return;
   }
   if(!me||!foe)return;
+  if(room.phase==='preview'){
+    var preview=el('div',{class:'battle-preview'});
+    preview.appendChild(el('h3',{text:'Team Preview · Choose your lead'}));
+    preview.appendChild(el('p',{class:'online-status',text:'Matchmaking succeeded. Both full teams are visible. Choose your lead before the battle starts.'}));
+    var cols=el('div',{class:'online-shell'});
+    function previewTeam(player,isMe){
+      var card=el('section',{class:'online-card'});card.appendChild(el('h4',{text:(isMe?'Your team · ':'Opponent · ')+player.name}));
+      var grid=el('div',{class:'battle-preview-team'});
+      (player.team||[]).forEach(function(mon,index){
+        var row=el('div',{class:'battle-preview-mon'+(isMe&&player.leadSelected===index?' selected':'')});
+        row.appendChild(makeIconEl({species:mon.species,isShiny:false},'encounter-icon'));
+        var info=el('span');info.appendChild(el('strong',{text:mon.name}));info.appendChild(el('small',{text:'Lv'+mon.level+' · '+(mon.types||[]).join(' / ')}));row.appendChild(info);
+        if(isMe){var choose=el('button',{class:player.leadSelected===index?'primary':'ghost',text:player.leadSelected===index?'Lead selected':'Choose lead'});choose.disabled=!!player.previewReady;choose.addEventListener('click',function(){battleAction('lead',{slot:index});});row.appendChild(choose);}
+        grid.appendChild(row);
+      });card.appendChild(grid);
+      if(isMe){card.appendChild(el('div',{class:'online-status',text:player.previewReady?'Lead locked · waiting for opponent.':'Your opponent can see your full team too.'}));}
+      return card;
+    }
+    cols.appendChild(previewTeam(me,true));cols.appendChild(previewTeam(foe,false));preview.appendChild(cols);root.appendChild(preview);return;
+  }
   function battleSpriteFor(mon,isMe){
     var species=NAME_DATA.species[String(mon.species)]||{};
     return isMe?(species.backSprite||species.frontSprite||SPECIES_ICONS[String(mon.species)]||null):(species.frontSprite||SPECIES_ICONS[String(mon.species)]||null);
@@ -6131,6 +6166,7 @@ function renderOnlineBattle(){
   function battleSidePanel(player,sideName){
     var panel=el('div',{class:'battle-side-panel '+sideName});
     panel.appendChild(el('div',{class:'battle-side-name',text:player.name+(player.title?' · '+player.title:'')+(player.rating?' · '+player.rating:'')}));
+    var trainerWrap=el('div',{class:'battle-side-trainer-wrap'});trainerWrap.appendChild(onlineTrainerImage(player,'battle-trainer-sprite'));panel.appendChild(trainerWrap);
     var team=el('div',{class:'battle-side-team'});
     (player.team||[]).forEach(function(mon,index){team.appendChild(el('span',{class:'battle-side-ball'+(mon.hp<=0?' fainted':'')+((index===player.active||index===player.active2)?' active':''),title:mon.name}));});
     panel.appendChild(team);return panel;
@@ -6149,8 +6185,6 @@ function renderOnlineBattle(){
   else if(equippedProfile.accent==='cyan')sim.style.setProperty('--battle-accent','#19d9d2');
   scene.appendChild(el('div',{class:'battle-turn-badge',text:'Turn '+room.turn}));
   scene.appendChild(el('div',{class:'battle-platform foe'}));scene.appendChild(el('div',{class:'battle-platform me'}));
-  var myFieldTrainer=onlineTrainerImage(me,'battle-field-trainer me battle-trainer-enter-me'),foeFieldTrainer=onlineTrainerImage(foe,'battle-field-trainer foe battle-trainer-enter-foe');
-  scene.appendChild(myFieldTrainer);scene.appendChild(foeFieldTrainer);
   scene.appendChild(combatant(foe.team[foe.active],false,0));scene.appendChild(combatant(me.team[me.active],true,0));
   scene.appendChild(battleHud(foe,false,0));scene.appendChild(battleHud(me,true,0));
   if(isDoubles&&meSecondary&&foeSecondary){
