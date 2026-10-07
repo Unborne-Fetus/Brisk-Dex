@@ -2360,8 +2360,65 @@ var ONLINE_STATE = {
   room: null, polling: null, busy: false, gimmickChoice:null, selectedTeamKeys:[], teamSearch:'', teamSource:'all',
   lanScanning:false, lanScanDone:false, lanRelay:null, lanRooms:[], lanError:'',
   rewardProcessing:false, rewardMessage:'', lastAnimationSeq:0, animationQueue:[], animationPlaying:false,
-  matchmakingTicket:'', matchmakingMode:'', matchmakingTimer:null, matchmakingStartedAt:0, doubleActorPos:0, doubleTargetPos:0
+  matchmakingTicket:'', matchmakingMode:'', matchmakingTimer:null, matchmakingStartedAt:0, doubleActorPos:0, doubleTargetPos:0,
+  profile:null,shop:[],profileLoading:false,rankedTicket:'',rankedTimer:null,rankedStartedAt:0,leaderboard:[]
 };
+function onlineProfileToken(){
+  var token=localStorage.getItem('briskdex_battle_profile_token');
+  if(!token){
+    token=(window.crypto&&window.crypto.randomUUID)?window.crypto.randomUUID():('brisk-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));
+    localStorage.setItem('briskdex_battle_profile_token',token);
+  }
+  return token;
+}
+function onlineProfileName(){return (currentSave&&currentSave.trainer&&currentSave.trainer.name)||'Trainer';}
+async function refreshBattleProfile(startRelay){
+  if(ONLINE_STATE.profileLoading)return ONLINE_STATE.profile;
+  ONLINE_STATE.profileLoading=true;
+  try{
+    if(startRelay!==false)await ensureMysteryBattleRelay();
+    var data=await battleRequest('/profile?profileToken='+encodeURIComponent(onlineProfileToken()),{method:'GET'});
+    ONLINE_STATE.profile=data.profile||null;ONLINE_STATE.shop=Array.isArray(data.shop)?data.shop:[];
+    try{var lb=await battleRequest('/ranked/leaderboard',{method:'GET'});ONLINE_STATE.leaderboard=Array.isArray(lb.leaders)?lb.leaders:[];}catch(e){}
+    return ONLINE_STATE.profile;
+  }finally{ONLINE_STATE.profileLoading=false;}
+}
+async function purchaseWinShopItem(itemId){
+  try{await ensureMysteryBattleRelay();var data=await battleRequest('/shop/purchase',{method:'POST',body:JSON.stringify({profileToken:onlineProfileToken(),name:onlineProfileName(),itemId:itemId})});ONLINE_STATE.profile=data.profile;showNotice('Shop purchase complete.');renderOnlineBattle();}
+  catch(err){showError('Wins Shop: '+err.message);}
+}
+async function equipWinShopItem(itemId){
+  try{var data=await battleRequest('/shop/equip',{method:'POST',body:JSON.stringify({profileToken:onlineProfileToken(),name:onlineProfileName(),itemId:itemId})});ONLINE_STATE.profile=data.profile;showNotice('Cosmetic equipped.');renderOnlineBattle();}
+  catch(err){showError('Wins Shop: '+err.message);}
+}
+function stopRankedPolling(){if(ONLINE_STATE.rankedTimer){clearInterval(ONLINE_STATE.rankedTimer);ONLINE_STATE.rankedTimer=null;}}
+async function cancelRankedBattle(){
+  var ticket=ONLINE_STATE.rankedTicket;stopRankedPolling();
+  if(ticket){try{await battleRequest('/ranked/cancel',{method:'POST',body:JSON.stringify({ticket:ticket})});}catch(e){}}
+  ONLINE_STATE.rankedTicket='';ONLINE_STATE.rankedStartedAt=0;renderOnlineBattle();
+}
+async function startRankedBattle(){
+  if(ONLINE_STATE.busy||ONLINE_STATE.rankedTicket)return;
+  var team=battlePartySnapshot();if(team.length!==6){showError('Ranked Singles requires exactly 6 Pokémon.');return;}
+  ONLINE_STATE.busy=true;
+  try{
+    await ensureMysteryBattleRelay();await refreshBattleProfile(false);
+    var latency=await measureBattleLatency();if(latency>=9999)throw new Error('The relay stopped responding during the latency check.');
+    var data=await battleRequest('/ranked/join',{method:'POST',body:JSON.stringify({profileToken:onlineProfileToken(),name:onlineProfileName(),trainer:onlineTrainerAppearance(),team:team,latency:latency})});
+    ONLINE_STATE.rankedTicket=data.ticket;ONLINE_STATE.rankedStartedAt=Date.now();
+    function checkRanked(){
+      if(!ONLINE_STATE.rankedTicket)return;
+      battleRequest('/ranked/status?ticket='+encodeURIComponent(ONLINE_STATE.rankedTicket),{method:'GET'}).then(function(state){
+        if(state.status==='matched'&&state.room){
+          stopRankedPolling();ONLINE_STATE.roomCode=state.roomCode;ONLINE_STATE.playerId=state.playerId;ONLINE_STATE.playerIndex=state.playerIndex;ONLINE_STATE.room=state.room;
+          ONLINE_STATE.rankedTicket='';ONLINE_STATE.lastAnimationSeq=Number(state.room.animationSeq||0);persistOnlineSession();startBattlePolling();renderOnlineBattle();showNotice('Ranked match found.');
+        }else renderOnlineBattle();
+      }).catch(function(err){stopRankedPolling();ONLINE_STATE.rankedTicket='';showError('Ranked matchmaking failed: '+err.message);renderOnlineBattle();});
+    }
+    checkRanked();ONLINE_STATE.rankedTimer=setInterval(checkRanked,900);renderOnlineBattle();
+  }catch(err){showError('Could not enter Ranked matchmaking: '+err.message);}
+  finally{ONLINE_STATE.busy=false;}
+}
 function persistOnlineSession(){
   if(ONLINE_STATE.roomCode&&ONLINE_STATE.playerId){
     sessionStorage.setItem('briskdex_room_code',ONLINE_STATE.roomCode);
@@ -5425,7 +5482,7 @@ async function startBotBattle(){
     var source=document.getElementById('bot-battle-source').value;
     var difficulty=document.getElementById('bot-battle-difficulty').value;
     var name=(currentSave&&currentSave.trainer&&currentSave.trainer.name)||'Trainer';
-    var data=await battleRequest('/bot-battle',{method:'POST',body:JSON.stringify({source:source,difficulty:difficulty,name:name,trainer:onlineTrainerAppearance(),team:team})});
+    var data=await battleRequest('/bot-battle',{method:'POST',body:JSON.stringify({source:source,difficulty:difficulty,name:name,profileToken:onlineProfileToken(),trainer:onlineTrainerAppearance(),team:team})});
     ONLINE_STATE.roomCode=data.code;ONLINE_STATE.playerId=data.playerId;ONLINE_STATE.playerIndex=0;ONLINE_STATE.room=data.room;
     ONLINE_STATE.lastAnimationSeq=Number(data.room&&data.room.animationSeq||0);
     ONLINE_STATE.doubleActorPos=0;ONLINE_STATE.doubleTargetPos=0;
@@ -5450,7 +5507,7 @@ async function startMysteryBattle(mode){
     var latency=await measureBattleLatency();
     if(latency>=9999)throw new Error('The battle relay stopped responding during the latency check.');
     var name=(currentSave&&currentSave.trainer&&currentSave.trainer.name)||'Trainer';
-    var data=await battleRequest('/matchmaking/join',{method:'POST',body:JSON.stringify({mode:mode,name:name,trainer:onlineTrainerAppearance(),team:team,latency:latency})});
+    var data=await battleRequest('/matchmaking/join',{method:'POST',body:JSON.stringify({mode:mode,name:name,profileToken:onlineProfileToken(),trainer:onlineTrainerAppearance(),team:team,latency:latency})});
     battleConnectionStatus('Searching for a Mystery Battle opponent…');
     ONLINE_STATE.matchmakingTicket=data.ticket;ONLINE_STATE.matchmakingMode=mode;ONLINE_STATE.matchmakingStartedAt=Date.now();
     function checkMatch(){
@@ -5562,7 +5619,11 @@ function startBattlePolling(){
     try{
       var data=await battleRequest('/rooms/'+ONLINE_STATE.roomCode+'?playerId='+encodeURIComponent(ONLINE_STATE.playerId),{method:'GET'});
       ONLINE_STATE.room=data.room; ONLINE_STATE.playerIndex=data.playerIndex;
-      if(data.room.phase==='finished'){await receiveOnlineBattleReward(data.room);stopBattlePolling();}
+      if(data.room.phase==='finished'){
+        await receiveOnlineBattleReward(data.room);
+        if(data.room.profileUpdates&&data.room.profileUpdates[data.playerIndex])ONLINE_STATE.profile=data.room.profileUpdates[data.playerIndex];
+        stopBattlePolling();try{await refreshBattleProfile(false);}catch(e){}
+      }
       renderOnlineBattle();enqueueBattleAnimations(data.room);
     }catch(err){
       if(/removed from the room by the host/i.test(err.message||'')){
@@ -5596,7 +5657,7 @@ async function hostOnlineBattle(){
     }
     var data=await battleRequest('/rooms',{method:'POST',body:JSON.stringify({
       name:(name&&name.value.trim())||(currentSave&&currentSave.trainer&&currentSave.trainer.name)||'Host',
-      trainer:onlineTrainerAppearance(),team:team,rules:{format:'singles',teamSize:Math.min(6,team.length)}
+      profileToken:onlineProfileToken(),trainer:onlineTrainerAppearance(),team:team,rules:{format:'singles',teamSize:Math.min(6,team.length)}
     })});
     ONLINE_STATE.roomCode=data.code;ONLINE_STATE.playerId=data.playerId;ONLINE_STATE.playerIndex=data.playerIndex;ONLINE_STATE.room=data.room;ONLINE_STATE.lastAnimationSeq=Number(data.room&&data.room.animationSeq||0);persistOnlineSession();
     startBattlePolling();renderOnlineBattle();
@@ -5615,7 +5676,7 @@ async function joinOnlineBattle(){
   ONLINE_STATE.busy=true;
   try{
     var data=await battleRequest('/rooms/'+roomCode+'/join',{method:'POST',body:JSON.stringify({
-      name:(name&&name.value.trim())||(currentSave&&currentSave.trainer&&currentSave.trainer.name)||'Challenger',trainer:onlineTrainerAppearance(),team:team
+      name:(name&&name.value.trim())||(currentSave&&currentSave.trainer&&currentSave.trainer.name)||'Challenger',profileToken:onlineProfileToken(),trainer:onlineTrainerAppearance(),team:team
     })});
     ONLINE_STATE.roomCode=data.code;ONLINE_STATE.playerId=data.playerId;ONLINE_STATE.playerIndex=data.playerIndex;ONLINE_STATE.room=data.room;ONLINE_STATE.lastAnimationSeq=Number(data.room&&data.room.animationSeq||0);persistOnlineSession();
     startBattlePolling();renderOnlineBattle();
@@ -5629,7 +5690,11 @@ async function battleAction(type,payload){
     var body=Object.assign({playerId:ONLINE_STATE.playerId,type:type},payload||{});
     var data=await battleRequest('/rooms/'+ONLINE_STATE.roomCode+'/action',{method:'POST',body:JSON.stringify(body)});
     ONLINE_STATE.room=data.room;ONLINE_STATE.playerIndex=data.playerIndex;
-    if(data.room.phase==='finished')await receiveOnlineBattleReward(data.room);
+    if(data.room.phase==='finished'){
+      await receiveOnlineBattleReward(data.room);
+      if(data.room.profileUpdates&&data.room.profileUpdates[data.playerIndex])ONLINE_STATE.profile=data.room.profileUpdates[data.playerIndex];
+      try{await refreshBattleProfile(false);}catch(e){}
+    }
     renderOnlineBattle();enqueueBattleAnimations(data.room);
   }catch(err){showError('Battle action failed: '+err.message);}
   finally{ONLINE_STATE.busy=false;}
@@ -5638,7 +5703,7 @@ async function leaveOnlineBattle(){
   if(onlineBattleIsLive()){
     try{await battleAction('forfeit',{reason:'left_room'});}catch(e){}
   }
-  stopBattlePolling();stopMysteryPolling();
+  stopBattlePolling();stopMysteryPolling();stopRankedPolling();
   ONLINE_STATE.roomCode='';ONLINE_STATE.playerId='';ONLINE_STATE.playerIndex=-1;ONLINE_STATE.room=null;ONLINE_STATE.gimmickChoice=null;ONLINE_STATE.rewardMessage='';ONLINE_STATE.lastAnimationSeq=0;ONLINE_STATE.animationQueue=[];ONLINE_STATE.animationPlaying=false;persistOnlineSession();
   renderOnlineBattle();
 }
