@@ -752,7 +752,13 @@ function beginBattle(room){
     p.team.forEach(mon=>{ mon.hp=mon.maxHP; mon.status=null; mon.choiceLock=null;mon.lastMoveIndex=null;mon.transformed=false;mon.transformedKind=null;mon.originalTypes=null; mon.statusTurns=0; mon.toxicCounter=0; mon.stages={atk:0,def:0,spa:0,spd:0,spe:0,acc:0,eva:0}; mon.volatile={protect:false,protectCounter:0,flinch:false,confusion:0,seeded:false,taunt:0,encore:0,encoreMove:null,substitute:0,
       disabledMove:null,disableTurns:0,torment:false,trapped:false,recharge:false,charging:null,destinyBond:false,perish:0,yawn:0,
       aquaRing:false,ingrain:false,healBlock:0,saltCure:false,rageFistHits:0,lastDamageTaken:0,lastDamagedTurn:0,noRetreat:false,focusEnergy:0,lockOn:false,magnetRise:0,tarShot:false,octolock:false,recycledItem:'',actedTurn:0,statsLoweredTurn:0,smackedDown:false,endure:false,laserFocus:0,nightmare:false,infatuated:false,stockpile:0,rollout:0,uproar:0,throatChop:0,grudge:false,embargo:0,telekinesis:0,switchInTurn:0,beakBlast:false,magicCoat:false,imprison:false,usedMoves:[],lastDamageCategory:null,bideTurns:0,bideDamage:0,identified:false,miracleEye:false,snatch:false,skyDrop:false,glaiveRush:0}; });
-    p.active=Math.max(0,p.team.findIndex(mon=>mon.hp>0));
+    // Preserve the lead chosen during post-matchmaking Team Preview.
+    // Lobby/bot battles that do not use preview still fall back to the first healthy Pokémon.
+    if(!(Number.isInteger(p.leadSelected)&&p.leadSelected>=0&&p.team[p.leadSelected]&&p.team[p.leadSelected].hp>0)){
+      p.active=Math.max(0,p.team.findIndex(mon=>mon.hp>0));
+    }else{
+      p.active=p.leadSelected;
+    }
     if(room.rules&&room.rules.format==='doubles')p.active2=availableBench(p,[p.active]);else p.active2=null;
     p.choice=null;if(active(p))active(p).volatile.switchInTurn=room.turn;if(room.rules&&room.rules.format==='doubles'&&activeAt(p,1))activeAt(p,1).volatile.switchInTurn=room.turn;
   });
