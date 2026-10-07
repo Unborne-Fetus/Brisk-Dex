@@ -355,6 +355,51 @@ input[type=file]{ display:none; }
 @media(max-width:850px){.battle-sim-field{min-height:360px}.battle-combatant.foe{right:3%;top:15%;width:190px;height:180px}.battle-combatant.me{left:2%;width:210px;height:200px}.battle-sprite{max-width:170px;max-height:170px}.battle-hud{width:46%;padding:9px}.battle-hud-name{font-size:13px}.battle-sim-bottom{grid-template-columns:1fr}.battle-log-panel{border-left:0;border-top:1px solid var(--line)}.battle-log{max-height:180px}.battle-switch-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.battle-sim-field{min-height:330px}.battle-hud{width:58%}.battle-hud.foe{left:2%;top:4%}.battle-hud.me{right:2%;bottom:3%}.battle-combatant.foe{right:-5%;top:19%;width:160px;height:150px}.battle-combatant.me{left:-5%;bottom:5%;width:175px;height:170px}.battle-sprite{max-width:145px;max-height:145px}.battle-move-grid{grid-template-columns:1fr}.battle-switch-grid{grid-template-columns:1fr}.battle-field-banner{max-width:75%}}
 
+
+/* ---------- Showdown-inspired battle layout ---------- */
+.battle-sim{border-radius:0;background:#dfe3eb;border-color:#9098a5;box-shadow:none;color:#111}
+.battle-sim-topbar{background:#eff1f5;color:#444;border-bottom:1px solid #9ca4b0;padding:6px 10px}
+.battle-sim-topbar strong{color:#222}
+.battle-sim-field{min-height:460px;margin:0 100px;border-left:1px solid #aeb4bf;border-right:1px solid #aeb4bf;background:
+ linear-gradient(#b8bed1 0 56%,#a4aac0 56% 100%)}
+.battle-sim-field:before{content:"";position:absolute;inset:0;background:
+ radial-gradient(ellipse at 27% 70%,#8f95ab55 0 17%,transparent 18%),
+ radial-gradient(ellipse at 73% 35%,#8f95ab55 0 17%,transparent 18%);height:auto;box-shadow:none}
+.battle-sim:before,.battle-sim:after{content:"";position:absolute}
+.battle-sim{position:relative}
+.battle-sim-field:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,#e9ecf3 0 0)}
+.battle-side-panel{position:absolute;top:34px;bottom:250px;width:100px;background:#e7eaf1;border-color:#aeb4bf;z-index:6;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding:10px 6px;box-sizing:border-box;color:#444}
+.battle-side-panel.left{left:0;border-right:1px solid #aeb4bf}.battle-side-panel.right{right:0;border-left:1px solid #aeb4bf}
+.battle-side-name{font-weight:800;font-size:12px;margin-bottom:8px;text-align:center;word-break:break-word}
+.battle-side-team{display:grid;grid-template-columns:repeat(3,18px);gap:7px;justify-content:center}
+.battle-side-ball{width:13px;height:13px;border-radius:50%;border:1px solid #555;background:linear-gradient(#ef5c5c 0 46%,#222 47% 55%,#f7f7f7 56% 100%);position:relative}
+.battle-side-ball:after{content:"";position:absolute;left:4px;top:4px;width:3px;height:3px;border-radius:50%;background:#fff;border:1px solid #555}
+.battle-side-ball.fainted{filter:grayscale(1);opacity:.4}.battle-side-ball.active{box-shadow:0 0 0 2px #e2b800}
+.battle-turn-badge{position:absolute;z-index:8;left:12px;top:10px;padding:4px 8px;background:#fff7dc;color:#111;border:2px solid #463f2d;border-radius:7px;font-size:15px;font-weight:900}
+.battle-combatant.foe{right:17%;top:8%;width:250px;height:250px}.battle-combatant.me{left:14%;bottom:3%;width:280px;height:270px}
+.battle-sprite{width:190px;height:190px;max-width:none;max-height:none;image-rendering:pixelated;object-fit:contain;filter:drop-shadow(0 7px 4px #0004);animation:none}
+.battle-combatant.me .battle-sprite{width:220px;height:220px;max-width:none;max-height:none}
+.battle-fallback-sprite{width:82px;height:82px;transform:scale(2.2)}
+.battle-platform{display:none}
+.battle-hud{background:transparent;border:0;border-radius:0;box-shadow:none;padding:0;color:#111;width:34%;z-index:7}
+.battle-hud.foe{left:7%;top:22%}.battle-hud.me{right:6%;bottom:26%}
+.battle-hud-row{align-items:end}.battle-hud-name{font-size:14px;text-shadow:0 1px #fff}.battle-hud-level{font-size:11px}
+.battle-hud-hp-row{grid-template-columns:1fr;margin-top:2px}.battle-hud-hp-label{display:none}
+.battle-hud .online-hp{height:9px;border-radius:3px;background:#888;border:1px solid #444;box-shadow:0 1px #fff}
+.battle-hud-hp-text{font-size:9px;margin-top:0}.battle-hud.foe .battle-hud-hp-text{visibility:visible}
+.battle-hud .battle-team-pips{display:none}
+.battle-field-banner{top:40px;max-width:58%}.battle-field-chip{background:#ffffffd8;color:#333;border-color:#777;font-size:8px}
+.battle-sim-bottom{margin-top:0;background:#f1f2f5;grid-template-columns:minmax(0,1.5fr) minmax(250px,.7fr);border-top:1px solid #9da5b1}
+.battle-command{background:#f4f5f7;color:#111;padding:12px}.battle-command h4{color:#111}
+.battle-move-grid{gap:6px}.battle-move-button{min-height:58px;border-radius:5px;border-color:#777;color:#111;background:#dcdcdc!important;text-shadow:none}
+.battle-move-button:before{display:none}.battle-move-button strong{color:#111}.battle-move-button small{color:#333}.battle-move-button .battle-move-pp{color:#222}
+.battle-effect{position:absolute;left:10px;bottom:6px;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.03em;padding:2px 5px;border-radius:3px}
+.effect-super{background:#cfead0;color:#145b1d;border:1px solid #63a66b}.effect-resist{background:#f0dfc7;color:#704b11;border:1px solid #ba8b47}.effect-none{background:#dedede;color:#555;border:1px solid #999}.effect-neutral{background:#e6e8eb;color:#4e5359;border:1px solid #aeb3ba}.effect-status{background:#e5def0;color:#55416e;border:1px solid #9a87b5}
+.battle-switch-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.battle-switch{background:#fff;color:#111;border-color:#b3b8c1}.battle-switch small{color:#555}
+.battle-log-panel{background:#fff;color:#222;border-left:1px solid #aeb4bf}.battle-log-title{background:#e7eaf1;color:#555;border-bottom:1px solid #aeb4bf}.battle-log{background:#fff;color:#222}.battle-log-line{border-bottom-color:#e5e5e5}.battle-log-line:last-child{color:#111}
+@media(max-width:850px){.battle-sim-field{margin:0 72px}.battle-side-panel{width:72px}.battle-side-team{grid-template-columns:repeat(2,18px)}.battle-combatant.foe{right:8%}.battle-combatant.me{left:5%}.battle-hud.foe{left:4%;width:40%}.battle-hud.me{right:4%;width:40%}}
+@media(max-width:600px){.battle-sim-field{margin:0;min-height:390px}.battle-side-panel{display:none}.battle-combatant.foe{right:-1%;top:13%}.battle-combatant.me{left:-4%;bottom:4%}.battle-sprite{width:150px;height:150px}.battle-combatant.me .battle-sprite{width:170px;height:170px}.battle-hud{width:48%}.battle-hud.foe{left:3%;top:20%}.battle-hud.me{right:3%;bottom:24%}.battle-turn-badge{left:8px;top:8px}.battle-sim-bottom{grid-template-columns:1fr}}
+
 /* ---------- Brisk Pokédex ---------- */
 .dex-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
 .dex-tools input,.dex-tools select{min-height:38px;color:var(--text);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:8px 11px;font:inherit;}
@@ -5014,6 +5059,13 @@ function startBattlePolling(){
       if(data.room.phase==='finished'){await receiveOnlineBattleReward(data.room);stopBattlePolling();}
       renderOnlineBattle();
     }catch(err){
+      if(/removed from the room by the host/i.test(err.message||'')){
+        stopBattlePolling();
+        ONLINE_STATE.roomCode='';ONLINE_STATE.playerId='';ONLINE_STATE.playerIndex=-1;ONLINE_STATE.room=null;persistOnlineSession();
+        showNotice('The host removed you from the battle room.');
+        renderOnlineBattle();
+        return;
+      }
       var status=document.getElementById('online-live-status');
       if(status) status.textContent='Connection problem: '+err.message;
     }
@@ -5091,6 +5143,27 @@ function appendOnlineTeam(parent,team){
     row.appendChild(info);row.appendChild(el('span',{text:(mon.moves||[]).length+' moves',class:'dex-muted'}));wrap.appendChild(row);
   });
   parent.appendChild(wrap);
+}
+var BATTLE_TYPE_CHART={
+  Normal:{Rock:.5,Ghost:0,Steel:.5},Fire:{Fire:.5,Water:.5,Grass:2,Ice:2,Bug:2,Rock:.5,Dragon:.5,Steel:2},
+  Water:{Fire:2,Water:.5,Grass:.5,Ground:2,Rock:2,Dragon:.5},Electric:{Water:2,Electric:.5,Grass:.5,Ground:0,Flying:2,Dragon:.5},
+  Grass:{Fire:.5,Water:2,Grass:.5,Poison:.5,Ground:2,Flying:.5,Bug:.5,Rock:2,Dragon:.5,Steel:.5},Ice:{Fire:.5,Water:.5,Grass:2,Ice:.5,Ground:2,Flying:2,Dragon:2,Steel:.5},
+  Fighting:{Normal:2,Ice:2,Poison:.5,Flying:.5,Psychic:.5,Bug:.5,Rock:2,Ghost:0,Dark:2,Steel:2,Fairy:.5},
+  Poison:{Grass:2,Poison:.5,Ground:.5,Rock:.5,Ghost:.5,Steel:0,Fairy:2},Ground:{Fire:2,Electric:2,Grass:.5,Poison:2,Flying:0,Bug:.5,Rock:2,Steel:2},
+  Flying:{Electric:.5,Grass:2,Fighting:2,Bug:2,Rock:.5,Steel:.5},Psychic:{Fighting:2,Poison:2,Psychic:.5,Dark:0,Steel:.5},
+  Bug:{Fire:.5,Grass:2,Fighting:.5,Poison:.5,Flying:.5,Psychic:2,Ghost:.5,Dark:2,Steel:.5,Fairy:.5},
+  Rock:{Fire:2,Ice:2,Fighting:.5,Ground:.5,Flying:2,Bug:2,Steel:.5},Ghost:{Normal:0,Psychic:2,Ghost:2,Dark:.5},
+  Dragon:{Dragon:2,Steel:.5,Fairy:0},Dark:{Fighting:.5,Psychic:2,Ghost:2,Dark:.5,Fairy:.5},
+  Steel:{Fire:.5,Water:.5,Electric:.5,Ice:2,Rock:2,Steel:.5,Fairy:2},Fairy:{Fire:.5,Fighting:2,Poison:.5,Dragon:2,Dark:2,Steel:.5}
+};
+function battleMoveEffectiveness(move,defender){
+  if(!move||move.category==='Status')return {multiplier:null,label:'Status move',className:'effect-status'};
+  var chart=BATTLE_TYPE_CHART[move.type]||{},mult=1;
+  (defender&&defender.types||[]).forEach(function(type){if(chart[type]!==undefined)mult*=chart[type];});
+  if(mult===0)return {multiplier:0,label:'No effect',className:'effect-none'};
+  if(mult>1)return {multiplier:mult,label:'Super effective ×'+mult,className:'effect-super'};
+  if(mult<1)return {multiplier:mult,label:'Not very effective ×'+mult,className:'effect-resist'};
+  return {multiplier:1,label:'Neutral',className:'effect-neutral'};
 }
 function renderOnlineBattle(){
   var root=document.getElementById('online-root');if(!root)return;
@@ -5232,6 +5305,11 @@ function renderOnlineBattle(){
   if(room.phase==='lobby'){
     var ready=el('button',{class:me&&me.ready?'':'primary',text:me&&me.ready?'Not Ready':'Ready'});
     ready.addEventListener('click',function(){battleAction('ready',{ready:!(me&&me.ready)});});topActions.appendChild(ready);
+    if(ONLINE_STATE.playerIndex===0&&foe){
+      var kick=el('button',{class:'ghost',text:'Kick Opponent'});
+      kick.addEventListener('click',function(){if(window.confirm('Remove '+foe.name+' from this room?'))battleAction('kick',{});});
+      topActions.appendChild(kick);
+    }
   }
   var copy=el('button',{class:'ghost',text:'Copy Code'});copy.addEventListener('click',function(){if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(room.code).then(function(){showNotice('Copied room '+room.code+'.');}).catch(function(){});});topActions.appendChild(copy);
   if(room.phase==='battle'){var forfeit=el('button',{class:'ghost',text:'Forfeit'});forfeit.addEventListener('click',function(){if(window.confirm('Forfeit this battle?'))battleAction('forfeit',{});});topActions.appendChild(forfeit);}
@@ -5282,12 +5360,20 @@ function renderOnlineBattle(){
     return wrap;
   }
   var active=me.team[me.active],foeActive=foe.team[foe.active];
+  function battleSidePanel(player,sideName){
+    var panel=el('div',{class:'battle-side-panel '+sideName});
+    panel.appendChild(el('div',{class:'battle-side-name',text:player.name}));
+    var team=el('div',{class:'battle-side-team'});
+    (player.team||[]).forEach(function(mon,index){team.appendChild(el('span',{class:'battle-side-ball'+(mon.hp<=0?' fainted':'')+(index===player.active?' active':''),title:mon.name}));});
+    panel.appendChild(team);return panel;
+  }
   var sim=el('div',{class:'battle-sim'});
   var simTop=el('div',{class:'battle-sim-topbar'});
   simTop.appendChild(el('strong',{text:me.name+' vs '+foe.name}));
   simTop.appendChild(el('span',{text:room.phase==='finished'?'Battle complete':'Turn '+room.turn+' · Singles'}));
   sim.appendChild(simTop);
   var scene=el('div',{class:'battle-sim-field'+battleWeatherClass(room.weather)});
+  scene.appendChild(el('div',{class:'battle-turn-badge',text:'Turn '+room.turn}));
   scene.appendChild(el('div',{class:'battle-platform foe'}));scene.appendChild(el('div',{class:'battle-platform me'}));
   scene.appendChild(combatant(foeActive,false));scene.appendChild(combatant(active,true));
   scene.appendChild(battleHud(foe,false));scene.appendChild(battleHud(me,true));
@@ -5312,7 +5398,7 @@ function renderOnlineBattle(){
     }
     overlay.appendChild(result);scene.appendChild(overlay);
   }
-  sim.appendChild(scene);
+  sim.appendChild(battleSidePanel(me,'left'));sim.appendChild(battleSidePanel(foe,'right'));sim.appendChild(scene);
   var bottom=el('div',{class:'battle-sim-bottom'}),command=el('section',{class:'battle-command'});
   if(room.phase==='battle'){
     command.appendChild(el('h4',{text:me.hasChoice?'Action selected · waiting for opponent':'What will '+active.name+' do?'}));
@@ -5336,6 +5422,8 @@ function renderOnlineBattle(){
       btn.style.background='linear-gradient(135deg,'+(TYPE_COLORS[move.type]||'#4d5551')+',color-mix(in srgb,'+(TYPE_COLORS[move.type]||'#4d5551')+' 58%,#111))';
       btn.appendChild(el('strong',{text:move.name}));
       btn.appendChild(el('small',{text:move.type+' · '+move.category+(move.power?' · Power '+move.power:'')+(move.accuracy?' · Acc '+move.accuracy:'')}));
+      var eff=battleMoveEffectiveness(move,foeActive);
+      btn.appendChild(el('span',{class:'battle-effect '+eff.className,text:eff.label}));
       btn.appendChild(el('span',{class:'battle-move-pp',text:'PP '+move.pp+'/'+move.maxPP}));
       var locked=active.choiceLock!==null&&active.choiceLock!==undefined&&Number(active.choiceLock)!==index;
       var encored=active.volatile&&active.volatile.encore>0&&active.volatile.encoreMove!==null&&active.volatile.encoreMove!==undefined&&Number(active.volatile.encoreMove)!==index;
