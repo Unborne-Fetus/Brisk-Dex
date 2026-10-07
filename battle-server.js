@@ -209,6 +209,7 @@ function battleAnimation(room,attackerIndex,move){
   room.animationSeq=(room.animationSeq||0)+1;
   const event={
     seq:room.animationSeq,turn:room.turn,attacker:attackerIndex,target:other(attackerIndex),
+    actorPos:Number(room._animationActorPos)||0,targetPos:Number(room._animationTargetPos)||0,
     move:{id:Number(move.id)||0,name:move.name,type:move.type,category:move.category,power:Number(move.power)||0,
       flags:Array.isArray(move.flags)?move.flags.slice(0,16):[]},
     hit:true,createdAt:Date.now()
@@ -1464,7 +1465,9 @@ function doublesContext(room,pi,actorPos,targetPos,fn){
   let p0=p.active,p1=p.active2,f0=foe.active,f1=foe.active2;
   const actor=actorPos===1?p1:p0,target=targetPos===1?f1:f0,otherActor=actorPos===1?p0:p1,otherTarget=targetPos===1?f0:f1;
   p.active=actor;p.active2=otherActor;foe.active=target;foe.active2=otherTarget;
+  const prevAnimActor=room._animationActorPos,prevAnimTarget=room._animationTargetPos;room._animationActorPos=actorPos;room._animationTargetPos=targetPos;
   try{fn();}finally{
+    room._animationActorPos=prevAnimActor;room._animationTargetPos=prevAnimTarget;
     const actorAfter=p.active,targetAfter=foe.active;
     if(actorPos===1){p1=actorAfter;p0=p.active2;}else{p0=actorAfter;p1=p.active2;}
     if(targetPos===1){f1=targetAfter;f0=foe.active2;}else{f0=targetAfter;f1=foe.active2;}
