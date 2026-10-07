@@ -470,6 +470,20 @@ input[type=file]{ display:none; }
 }
 @media(max-width:390px){.battle-move-grid,.battle-switch-grid{grid-template-columns:1fr}.battle-sim-field{height:300px}}
 
+
+/* ---------- Full-size battle trainer presentation ---------- */
+.battle-side-trainer-wrap{height:128px;width:100%;overflow:visible}
+.battle-trainer-sprite.trainer-battle-art{width:96px;height:96px;max-width:none;max-height:none;object-fit:contain;image-rendering:pixelated}
+.battle-trainer-sprite.trainer-overworld-upscale{width:70px;height:105px;max-width:none;max-height:none;object-fit:contain;image-rendering:pixelated}
+.battle-field-trainer{width:120px;height:165px}
+.battle-field-trainer img.trainer-battle-art{width:128px;height:128px;max-width:none;max-height:none;object-fit:contain;image-rendering:pixelated}
+.battle-field-trainer img.trainer-overworld-upscale{width:92px;height:138px;max-width:none;max-height:none;object-fit:contain;image-rendering:pixelated}
+.online-lobby-trainer img.trainer-battle-art{width:96px;height:96px;object-fit:contain;image-rendering:pixelated}
+.online-lobby-trainer img.trainer-overworld-upscale{width:68px;height:102px;object-fit:contain;image-rendering:pixelated}
+@media(max-width:850px){
+ .battle-trainer-sprite.trainer-battle-art{width:72px;height:72px}.battle-trainer-sprite.trainer-overworld-upscale{width:54px;height:81px}
+}
+
 /* ---------- Battle move animations ---------- */
 .battle-combatant{will-change:transform,filter,opacity}
 .battle-attack-fx{position:absolute;z-index:10;pointer-events:none;left:0;top:0;transform:translate(-50%,-50%);}
@@ -2826,11 +2840,17 @@ function formatPlaytime(t){
   return h + ':' + m + ':' + s;
 }
 
+var DEFAULT_TRAINER_BATTLE_SPRITES={
+  male:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABABAMAAABYR2ztAAAAMFBMVEVzxaT/3s3epJTNg3N7WlJie5xKWoMxQWoYKVLe5u6L3nNinFr/YlrFQUH///8AAADyu5bUAAAAAXRSTlMAQObYZgAAAjhJREFUSInt1D9r20AUAPCDKsZQgrDcLxA3Q7bWfyje6igZTJvgDjljd7C9SMhNTb9C+sfiEhVuckB0L0Gh0CEYtxq8dOiQbMG4g+mUIYtwWyWIFud6Z4/SU79AH8jL++nde4+TEfofoWgt4Sdx+cRhw7uIEbjd8Dy7B+aXvJ7tXdo2XKJt2xdl18JwC/Ve/VK3hzBoPj3+5L1zpxDQmo4zILswaP/5fPRSKVsgSASDTFbJlUGAfv5orCg3xRII1OxNSmkUYsD6SkrJrIJ5JPmpVDqzCQOUzKbVu/AJPFguPi9rvv8iDty+fv2AxeSl3++N4jm8JyQ7zqgzoQscBa6qBx9OJ0SUkNSoZq+0mvN8XONA2voSARJVUzs46jb5HOr2WQTI6bS743Sbr+4jtbFxJwzWi6yjPRrQfAm92d8Jb1xSHlYmI8ul+UL5baBWwgXS/sn2yHBbv9S1/vlmaB23UquyO5sYbl/Kr+3S8EKTZkEA3eqjjTzZC7f4DO/JbmfinkyRFHUlEvi4hBjRdbMVkRWAVEtIJho2jWjw+CsTfWCsAxdi65TPFXQxNiFwdm8OqK5HTMBDViqiheo1BJA/5QDHAFGFYIMPCt+5wJwD+F7zHo3kv4BswkAMMeWAgiDQarEAMcamMn/ACgblORaABeR58YC0YCBeJlG3aRGW/nEOwB6oa4o6FASz4Xf+u1whEPCH4mPxx+AczBfFZ7TiRx8ijYk4Qmb1HgC+9ZqLStDfVMyS4+Iv7x7sou/WP74AAAAASUVORK5CYII=',
+  female:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABABAMAAABYR2ztAAAAMFBMVEVzxaT/3s3epJTNg3N7WlJiYnMpOUGkalJKMTnNzd6L3nNinFr/YlrFQUH///8AAAD1AjAFAAAAAXRSTlMAQObYZgAAAi9JREFUSInt1D+I01AcB/CHF0u38NoDp4KXnODgoSYRuhxNz4cN/qGCNlCQi0ML/kFcCskod4WE6+DSG+So7hU6nQjN6uCQItwgihdFt8Kd5GhSODiNLz1w8f3i4OpveBm+n/7yy8trEPpff1TNfZKad/qDrRThZIeD7+MtOHc7/fEz7RrUIuu6Vwddx7Q0cIBXw65ZbJkEbOG8rFiibbdVqEX2tWVdtp22BYJKa10oSo1FCHCmduYbPtRMaIjKKef8V7x6FgS2qeQxFoom9KB2a22BgpYNTEln5KTCjhjYhH2PLNEQtywGqJ0C0NPg+MqsthZUnVKMHCCnP+cKb52VAMwRKhdGO2sAIDNwzvv8ng3CPZXutaTsjvbfsXL+jveBrnJp1+t9YXaYRi8Qmsix77MBbxixJORK6Ia/FALg8ABjFR15SxOVJeK4TrCo3jt6o0wUpuBjRNRM3+272zJ4pNCDh0OyXJWEagSATuO619skUvTTYG9Xp77n9T4G1ej55mMm2Fj1vH3/JuJ1w2CCppcAulN8wL4FX9cbcRSDD4EydT2Iauzuv0EzDczl9eBkGjiB8yhTm4fBRTyP5jC+AIIyXkyA+i+Adl9IASs5mpVzp6GcE2QKJBHswIkKXUOZQOBALNGVJ1cgEN26NAPss0Crqd9NLlMQRHqQDqY6+gs4fo/RbSDnR59Q6pD89H4yQ+huA9+QR97s4/HDJwAIx90k4WPm/3uWpJznlPoFLunMs4ee3qwAAAAASUVORK5CYII='
+};
 function trainerSpritePath(trainer){
-  var gender = trainer&&trainer.gender === 'Female' ? 'female' : 'male';
-  var outfitId = trainer&&trainer.outfitId === 2 ? 2 : 1;
-  return './brisk-dex-trainers/outfit-' + outfitId + '-' + gender + '.png';
+  var gender=trainer&&trainer.gender==='Female'?'female':'male';
+  var outfitId=trainer&&trainer.outfitId===2?2:1;
+  if(outfitId===1)return DEFAULT_TRAINER_BATTLE_SPRITES[gender];
+  return './brisk-dex-trainers/outfit-'+outfitId+'-'+gender+'.png';
 }
+function trainerSpriteIsOverworld(trainer){return Number(trainer&&trainer.outfitId)===2;}
 function onlineTrainerAppearance(){
   var t=currentSave&&currentSave.trainer?currentSave.trainer:{gender:'Male',outfitId:1};
   return {gender:t.gender==='Female'?'Female':'Male',outfitId:t.outfitId===2?2:1};
@@ -5300,6 +5320,23 @@ async function battleRequest(path,options){
   if(!response.ok) throw new Error(data.error||('Battle server returned '+response.status));
   return data;
 }
+function onlineBattleIsLive(){
+  return !!(ONLINE_STATE.roomCode&&ONLINE_STATE.playerId&&ONLINE_STATE.room&&ONLINE_STATE.room.phase==='battle');
+}
+function forfeitOnlineBattleOnExit(){
+  if(!onlineBattleIsLive())return;
+  var url=battleRelayUrl()+'/rooms/'+ONLINE_STATE.roomCode+'/action';
+  var body=JSON.stringify({playerId:ONLINE_STATE.playerId,type:'forfeit',reason:'client_closed'});
+  try{
+    if(navigator.sendBeacon){
+      var blob=new Blob([body],{type:'application/json'});
+      if(navigator.sendBeacon(url,blob))return;
+    }
+  }catch(e){}
+  try{fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:body,keepalive:true}).catch(function(){});}catch(e){}
+}
+window.addEventListener('pagehide',forfeitOnlineBattleOnExit);
+window.addEventListener('beforeunload',forfeitOnlineBattleOnExit);
 function stopBattlePolling(){
   if(ONLINE_STATE.polling){clearInterval(ONLINE_STATE.polling);ONLINE_STATE.polling=null;}
 }
@@ -5382,7 +5419,10 @@ async function battleAction(type,payload){
   }catch(err){showError('Battle action failed: '+err.message);}
   finally{ONLINE_STATE.busy=false;}
 }
-function leaveOnlineBattle(){
+async function leaveOnlineBattle(){
+  if(onlineBattleIsLive()){
+    try{await battleAction('forfeit',{reason:'left_room'});}catch(e){}
+  }
   stopBattlePolling();stopMysteryPolling();
   ONLINE_STATE.roomCode='';ONLINE_STATE.playerId='';ONLINE_STATE.playerIndex=-1;ONLINE_STATE.room=null;ONLINE_STATE.gimmickChoice=null;ONLINE_STATE.rewardMessage='';ONLINE_STATE.lastAnimationSeq=0;ONLINE_STATE.animationQueue=[];ONLINE_STATE.animationPlaying=false;persistOnlineSession();
   renderOnlineBattle();
@@ -5502,7 +5542,8 @@ function battleMoveEffectiveness(move,defender){
 }
 function onlineTrainerImage(player,className){
   var wrap=el('div',{class:className||''});
-  var img=el('img',{src:trainerSpritePath(player&&player.trainer||{}),alt:(player&&player.name||'Trainer')+' outfit'});
+  var appearance=player&&player.trainer||{},img=el('img',{src:trainerSpritePath(appearance),alt:(player&&player.name||'Trainer')+' outfit'});
+  img.classList.add(trainerSpriteIsOverworld(appearance)?'trainer-overworld-upscale':'trainer-battle-art');
   img.decoding='async';img.addEventListener('error',function(){wrap.remove();});wrap.appendChild(img);return wrap;
 }
 function renderOnlineBattle(){
@@ -5736,7 +5777,7 @@ function renderOnlineBattle(){
   var active=me.team[actorPos===1?me.active2:me.active],foeActive=foe.team[targetPos===1?foe.active2:foe.active];
   function battleSidePanel(player,sideName){
     var panel=el('div',{class:'battle-side-panel '+sideName});
-    var trainerWrap=el('div',{class:'battle-side-trainer-wrap'}),trainerImg=el('img',{class:'battle-trainer-sprite',src:trainerSpritePath(player.trainer||{}),alt:player.name+' trainer'});
+    var trainerWrap=el('div',{class:'battle-side-trainer-wrap'}),trainerImg=el('img',{class:'battle-trainer-sprite '+(trainerSpriteIsOverworld(player.trainer||{})?'trainer-overworld-upscale':'trainer-battle-art'),src:trainerSpritePath(player.trainer||{}),alt:player.name+' trainer'});
     trainerImg.decoding='async';trainerImg.addEventListener('error',function(){trainerWrap.remove();});trainerWrap.appendChild(trainerImg);panel.appendChild(trainerWrap);
     panel.appendChild(el('div',{class:'battle-side-name',text:player.name}));
     var team=el('div',{class:'battle-side-team'});
