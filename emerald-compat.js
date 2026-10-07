@@ -26,6 +26,8 @@ var PROFILES={
 
 function detectProfile(context){
   context=context||{};
+  if(context.override==='emerald') return PROFILES.emerald;
+  if(context.override==='brisk-emerald') return PROFILES.briskEmerald;
   // Brisk's fixed 20-box storage extension is intentionally a strong signal.
   // Unknown 14-box Emerald hacks stay on the conservative vanilla profile.
   return context.storageExtensionPresent ? PROFILES.briskEmerald : PROFILES.emerald;
