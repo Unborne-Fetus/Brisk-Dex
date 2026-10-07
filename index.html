@@ -872,6 +872,7 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
     <button id="tab-trainers" role="tab" aria-selected="false" aria-controls="trainers-tab-panel">Trainer Teams</button>
     <button id="tab-competitive" role="tab" aria-selected="false" aria-controls="competitive-tab-panel">Competitive Sets</button>
     <button id="tab-online" role="tab" aria-selected="false" aria-controls="online-tab-panel">Online Battle</button>
+    <button id="tab-trading" role="tab" aria-selected="false" aria-controls="trading-tab-panel">Trading</button>
     <button id="tab-moves" role="tab" aria-selected="false" aria-controls="moves-tab-panel">Moves</button>
     <button id="tab-abilities" role="tab" aria-selected="false" aria-controls="abilities-tab-panel">Abilities</button>
     <button id="tab-items" role="tab" aria-selected="false" aria-controls="items-tab-panel">Items</button>
@@ -1033,6 +1034,28 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
     <div class="section-heading"><h3>Online Battle</h3><span class="count" id="online-count">Host / Join</span></div>
     <p class="route-intro">Private Brisk battles using your loaded save-file party. Host a six-character room or join a friend's room. The first prototype supports singles, switching, damaging moves, STAB, accuracy, priority, and type effectiveness.</p>
     <div id="online-root"></div>
+  </section>
+
+  <section id="trading-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-trading" style="display:none;">
+    <div class="section-heading"><h3>Trading</h3><span class="count">Brisk verified Pokémon only</span></div>
+    <p class="route-intro">Offline Wonder Trade works locally. Online Wonder Box, Link Trade, and GTS use the same relay as Online Battle. Debug-created, hacked, corrupted, or otherwise unverified Pokémon cannot be traded.</p>
+    <div class="online-shell">
+      <div class="online-card">
+        <h4>Trade Pokémon</h4>
+        <div class="online-form">
+          <label>Relay <input id="trade-relay" type="text" placeholder="http://host:8787"></label>
+          <label>Pokémon <select id="trade-mon"></select></label>
+          <div class="online-actions"><button id="trade-refresh">Refresh eligible Pokémon</button></div>
+          <div id="trade-status" class="online-status">Choose an eligible boxed or externally stored Pokémon.</div>
+        </div>
+      </div>
+      <div style="display:grid;gap:14px;">
+        <div class="online-card"><h4>Offline Wonder Trade</h4><p class="route-intro">Open a Pokémon from your party or PC and choose Wonder Trade. Offline trades use Brisk's bundled eligible species pool and now enforce trusted provenance.</p></div>
+        <div class="online-card"><h4>Wonder Box</h4><p class="route-intro">Deposit up to 10 Pokémon. Matches happen independently, like Pokémon HOME's Wonder Box.</p><div class="online-actions"><button class="primary" id="wonderbox-deposit">Deposit selected</button><button id="wonderbox-check">Check / claim matches</button></div><div id="wonderbox-list" class="online-status"></div></div>
+        <div class="online-card"><h4>Link Trade</h4><div class="online-form"><label>Room code <input id="linktrade-code" maxlength="6" placeholder="ABC123"></label><div class="online-actions"><button class="primary" id="linktrade-host">Host</button><button id="linktrade-join">Join</button><button id="linktrade-confirm">Confirm trade</button></div><div id="linktrade-status" class="online-status"></div></div></div>
+        <div class="online-card"><h4>GTS</h4><div class="online-form"><label>Requested species # (0 = any) <input id="gts-species" type="number" min="0" step="1" value="0"></label><label>Requested type (blank = any) <input id="gts-type" placeholder="e.g. Water"></label><div style="display:flex;gap:8px"><label style="flex:1">Min Lv <input id="gts-min" type="number" min="1" max="100" value="1"></label><label style="flex:1">Max Lv <input id="gts-max" type="number" min="1" max="100" value="100"></label></div><div class="online-actions"><button class="primary" id="gts-deposit">Deposit selected</button><button id="gts-search">Search listings</button></div><div id="gts-list" class="online-status"></div></div></div>
+      </div>
+    </div>
   </section>
 
   <section id="moves-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-moves" style="display:none;">
@@ -2053,6 +2076,8 @@ function getWonderTradePool(level){
 }
 async function wonderTradeAtLocation(mon, loc){
   if (!currentSave || !loc || (loc.type !== 'party' && loc.type !== 'box')) return;
+  var tradeLegality=competitiveLegality(mon);
+  if(!tradeLegality.ok){ showError('This Pokémon cannot be traded: '+tradeLegality.reason); return; }
   var locationName = loc.type === 'party' ? 'party slot' : 'box slot';
   if (!window.confirm('Trade ' + (mon.nickname || speciesName(mon.species)) + ' from this ' + locationName + '? It will be replaced by a random Pokémon from the offline Brisk Emerald pool. This cannot be undone.')) return;
 
@@ -5975,6 +6000,7 @@ function setMainTab(tabName){
   var trainers = tabName === 'trainers';
   var competitive = tabName === 'competitive';
   var online = tabName === 'online';
+  var trading = tabName === 'trading';
   var moves = tabName === 'moves';
   var abilities = tabName === 'abilities';
   var items = tabName === 'items';
@@ -5985,13 +6011,14 @@ function setMainTab(tabName){
   document.getElementById('settings-tab-panel').style.display=settings?'block':'none';
   document.getElementById('tab-settings').classList.toggle('active',settings);
   document.getElementById('tab-settings').setAttribute('aria-selected',String(settings));
-  var save = !settings && !routes && !dex && !trainers && !competitive && !online && !moves && !abilities && !items && !bag && !guide && !changes;
+  var save = !settings && !routes && !dex && !trainers && !competitive && !online && !trading && !moves && !abilities && !items && !bag && !guide && !changes;
   document.getElementById('save-tab-panel').style.display = save ? 'block' : 'none';
   document.getElementById('routes-tab-panel').style.display = routes ? 'block' : 'none';
   document.getElementById('dex-tab-panel').style.display = dex ? 'block' : 'none';
   document.getElementById('trainers-tab-panel').style.display = trainers ? 'block' : 'none';
   document.getElementById('competitive-tab-panel').style.display = competitive ? 'block' : 'none';
   document.getElementById('online-tab-panel').style.display = online ? 'block' : 'none';
+  document.getElementById('trading-tab-panel').style.display = trading ? 'block' : 'none';
   document.getElementById('moves-tab-panel').style.display = moves ? 'block' : 'none';
   document.getElementById('abilities-tab-panel').style.display = abilities ? 'block' : 'none';
   document.getElementById('items-tab-panel').style.display = items ? 'block' : 'none';
@@ -6010,6 +6037,8 @@ function setMainTab(tabName){
   document.getElementById('tab-competitive').setAttribute('aria-selected', String(competitive));
   document.getElementById('tab-online').classList.toggle('active', online);
   document.getElementById('tab-online').setAttribute('aria-selected', String(online));
+  document.getElementById('tab-trading').classList.toggle('active', trading);
+  document.getElementById('tab-trading').setAttribute('aria-selected', String(trading));
   document.getElementById('tab-moves').classList.toggle('active', moves);
   document.getElementById('tab-moves').setAttribute('aria-selected', String(moves));
   document.getElementById('tab-abilities').classList.toggle('active', abilities);
@@ -6149,6 +6178,100 @@ var renderCompetitiveSetsDebounced=debounce(renderCompetitiveSets,120);
 var renderRouteEncountersDebounced=debounce(renderRouteEncounters,120);
 var renderChangesDebounced=debounce(renderChanges,120);
 
+var TRADE_STATE={ownerToken:localStorage.getItem('briskdex_trade_owner')||genId(),linkCode:'',linkPlayerId:'',reserved:{}};
+localStorage.setItem('briskdex_trade_owner',TRADE_STATE.ownerToken);
+function tradeCandidates(){
+  return allBattleCandidates().filter(function(x){return x.competitiveLegal&&x.checksumValid&&x.key.indexOf('party:')!==0;});
+}
+function renderTrading(){
+  var relay=document.getElementById('trade-relay');if(relay&&!relay.value)relay.value=ONLINE_STATE.relayUrl;
+  var select=document.getElementById('trade-mon');if(!select)return;
+  var old=select.value,cands=tradeCandidates();
+  select.innerHTML=cands.map(function(x){return '<option value="'+escapeHtml(x.key)+'">'+escapeHtml(x.sourceLabel+' · '+x.name+' Lv'+x.level+(x.isShiny?' ✨':''))+'</option>';}).join('');
+  if(cands.some(function(x){return x.key===old;}))select.value=old;
+  if(!cands.length)select.innerHTML='<option value="">No verified boxed/storage Pokémon</option>';
+}
+function selectedTradeCandidate(){
+  var key=document.getElementById('trade-mon').value;
+  return tradeCandidates().find(function(x){return x.key===key;})||null;
+}
+function tradeBase(){
+  var input=document.getElementById('trade-relay');ONLINE_STATE.relayUrl=String(input&&input.value||ONLINE_STATE.relayUrl).trim().replace(/\/+$/,'');
+  localStorage.setItem('briskdex_battle_relay',ONLINE_STATE.relayUrl);return ONLINE_STATE.relayUrl;
+}
+async function tradeFetch(path,opts){
+  opts=opts||{};opts.headers=Object.assign({'Content-Type':'application/json'},opts.headers||{});
+  var res=await fetch(tradeBase()+path,opts),data=await res.json().catch(function(){return {};});
+  if(!res.ok)throw new Error(data.error||('Trade relay error '+res.status));return data;
+}
+function tradeStatus(msg){var el=document.getElementById('trade-status');if(el)el.textContent=msg;}
+async function replaceTradeSource(key,raw80){
+  var raw=base64ToBytes(raw80),parts=String(key).split(':');
+  if(parts[0]==='box'){
+    var bi=Number(parts[1]),si=Number(parts[2]),logicalOffset=4+(bi*30+si)*80;
+    var touched=writeLogicalPCBytes(currentSave,logicalOffset,raw.subarray(0,80));touched.forEach(function(id){recomputeChecksum(currentSave,id);});
+    currentSave.boxes[bi][si]=decodePokemon(raw.subarray(0,80),false);markDirty();await saveChangesToFile();
+  }else if(parts[0]==='storage'){
+    await storageReady;var idx=externalStorage.findIndex(function(e){return e.id===parts[1];});if(idx<0)throw new Error('The deposited External Storage Pokémon is no longer present.');
+    externalStorage[idx].raw80=raw80;await persistExternalStorage();
+  }else throw new Error('Online trading currently requires a PC box or External Storage Pokémon.');
+  renderAll();renderTrading();
+}
+async function depositWonderBox(){
+  try{var mon=selectedTradeCandidate();if(!mon)throw new Error('Choose an eligible Pokémon.');
+    var data=await tradeFetch('/trades/wonder-box/deposit',{method:'POST',body:JSON.stringify({ownerToken:TRADE_STATE.ownerToken,raw80:mon.rewardRaw80})});
+    localStorage.setItem('briskdex_wonder_'+data.depositId,mon.key);tradeStatus(mon.name+' was deposited into Wonder Box.');await checkWonderBox();
+  }catch(e){tradeStatus(e.message);}
+}
+async function checkWonderBox(){
+  var out=document.getElementById('wonderbox-list');
+  try{var data=await tradeFetch('/trades/wonder-box/status?ownerToken='+encodeURIComponent(TRADE_STATE.ownerToken),{method:'GET'}),lines=[];
+    for(var i=0;i<data.entries.length;i++){var x=data.entries[i],name=speciesName(x.sent.species);if(x.status==='matched'){
+      var key=localStorage.getItem('briskdex_wonder_'+x.depositId);if(key){
+        var claimed=await tradeFetch('/trades/wonder-box/claim',{method:'POST',body:JSON.stringify({ownerToken:TRADE_STATE.ownerToken,depositId:x.depositId})});
+        await replaceTradeSource(key,claimed.raw80);localStorage.removeItem('briskdex_wonder_'+x.depositId);lines.push(name+' → '+speciesName(claimed.receivedMon.species)+' complete');
+      }
+    }else lines.push(name+' · waiting');}
+    out.textContent=lines.length?lines.join(' | '):'Wonder Box is empty.';
+  }catch(e){out.textContent=e.message;}
+}
+async function hostLinkTrade(){
+ try{var mon=selectedTradeCandidate();if(!mon)throw new Error('Choose an eligible Pokémon.');var d=await tradeFetch('/trades/link/host',{method:'POST',body:JSON.stringify({name:currentSave&&currentSave.trainerName||'Trainer',raw80:mon.rewardRaw80})});
+ TRADE_STATE.linkCode=d.code;TRADE_STATE.linkPlayerId=d.playerId;TRADE_STATE.linkKey=mon.key;document.getElementById('linktrade-code').value=d.code;document.getElementById('linktrade-status').textContent='Room '+d.code+' created. Share this code.';}catch(e){document.getElementById('linktrade-status').textContent=e.message;}
+}
+async function joinLinkTrade(){
+ try{var mon=selectedTradeCandidate();if(!mon)throw new Error('Choose an eligible Pokémon.');var code=document.getElementById('linktrade-code').value.trim().toUpperCase();var d=await tradeFetch('/trades/link/join',{method:'POST',body:JSON.stringify({code:code,name:currentSave&&currentSave.trainerName||'Trainer',raw80:mon.rewardRaw80})});
+ TRADE_STATE.linkCode=code;TRADE_STATE.linkPlayerId=d.playerId;TRADE_STATE.linkKey=mon.key;document.getElementById('linktrade-status').textContent='Joined '+code+'. Review the other offer, then confirm.';}catch(e){document.getElementById('linktrade-status').textContent=e.message;}
+}
+async function confirmLinkTrade(){
+ var el=document.getElementById('linktrade-status');try{if(!TRADE_STATE.linkCode)throw new Error('Host or join a Link Trade first.');
+ await tradeFetch('/trades/link/confirm',{method:'POST',body:JSON.stringify({code:TRADE_STATE.linkCode,playerId:TRADE_STATE.linkPlayerId,confirmed:true})});el.textContent='Confirmed. Waiting for the other player…';
+ for(var tries=0;tries<60;tries++){await new Promise(function(r){setTimeout(r,1000);});var s=await tradeFetch('/trades/link/status?code='+encodeURIComponent(TRADE_STATE.linkCode)+'&playerId='+encodeURIComponent(TRADE_STATE.linkPlayerId),{method:'GET'});
+ if(s.complete){await replaceTradeSource(TRADE_STATE.linkKey,s.received);el.textContent='Link Trade complete: received '+speciesName(s.receivedMon.species)+'.';TRADE_STATE.linkCode='';return;}}
+ el.textContent='Still waiting for the other player to confirm.';}catch(e){el.textContent=e.message;}
+}
+async function gtsDeposit(){
+ var out=document.getElementById('gts-list');try{var mon=selectedTradeCandidate();if(!mon)throw new Error('Choose an eligible Pokémon.');
+ var request={species:Number(document.getElementById('gts-species').value)||0,type:document.getElementById('gts-type').value.trim(),minLevel:Number(document.getElementById('gts-min').value)||1,maxLevel:Number(document.getElementById('gts-max').value)||100};
+ var d=await tradeFetch('/trades/gts/list',{method:'POST',body:JSON.stringify({ownerToken:TRADE_STATE.ownerToken,trainer:currentSave&&currentSave.trainerName||'Trainer',raw80:mon.rewardRaw80,request:request})});
+ localStorage.setItem('briskdex_gts_'+d.listingId,mon.key);out.textContent='GTS listing posted. Listing '+d.listingId.slice(0,8)+'…';}catch(e){out.textContent=e.message;}
+}
+async function gtsSearch(){
+ var out=document.getElementById('gts-list');try{var d=await tradeFetch('/trades/gts?ownerToken='+encodeURIComponent(TRADE_STATE.ownerToken),{method:'GET'});
+ if(!d.listings.length){out.textContent='No GTS listings are available right now.';return;}
+ out.innerHTML=d.listings.slice(0,30).map(function(x){var req=[];if(x.request.species)req.push(speciesName(x.request.species));if(x.request.type)req.push(x.request.type+' type');req.push('Lv'+x.request.minLevel+'–'+x.request.maxLevel);return '<div style="padding:8px 0;border-bottom:1px solid var(--line-soft)"><strong>'+escapeHtml(speciesName(x.offered.species))+' Lv'+x.offered.level+'</strong> · wants '+escapeHtml(req.join(', '))+' <button data-gts-take="'+x.listingId+'" style="margin-left:8px">Trade selected</button></div>';}).join('');
+ out.querySelectorAll('[data-gts-take]').forEach(function(btn){btn.addEventListener('click',async function(){try{var mon=selectedTradeCandidate();if(!mon)throw new Error('Choose the Pokémon you want to offer.');var x=await tradeFetch('/trades/gts/take',{method:'POST',body:JSON.stringify({listingId:btn.dataset.gtsTake,ownerToken:TRADE_STATE.ownerToken,raw80:mon.rewardRaw80})});await replaceTradeSource(mon.key,x.received);out.textContent='GTS trade complete: received '+speciesName(x.receivedMon.species)+'.';}catch(e){out.textContent=e.message;}});});
+ }catch(e){out.textContent=e.message;}
+}
+document.getElementById('trade-refresh').addEventListener('click',renderTrading);
+document.getElementById('wonderbox-deposit').addEventListener('click',depositWonderBox);
+document.getElementById('wonderbox-check').addEventListener('click',checkWonderBox);
+document.getElementById('linktrade-host').addEventListener('click',hostLinkTrade);
+document.getElementById('linktrade-join').addEventListener('click',joinLinkTrade);
+document.getElementById('linktrade-confirm').addEventListener('click',confirmLinkTrade);
+document.getElementById('gts-deposit').addEventListener('click',gtsDeposit);
+document.getElementById('gts-search').addEventListener('click',gtsSearch);
+
 /* ============================================================
    Wiring
    ============================================================ */
@@ -6158,6 +6281,7 @@ document.getElementById('tab-dex').addEventListener('click', function(){ setMain
 document.getElementById('tab-trainers').addEventListener('click', function(){ setMainTab('trainers'); });
 document.getElementById('tab-competitive').addEventListener('click', function(){ setMainTab('competitive'); });
 document.getElementById('tab-online').addEventListener('click', function(){ setMainTab('online'); });
+document.getElementById('tab-trading').addEventListener('click', function(){ setMainTab('trading'); renderTrading(); });
 document.getElementById('tab-moves').addEventListener('click', function(){ setMainTab('moves'); });
 document.getElementById('tab-abilities').addEventListener('click', function(){ setMainTab('abilities'); });
 document.getElementById('tab-items').addEventListener('click', function(){ setMainTab('items'); });
