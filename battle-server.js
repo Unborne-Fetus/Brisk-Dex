@@ -1930,7 +1930,7 @@ function resolveTurn(room){
 }
 
 setInterval(()=>{
-  const now=Date.now(),grace=12000;
+  const now=Date.now(),grace=45000;
   for(const room of rooms.values()){
     if(room.phase!=='battle'||room.players.length<2)continue;
     const stale=room.players.map(p=>p.isBot?false:now-(p.lastSeen||room.updatedAt||now)>grace);
