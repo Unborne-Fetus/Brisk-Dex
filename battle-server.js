@@ -22,13 +22,18 @@ const rankedQueue = [];
 const rankedTickets = new Map();
 
 const SHOP_CATALOG=[
+  {id:'gacha_standard',kind:'gacha',name:'Random Pokémon Gacha',price:4,value:'standard',repeatable:true,description:'Pull one random eligible Pokémon for your Wins collection.'},
+  {id:'gacha_premium',kind:'gacha',name:'Premium Pokémon Gacha',price:10,value:'premium',repeatable:true,description:'Pull from stronger species with a small shiny chance.'},
   {id:'title_ace',kind:'title',name:'Ace Trainer',price:3,value:'Ace Trainer'},
   {id:'title_elite',kind:'title',name:'Elite Battler',price:8,value:'Elite Battler'},
   {id:'title_champion',kind:'title',name:'Brisk Champion',price:20,value:'Brisk Champion'},
   {id:'accent_cyan',kind:'accent',name:'Cyan Battle Accent',price:5,value:'cyan'},
   {id:'accent_gold',kind:'accent',name:'Gold Battle Accent',price:12,value:'gold'},
   {id:'arena_cave',kind:'arena',name:'Cave Arena',price:8,value:'cave'},
-  {id:'arena_sky',kind:'arena',name:'Sky Arena',price:15,value:'sky'}
+  {id:'arena_sky',kind:'arena',name:'Sky Arena',price:15,value:'sky'},
+  {id:'title_collector',kind:'title',name:'Master Collector',price:25,value:'Master Collector'},
+  {id:'accent_master',kind:'accent',name:'Master Ball Accent',price:18,value:'master'},
+  {id:'arena_archive',kind:'arena',name:'Champion Archive Arena',price:25,value:'archive'}
 ];
 const PROFILE_DIR=process.env.BRISK_BATTLE_PROFILE_DIR||path.join(os.homedir(),'.brisk-dex');
 const PROFILE_PATH=path.join(PROFILE_DIR,'battle-profiles.json');
@@ -49,16 +54,16 @@ function profileKeyForToken(token){
 function ensureProfile(token,name){
   const key=profileKeyForToken(token);if(!key)return null;
   let p=PROFILE_DB.profiles[key];
-  if(!p)p=PROFILE_DB.profiles[key]={key,name:cleanText(name,24)||'Trainer',wins:0,lifetimeWins:0,rating:1000,rankedWins:0,rankedLosses:0,rankedGames:0,purchases:[],equipped:{title:'',accent:'default',arena:'stadium'},createdAt:Date.now(),updatedAt:Date.now()};
+  if(!p)p=PROFILE_DB.profiles[key]={key,name:cleanText(name,24)||'Trainer',wins:0,lifetimeWins:0,rating:1000,rankedWins:0,rankedLosses:0,rankedGames:0,purchases:[],gachaPokemon:[],equipped:{title:'',accent:'default',arena:'stadium'},createdAt:Date.now(),updatedAt:Date.now()};
   if(name)p.name=cleanText(name,24)||p.name;
   p.wins=Math.max(0,Number(p.wins)||0);p.lifetimeWins=Math.max(0,Number(p.lifetimeWins)||0);p.rating=Math.max(100,Math.round(Number(p.rating)||1000));
   p.rankedWins=Math.max(0,Number(p.rankedWins)||0);p.rankedLosses=Math.max(0,Number(p.rankedLosses)||0);p.rankedGames=Math.max(0,Number(p.rankedGames)||0);
-  if(!Array.isArray(p.purchases))p.purchases=[];if(!p.equipped)p.equipped={title:'',accent:'default',arena:'stadium'};
+  if(!Array.isArray(p.purchases))p.purchases=[];if(!Array.isArray(p.gachaPokemon))p.gachaPokemon=[];if(!p.equipped)p.equipped={title:'',accent:'default',arena:'stadium'};
   p.updatedAt=Date.now();return p;
 }
 function publicProfile(p){
   if(!p)return null;
-  return {name:p.name,wins:p.wins,lifetimeWins:p.lifetimeWins,rating:p.rating,rankedWins:p.rankedWins,rankedLosses:p.rankedLosses,rankedGames:p.rankedGames,purchases:p.purchases.slice(),equipped:Object.assign({},p.equipped)};
+  return {name:p.name,wins:p.wins,lifetimeWins:p.lifetimeWins,rating:p.rating,rankedWins:p.rankedWins,rankedLosses:p.rankedLosses,rankedGames:p.rankedGames,purchases:p.purchases.slice(),gachaPokemon:p.gachaPokemon.slice(-50),equipped:Object.assign({},p.equipped)};
 }
 function shopItem(id){return SHOP_CATALOG.find(x=>x.id===id)||null;}
 function ratingDelta(winnerRating,loserRating){
@@ -2060,6 +2065,28 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==='GET'&&url.pathname==='/ranked/leaderboard'){
       const leaders=Object.values(PROFILE_DB.profiles).filter(p=>(Number(p.rankedGames)||0)>0).sort((a,b)=>(b.rating||1000)-(a.rating||1000)||(b.rankedWins||0)-(a.rankedWins||0)).slice(0,100).map((p,i)=>({rank:i+1,name:p.name,rating:p.rating,rankedWins:p.rankedWins,rankedLosses:p.rankedLosses}));
       return json(res,200,{ok:true,leaders});
+    }
+    if(req.method==='GET'&&url.pathname==='/leaderboard'){
+      const leaders=Object.values(PROFILE_DB.profiles).filter(p=>(Number(p.lifetimeWins)||0)>0||(Number(p.rankedLosses)||0)>0).sort((a,b)=>(b.lifetimeWins||0)-(a.lifetimeWins||0)||(b.rankedWins||0)-(a.rankedWins||0)||(a.rankedLosses||0)-(b.rankedLosses||0)).slice(0,100).map((p,i)=>{
+        const wins=Number(p.lifetimeWins)||0,losses=Number(p.rankedLosses)||0;
+        return {rank:i+1,name:p.name,wins,losses,winLossRatio:losses?wins/losses:wins?null:0,record:wins+'–'+losses};
+      });
+      return json(res,200,{ok:true,leaders});
+    }
+    if(req.method==='POST'&&url.pathname==='/shop/gacha'){
+      const body=await readBody(req),profile=ensureProfile(body.profileToken,body.name),item=shopItem(String(body.itemId||''));
+      if(!profile||!item||item.kind!=='gacha')return json(res,400,{error:'Invalid gacha item.'});
+      if(profile.wins<item.price)return json(res,409,{error:'Not enough Wins.'});
+      let pool=eligibleBotSpecies().filter(speciesId=>{
+        const s=(BRISK_DATA.species||{})[String(speciesId)]||{},stats=Array.isArray(s.baseStats)?s.baseStats.map(Number):[];
+        const bst=stats.reduce((a,b)=>a+b,0);
+        return item.value==='premium'?bst>=500:bst>0;
+      });
+      if(!pool.length)return json(res,503,{error:'No eligible Pokémon are available for the gacha.'});
+      const species=choose(pool),data=(BRISK_DATA.species||{})[String(species)]||{},shiny=item.value==='premium'&&chance(5);
+      const prize={id:id(),species,name:data.name||data.constant||('Pokémon '+species),shiny,tier:item.value,wonAt:Date.now()};
+      profile.wins-=item.price;profile.gachaPokemon.push(prize);if(profile.gachaPokemon.length>200)profile.gachaPokemon=profile.gachaPokemon.slice(-200);profile.updatedAt=Date.now();saveProfiles();
+      return json(res,200,{ok:true,profile:publicProfile(profile),prize});
     }
     if(req.method==='POST'&&url.pathname==='/shop/purchase'){
       const body=await readBody(req),profile=ensureProfile(body.profileToken,body.name),item=shopItem(String(body.itemId||''));
