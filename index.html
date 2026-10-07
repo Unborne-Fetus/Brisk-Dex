@@ -2503,6 +2503,7 @@ async function loadExternalStorage(){
     showError('Could not load external storage. It has been left untouched: ' + storageLoadError);
   }
   renderStoragePanel();
+  if(currentMainTab==='online')renderOnlineBattle();
 }
 function assertStorageReadable(){
   if (storageLoadError) throw new Error('External storage is unreadable. Import a backup archive before changing it.');
@@ -5002,7 +5003,8 @@ function competitiveLegality(mon){
 function battleCandidateFromMon(mon,key,sourceLabel){
   if(!mon||mon.empty||mon.isEgg)return null;
   var legality=competitiveLegality(mon);
-  if(!legality.ok)return null;
+  var legacyExternal=(sourceLabel==='External Storage'&&mon.checksumValid&&!mon.competitiveLegal);
+  if(!legality.ok&&!legacyExternal)return null;
   var species=NAME_DATA.species[String(mon.species)]||{}, abilityList=Array.isArray(species.abilities)?species.abilities.filter(Boolean):[];
   var ability=abilityList[Math.min(Number(mon.abilitySlot)||0,Math.max(0,abilityList.length-1))]||abilityList[0]||'';
   var calculated=calculateBattleStats(mon,species);
@@ -5028,10 +5030,19 @@ function battleCandidateFromMon(mon,key,sourceLabel){
       ability:formAbilities[0]||ability,maxHP:adjusted(stats.maxHP,0),atk:adjusted(stats.atk,1),def:adjusted(stats.def,2),
       speed:adjusted(stats.speed,3),spAtk:adjusted(stats.spAtk,4),spDef:adjusted(stats.spDef,5)};
   });
+  var battleRaw80='';
+  if(mon.rawRecord&&mon.rawRecord.length>=80){
+    var battleRecord=mon.rawRecord.slice(0,80);
+    if(legacyExternal){
+      var battleView=new DataView(battleRecord.buffer,battleRecord.byteOffset,battleRecord.byteLength);
+      battleView.setUint16(0x1E,battleView.getUint16(0x1E,true)|0x8000,true);
+    }
+    battleRaw80=bytesToBase64(battleRecord);
+  }
   return {
     key:key,sourceLabel:sourceLabel,personality:Number(mon.personality)||0,otId:Number(mon.otId)||0,
-    rewardRaw80:(mon.rawRecord&&mon.rawRecord.length>=80)?bytesToBase64(mon.rawRecord.subarray(0,80)):'',
-    checksumValid:!!mon.checksumValid,competitiveLegal:!!mon.competitiveLegal,
+    rewardRaw80:battleRaw80,
+    checksumValid:!!mon.checksumValid,competitiveLegal:!!mon.competitiveLegal||legacyExternal,
     species:Number(mon.species),name:mon.nickname||speciesName(mon.species),level:stats.level,friendship:Number(mon.friendship)||0,
     weight:Number(species.weight||species.weightHg||0),ivs:Object.assign({},mon.ivs||{}),
     types:(species.types||[]).filter(Boolean).slice(0,2),ability:ability,item:itemName(mon.heldItem||0),
@@ -5629,7 +5640,12 @@ function renderOnlineBattle(){
         });
         sec.appendChild(grid);teamCard.appendChild(sec);
       });
-    }else teamCard.appendChild(el('div',{class:'route-empty',text:'Load a save or add Pokémon to External Storage to build a battle team.'}));
+    }else{
+      var storageCount=(externalStorage||[]).filter(validStorageEntry).length;
+      teamCard.appendChild(el('div',{class:'route-empty',text:storageCount?
+        'External Storage contains '+storageCount+' Pokémon, but none passed battle validation. Reload Brisk Dex; if this remains, check the Pokémon records for checksum or move-data errors.':
+        'Load a save or add Pokémon to External Storage to build a battle team.'}));
+    }
 
     shell.appendChild(teamCard);
     var mysteryCard=el('section',{class:'online-card',style:'grid-column:1 / -1;'});
