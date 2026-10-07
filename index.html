@@ -2391,6 +2391,7 @@ async function refreshBattleProfile(startRelay){
     var data=await battleRequest('/profile?profileToken='+encodeURIComponent(onlineProfileToken()),{method:'GET'});
     ONLINE_STATE.profile=data.profile||null;ONLINE_STATE.shop=Array.isArray(data.shop)?data.shop:[];
     try{var lb=await battleRequest('/ranked/leaderboard',{method:'GET'});ONLINE_STATE.leaderboard=Array.isArray(lb.leaders)?lb.leaders:[];}catch(e){}
+    try{var wl=await battleRequest('/leaderboard',{method:'GET'});ONLINE_STATE.winsLeaderboard=Array.isArray(wl.leaders)?wl.leaders:[];}catch(e){}
     return ONLINE_STATE.profile;
   }finally{ONLINE_STATE.profileLoading=false;}
 }
@@ -2401,6 +2402,15 @@ async function purchaseWinShopItem(itemId){
 async function equipWinShopItem(itemId){
   try{var data=await battleRequest('/shop/equip',{method:'POST',body:JSON.stringify({profileToken:onlineProfileToken(),name:onlineProfileName(),itemId:itemId})});ONLINE_STATE.profile=data.profile;showNotice('Cosmetic equipped.');renderOnlineBattle();}
   catch(err){showError('Wins Shop: '+err.message);}
+}
+async function pullWinShopGacha(itemId){
+  try{
+    var data=await battleRequest('/shop/gacha',{method:'POST',body:JSON.stringify({profileToken:onlineProfileToken(),name:onlineProfileName(),itemId:itemId})});
+    ONLINE_STATE.profile=data.profile;
+    var prize=data.prize||{},label=(prize.shiny?'Shiny ':'')+(prize.name||speciesName(prize.species)||'Pokémon');
+    showNotice('Gacha pull: '+label+'! Added to your Wins collection.');
+    renderOnlineBattle();
+  }catch(err){showError('Wins Shop Gacha: '+err.message);}
 }
 function stopRankedPolling(){if(ONLINE_STATE.rankedTimer){clearInterval(ONLINE_STATE.rankedTimer);ONLINE_STATE.rankedTimer=null;}}
 async function cancelRankedBattle(){
@@ -5952,14 +5962,25 @@ function renderOnlineBattle(){
       progressionCard.appendChild(ranked);
       var shop=el('div',{class:'wins-shop-grid'});
       (ONLINE_STATE.shop||[]).forEach(function(item){
-        var owned=(p.purchases||[]).includes(item.id),equipped=p.equipped&&p.equipped[item.kind]===item.value,card=el('div',{class:'wins-shop-item'});
-        card.appendChild(el('strong',{text:item.name}));card.appendChild(el('small',{text:item.price+' Wins · '+item.kind}));
-        var btn=el('button',{class:equipped?'ghost':owned?'primary':'',text:equipped?'Equipped':owned?'Equip':'Buy · '+item.price});
-        btn.disabled=equipped||(!owned&&p.wins<item.price);btn.addEventListener('click',function(){owned?equipWinShopItem(item.id):purchaseWinShopItem(item.id);});card.appendChild(btn);shop.appendChild(card);
+        var owned=(p.purchases||[]).includes(item.id),equipped=p.equipped&&p.equipped[item.kind]===item.value,card=el('div',{class:'wins-shop-item'}),isGacha=item.kind==='gacha';
+        card.appendChild(el('strong',{text:item.name}));card.appendChild(el('small',{text:(item.description?item.description+' · ':'')+item.price+' Wins · '+(isGacha?'repeatable reward':item.kind)}));
+        var btn=el('button',{class:equipped?'ghost':owned&&!isGacha?'primary':'',text:isGacha?'Pull · '+item.price:equipped?'Equipped':owned?'Equip':'Buy · '+item.price});
+        btn.disabled=equipped||p.wins<item.price&&(!owned||isGacha);btn.addEventListener('click',function(){isGacha?pullWinShopGacha(item.id):owned?equipWinShopItem(item.id):purchaseWinShopItem(item.id);});card.appendChild(btn);shop.appendChild(card);
       });
       progressionCard.appendChild(shop);
+      if((p.gachaPokemon||[]).length){
+        var collection=el('div',{class:'ranked-leaderboard'});collection.appendChild(el('h5',{text:'Wins Gacha Collection'}));
+        p.gachaPokemon.slice().reverse().slice(0,12).forEach(function(mon){collection.appendChild(el('div',{class:'ranked-leader-row',text:(mon.shiny?'★ Shiny ':'')+(mon.name||speciesName(mon.species))+' · '+(mon.tier==='premium'?'Premium':'Standard')}));});progressionCard.appendChild(collection);
+      }
+      if((ONLINE_STATE.winsLeaderboard||[]).length){
+        var publicLeaders=el('div',{class:'ranked-leaderboard'});publicLeaders.appendChild(el('h5',{text:'Public Wins Leaderboard'}));
+        ONLINE_STATE.winsLeaderboard.slice(0,25).forEach(function(row){
+          var ratio=row.winLossRatio===null?'∞':Number(row.winLossRatio||0).toFixed(2);
+          publicLeaders.appendChild(el('div',{class:'ranked-leader-row',text:'#'+row.rank+' · '+row.name+' · '+row.wins+' wins · '+row.record+' · '+ratio+' W/L'}));
+        });progressionCard.appendChild(publicLeaders);
+      }
       if((ONLINE_STATE.leaderboard||[]).length){
-        var leaders=el('div',{class:'ranked-leaderboard'});leaders.appendChild(el('h5',{text:'Ranked Leaderboard'}));
+        var leaders=el('div',{class:'ranked-leaderboard'});leaders.appendChild(el('h5',{text:'Ranked Rating Leaderboard'}));
         ONLINE_STATE.leaderboard.slice(0,10).forEach(function(row){leaders.appendChild(el('div',{class:'ranked-leader-row',text:'#'+row.rank+' · '+row.name+' · '+row.rating+' · '+row.rankedWins+'–'+row.rankedLosses}));});progressionCard.appendChild(leaders);
       }
     }
