@@ -839,6 +839,86 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
 
 [hidden]{display:none!important;}
 html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){text-align:right;}
+
+/* ---------- Battle readability / spacing polish ---------- */
+.battle-sim-bottom{position:relative;z-index:20}
+.battle-side-panel{justify-content:flex-end;padding-bottom:18px}
+.battle-side-trainer-wrap,.battle-side-panel .battle-trainer-sprite{display:none!important}
+
+/* Pull the player's Pokémon farther back so large back sprites stay fully on-screen. */
+.battle-combatant.me{left:4%!important;bottom:3%!important;width:clamp(180px,21vw,270px)!important;height:48%!important}
+.battle-combatant.me .battle-sprite{width:clamp(135px,13vw,215px)!important;height:clamp(135px,13vw,215px)!important;object-fit:contain!important;object-position:center bottom!important}
+.battle-combatant.foe .battle-sprite{object-fit:contain!important;object-position:center bottom!important}
+
+/* Keep battle labels readable against every battlefield/theme. */
+.battle-hud-name{font-size:16px!important;font-weight:900!important;line-height:1.25!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;text-shadow:0 1px 2px #fff,0 0 2px #fff!important}
+.battle-hud-level{font-size:12px!important;font-weight:800!important;text-shadow:0 1px 2px #fff!important}
+.battle-hud-hp-text{font-size:11px!important;font-weight:800!important}
+:root:not([data-theme="light"]) .battle-hud-name,
+:root:not([data-theme="light"]) .battle-hud-level{color:#f5f5f5!important;text-shadow:0 1px 2px #000,0 0 3px #000!important}
+:root:not([data-theme="light"]) .battle-hud-hp-text{color:#e2e2e2!important}
+
+/* Make the command area roomier and never crop move text. */
+.battle-command{padding:16px!important;min-width:0!important}
+.battle-command h4{font-size:16px!important;line-height:1.35!important;margin:0 0 12px!important;white-space:normal!important;overflow:visible!important}
+.battle-move-grid{gap:10px!important}
+.battle-move-button{
+  min-height:82px!important;
+  padding:12px 14px 28px!important;
+  overflow:visible!important;
+  white-space:normal!important;
+  min-width:0!important;
+  align-items:flex-start!important;
+}
+.battle-move-button strong{
+  font-size:15px!important;
+  line-height:1.25!important;
+  margin:0 0 7px!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere!important;
+}
+.battle-move-button small{
+  font-size:11px!important;
+  line-height:1.35!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere!important;
+  padding-right:38px!important;
+}
+.battle-move-button .battle-move-pp{
+  right:10px!important;
+  bottom:8px!important;
+  font-size:10px!important;
+  white-space:nowrap!important;
+}
+.battle-effect{font-size:9px!important;bottom:7px!important;max-width:55%!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}
+
+/* Give the log enough width and readable line spacing. */
+.battle-sim-bottom{grid-template-columns:minmax(0,1.55fr) minmax(320px,.85fr)!important}
+.battle-log-title{font-size:12px!important;padding:12px 14px!important}
+.battle-log{font-size:13px!important;line-height:1.55!important;padding:12px 14px!important;max-height:320px!important}
+.battle-log-line{padding:6px 0!important;overflow-wrap:anywhere!important}
+
+/* Side rails keep player names + team balls only; no duplicate trainer art. */
+.battle-side-name{font-size:11px!important;line-height:1.25!important;margin-bottom:10px!important;overflow-wrap:anywhere!important}
+.battle-side-team{margin-bottom:4px!important}
+
+@media(max-width:900px){
+  .battle-combatant.me{left:1%!important;bottom:2%!important}
+  .battle-combatant.me .battle-sprite{width:clamp(125px,24vw,190px)!important;height:clamp(125px,24vw,190px)!important}
+  .battle-sim-bottom{grid-template-columns:1fr!important}
+  .battle-log{max-height:210px!important}
+}
+@media(max-width:600px){
+  .battle-combatant.me{left:-1%!important;bottom:1%!important;width:48%!important;height:44%!important}
+  .battle-combatant.me .battle-sprite{width:clamp(105px,32vw,150px)!important;height:clamp(105px,32vw,150px)!important}
+  .battle-command{padding:10px!important}
+  .battle-command h4{font-size:14px!important}
+  .battle-move-button{min-height:78px!important;padding:10px 10px 27px!important}
+  .battle-move-button strong{font-size:13px!important}
+  .battle-move-button small{font-size:9px!important}
+  .battle-log{font-size:11px!important;max-height:160px!important}
+}
+
 </style>
 </head>
 <body>
@@ -5919,8 +5999,6 @@ function renderOnlineBattle(){
   var active=me.team[actorPos===1?me.active2:me.active],foeActive=foe.team[targetPos===1?foe.active2:foe.active];
   function battleSidePanel(player,sideName){
     var panel=el('div',{class:'battle-side-panel '+sideName});
-    var trainerWrap=el('div',{class:'battle-side-trainer-wrap'}),trainerImg=el('img',{class:'battle-trainer-sprite '+(trainerSpriteIsOverworld(player.trainer||{})?'trainer-overworld-upscale':'trainer-battle-art'),src:trainerSpritePath(player.trainer||{}),alt:player.name+' trainer'});
-    trainerImg.decoding='async';trainerImg.addEventListener('error',function(){trainerWrap.remove();});trainerWrap.appendChild(trainerImg);panel.appendChild(trainerWrap);
     panel.appendChild(el('div',{class:'battle-side-name',text:player.name}));
     var team=el('div',{class:'battle-side-team'});
     (player.team||[]).forEach(function(mon,index){team.appendChild(el('span',{class:'battle-side-ball'+(mon.hp<=0?' fainted':'')+((index===player.active||index===player.active2)?' active':''),title:mon.name}));});
