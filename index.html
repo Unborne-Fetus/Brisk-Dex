@@ -1807,7 +1807,8 @@ function parseTrainer(v0, s0, profile){
   var hours = u16(v0, 0x000E);
   var minutes = u8(v0, 0x0010);
   var seconds = u8(v0, 0x0011);
-  var outfitId = profile && profile.brisk ? u16(v0, 0x0090) : 1;
+  var outfitOffset=profile&&profile.trainer&&profile.trainer.outfitOffset;
+  var outfitId=outfitOffset!=null&&Number(outfitOffset)+2<=v0.byteLength?u16(v0,Number(outfitOffset)):1;
   if (outfitId !== 1 && outfitId !== 2) outfitId = 1;
   return {
     name: name || "TRAINER",
@@ -1819,137 +1820,64 @@ function parseTrainer(v0, s0, profile){
   };
 }
 
-function decodePokemon(rec, isPartySlot){
-  if (rec.length < 80) return null;
-  var view = new DataView(rec.buffer, rec.byteOffset, rec.length);
-  var profile = (currentSave && currentSave.profile) || window.ACTIVE_EMERALD_PROFILE || (window.EmeraldCompat && EmeraldCompat.profiles.emerald);
-  var isBriskEncoding = !!(profile && profile.brisk);
-  var personality = u32(view, 0x00);
-  var otId = u32(view, 0x04);
+function decodePokemon(rec,isPartySlot,profileOverride){
+  if(rec.length<80)return null;
+  var view=new DataView(rec.buffer,rec.byteOffset,rec.length);
+  var profile=profileOverride||(currentSave&&currentSave.profile)||window.ACTIVE_EMERALD_PROFILE||(window.EmeraldCompat&&EmeraldCompat.profileForId('emerald'));
+  var pk=profile&&profile.pokemon||{};
+  var personality=u32(view,0x00),otId=u32(view,0x04);
+  if(personality===0&&otId===0)return {empty:true};
 
-  if (personality === 0 && otId === 0){
-    return { empty:true };
+  var nickname=decodeGen3String(rec.subarray(0x08,0x12)),language=u8(view,0x12),otName=decodeGen3String(rec.subarray(0x14,0x1B));
+  var markings=u8(view,0x1B),checksum=u16(view,0x1C),key=(otId^personality)>>>0;
+  var dataBytes=new Uint8Array(48);dataBytes.set(rec.subarray(0x20,0x50));
+  var dataView=new DataView(dataBytes.buffer);
+  for(var w=0;w<12;w++)dataView.setUint32(w*4,(dataView.getUint32(w*4,true)^key)>>>0,true);
+  var calculatedChecksum=0;for(var cw=0;cw<24;cw++)calculatedChecksum=(calculatedChecksum+dataView.getUint16(cw*2,true))&0xFFFF;
+  var checksumValid=calculatedChecksum===checksum;
+
+  var order=SUB_ORDERS[personality%24],subOffsets={};
+  for(var i=0;i<4;i++)subOffsets[order[i]]=i*12;
+  var gOff=subOffsets.G,aOff=subOffsets.A,eOff=subOffsets.E,mOff=subOffsets.M;
+  var speciesMask=pk.speciesMask==null?0xFFFF:Number(pk.speciesMask),itemMask=pk.heldItemMask==null?0xFFFF:Number(pk.heldItemMask);
+  var expMask=pk.experienceMask==null?0xFFFFFFFF:Number(pk.experienceMask)>>>0,moveMask=pk.moveMask==null?0xFFFF:Number(pk.moveMask),ppMask=pk.ppMask==null?0xFF:Number(pk.ppMask);
+  var speciesWord=dataView.getUint16(gOff,true),rawSpecies=speciesWord&speciesMask;
+  var species=window.EmeraldCompat?EmeraldCompat.mapId(profile,'species',rawSpecies,true):rawSpecies;
+  var teraType=pk.teraShift==null?null:((speciesWord>>>Number(pk.teraShift))&Number(pk.teraMask||0));
+  var rawHeld=dataView.getUint16(gOff+2,true)&itemMask,heldItem=window.EmeraldCompat?EmeraldCompat.mapId(profile,'items',rawHeld,true):rawHeld;
+  var experience=dataView.getUint32(gOff+4,true)&expMask,ppBonuses=dataView.getUint8(gOff+8),friendship=dataView.getUint8(gOff+9);
+  var moves=[],pp=[];
+  for(var mi=0;mi<4;mi++){
+    var rawMove=dataView.getUint16(aOff+mi*2,true)&moveMask;
+    moves.push(window.EmeraldCompat?EmeraldCompat.mapId(profile,'moves',rawMove,true):rawMove);
+    pp.push(dataView.getUint8(aOff+8+mi)&ppMask);
   }
 
-  var nickname = decodeGen3String(rec.subarray(0x08, 0x08+10));
-  var language = u8(view, 0x12);
-  var otName = decodeGen3String(rec.subarray(0x14, 0x14+7));
-  var markings = u8(view, 0x1B);
-  var checksum = u16(view, 0x1C);
+  var evs={hp:dataView.getUint8(eOff),atk:dataView.getUint8(eOff+1),def:dataView.getUint8(eOff+2),spd:dataView.getUint8(eOff+3),spa:dataView.getUint8(eOff+4),spdef:dataView.getUint8(eOff+5)};
+  var pokerusRaw=dataView.getUint8(mOff),metLocation=dataView.getUint8(mOff+1),originsInfo=dataView.getUint16(mOff+2,true),ivEggAbility=dataView.getUint32(mOff+4,true);
+  var ivs={hp:ivEggAbility&0x1F,atk:(ivEggAbility>>>5)&0x1F,def:(ivEggAbility>>>10)&0x1F,spd:(ivEggAbility>>>15)&0x1F,spa:(ivEggAbility>>>20)&0x1F,spdef:(ivEggAbility>>>25)&0x1F};
+  var isEgg=((ivEggAbility>>>30)&1)===1,abilityBits=dataView.getUint32(mOff+8,true);
+  var abilitySlot=pk.abilityMode==='vanilla-bit31'?((ivEggAbility>>>31)&1):((abilityBits>>>29)&3);
+  var levelMet=originsInfo&0x7F,gameOfOrigin=(originsInfo>>>7)&0x0F,ballCaught=(originsInfo>>>11)&0x0F,otGender=(originsInfo>>>15)&1;
+  var nature=NATURES[personality%25],shinyValue=(personality&0xFFFF)^(personality>>>16)^(otId&0xFFFF)^(otId>>>16);
+  var shinyThreshold=Number(pk.shinyThreshold||8),shinyModifier=pk.shinyOverrideBit==null?0:((u16(view,0x1E)>>>Number(pk.shinyOverrideBit))&1);
+  var isShiny=pk.shinyOverrideBit==null?(shinyValue<shinyThreshold):((shinyValue<shinyThreshold)!==(shinyModifier===1));
+  var competitiveLegal=pk.provenanceBit==null?false:(((u16(view,0x1E)>>>Number(pk.provenanceBit))&1)===1);
 
-  // decrypt 48-byte data section
-  var key = (otId ^ personality) >>> 0;
-  var dataBytes = new Uint8Array(48);
-  dataBytes.set(rec.subarray(0x20, 0x20+48));
-  var dataView = new DataView(dataBytes.buffer);
-  for (var w=0; w<12; w++){
-    var word = dataView.getUint32(w*4, true);
-    var dec = (word ^ key) >>> 0;
-    dataView.setUint32(w*4, dec, true);
+  var mon={
+    empty:false,rawRecord:rec.slice(0,isPartySlot?(Number(pk.partyRecordSize)||100):(Number(pk.boxRecordSize)||80)),
+    recordProfileId:profile&&profile.id||'emerald',personality:personality,otId:otId,nickname:nickname,otName:otName,otGender:otGender===1?'Female':'Male',
+    language:language,markings:markings,species:species,rawSpecies:rawSpecies,teraType:teraType,heldItem:heldItem,rawHeldItem:rawHeld,
+    experience:experience,friendship:friendship,moves:moves,pp:pp,ppBonuses:ppBonuses,evs:evs,ivs:ivs,isEgg:isEgg,abilitySlot:abilitySlot,
+    nature:nature,isShiny:isShiny,pokerus:pokerusRaw,metLocation:metLocation,levelMet:levelMet,gameOfOrigin:gameOfOrigin,ballCaught:ballCaught,
+    checksumValid:checksumValid,competitiveLegal:competitiveLegal
+  };
+  if(isPartySlot&&rec.length>=100){
+    mon.status=u32(view,0x50);mon.level=u8(view,0x54);mon.currentHP=u16(view,0x56);mon.maxHP=u16(view,0x58);
+    mon.atk=u16(view,0x5A);mon.def=u16(view,0x5C);mon.speed=u16(view,0x5E);mon.spAtk=u16(view,0x60);mon.spDef=u16(view,0x62);
+  }else{
+    mon.level=estimateLevelFromExp(experience,speciesGrowthRate(species));mon.maxHP=null;mon.currentHP=null;
   }
-
-  var calculatedChecksum = 0;
-  for (var cw=0; cw<24; cw++) calculatedChecksum = (calculatedChecksum + dataView.getUint16(cw*2, true)) & 0xFFFF;
-  var checksumValid = calculatedChecksum === checksum;
-  // Bits in the party padding word are Brisk-only metadata. Vanilla Emerald
-  // leaves them out of the Pokémon format entirely.
-  var competitiveLegal = isBriskEncoding && (((u16(view, 0x1E) >>> 15) & 1) === 1);
-
-  var order = SUB_ORDERS[personality % 24];
-  var subOffsets = {};
-  for (var i=0;i<4;i++){ subOffsets[order[i]] = i*12; }
-
-  var gOff = subOffsets['G'], aOff = subOffsets['A'], eOff = subOffsets['E'], mOff = subOffsets['M'];
-
-  var speciesWord = dataView.getUint16(gOff+0, true);
-  var rawSpecies = isBriskEncoding ? (speciesWord & 0x07FF) : speciesWord;
-  var species = isBriskEncoding ? rawSpecies
-    : (window.EmeraldCompat ? EmeraldCompat.emeraldInternalSpeciesToNational(rawSpecies) : rawSpecies);
-  var teraType = isBriskEncoding ? ((speciesWord >>> 11) & 0x1F) : null;
-  var heldItem = isBriskEncoding ? (dataView.getUint16(gOff+2, true) & 0x03FF) : dataView.getUint16(gOff+2, true);
-  var experience = isBriskEncoding ? (dataView.getUint32(gOff+4, true) & 0x001FFFFF) : dataView.getUint32(gOff+4, true);
-  var ppBonuses = dataView.getUint8(gOff+8);
-  var friendship = dataView.getUint8(gOff+9);
-
-  var moves = [
-    isBriskEncoding ? (dataView.getUint16(aOff+0, true) & 0x07FF) : dataView.getUint16(aOff+0, true),
-    isBriskEncoding ? (dataView.getUint16(aOff+2, true) & 0x07FF) : dataView.getUint16(aOff+2, true),
-    isBriskEncoding ? (dataView.getUint16(aOff+4, true) & 0x07FF) : dataView.getUint16(aOff+4, true),
-    isBriskEncoding ? (dataView.getUint16(aOff+6, true) & 0x07FF) : dataView.getUint16(aOff+6, true)
-  ];
-  var pp = [
-    isBriskEncoding ? (dataView.getUint8(aOff+8) & 0x7F) : dataView.getUint8(aOff+8),
-    isBriskEncoding ? (dataView.getUint8(aOff+9) & 0x7F) : dataView.getUint8(aOff+9),
-    isBriskEncoding ? (dataView.getUint8(aOff+10) & 0x7F) : dataView.getUint8(aOff+10),
-    isBriskEncoding ? (dataView.getUint8(aOff+11) & 0x7F) : dataView.getUint8(aOff+11)
-  ];
-
-  var evs = {
-    hp: dataView.getUint8(eOff+0), atk: dataView.getUint8(eOff+1), def: dataView.getUint8(eOff+2),
-    spd: dataView.getUint8(eOff+3), spa: dataView.getUint8(eOff+4), spdef: dataView.getUint8(eOff+5)
-  };
-
-  var pokerusRaw = dataView.getUint8(mOff+0);
-  var metLocation = dataView.getUint8(mOff+1);
-  var originsInfo = dataView.getUint16(mOff+2, true);
-  var ivEggAbility = dataView.getUint32(mOff+4, true);
-
-  var ivs = {
-    hp: ivEggAbility & 0x1F,
-    atk: (ivEggAbility >>> 5) & 0x1F,
-    def: (ivEggAbility >>> 10) & 0x1F,
-    spd: (ivEggAbility >>> 15) & 0x1F,
-    spa: (ivEggAbility >>> 20) & 0x1F,
-    spdef: (ivEggAbility >>> 25) & 0x1F
-  };
-  var isEgg = ((ivEggAbility >>> 30) & 1) === 1;
-  var abilityBits = dataView.getUint32(mOff+8, true);
-  var abilitySlot = isBriskEncoding ? ((abilityBits >>> 29) & 3) : ((ivEggAbility >>> 31) & 1);
-
-  var levelMet = originsInfo & 0x7F;
-  var gameOfOrigin = (originsInfo >>> 7) & 0x0F;
-  var ballCaught = (originsInfo >>> 11) & 0x0F;
-  var otGender = (originsInfo >>> 15) & 1;
-
-  var nature = NATURES[personality % 25];
-  var shinyValue = (personality & 0xFFFF) ^ (personality >>> 16) ^ (otId & 0xFFFF) ^ (otId >>> 16);
-  var shinyModifier = isBriskEncoding ? ((u16(view, 0x1E) >>> 14) & 1) : 0;
-  var isShiny = isBriskEncoding
-    ? ((shinyValue < GAME_SHINY_ODDS) !== (shinyModifier === 1))
-    : (shinyValue < 8);
-
-  var mon = {
-    empty:false,
-    rawRecord: rec.slice(0, isPartySlot ? 100 : 80),
-    personality: personality, otId: otId,
-    nickname: nickname, otName: otName, otGender: otGender === 1 ? "Female":"Male",
-    language: language, markings: markings,
-    species: species, rawSpecies: rawSpecies, teraType: teraType, heldItem: heldItem, experience: experience,
-    friendship: friendship, moves: moves, pp: pp, ppBonuses: ppBonuses,
-    evs: evs, ivs: ivs, isEgg: isEgg, abilitySlot: abilitySlot,
-    nature: nature, isShiny: isShiny,
-    pokerus: pokerusRaw, metLocation: metLocation, levelMet: levelMet,
-    gameOfOrigin: gameOfOrigin, ballCaught: ballCaught,
-    checksumValid: checksumValid, competitiveLegal: competitiveLegal
-  };
-
-  if (isPartySlot && rec.length >= 100){
-    mon.status = u32(view, 0x50);
-    mon.level = u8(view, 0x54);
-    mon.currentHP = u16(view, 0x56);
-    mon.maxHP = u16(view, 0x58);
-    mon.atk = u16(view, 0x5A);
-    mon.def = u16(view, 0x5C);
-    mon.speed = u16(view, 0x5E);
-    mon.spAtk = u16(view, 0x60);
-    mon.spDef = u16(view, 0x62);
-  } else {
-    // derive an approximate level from experience using a medium-fast curve
-    // (exact curve depends on species growth rate, which we may not have data for)
-    mon.level = estimateLevelFromExp(experience, speciesGrowthRate(species));
-    mon.maxHP = null; mon.currentHP = null;
-  }
-
   return mon;
 }
 
