@@ -11,6 +11,44 @@ const HOST = process.env.HOST || '0.0.0.0';
 const rooms = new Map();
 const matchmaking = new Map();
 const matchmakingTickets = new Map();
+const wonderBoxDeposits = new Map();
+const gtsListings = new Map();
+const linkTradeRooms = new Map();
+
+function tradePokemon(value){
+  const decoded=decodeVerifiedRaw80(value);
+  if(!decoded.ok)return {ok:false,reason:decoded.reason};
+  return {ok:true,raw:decoded.raw,mon:decoded.mon};
+}
+function publicTradeMon(entry){
+  if(!entry)return null;
+  const m=entry.mon||entry;
+  return {species:m.species,level:m.level,isShiny:!!m.isShiny,teraType:m.teraType,heldItem:m.heldItem};
+}
+function tradeCode(){
+  const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let out='';
+  do{out='';const b=crypto.randomBytes(6);for(let i=0;i<6;i++)out+=chars[b[i]%chars.length];}while(linkTradeRooms.has(out));
+  return out;
+}
+function gtsMatches(request,mon){
+  request=request||{};
+  if(request.species&&Number(request.species)!==Number(mon.species))return false;
+  if(request.minLevel&&mon.level<Number(request.minLevel))return false;
+  if(request.maxLevel&&mon.level>Number(request.maxLevel))return false;
+  if(request.type){
+    const types=Array.isArray(mon.speciesData&&mon.speciesData.types)?mon.speciesData.types:[];
+    if(!types.some(t=>normalizeName(t)===normalizeName(request.type)))return false;
+  }
+  return true;
+}
+function tryWonderBoxMatch(){
+  const pending=[...wonderBoxDeposits.values()].filter(x=>x.status==='waiting').sort((a,b)=>a.createdAt-b.createdAt);
+  for(let i=0;i<pending.length;i++)for(let j=i+1;j<pending.length;j++){
+    const a=pending[i],b=pending[j];if(a.ownerToken===b.ownerToken)continue;
+    a.status=b.status='matched';a.received=b.raw;b.received=a.raw;a.receivedMon=publicTradeMon(b);b.receivedMon=publicTradeMon(a);a.updatedAt=b.updatedAt=Date.now();
+    pending.splice(j,1);break;
+  }
+}
 
 function json(res, status, body){
   res.writeHead(status, {
@@ -1804,6 +1842,75 @@ const server=http.createServer(async (req,res)=>{
         rules:{format:'singles',teamSize:Math.max(1,Math.min(6,Number(body.rules&&body.rules.teamSize)||6))},
         players:[{id:playerId,name:cleanText(body.name,24)||'Host',trainer:cleanTrainerAppearance(body.trainer),team,ready:false,active:0,choice:null,side:{},lastSeen:Date.now()}]};
       rooms.set(code,room); return json(res,200,{code,playerId,playerIndex:0,room:publicRoom(room,0)});
+    }
+    if(req.method==='POST'&&url.pathname==='/trades/wonder-box/deposit'){
+      const body=await readBody(req),verified=tradePokemon(body.raw80);
+      if(!verified.ok)return json(res,400,{error:'Trade rejected: '+verified.reason});
+      const ownerToken=cleanText(body.ownerToken,96)||id();
+      const owned=[...wonderBoxDeposits.values()].filter(x=>x.ownerToken===ownerToken&&x.status==='waiting');
+      if(owned.length>=10)return json(res,409,{error:'Wonder Box already has 10 waiting Pokémon.'});
+      const depositId=id(),entry={id:depositId,ownerToken,raw:verified.raw,mon:verified.mon,status:'waiting',createdAt:Date.now(),updatedAt:Date.now()};
+      wonderBoxDeposits.set(depositId,entry);tryWonderBoxMatch();
+      return json(res,200,{ok:true,depositId,ownerToken,status:entry.status,receivedMon:entry.receivedMon||null});
+    }
+    if(req.method==='GET'&&url.pathname==='/trades/wonder-box/status'){
+      const ownerToken=cleanText(url.searchParams.get('ownerToken'),96);
+      const entries=[...wonderBoxDeposits.values()].filter(x=>x.ownerToken===ownerToken).map(x=>({depositId:x.id,status:x.status,sent:publicTradeMon(x),receivedMon:x.receivedMon||null,received:x.status==='matched'?x.received:null}));
+      return json(res,200,{ok:true,entries});
+    }
+    if(req.method==='POST'&&url.pathname==='/trades/wonder-box/claim'){
+      const body=await readBody(req),entry=wonderBoxDeposits.get(String(body.depositId||''));
+      if(!entry||entry.ownerToken!==cleanText(body.ownerToken,96))return json(res,404,{error:'Wonder Box deposit not found.'});
+      if(entry.status!=='matched')return json(res,409,{error:'This Wonder Box slot has not matched yet.'});
+      wonderBoxDeposits.delete(entry.id);return json(res,200,{ok:true,raw80:entry.received,receivedMon:entry.receivedMon});
+    }
+    if(req.method==='POST'&&url.pathname==='/trades/gts/list'){
+      const body=await readBody(req),verified=tradePokemon(body.raw80);
+      if(!verified.ok)return json(res,400,{error:'Trade rejected: '+verified.reason});
+      const request={species:Number(body.request&&body.request.species)||0,type:cleanText(body.request&&body.request.type,24),minLevel:clamp(Number(body.request&&body.request.minLevel)||1,1,100),maxLevel:clamp(Number(body.request&&body.request.maxLevel)||100,1,100)};
+      if(request.minLevel>request.maxLevel)return json(res,400,{error:'Minimum level cannot exceed maximum level.'});
+      const listingId=id(),ownerToken=cleanText(body.ownerToken,96)||id();
+      gtsListings.set(listingId,{id:listingId,ownerToken,trainer:cleanText(body.trainer,24)||'Trainer',raw:verified.raw,mon:verified.mon,request,createdAt:Date.now()});
+      return json(res,200,{ok:true,listingId,ownerToken});
+    }
+    if(req.method==='GET'&&url.pathname==='/trades/gts'){
+      const ownerToken=cleanText(url.searchParams.get('ownerToken'),96),out=[];
+      for(const x of gtsListings.values())if(x.ownerToken!==ownerToken)out.push({listingId:x.id,trainer:x.trainer,offered:publicTradeMon(x),request:x.request,createdAt:x.createdAt});
+      return json(res,200,{ok:true,listings:out.slice(0,200)});
+    }
+    if(req.method==='POST'&&url.pathname==='/trades/gts/take'){
+      const body=await readBody(req),listing=gtsListings.get(String(body.listingId||'')),verified=tradePokemon(body.raw80);
+      if(!listing)return json(res,404,{error:'That GTS listing is no longer available.'});
+      if(!verified.ok)return json(res,400,{error:'Trade rejected: '+verified.reason});
+      if(!gtsMatches(listing.request,verified.mon))return json(res,409,{error:'That Pokémon does not meet the requested GTS conditions.'});
+      if(listing.ownerToken===cleanText(body.ownerToken,96))return json(res,409,{error:'You cannot trade with your own GTS listing.'});
+      gtsListings.delete(listing.id);
+      return json(res,200,{ok:true,received:listing.raw,receivedMon:publicTradeMon(listing),sentMon:publicTradeMon(verified)});
+    }
+    if(req.method==='POST'&&url.pathname==='/trades/link/host'){
+      const body=await readBody(req),verified=tradePokemon(body.raw80);
+      if(!verified.ok)return json(res,400,{error:'Trade rejected: '+verified.reason});
+      const code=tradeCode(),playerId=id(),room={code,createdAt:Date.now(),updatedAt:Date.now(),players:[{id:playerId,name:cleanText(body.name,24)||'Host',raw:verified.raw,mon:verified.mon,confirmed:false}]};
+      linkTradeRooms.set(code,room);return json(res,200,{ok:true,code,playerId,room:{code,players:[{name:room.players[0].name,offer:publicTradeMon(room.players[0])}]}});
+    }
+    if(req.method==='POST'&&url.pathname==='/trades/link/join'){
+      const body=await readBody(req),room=linkTradeRooms.get(String(body.code||'').toUpperCase()),verified=tradePokemon(body.raw80);
+      if(!room)return json(res,404,{error:'Link Trade room not found.'});if(room.players.length>=2)return json(res,409,{error:'Link Trade room is full.'});
+      if(!verified.ok)return json(res,400,{error:'Trade rejected: '+verified.reason});
+      const playerId=id();room.players.push({id:playerId,name:cleanText(body.name,24)||'Trainer',raw:verified.raw,mon:verified.mon,confirmed:false});room.updatedAt=Date.now();
+      return json(res,200,{ok:true,code:room.code,playerId});
+    }
+    if(req.method==='GET'&&url.pathname==='/trades/link/status'){
+      const room=linkTradeRooms.get(String(url.searchParams.get('code')||'').toUpperCase()),playerId=url.searchParams.get('playerId');
+      if(!room)return json(res,404,{error:'Link Trade room not found.'});const pi=room.players.findIndex(p=>p.id===playerId);if(pi<0)return json(res,403,{error:'Invalid Link Trade token.'});
+      const complete=room.players.length===2&&room.players.every(p=>p.confirmed);
+      return json(res,200,{ok:true,complete,players:room.players.map(p=>({name:p.name,offer:publicTradeMon(p),confirmed:p.confirmed})),received:complete?room.players[1-pi].raw:null,receivedMon:complete?publicTradeMon(room.players[1-pi]):null});
+    }
+    if(req.method==='POST'&&url.pathname==='/trades/link/confirm'){
+      const body=await readBody(req),room=linkTradeRooms.get(String(body.code||'').toUpperCase());
+      if(!room)return json(res,404,{error:'Link Trade room not found.'});const pi=room.players.findIndex(p=>p.id===body.playerId);if(pi<0)return json(res,403,{error:'Invalid Link Trade token.'});
+      if(room.players.length!==2)return json(res,409,{error:'Waiting for another player.'});room.players[pi].confirmed=!!body.confirmed;room.updatedAt=Date.now();
+      return json(res,200,{ok:true,complete:room.players.every(p=>p.confirmed)});
     }
     const match=url.pathname.match(/^\/rooms\/([A-Z0-9]{6})(?:\/(join|action))?$/);
     if(!match) return json(res,404,{error:'Not found'});
