@@ -1709,128 +1709,90 @@ function base64ToBytes(b64){
 }
 
 function parseSav(arrayBuffer){
-  var bytes = new Uint8Array(arrayBuffer);
-  if (bytes.length < 0x1C000){
-    throw new Error("This file is too small to be a Generation III save file (expected at least 114,688 bytes).");
-  }
-  var blockA = readBlock(bytes, 0x0000);
-  var blockB = readBlock(bytes, 0xE000);
+  var bytes=new Uint8Array(arrayBuffer),override=selectedEmeraldProfileOverride();
+  var briskProbeProfile=window.EmeraldCompat?EmeraldCompat.profileForId('brisk-emerald'):null;
+  var briskProbe=briskProbeProfile?readStorageExtension(bytes,briskProbeProfile):{present:false};
+  var profile=window.EmeraldCompat
+    ? EmeraldCompat.detectProfile({storageExtensionPresent:briskProbe.present,bytes:bytes,override:override})
+    : {id:'emerald',name:'Pokémon Emerald',save:{},pc:{boxCount:14,slotsPerBox:30,mainSectionIds:[5,6,7,8,9,10,11,12,13],sectionSize:3968,lastSectionSize:2000},features:{}};
+  window.ACTIVE_EMERALD_PROFILE=profile;
 
-  if (!blockA.valid && !blockB.valid){
-    throw new Error("Could not find a valid Generation III save block in this file. Is it a compatible Gen III .sav/.srm (Ruby/Sapphire/Emerald/FireRed/LeafGreen) save file?");
-  }
-  var block;
-  if (blockA.valid && blockB.valid){
-    block = (blockA.saveIndex > blockB.saveIndex) ? blockA : blockB;
-  } else {
-    block = blockA.valid ? blockA : blockB;
-  }
-  var sections = block.sections;
-  if (!sections[0] || !sections[1]){
-    throw new Error("Save file is missing required sections (trainer info / team & items). It may be corrupted or from an unsupported game.");
-  }
+  var cfg=profileSaveConfig(profile),minimum=Number(cfg.minimumSize)||0x1C000;
+  if(bytes.length<minimum)throw new Error('This file is too small for the selected Emerald compatibility profile (expected at least '+minimum.toLocaleString()+' bytes).');
 
-  var storageExtension = readStorageExtension(bytes);
-  var profileOverride='auto';
-  try{ profileOverride=localStorage.getItem('briskdex_emerald_profile')||'auto'; }catch(e){}
-  var profile = window.EmeraldCompat
-    ? EmeraldCompat.detectProfile({storageExtensionPresent:storageExtension.present, bytes:bytes, override:profileOverride})
-    : {id:'emerald',name:'Pokémon Emerald',brisk:false,boxCount:14,features:{}};
-  window.ACTIVE_EMERALD_PROFILE = profile;
+  var blockOffsets=Array.isArray(cfg.blockOffsets)&&cfg.blockOffsets.length>=2?cfg.blockOffsets:[0x0000,0xE000];
+  var blockA=readBlock(bytes,Number(blockOffsets[0]),profile),blockB=readBlock(bytes,Number(blockOffsets[1]),profile);
+  if(!blockA.valid&&!blockB.valid)throw new Error('Could not find a valid Pokémon Emerald save block for the selected compatibility profile.');
+  var block=blockA.valid&&blockB.valid?(blockA.saveIndex>blockB.saveIndex?blockA:blockB):(blockA.valid?blockA:blockB);
+  var sections=block.sections;
+  if(!sections[0]||!sections[1])throw new Error('Save file is missing required Emerald sections (trainer info / team & items).');
 
-  var s0 = sections[0], s1 = sections[1];
-  var v0 = new DataView(s0.buffer, s0.byteOffset, s0.length);
-  var v1 = new DataView(s1.buffer, s1.byteOffset, s1.length);
+  var storageExtension=readStorageExtension(bytes,profile),pc=profile.pc||{};
+  if(pc.extension&&Number(pc.boxCount)>14&&!storageExtension.present)
+    throw new Error('The selected profile expects expanded PC storage, but its extension sectors were not found or failed checksum validation.');
 
-  var trainer = parseTrainer(v0, s0, profile);
-  var securityKey = u32(v0, 0x00AC);
+  var s0=sections[0],s1=sections[1],v0=new DataView(s0.buffer,s0.byteOffset,s0.length),v1=new DataView(s1.buffer,s1.byteOffset,s1.length);
+  var trainer=parseTrainer(v0,s0,profile);
+  var keyOffset=Number(cfg.encryptionKeyOffset==null?0x00AC:cfg.encryptionKeyOffset);
+  var securityKey=keyOffset+4<=v0.byteLength?u32(v0,keyOffset):0;
 
-  var teamSize = u8(v1, 0x0234);
-  if (teamSize > 6) teamSize = 6;
-  var party = [];
-  for (var i=0;i<teamSize;i++){
-    var off = 0x0238 + i*100;
-    var slice = s1.subarray(off, off+100);
-    var mon = decodePokemon(slice, true);
-    if (mon) party.push(mon);
+  var partyCountOffset=Number(cfg.partyCountOffset==null?0x0234:cfg.partyCountOffset);
+  var partyOffset=Number(cfg.partyOffset==null?0x0238:cfg.partyOffset),partyRecordSize=Number(cfg.partyRecordSize)||100;
+  var teamSize=u8(v1,partyCountOffset);if(teamSize>6)teamSize=6;
+  var party=[];
+  for(var i=0;i<teamSize;i++){
+    var po=partyOffset+i*partyRecordSize,slice=s1.subarray(po,po+partyRecordSize),mon=decodePokemon(slice,true,profile);
+    if(mon)party.push(mon);
   }
 
-  var moneyRaw = u32(v1, 0x0490);
-  var money = moneyRaw ^ securityKey;
+  var moneyOffset=Number(cfg.moneyOffset==null?0x0490:cfg.moneyOffset),moneyRaw=moneyOffset+4<=v1.byteLength?u32(v1,moneyOffset):0;
+  var money=(profile.bag&&profile.bag.quantityEncrypted===false)?moneyRaw:(moneyRaw^securityKey);
 
-  // PC storage. Legacy saves use 14 boxes in sections 5-13. Brisk Emerald's
-  // 20-box saves continue PokemonStorage through fixed physical sectors 28-31.
-  var pcParts = [];
-  for (var pid=5; pid<=13; pid++){
-    if (!sections[pid]) throw new Error("Save file is missing PC storage section " + pid + ".");
-    pcParts.push(storageExtension.present ? sections[pid] : (pid === 13 ? sections[pid].subarray(0,2000) : sections[pid]));
-  }
-  if (storageExtension.present) storageExtension.parts.forEach(function(part){ pcParts.push(part); });
+  var mainIds=Array.isArray(pc.mainSectionIds)?pc.mainSectionIds:[5,6,7,8,9,10,11,12,13];
+  var mainSectionSize=Number(pc.sectionSize)||3968,lastSectionSize=Number(pc.lastSectionSize)||2000,pcParts=[];
+  mainIds.forEach(function(pid,index){
+    if(!sections[pid])throw new Error('Save file is missing PC storage section '+pid+'.');
+    var isLast=index===mainIds.length-1;
+    pcParts.push(storageExtension.present?sections[pid]:sections[pid].subarray(0,isLast?lastSectionSize:mainSectionSize));
+  });
+  if(storageExtension.present)storageExtension.parts.forEach(function(part){pcParts.push(part);});
+  var totalLen=pcParts.reduce(function(n,p){return n+p.length;},0),pcBuffer=new Uint8Array(totalLen),pos=0;
+  pcParts.forEach(function(p){pcBuffer.set(p,pos);pos+=p.length;});
 
-  var totalLen = 0;
-  pcParts.forEach(function(p){ totalLen += p.length; });
-  var pcBuffer = new Uint8Array(totalLen);
-  var pos = 0;
-  pcParts.forEach(function(p){ pcBuffer.set(p, pos); pos += p.length; });
-
-  var boxCount = storageExtension.present ? BRISK_BOX_COUNT : LEGACY_BOX_COUNT;
-  var currentBox = pcBuffer[0];
-  if (currentBox >= boxCount) currentBox = 0;
-
-  var boxes = [];
-  for (var b=0; b<boxCount; b++){
-    var monsInBox = [];
-    for (var slot=0; slot<BOX_SLOTS; slot++){
-      var recOff = 4 + (b*BOX_SLOTS + slot)*BOX_MON_SIZE;
-      var rec = pcBuffer.subarray(recOff, recOff + BOX_MON_SIZE);
-      var mon = decodePokemon(rec, false);
-      monsInBox.push(mon);
+  var boxCount=Number(pc.boxCount)||14,slotsPerBox=Number(pc.slotsPerBox)||30,boxMonSize=Number(profile.pokemon&&profile.pokemon.boxRecordSize)||80;
+  var needed=4+boxCount*slotsPerBox*boxMonSize+boxCount*9;
+  if(pcBuffer.length<needed)throw new Error('The selected compatibility profile expects '+boxCount+' PC boxes, but this save only contains '+pcBuffer.length.toLocaleString()+' logical PC bytes.');
+  var currentBox=pcBuffer[0];if(currentBox>=boxCount)currentBox=0;
+  var boxes=[];
+  for(var b=0;b<boxCount;b++){
+    var mons=[];
+    for(var slot=0;slot<slotsPerBox;slot++){
+      var recOff=4+(b*slotsPerBox+slot)*boxMonSize,rec=pcBuffer.subarray(recOff,recOff+boxMonSize);
+      mons.push(decodePokemon(rec,false,profile));
     }
-    boxes.push(monsInBox);
+    boxes.push(mons);
+  }
+  var boxNamesOff=4+boxCount*slotsPerBox*boxMonSize,boxNames=[];
+  for(var b2=0;b2<boxCount;b2++){
+    var name=decodeGen3String(pcBuffer.subarray(boxNamesOff+b2*9,boxNamesOff+b2*9+9));
+    boxNames.push(name||('BOX '+(b2+1)));
   }
 
-  var boxNamesOff = 4 + boxCount * BOX_SLOTS * BOX_MON_SIZE;
-  var boxNames = [];
-  for (var b2=0; b2<boxCount; b2++){
-    var nOff = boxNamesOff + b2*9;
-    var nameBytes = pcBuffer.subarray(nOff, nOff+9);
-    var name = decodeGen3String(nameBytes);
-    boxNames.push(name || ("BOX " + (b2+1)));
-  }
-
-  // Pokédex storage differs between vanilla Emerald and Brisk's expanded save.
-  // The compatibility profile owns that distinction so unknown Emerald hacks do
-  // not get interpreted with Brisk-only offsets.
-  var dexFlags = window.EmeraldCompat
-    ? EmeraldCompat.readDexFlags(profile, sections)
-    : {seen:new Uint8Array(0),caught:new Uint8Array(0)};
-  var dexSeen=dexFlags.seen, dexCaught=dexFlags.caught;
+  var dexFlags=window.EmeraldCompat?EmeraldCompat.readDexFlags(profile,sections):{seen:new Uint8Array(0),caught:new Uint8Array(0),known:false};
+  var bag=readSaveBag(v1,securityKey,profile);
+  var keyPocket=(window.EmeraldCompat?EmeraldCompat.bagPockets(profile):[]).find(function(p){return p.category==='key';});
+  var keyItemIds=[];
+  if(keyPocket)for(var ki=0;ki<keyPocket.count;ki++){var kid=v1.getUint16(keyPocket.offset+ki*4,true);if(kid)keyItemIds.push(kid);}
 
   return {
-    profileId: profile.id,
-    profileName: profile.name,
-    profile: profile,
-    keyItemIds: Array.from({length:30},function(_,i){return v1.getUint16(0x5d8+i*4,true);}).filter(Boolean),
-    bag: readSaveBag(v1,securityKey),
-    securityKey: securityKey,
-    trainer: trainer,
-    money: money,
-    dexSeen: dexSeen,
-    dexCaught: dexCaught,
-    party: party,
-    boxes: boxes,
-    boxNames: boxNames,
-    currentBox: currentBox,
-    filePath: null,
-    _internal: {
-      rawBytes: bytes,
-      sectionView: block.sections,
-      sectionFileOffset: block.fileOffsets,
-      saveIndex: block.saveIndex,
-      profileId: profile.id,
-      hasStorageExtension: storageExtension.present,
-      storageExtensionViews: storageExtension.views,
-      storageExtensionFileOffsets: storageExtension.fileOffsets
+    profileId:profile.id,profileName:profile.name,profile:profile,compatibility:window.EmeraldCompat?EmeraldCompat.compatibilityReport(profile):null,
+    keyItemIds:keyItemIds,bag:bag,securityKey:securityKey,trainer:trainer,money:money,
+    dexSeen:dexFlags.seen,dexCaught:dexFlags.caught,dexKnown:dexFlags.known!==false,
+    party:party,boxes:boxes,boxNames:boxNames,currentBox:currentBox,filePath:null,
+    _internal:{
+      rawBytes:bytes,originalBytes:bytes.slice(),sectionView:block.sections,sectionFileOffset:block.fileOffsets,saveIndex:block.saveIndex,profileId:profile.id,
+      hasStorageExtension:storageExtension.present,storageExtensionViews:storageExtension.views,storageExtensionFileOffsets:storageExtension.fileOffsets,
+      storageExtensionIds:storageExtension.ids||[],storageExtensionSizes:storageExtension.sizes||[],storageExtensionPhysicalSectors:storageExtension.physicalSectors||[]
     }
   };
 }
