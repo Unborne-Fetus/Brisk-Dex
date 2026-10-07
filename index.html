@@ -5003,8 +5003,11 @@ function competitiveLegality(mon){
 function battleCandidateFromMon(mon,key,sourceLabel){
   if(!mon||mon.empty||mon.isEgg)return null;
   var legality=competitiveLegality(mon);
-  var legacyExternal=(sourceLabel==='External Storage'&&mon.checksumValid&&!mon.competitiveLegal);
-  if(!legality.ok&&!legacyExternal)return null;
+  // Older Brisk Emerald saves and previously stored Pokémon predate the
+  // competitive-provenance bit. Do not hide otherwise valid records from
+  // the battle picker just because that metadata did not exist yet.
+  var legacyRecord=!!mon.checksumValid&&!mon.competitiveLegal;
+  if(!legality.ok&&!legacyRecord)return null;
   var species=NAME_DATA.species[String(mon.species)]||{}, abilityList=Array.isArray(species.abilities)?species.abilities.filter(Boolean):[];
   var ability=abilityList[Math.min(Number(mon.abilitySlot)||0,Math.max(0,abilityList.length-1))]||abilityList[0]||'';
   var calculated=calculateBattleStats(mon,species);
@@ -5033,7 +5036,7 @@ function battleCandidateFromMon(mon,key,sourceLabel){
   var battleRaw80='';
   if(mon.rawRecord&&mon.rawRecord.length>=80){
     var battleRecord=mon.rawRecord.slice(0,80);
-    if(legacyExternal){
+    if(legacyRecord){
       var battleView=new DataView(battleRecord.buffer,battleRecord.byteOffset,battleRecord.byteLength);
       battleView.setUint16(0x1E,battleView.getUint16(0x1E,true)|0x8000,true);
     }
@@ -5042,7 +5045,7 @@ function battleCandidateFromMon(mon,key,sourceLabel){
   return {
     key:key,sourceLabel:sourceLabel,personality:Number(mon.personality)||0,otId:Number(mon.otId)||0,
     rewardRaw80:battleRaw80,
-    checksumValid:!!mon.checksumValid,competitiveLegal:!!mon.competitiveLegal||legacyExternal,
+    checksumValid:!!mon.checksumValid,competitiveLegal:!!mon.competitiveLegal||legacyRecord,
     species:Number(mon.species),name:mon.nickname||speciesName(mon.species),level:stats.level,friendship:Number(mon.friendship)||0,
     weight:Number(species.weight||species.weightHg||0),ivs:Object.assign({},mon.ivs||{}),
     types:(species.types||[]).filter(Boolean).slice(0,2),ability:ability,item:itemName(mon.heldItem||0),
@@ -5642,8 +5645,10 @@ function renderOnlineBattle(){
       });
     }else{
       var storageCount=(externalStorage||[]).filter(validStorageEntry).length;
-      teamCard.appendChild(el('div',{class:'route-empty',text:storageCount?
-        'External Storage contains '+storageCount+' Pokémon, but none passed battle validation. Reload Brisk Dex; if this remains, check the Pokémon records for checksum or move-data errors.':
+      var saveCount=currentSave?((currentSave.party||[]).filter(function(m){return m&&!m.empty;}).length+
+        (currentSave.boxes||[]).reduce(function(n,box){return n+(box||[]).filter(function(m){return m&&!m.empty;}).length;},0)):0;
+      teamCard.appendChild(el('div',{class:'route-empty',text:(storageCount||saveCount)?
+        'Found '+(saveCount+storageCount)+' stored Pokémon, but none passed structural battle validation. This usually means a checksum, species, ability, item, or move-data problem.':
         'Load a save or add Pokémon to External Storage to build a battle team.'}));
     }
 
