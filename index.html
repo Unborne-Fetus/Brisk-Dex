@@ -5264,7 +5264,7 @@ async function battleAction(type,payload){
   finally{ONLINE_STATE.busy=false;}
 }
 function leaveOnlineBattle(){
-  stopBattlePolling();
+  stopBattlePolling();stopMysteryPolling();
   ONLINE_STATE.roomCode='';ONLINE_STATE.playerId='';ONLINE_STATE.playerIndex=-1;ONLINE_STATE.room=null;ONLINE_STATE.gimmickChoice=null;ONLINE_STATE.rewardMessage='';ONLINE_STATE.lastAnimationSeq=0;ONLINE_STATE.animationQueue=[];ONLINE_STATE.animationPlaying=false;persistOnlineSession();
   renderOnlineBattle();
 }
@@ -5298,9 +5298,9 @@ function battleCombatantCenter(node,field){
 function playBattleAnimationEvent(event){
   return new Promise(function(resolve){
     var field=document.querySelector('.battle-sim-field');if(!field){resolve();return;}
-    var attackerIsMe=Number(event.attacker)===ONLINE_STATE.playerIndex;
-    var attacker=document.querySelector('.battle-combatant.'+(attackerIsMe?'me':'foe'));
-    var target=document.querySelector('.battle-combatant.'+(attackerIsMe?'foe':'me'));
+    var attackerIsMe=Number(event.attacker)===ONLINE_STATE.playerIndex,actorPos=Number(event.actorPos)||0,targetPos=Number(event.targetPos)||0;
+    var attacker=document.querySelector('.battle-combatant.'+(attackerIsMe?'me':'foe')+'.pos'+actorPos);
+    var target=document.querySelector('.battle-combatant.'+(attackerIsMe?'foe':'me')+'.pos'+targetPos);
     if(!attacker||!target){resolve();return;}
     var move=event.move||{},kind=battleAnimationKind(move),color=battleAnimationColor(move.type);
     var from=battleCombatantCenter(attacker,field),to=battleCombatantCenter(target,field);
@@ -5412,8 +5412,8 @@ function renderOnlineBattle(){
     var codeLabel=el('label',{text:'Room code'});
     codeLabel.appendChild(el('input',{id:'online-code-input',placeholder:'ABC123',maxlength:'6',style:'text-transform:uppercase;'}));form.appendChild(codeLabel);
     var actions=el('div',{class:'online-actions'});
-    var host=el('button',{class:'primary',text:'Host Battle'});host.addEventListener('click',hostOnlineBattle);
-    var join=el('button',{text:'Join Battle'});join.addEventListener('click',joinOnlineBattle);
+    var host=el('button',{class:'primary',text:'Host Battle'});host.disabled=!!ONLINE_STATE.matchmakingTicket;host.addEventListener('click',hostOnlineBattle);
+    var join=el('button',{text:'Join Battle'});join.disabled=!!ONLINE_STATE.matchmakingTicket;join.addEventListener('click',joinOnlineBattle);
     actions.appendChild(host);actions.appendChild(join);form.appendChild(actions);setup.appendChild(form);
     setup.appendChild(el('div',{id:'online-connection-status',class:'online-status',role:'status','aria-live':'polite',text:'Ready to connect.'}));
     setup.appendChild(el('div',{class:'online-status',text:'On desktop, Brisk Dex detects your network address and Host Battle starts the local relay automatically. With a loaded save, your party is selected by default, so hosting is normally one click. Joiners on the same Wi-Fi/LAN use the shown relay address and room code; allow Brisk Dex through Windows Firewall on private networks.'}));
@@ -5600,20 +5600,21 @@ function renderOnlineBattle(){
   }
   var isDoubles=room.rules&&room.rules.format==='doubles';
   var choiceSlots=Array.isArray(me.choiceSlots)?me.choiceSlots:[false,false];
+  var meSecondary=isDoubles&&Number.isInteger(me.active2)?me.team[me.active2]:null,foeSecondary=isDoubles&&Number.isInteger(foe.active2)?foe.team[foe.active2]:null;
   if(isDoubles){
-    if(choiceSlots[ONLINE_STATE.doubleActorPos])ONLINE_STATE.doubleActorPos=choiceSlots[0]?(choiceSlots[1]?0:1):0;
-    if(!Number.isInteger(ONLINE_STATE.doubleTargetPos)||ONLINE_STATE.doubleTargetPos<0||ONLINE_STATE.doubleTargetPos>1)ONLINE_STATE.doubleTargetPos=0;
+    if(!meSecondary||meSecondary.hp<=0)ONLINE_STATE.doubleActorPos=0;
+    else if(choiceSlots[ONLINE_STATE.doubleActorPos])ONLINE_STATE.doubleActorPos=choiceSlots[0]?(choiceSlots[1]?0:1):0;
+    if(!Number.isInteger(ONLINE_STATE.doubleTargetPos)||ONLINE_STATE.doubleTargetPos<0||ONLINE_STATE.doubleTargetPos>1||(!foeSecondary&&ONLINE_STATE.doubleTargetPos===1))ONLINE_STATE.doubleTargetPos=0;
   }else ONLINE_STATE.doubleActorPos=0;
   var actorPos=isDoubles?ONLINE_STATE.doubleActorPos:0,targetPos=isDoubles?ONLINE_STATE.doubleTargetPos:0;
   var active=me.team[actorPos===1?me.active2:me.active],foeActive=foe.team[targetPos===1?foe.active2:foe.active];
-  var meSecondary=isDoubles?me.team[me.active2]:null,foeSecondary=isDoubles?foe.team[foe.active2]:null;
   function battleSidePanel(player,sideName){
     var panel=el('div',{class:'battle-side-panel '+sideName});
     var trainerWrap=el('div',{class:'battle-side-trainer-wrap'}),trainerImg=el('img',{class:'battle-trainer-sprite',src:trainerSpritePath(player.trainer||{}),alt:player.name+' trainer'});
     trainerImg.decoding='async';trainerImg.addEventListener('error',function(){trainerWrap.remove();});trainerWrap.appendChild(trainerImg);panel.appendChild(trainerWrap);
     panel.appendChild(el('div',{class:'battle-side-name',text:player.name}));
     var team=el('div',{class:'battle-side-team'});
-    (player.team||[]).forEach(function(mon,index){team.appendChild(el('span',{class:'battle-side-ball'+(mon.hp<=0?' fainted':'')+(index===player.active?' active':''),title:mon.name}));});
+    (player.team||[]).forEach(function(mon,index){team.appendChild(el('span',{class:'battle-side-ball'+(mon.hp<=0?' fainted':'')+((index===player.active||index===player.active2)?' active':''),title:mon.name}));});
     panel.appendChild(team);return panel;
   }
   var sim=el('div',{class:'battle-sim'});
@@ -5660,7 +5661,7 @@ function renderOnlineBattle(){
   if(room.phase==='battle'){
     if(isDoubles){
       var actorPicker=el('div',{class:'battle-active-picker'});
-      [0,1].forEach(function(pos){var idx=pos===1?me.active2:me.active,mon=me.team[idx];if(!mon)return;var b=el('button',{class:(actorPos===pos?'selected ':'')+(choiceSlots[pos]?'ghost':'primary'),text:(choiceSlots[pos]?'✓ ':'')+mon.name});b.disabled=!!choiceSlots[pos];b.addEventListener('click',function(){ONLINE_STATE.doubleActorPos=pos;renderOnlineBattle();});actorPicker.appendChild(b);});
+      [0,1].forEach(function(pos){var idx=pos===1?me.active2:me.active,mon=Number.isInteger(idx)?me.team[idx]:null;if(!mon||mon.hp<=0)return;var b=el('button',{class:(actorPos===pos?'selected ':'')+(choiceSlots[pos]?'ghost':'primary'),text:(choiceSlots[pos]?'✓ ':'')+mon.name});b.disabled=!!choiceSlots[pos];b.addEventListener('click',function(){ONLINE_STATE.doubleActorPos=pos;renderOnlineBattle();});actorPicker.appendChild(b);});
       command.appendChild(actorPicker);
       var targets=el('div',{class:'battle-targets'});targets.appendChild(el('span',{class:'dex-muted',text:'Target:'}));
       [0,1].forEach(function(pos){var idx=pos===1?foe.active2:foe.active,mon=foe.team[idx];if(!mon||mon.hp<=0)return;var b=el('button',{class:targetPos===pos?'selected':'',text:mon.name+' · HP '+mon.hp+'/'+mon.maxHP});b.addEventListener('click',function(){ONLINE_STATE.doubleTargetPos=pos;renderOnlineBattle();});targets.appendChild(b);});
