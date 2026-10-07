@@ -304,6 +304,57 @@ input[type=file]{ display:none; }
 .online-pick strong,.online-pick small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .online-pick small{color:var(--muted);font-size:9px;}
 
+
+/* ---------- Battle simulator presentation ---------- */
+.battle-sim{margin-top:12px;border:1px solid var(--line);background:#0b1210;border-radius:12px;overflow:hidden;box-shadow:0 20px 50px #0008;}
+.battle-sim-topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:#101b17;border-bottom:1px solid var(--line);font-size:11px;color:var(--muted);}
+.battle-sim-topbar strong{color:var(--text);font-size:12px;}
+.battle-sim-field{position:relative;min-height:430px;overflow:hidden;background:
+  radial-gradient(ellipse at 25% 76%,#6f8d6175 0 12%,transparent 13%),
+  radial-gradient(ellipse at 75% 35%,#6f8d6175 0 12%,transparent 13%),
+  linear-gradient(#79a7bf 0 46%,#b5c983 46% 55%,#6d9256 55% 100%);
+}
+.battle-sim-field:before{content:"";position:absolute;inset:48% 0 auto;height:3px;background:#ffffff35;box-shadow:0 8px 20px #0003;}
+.battle-sim-field.weather-rain:after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(105deg,transparent 0 24px,#d8f1ff55 25px 27px,transparent 28px 48px);animation:battleRain .7s linear infinite;}
+.battle-sim-field.weather-sun{filter:saturate(1.12) brightness(1.08);}
+.battle-sim-field.weather-sandstorm:after{content:"";position:absolute;inset:0;pointer-events:none;background:#caa66b30;animation:battleWeatherPulse 2s ease-in-out infinite;}
+.battle-sim-field.weather-hail:after,.battle-sim-field.weather-snow:after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle,#fff9 0 2px,transparent 3px) 0 0/38px 38px;animation:battleSnow 3s linear infinite;}
+.battle-platform{position:absolute;width:260px;height:72px;border-radius:50%;background:#31553d45;border:3px solid #ffffff25;box-shadow:0 14px 28px #0003 inset;}
+.battle-platform.foe{right:8%;top:30%}.battle-platform.me{left:8%;bottom:7%}
+.battle-combatant{position:absolute;z-index:2;display:flex;align-items:flex-end;justify-content:center;}
+.battle-combatant.foe{right:10%;top:10%;width:250px;height:230px}.battle-combatant.me{left:9%;bottom:4%;width:270px;height:250px}
+.battle-sprite{max-width:220px;max-height:220px;object-fit:contain;image-rendering:pixelated;filter:drop-shadow(0 12px 8px #0005);animation:battleIdle 2.6s ease-in-out infinite;}
+.battle-combatant.me .battle-sprite{max-width:240px;max-height:240px;transform-origin:bottom center;}
+.battle-fallback-sprite{width:160px;height:160px;display:flex;align-items:center;justify-content:center;transform:scale(2.3);transform-origin:center;}
+.battle-hud{position:absolute;z-index:4;width:min(360px,42%);padding:11px 13px;background:#f6f6ecf2;color:#19201c;border:2px solid #29352e;border-radius:10px;box-shadow:0 7px 20px #0004;}
+.battle-hud.foe{left:4%;top:6%}.battle-hud.me{right:4%;bottom:6%}
+.battle-hud-row{display:flex;align-items:center;justify-content:space-between;gap:10px}.battle-hud-name{font-size:16px;font-weight:800}.battle-hud-level{font-size:12px;font-weight:700}
+.battle-hud-status{font-size:9px;font-weight:900;padding:2px 6px;border-radius:999px;background:#504d49;color:white;text-transform:uppercase;}
+.battle-hud-hp-row{display:grid;grid-template-columns:auto 1fr;gap:6px;align-items:center;margin-top:6px}.battle-hud-hp-label{font-size:10px;font-weight:900;color:#5d6c33;}
+.battle-hud .online-hp{height:10px;margin:0;background:#4a4a47;border:1px solid #2c2c2a}.battle-hud .online-hp span{transition:width .45s ease,background .25s ease;border-radius:6px;}
+.battle-hud-hp-text{text-align:right;font-size:10px;font-weight:700;margin-top:3px;color:#4d554f}.battle-hud.foe .battle-hud-hp-text{visibility:hidden;}
+.battle-team-pips{display:flex;gap:4px;margin-top:6px}.battle-team-pip{width:11px;height:11px;border-radius:50%;background:#d7e0d5;border:2px solid #59655b}.battle-team-pip.fainted{background:#6b6b6b;opacity:.55}.battle-team-pip.active{box-shadow:0 0 0 2px #e0c44e;}
+.battle-field-banner{position:absolute;z-index:5;top:8px;left:50%;transform:translateX(-50%);display:flex;gap:6px;flex-wrap:wrap;justify-content:center;max-width:48%;}
+.battle-field-chip{padding:4px 8px;border-radius:999px;background:#15231fd9;border:1px solid #ffffff35;color:#eff8f3;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;}
+.battle-sim-bottom{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(260px,.8fr);min-height:250px;border-top:1px solid var(--line);}
+.battle-command{padding:14px;background:#111a17}.battle-command h4{margin:0 0 10px;color:var(--text);font-size:14px;}
+.battle-command-tabs{display:flex;gap:7px;margin-bottom:10px}.battle-command-tabs button{min-width:78px;}
+.battle-move-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;}
+.battle-move-button{position:relative;min-height:70px;padding:10px 12px;text-align:left;border:1px solid #ffffff3b;border-radius:9px;color:white;overflow:hidden;background:#353a38;}
+.battle-move-button:before{content:"";position:absolute;inset:0;background:linear-gradient(120deg,#ffffff18,transparent 55%);pointer-events:none}
+.battle-move-button strong,.battle-move-button small{position:relative;z-index:1;display:block}.battle-move-button strong{font-size:13px;margin-bottom:5px}.battle-move-button small{font-size:9px;color:#fffddd;}
+.battle-move-button .battle-move-pp{position:absolute;right:9px;bottom:8px;font-size:9px;font-weight:800;z-index:1}
+.battle-switch-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:10px}
+.battle-switch{display:grid;grid-template-columns:38px minmax(0,1fr);gap:7px;align-items:center;text-align:left;padding:7px;background:#17221e;border:1px solid var(--line);border-radius:8px}.battle-switch .encounter-icon{width:38px;height:38px}.battle-switch small{display:block;font-size:9px;color:var(--muted)}
+.battle-gimmicks{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}.battle-gimmicks button{font-size:10px;padding:7px 9px}
+.battle-log-panel{background:#0c100f;border-left:1px solid var(--line);display:flex;flex-direction:column;min-width:0}.battle-log-title{padding:11px 12px;border-bottom:1px solid var(--line);font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.battle-log{flex:1;overflow:auto;max-height:280px;padding:10px 12px;font-size:11px;line-height:1.5}.battle-log-line{padding:4px 0;border-bottom:1px solid #ffffff0d}.battle-log-line:last-child{color:#f3f6f4;font-weight:700}
+.battle-waiting{min-height:120px;display:grid;place-items:center;text-align:center;color:var(--muted);font-size:12px;border:1px dashed var(--line);border-radius:8px}
+.battle-result-overlay{position:absolute;z-index:12;inset:0;display:grid;place-items:center;background:#07100db8;backdrop-filter:blur(5px)}.battle-result-card{width:min(440px,86%);text-align:center;padding:28px;background:#111d19;border:1px solid #6b8c79;border-radius:14px;box-shadow:0 22px 55px #000a}.battle-result-card h2{font-size:34px;margin:0 0 8px}.battle-result-card .encounter-icon{width:70px;height:70px;margin:10px auto;display:block}
+@keyframes battleIdle{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}@keyframes battleRain{from{background-position:0 0}to{background-position:-48px 72px}}@keyframes battleSnow{from{background-position:0 0}to{background-position:20px 40px}}@keyframes battleWeatherPulse{0%,100%{opacity:.5}50%{opacity:1}}
+@media(max-width:850px){.battle-sim-field{min-height:360px}.battle-combatant.foe{right:3%;top:15%;width:190px;height:180px}.battle-combatant.me{left:2%;width:210px;height:200px}.battle-sprite{max-width:170px;max-height:170px}.battle-hud{width:46%;padding:9px}.battle-hud-name{font-size:13px}.battle-sim-bottom{grid-template-columns:1fr}.battle-log-panel{border-left:0;border-top:1px solid var(--line)}.battle-log{max-height:180px}.battle-switch-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.battle-sim-field{min-height:330px}.battle-hud{width:58%}.battle-hud.foe{left:2%;top:4%}.battle-hud.me{right:2%;bottom:3%}.battle-combatant.foe{right:-5%;top:19%;width:160px;height:150px}.battle-combatant.me{left:-5%;bottom:5%;width:175px;height:170px}.battle-sprite{max-width:145px;max-height:145px}.battle-move-grid{grid-template-columns:1fr}.battle-switch-grid{grid-template-columns:1fr}.battle-field-banner{max-width:75%}}
+
 /* ---------- Brisk Pokédex ---------- */
 .dex-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
 .dex-tools input,.dex-tools select{min-height:38px;color:var(--text);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:8px 11px;font:inherit;}
@@ -5193,79 +5244,124 @@ function renderOnlineBattle(){
     lobby.appendChild(b);root.appendChild(lobby);return;
   }
   if(!me||!foe)return;
-  var field=el('div',{class:'online-battlefield',style:'margin-top:12px;'});
-  function side(player,label){
-    var mon=player.team[player.active], card=el('section',{class:'online-side'});applyTypeStyle(card,mon.species);
-    var head=el('div',{class:'online-side-head'});head.appendChild(makeIconEl({species:mon.species,isShiny:false},'dex-hero-icon'));
-    var info=el('div',{style:'flex:1;'});info.appendChild(el('strong',{text:label+' · '+mon.name+' · Lv'+mon.level}));
-    info.appendChild(el('div',{class:'dex-muted',text:'HP '+mon.hp+' / '+mon.maxHP+(mon.status?' · '+String(mon.status).toUpperCase():'')+(mon.transformedKind?' · '+mon.transformedKind:'')}));
-    var vol=mon.volatile||{},volBits=[];
-    if(vol.substitute>0)volBits.push('Substitute');
-    if(vol.confusion>0)volBits.push('Confused '+vol.confusion);
-    if(vol.seeded)volBits.push('Leech Seed');
-    if(vol.taunt>0)volBits.push('Taunt '+vol.taunt);
-    if(vol.encore>0)volBits.push('Encore '+vol.encore);
-    if(vol.disableTurns>0)volBits.push('Disable '+vol.disableTurns);
-    if(vol.torment)volBits.push('Torment');
-    if(vol.trapped||vol.ingrain)volBits.push('Trapped');
-    if(vol.recharge)volBits.push('Recharge');
-    if(vol.charging!==null&&vol.charging!==undefined)volBits.push('Charging');
-    if(vol.perish>0)volBits.push('Perish '+vol.perish);
-    if(vol.yawn>0)volBits.push('Drowsy');
-    if(vol.aquaRing)volBits.push('Aqua Ring');
-    if(vol.healBlock>0)volBits.push('Heal Block '+vol.healBlock);
-    if(vol.saltCure)volBits.push('Salt Cure');
-    if(volBits.length)info.appendChild(el('div',{class:'online-status',text:volBits.join(' · ')}));
-    var hp=el('div',{class:'online-hp'}),fill=el('span');fill.style.width=Math.max(0,Math.min(100,100*mon.hp/mon.maxHP))+'%';hp.appendChild(fill);info.appendChild(hp);head.appendChild(info);card.appendChild(head);return card;
+  function battleSpriteFor(mon,isMe){
+    var species=NAME_DATA.species[String(mon.species)]||{};
+    return isMe?(species.backSprite||species.frontSprite||SPECIES_ICONS[String(mon.species)]||null):(species.frontSprite||SPECIES_ICONS[String(mon.species)]||null);
   }
-  field.appendChild(side(foe,foe.name));field.appendChild(side(me,me.name));
+  function battleWeatherClass(weather){
+    var w=String(weather||'').toLowerCase().replace(/[^a-z]/g,'');
+    if(w==='rain'||w==='raindance')return ' weather-rain';
+    if(w==='sun'||w==='sunnyday'||w==='harshsunlight')return ' weather-sun';
+    if(w==='sandstorm')return ' weather-sandstorm';
+    if(w==='hail')return ' weather-hail';
+    if(w==='snow')return ' weather-snow';
+    return '';
+  }
+  function battlePips(player){
+    var pips=el('div',{class:'battle-team-pips'});
+    (player.team||[]).forEach(function(mon,index){
+      pips.appendChild(el('span',{class:'battle-team-pip'+(mon.hp<=0?' fainted':'')+(index===player.active?' active':''),title:mon.name+(mon.hp<=0?' · fainted':'')}));
+    });
+    return pips;
+  }
+  function battleHud(player,isMe){
+    var mon=player.team[player.active],hud=el('div',{class:'battle-hud '+(isMe?'me':'foe')});
+    var row=el('div',{class:'battle-hud-row'});
+    var left=el('div');left.appendChild(el('div',{class:'battle-hud-name',text:mon.name+(mon.transformedKind?' · '+mon.transformedKind:'')}));
+    if(mon.status)left.appendChild(el('span',{class:'battle-hud-status',text:String(mon.status)}));
+    row.appendChild(left);row.appendChild(el('span',{class:'battle-hud-level',text:'Lv'+mon.level}));hud.appendChild(row);
+    var hpRow=el('div',{class:'battle-hud-hp-row'});hpRow.appendChild(el('span',{class:'battle-hud-hp-label',text:'HP'}));
+    var hp=el('div',{class:'online-hp'}),fill=el('span'),pct=Math.max(0,Math.min(1,mon.hp/Math.max(1,mon.maxHP)));
+    fill.style.width=(pct*100)+'%';fill.style.background=hpColor(pct);hp.appendChild(fill);hpRow.appendChild(hp);hud.appendChild(hpRow);
+    hud.appendChild(el('div',{class:'battle-hud-hp-text',text:mon.hp+' / '+mon.maxHP}));hud.appendChild(battlePips(player));return hud;
+  }
+  function combatant(mon,isMe){
+    var wrap=el('div',{class:'battle-combatant '+(isMe?'me':'foe')}),url=battleSpriteFor(mon,isMe);
+    if(url){var img=el('img',{class:'battle-sprite',src:url,alt:mon.name});img.loading='eager';img.decoding='async';wrap.appendChild(img);}
+    else wrap.appendChild(makeIconEl({species:mon.species,isShiny:false},'battle-fallback-sprite'));
+    return wrap;
+  }
+  var active=me.team[me.active],foeActive=foe.team[foe.active];
+  var sim=el('div',{class:'battle-sim'});
+  var simTop=el('div',{class:'battle-sim-topbar'});
+  simTop.appendChild(el('strong',{text:me.name+' vs '+foe.name}));
+  simTop.appendChild(el('span',{text:room.phase==='finished'?'Battle complete':'Turn '+room.turn+' · Singles'}));
+  sim.appendChild(simTop);
+  var scene=el('div',{class:'battle-sim-field'+battleWeatherClass(room.weather)});
+  scene.appendChild(el('div',{class:'battle-platform foe'}));scene.appendChild(el('div',{class:'battle-platform me'}));
+  scene.appendChild(combatant(foeActive,false));scene.appendChild(combatant(active,true));
+  scene.appendChild(battleHud(foe,false));scene.appendChild(battleHud(me,true));
+  var banner=el('div',{class:'battle-field-banner'});
+  var fieldBits=[];
+  if(room.weather)fieldBits.push('Weather · '+room.weather+(room.weatherTurns?' '+room.weatherTurns:''));
+  if(room.terrain)fieldBits.push('Terrain · '+room.terrain+(room.terrainTurns?' '+room.terrainTurns:''));
+  if(room.trickRoom)fieldBits.push('Trick Room · '+room.trickRoomTurns);
+  if(room.gravity)fieldBits.push('Gravity · '+room.gravityTurns);
+  if(room.magicRoom)fieldBits.push('Magic Room · '+room.magicRoomTurns);
+  if(room.wonderRoom)fieldBits.push('Wonder Room · '+room.wonderRoomTurns);
+  fieldBits.forEach(function(label){banner.appendChild(el('span',{class:'battle-field-chip',text:label}));});
+  scene.appendChild(banner);
+  if(room.phase==='finished'){
+    var won=room.winner===ONLINE_STATE.playerIndex,overlay=el('div',{class:'battle-result-overlay'}),result=el('div',{class:'battle-result-card'});
+    result.appendChild(el('h2',{text:won?'Victory!':'Defeat'}));
+    result.appendChild(el('div',{class:'dex-muted',text:won?'You won the battle.':'Your opponent won the battle.'}));
+    if(won&&room.reward){
+      result.appendChild(makeIconEl({species:room.reward.species,isShiny:false},'encounter-icon'));
+      result.appendChild(el('strong',{text:'Prize · '+(room.reward.name||speciesName(room.reward.species))+' · Lv'+room.reward.level}));
+      if(ONLINE_STATE.rewardMessage)result.appendChild(el('div',{class:'online-status',text:ONLINE_STATE.rewardMessage}));
+    }
+    overlay.appendChild(result);scene.appendChild(overlay);
+  }
+  sim.appendChild(scene);
+  var bottom=el('div',{class:'battle-sim-bottom'}),command=el('section',{class:'battle-command'});
   if(room.phase==='battle'){
-    var active=me.team[me.active], controls=el('section',{class:'online-card'});controls.appendChild(el('h4',{text:me.hasChoice?'Action locked — waiting for opponent':'Choose your action'}));
+    command.appendChild(el('h4',{text:me.hasChoice?'Action selected · waiting for opponent':'What will '+active.name+' do?'}));
     var stageText=Object.keys(active.stages||{}).filter(function(k){return active.stages[k];}).map(function(k){return k.toUpperCase()+' '+(active.stages[k]>0?'+':'')+active.stages[k];}).join(' · ');
-    if(stageText) controls.appendChild(el('div',{class:'online-status',text:'Stat stages: '+stageText}));
-    var gimmicks=el('div',{class:'online-actions',style:'margin-top:9px;'});
+    if(stageText)command.appendChild(el('div',{class:'online-status',text:'Stat stages · '+stageText}));
+    var gimmicks=el('div',{class:'battle-gimmicks'});
     function gimmickButton(label,kind,formIndex,disabled){
       var selected=ONLINE_STATE.gimmickChoice&&ONLINE_STATE.gimmickChoice.kind===kind&&Number(ONLINE_STATE.gimmickChoice.formIndex||0)===Number(formIndex||0);
-      var btn=el('button',{class:selected?'primary':'ghost',text:label});
-      btn.disabled=!!me.hasChoice||!!active.transformed||!!disabled;
-      btn.addEventListener('click',function(){
-        if(selected) ONLINE_STATE.gimmickChoice=null;
-        else ONLINE_STATE.gimmickChoice={kind:kind,formIndex:Number(formIndex)||0};
-        renderOnlineBattle();
-      });
-      gimmicks.appendChild(btn);
+      var btn=el('button',{class:selected?'primary':'ghost',text:label});btn.disabled=!!me.hasChoice||!!active.transformed||!!disabled;
+      btn.addEventListener('click',function(){ONLINE_STATE.gimmickChoice=selected?null:{kind:kind,formIndex:Number(formIndex)||0};renderOnlineBattle();});gimmicks.appendChild(btn);
     }
     (active.transformations||[]).forEach(function(form,index){
-      if(form.kind==='Mega')gimmickButton(form.name||'Mega Evolve','Mega',index,me.usedMega);
-      else if(form.kind==='Gigantamax')gimmickButton(form.name||'Gigantamax','Gigantamax',index,me.usedGmax);
+      if(form.kind==='Mega')gimmickButton('Mega · '+(form.name||active.name),'Mega',index,me.usedMega);
+      else if(form.kind==='Gigantamax')gimmickButton('G-Max · '+(form.name||active.name),'Gigantamax',index,me.usedGmax);
     });
-    if(active.teraType&&active.teraType!=='None'&&active.teraType!=='Mystery')gimmickButton('Terastallize · '+active.teraType,'Tera',0,me.usedTera);
-    if(gimmicks.childNodes.length)controls.appendChild(gimmicks);
-    var sideBits=[];var side=me.side||{};if(side.stealthRock)sideBits.push('Stealth Rock');if(side.spikes)sideBits.push('Spikes x'+side.spikes);if(side.toxicSpikes)sideBits.push('Toxic Spikes x'+side.toxicSpikes);if(side.stickyWeb)sideBits.push('Sticky Web');if(side.reflect)sideBits.push('Reflect '+side.reflect);if(side.lightScreen)sideBits.push('Light Screen '+side.lightScreen);if(side.tailwind)sideBits.push('Tailwind '+side.tailwind);if(side.wish)sideBits.push('Wish '+side.wish.turns);if(side.futureSight)sideBits.push('Future Sight '+side.futureSight.turns);if(sideBits.length)controls.appendChild(el('div',{class:'online-status',text:'Your field: '+sideBits.join(' · ')}));
-    var moves=el('div',{class:'online-moves'});
+    if(active.teraType&&active.teraType!=='None'&&active.teraType!=='Mystery')gimmickButton('Tera · '+active.teraType,'Tera',0,me.usedTera);
+    if(gimmicks.childNodes.length)command.appendChild(gimmicks);
+    var moves=el('div',{class:'battle-move-grid'});
     (active.moves||[]).forEach(function(move,index){
-      var btn=el('button',{class:'online-move',text:move.name+' · '+move.type+(move.power?' · '+move.power:'')+' · PP '+move.pp+'/'+move.maxPP});
+      var btn=el('button',{class:'battle-move-button'});
+      btn.style.background='linear-gradient(135deg,'+(TYPE_COLORS[move.type]||'#4d5551')+',color-mix(in srgb,'+(TYPE_COLORS[move.type]||'#4d5551')+' 58%,#111))';
+      btn.appendChild(el('strong',{text:move.name}));
+      btn.appendChild(el('small',{text:move.type+' · '+move.category+(move.power?' · Power '+move.power:'')+(move.accuracy?' · Acc '+move.accuracy:'')}));
+      btn.appendChild(el('span',{class:'battle-move-pp',text:'PP '+move.pp+'/'+move.maxPP}));
       var locked=active.choiceLock!==null&&active.choiceLock!==undefined&&Number(active.choiceLock)!==index;
       var encored=active.volatile&&active.volatile.encore>0&&active.volatile.encoreMove!==null&&active.volatile.encoreMove!==undefined&&Number(active.volatile.encoreMove)!==index;
       var disabled=active.volatile&&active.volatile.disableTurns>0&&Number(active.volatile.disabledMove)===index;
       var tormented=active.volatile&&active.volatile.torment&&active.lastMoveIndex!==null&&active.lastMoveIndex!==undefined&&Number(active.lastMoveIndex)===index;
-      btn.disabled=!!me.hasChoice||move.pp<=0||locked||encored||disabled||tormented;btn.addEventListener('click',function(){
-        var gimmick=ONLINE_STATE.gimmickChoice;
-        battleAction('move',{moveIndex:index,gimmick:gimmick&&gimmick.kind,formIndex:gimmick&&gimmick.formIndex});
-        ONLINE_STATE.gimmickChoice=null;
-      });moves.appendChild(btn);
-    });controls.appendChild(moves);
-    var roster=el('div',{class:'online-roster'});
+      btn.disabled=!!me.hasChoice||move.pp<=0||locked||encored||disabled||tormented;
+      btn.addEventListener('click',function(){var gimmick=ONLINE_STATE.gimmickChoice;battleAction('move',{moveIndex:index,gimmick:gimmick&&gimmick.kind,formIndex:gimmick&&gimmick.formIndex});ONLINE_STATE.gimmickChoice=null;});moves.appendChild(btn);
+    });
+    command.appendChild(moves);
+    var roster=el('div',{class:'battle-switch-grid'}),foeAbility=String(foeActive.ability||'').toLowerCase();
     me.team.forEach(function(mon,index){
-      var foeActive=foe&&foe.team&&foe.team[foe.active],foeAbility=foeActive?String(foeActive.ability||'').toLowerCase():'';
       var selfTrapped=active.volatile&&(active.volatile.trapped||active.volatile.ingrain);
       var abilityTrap=foeAbility==='shadow tag'||(foeAbility==='magnet pull'&&(active.types||[]).includes('Steel'))||(foeAbility==='arena trap'&&!(active.types||[]).includes('Flying')&&String(active.ability||'').toLowerCase()!=='levitate');
-      var btn=el('button',{text:mon.name+(mon.hp<=0?' (fainted)':'')});btn.disabled=!!me.hasChoice||index===me.active||mon.hp<=0||selfTrapped||abilityTrap;
-      btn.addEventListener('click',function(){battleAction('switch',{slot:index});});roster.appendChild(btn);
-    });controls.appendChild(roster);field.appendChild(controls);
+      var btn=el('button',{class:'battle-switch'});btn.appendChild(makeIconEl({species:mon.species,isShiny:false},'encounter-icon'));
+      var text=el('span');text.appendChild(el('strong',{text:mon.name}));text.appendChild(el('small',{text:(mon.hp<=0?'Fainted':'HP '+mon.hp+'/'+mon.maxHP)+(index===me.active?' · Active':'')}));btn.appendChild(text);
+      btn.disabled=!!me.hasChoice||index===me.active||mon.hp<=0||selfTrapped||abilityTrap;btn.addEventListener('click',function(){battleAction('switch',{slot:index});});roster.appendChild(btn);
+    });
+    command.appendChild(roster);
+  }else{
+    command.appendChild(el('div',{class:'battle-waiting',text:room.phase==='finished'?'Battle finished. Use Leave Room when you are ready.':'Waiting for battle to begin…'}));
   }
-  var log=el('div',{class:'online-log',text:(room.log||[]).join('\n')||'Battle log is empty.'});field.appendChild(log);root.appendChild(field);
-}
+  bottom.appendChild(command);
+  var logPanel=el('aside',{class:'battle-log-panel'});logPanel.appendChild(el('div',{class:'battle-log-title',text:'Battle log'}));
+  var log=el('div',{class:'battle-log'});(room.log||[]).slice(-80).forEach(function(line){log.appendChild(el('div',{class:'battle-log-line',text:line}));});if(!(room.log||[]).length)log.appendChild(el('div',{class:'battle-log-line',text:'Battle log is empty.'}));
+  logPanel.appendChild(log);bottom.appendChild(logPanel);sim.appendChild(bottom);root.appendChild(sim);
+}}
 
 function renderCurrentReferenceTab(){
   if(currentMainTab==='routes') renderRouteEncounters();
