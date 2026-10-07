@@ -9,6 +9,8 @@ try{BRISK_DATA=JSON.parse(fs.readFileSync(path.join(__dirname,'brisk-dex-data.js
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || '0.0.0.0';
 const rooms = new Map();
+const matchmaking = new Map();
+const matchmakingTickets = new Map();
 
 function json(res, status, body){
   res.writeHead(status, {
@@ -167,6 +169,35 @@ function alive(mon){ return !!mon && mon.hp>0; }
 function nextAlive(player){ return player.team.findIndex(mon=>mon.hp>0); }
 function other(i){ return i===0?1:0; }
 function playerIndex(room,playerId){ return room.players.findIndex(p=>p.id===playerId); }
+function activeAt(player,pos){return pos===1?player.team[player.active2]:player.team[player.active];}
+function availableBench(player,exclude){
+  const blocked=new Set((exclude||[]).filter(x=>Number.isInteger(x)));
+  return player.team.findIndex((m,i)=>m.hp>0&&!blocked.has(i));
+}
+function cleanLatency(v){v=Number(v);return Number.isFinite(v)?clamp(Math.round(v),1,5000):9999;}
+function mysteryKey(mode){return ['singles','doubles','random'].includes(mode)?mode:null;}
+function makeMatchedRoom(mode,a,b){
+  const better=a.latency<=b.latency?a:b,otherEntry=better===a?b:a;
+  const code=roomCode(),format=mode==='doubles'?'doubles':'singles';
+  const room={code,phase:'battle',turn:0,winner:null,reward:null,kickedIds:[],animationSeq:0,animations:[],createdAt:Date.now(),updatedAt:Date.now(),log:[],weather:null,weatherTurns:0,terrain:null,terrainTurns:0,
+    rules:{format,teamSize:6,mystery:true,mysteryMode:mode,noPrize:true,hostByLatency:true},
+    players:[
+      {id:better.playerId,name:better.name,trainer:better.trainer,team:cleanTeam(better.team),ready:true,active:0,choice:null,side:{},latency:better.latency},
+      {id:otherEntry.playerId,name:otherEntry.name,trainer:otherEntry.trainer,team:cleanTeam(otherEntry.team),ready:true,active:0,choice:null,side:{},latency:otherEntry.latency}
+    ]};
+  rooms.set(code,room);beginBattle(room);
+  [better,otherEntry].forEach((entry,index)=>{const t=matchmakingTickets.get(entry.ticket);if(t){t.status='matched';t.roomCode=code;t.playerId=entry.playerId;t.playerIndex=index;t.hostIndex=0;t.updatedAt=Date.now();}});
+  return room;
+}
+function tryMatchmake(mode){
+  const q=matchmaking.get(mode)||[];
+  while(q.length>=2){
+    const a=q.shift(),b=q.shift();
+    if(!matchmakingTickets.has(a.ticket)||!matchmakingTickets.has(b.ticket))continue;
+    makeMatchedRoom(mode,a,b);
+  }
+  matchmaking.set(mode,q);
+}
 function hasType(mon,type){ return (mon.types||[]).includes(type); }
 function hasAbility(mon,name){ return normalizeName(mon.ability)===normalizeName(name); }
 function hasItem(mon,name){ return !(mon.volatile&&mon.volatile.embargo>0) && normalizeName(mon.item)===normalizeName(name); }
@@ -205,7 +236,7 @@ function publicRoom(room,viewerIndex){
     animationSeq:room.animationSeq||0, animations:(room.animations||[]).slice(-24),
     log:room.log.slice(-100),
     players:room.players.map(p=>({
-      name:p.name,trainer:p.trainer||{gender:'Male',outfitId:1},ready:p.ready,connected:true,active:p.active,hasChoice:!!p.choice,
+      name:p.name,trainer:p.trainer||{gender:'Male',outfitId:1},ready:p.ready,connected:true,active:p.active,active2:Number.isInteger(p.active2)?p.active2:null,latency:p.latency||null,hasChoice:room.rules&&room.rules.format==='doubles'?!!(p.choice&&p.choice[0]&&p.choice[1]):!!p.choice,
       usedMega:p.usedMega,usedGmax:p.usedGmax,usedTera:p.usedTera,
       side:p.side, team:p.team.map(publicMon)
     }))
@@ -225,7 +256,9 @@ function beginBattle(room){
     p.team.forEach(mon=>{ mon.hp=mon.maxHP; mon.status=null; mon.choiceLock=null;mon.lastMoveIndex=null;mon.transformed=false;mon.transformedKind=null;mon.originalTypes=null; mon.statusTurns=0; mon.toxicCounter=0; mon.stages={atk:0,def:0,spa:0,spd:0,spe:0,acc:0,eva:0}; mon.volatile={protect:false,protectCounter:0,flinch:false,confusion:0,seeded:false,taunt:0,encore:0,encoreMove:null,substitute:0,
       disabledMove:null,disableTurns:0,torment:false,trapped:false,recharge:false,charging:null,destinyBond:false,perish:0,yawn:0,
       aquaRing:false,ingrain:false,healBlock:0,saltCure:false,rageFistHits:0,lastDamageTaken:0,lastDamagedTurn:0,noRetreat:false,focusEnergy:0,lockOn:false,magnetRise:0,tarShot:false,octolock:false,recycledItem:'',actedTurn:0,statsLoweredTurn:0,smackedDown:false,endure:false,laserFocus:0,nightmare:false,infatuated:false,stockpile:0,rollout:0,uproar:0,throatChop:0,grudge:false,embargo:0,telekinesis:0,switchInTurn:0,beakBlast:false,magicCoat:false,imprison:false,usedMoves:[],lastDamageCategory:null,bideTurns:0,bideDamage:0,identified:false,miracleEye:false,snatch:false,skyDrop:false,glaiveRush:0}; });
-    p.active=Math.max(0,p.team.findIndex(mon=>mon.hp>0)); p.choice=null; active(p).volatile.switchInTurn=room.turn;
+    p.active=Math.max(0,p.team.findIndex(mon=>mon.hp>0));
+    if(room.rules&&room.rules.format==='doubles')p.active2=availableBench(p,[p.active]);else p.active2=null;
+    p.choice=null;if(active(p))active(p).volatile.switchInTurn=room.turn;if(room.rules&&room.rules.format==='doubles'&&activeAt(p,1))activeAt(p,1).volatile.switchInTurn=room.turn;
   });
   log(room,'Battle started!');
   for(let i=0;i<2;i++) onSwitchIn(room,i);
@@ -492,6 +525,7 @@ function setStatus(room,mon,status){
   log(room,mon.name+' was '+label+'!'); return true;
 }
 function createBattleReward(room,winnerIndex){
+  if(room.rules&&room.rules.noPrize)return null;
   if(room.reward||winnerIndex<0||winnerIndex>1||room.players.length<2) return room.reward||null;
   const loserIndex=other(winnerIndex), loser=room.players[loserIndex];
   const eligible=(loser.team||[]).filter(mon=>cleanRewardRaw80(mon.rewardRaw80));
@@ -1421,6 +1455,55 @@ function endTurn(room){
   if(room.wonderRoomTurns>0&&--room.wonderRoomTurns===0){room.wonderRoom=false;log(room,'Wonder Room wore off.');}
   resetTurnVolatiles(room);
 }
+function doublesContext(room,pi,actorPos,targetPos,fn){
+  const p=room.players[pi],foe=room.players[other(pi)];
+  let p0=p.active,p1=p.active2,f0=foe.active,f1=foe.active2;
+  const actor=actorPos===1?p1:p0,target=targetPos===1?f1:f0,otherActor=actorPos===1?p0:p1,otherTarget=targetPos===1?f0:f1;
+  p.active=actor;p.active2=otherActor;foe.active=target;foe.active2=otherTarget;
+  try{fn();}finally{
+    const actorAfter=p.active,targetAfter=foe.active;
+    if(actorPos===1){p1=actorAfter;p0=p.active2;}else{p0=actorAfter;p1=p.active2;}
+    if(targetPos===1){f1=targetAfter;f0=foe.active2;}else{f0=targetAfter;f1=foe.active2;}
+    p.active=p0;p.active2=p1;foe.active=f0;foe.active2=f1;
+  }
+}
+function ensureDoublesReplacement(room,pi,pos){
+  const p=room.players[pi],idx=pos===1?p.active2:p.active,mon=p.team[idx];
+  if(mon&&mon.hp>0)return true;
+  const otherIdx=pos===1?p.active:p.active2,next=availableBench(p,[otherIdx]);
+  if(next>=0){if(pos===1)p.active2=next;else p.active=next;log(room,p.name+' sent out '+p.team[next].name+'!');return true;}
+  return false;
+}
+function allFainted(player){return !player.team.some(m=>m.hp>0);}
+function checkDoublesEnd(room){
+  for(let i=0;i<2;i++)if(allFainted(room.players[i])){finishBattle(room,other(i),room.players[other(i)].name+' won the battle!');return true;}
+  return false;
+}
+function doublesMovePriority(room,pi,pos,choice){
+  const mon=activeAt(room.players[pi],pos),move=mon&&mon.moves[choice.moveIndex]||{};let pr=Number(move.priority)||0;if(move.category==='Status'&&hasAbility(mon,'Prankster'))pr+=1;return pr;
+}
+function doublesSpeed(room,pi,pos){
+  const p=room.players[pi],saved=p.active;p.active=pos===1?p.active2:p.active;const v=effectiveSpeed(room,pi);p.active=saved;return v;
+}
+function resolveDoublesTurn(room){
+  if(!room.players.every(p=>p.choice&&p.choice[0]&&p.choice[1]))return;
+  const entries=[];room.players.forEach((p,pi)=>[0,1].forEach(pos=>entries.push({pi,pos,choice:p.choice[pos]})));
+  entries.filter(e=>e.choice.type==='switch').forEach(e=>{
+    if(room.phase!=='battle')return;const p=room.players[e.pi],slot=Number(e.choice.slot);
+    if(p.team[slot]&&p.team[slot].hp>0&&slot!==p.active&&slot!==p.active2)doublesContext(room,e.pi,e.pos,0,()=>doSwitch(room,e.pi,slot));
+  });
+  const moves=entries.filter(e=>e.choice.type==='move');
+  moves.sort((a,b)=>{const pa=doublesMovePriority(room,a.pi,a.pos,a.choice),pb=doublesMovePriority(room,b.pi,b.pos,b.choice);if(pa!==pb)return pb-pa;const sa=doublesSpeed(room,a.pi,a.pos),sb=doublesSpeed(room,b.pi,b.pos);return (room.trickRoom?sa-sb:sb-sa)||(Math.random()<.5?-1:1);});
+  for(const e of moves){
+    if(room.phase!=='battle')break;const p=room.players[e.pi],mon=activeAt(p,e.pos);if(!mon||mon.hp<=0)continue;
+    const foe=room.players[other(e.pi)],targetPos=(Number(e.choice.targetPos)===1&&activeAt(foe,1)&&activeAt(foe,1).hp>0)?1:0;
+    doublesContext(room,e.pi,e.pos,targetPos,()=>resolveAttack(room,e.pi,e.choice));
+    ensureDoublesReplacement(room,e.pi,0);ensureDoublesReplacement(room,e.pi,1);ensureDoublesReplacement(room,other(e.pi),0);ensureDoublesReplacement(room,other(e.pi),1);
+    if(checkDoublesEnd(room))break;
+  }
+  room.players.forEach(p=>p.choice=null);
+  if(room.phase==='battle'){endTurn(room);if(room.phase==='battle')room.turn++;}
+}
 function resolveTurn(room){
   const choices=room.players.map(p=>p.choice); if(choices.some(c=>!c)) return;
   const pursuitAttackers=[0,1].filter(i=>choices[i].type==='move'&&effectKey((active(room.players[i]).moves||[])[choices[i].moveIndex]||{})==='pursuit'&&choices[other(i)].type==='switch');
@@ -1455,6 +1538,23 @@ const server=http.createServer(async (req,res)=>{
   const url=new URL(req.url,'http://localhost');
   try{
     if(req.method==='GET'&&url.pathname==='/health') return json(res,200,{ok:true,rooms:rooms.size,engine:'advanced-v18'});
+    if(req.method==='POST'&&url.pathname==='/matchmaking/join'){
+      const body=await readBody(req),mode=mysteryKey(body.mode);if(!mode)return json(res,400,{error:'Invalid Mystery Battle mode.'});
+      const team=cleanTeam(body.team);if(team.length!==6)return json(res,400,{error:'Mystery Battles require exactly 6 Pokémon.'});
+      const ticket=id(),playerId=id(),entry={ticket,playerId,mode,name:cleanText(body.name,24)||'Trainer',trainer:cleanTrainerAppearance(body.trainer),team,latency:cleanLatency(body.latency),createdAt:Date.now()};
+      matchmakingTickets.set(ticket,{ticket,status:'searching',mode,playerId,createdAt:Date.now(),updatedAt:Date.now()});
+      const q=matchmaking.get(mode)||[];q.push(entry);matchmaking.set(mode,q);tryMatchmake(mode);
+      return json(res,200,matchmakingTickets.get(ticket));
+    }
+    if(req.method==='GET'&&url.pathname==='/matchmaking/status'){
+      const ticket=url.searchParams.get('ticket'),state=matchmakingTickets.get(ticket);if(!state)return json(res,404,{error:'Matchmaking ticket expired.'});
+      if(state.status==='matched'){const room=rooms.get(state.roomCode);if(!room)return json(res,404,{error:'Matched room expired.'});return json(res,200,Object.assign({},state,{room:publicRoom(room,state.playerIndex)}));}
+      return json(res,200,state);
+    }
+    if(req.method==='POST'&&url.pathname==='/matchmaking/cancel'){
+      const body=await readBody(req),state=matchmakingTickets.get(body.ticket);if(state&&state.status==='searching'){const q=matchmaking.get(state.mode)||[];matchmaking.set(state.mode,q.filter(e=>e.ticket!==body.ticket));state.status='cancelled';state.updatedAt=Date.now();}
+      return json(res,200,{ok:true});
+    }
     if(req.method==='GET'&&url.pathname==='/rooms'){
       const openRooms=[];
       for(const room of rooms.values()){
@@ -1515,6 +1615,14 @@ const server=http.createServer(async (req,res)=>{
       }else if(body.type==='ready'&&room.phase==='lobby'){
         p.ready=!!body.ready; if(room.players.length===2&&room.players.every(x=>x.ready)) beginBattle(room);
       }else if(body.type==='move'&&room.phase==='battle'){
+        if(room.rules&&room.rules.format==='doubles'){
+          const actorPos=Number(body.actorPos)===1?1:0,targetPos=Number(body.targetPos)===1?1:0;p.choice=p.choice||{};
+          if(p.choice[actorPos])return json(res,409,{error:'That Pokémon already selected an action this turn.'});
+          const idx=Number(body.moveIndex),mon=activeAt(p,actorPos);if(!mon)return json(res,400,{error:'No active Pokémon in that position.'});
+          if(!Number.isInteger(idx)||idx<0||idx>=mon.moves.length)return json(res,400,{error:'Invalid move.'});if(mon.moves[idx].pp<=0)return json(res,400,{error:'That move has no PP left.'});
+          p.choice[actorPos]={type:'move',moveIndex:idx,gimmick:['Mega','Gigantamax','Tera'].includes(body.gimmick)?body.gimmick:null,formIndex:Number(body.formIndex)||0,actorPos,targetPos};resolveDoublesTurn(room);
+          return json(res,200,{room:publicRoom(room,pi),playerIndex:pi});
+        }
         if(p.choice) return json(res,409,{error:'You already selected an action this turn.'});
         const idx=Number(body.moveIndex); const mon=active(p);
         if(!Number.isInteger(idx)||idx<0||idx>=mon.moves.length) return json(res,400,{error:'Invalid move.'});
@@ -1526,6 +1634,11 @@ const server=http.createServer(async (req,res)=>{
         const gimmick=['Mega','Gigantamax','Tera'].includes(body.gimmick)?body.gimmick:null;
         p.choice={type:'move',moveIndex:idx,gimmick:gimmick,formIndex:Number(body.formIndex)||0}; resolveTurn(room);
       }else if(body.type==='switch'&&room.phase==='battle'){
+        if(room.rules&&room.rules.format==='doubles'){
+          const actorPos=Number(body.actorPos)===1?1:0;p.choice=p.choice||{};if(p.choice[actorPos])return json(res,409,{error:'That Pokémon already selected an action this turn.'});
+          const slot=Number(body.slot);if(!Number.isInteger(slot)||!p.team[slot]||p.team[slot].hp<=0||slot===p.active||slot===p.active2)return json(res,400,{error:'Invalid switch.'});
+          p.choice[actorPos]={type:'switch',slot,actorPos};resolveDoublesTurn(room);return json(res,200,{room:publicRoom(room,pi),playerIndex:pi});
+        }
         if(p.choice) return json(res,409,{error:'You already selected an action this turn.'});
         const slot=Number(body.slot);
         if(switchBlocked(room,pi))return json(res,400,{error:'This Pokémon is trapped and cannot switch.'});
