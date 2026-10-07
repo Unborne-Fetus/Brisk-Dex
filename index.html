@@ -1370,6 +1370,7 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
           <ul>
             <li>Filter by walking, surfing, fishing rods, Rock Smash, static encounters, or gifts.</li>
             <li>Search by location, Pok&eacute;mon, or type.</li>
+            <li>Brisk's repeatable static legendary encounters only disappear permanently after a successful catch; knocking one out, fleeing, teleporting away, or losing leaves it available for another attempt.</li>
             <li>Related floors and subareas may be grouped under a cleaner player-facing location name.</li>
             <li>Encounter information can differ greatly from normal Pok&eacute;mon Emerald.</li>
           </ul>
@@ -2360,6 +2361,10 @@ var CURRENT_BRISK_CHANGES = [
   {category:"Brisk-specific · Pokédex & Catching",changes:[
     "The battle Bag displays catch chance beside the Poké Ball pocket and rounds the shown percentage to the nearest whole number.",
     "Field-use catching is restricted to supported Poké Balls rather than every ball item."
+  ]},
+  {category:"Brisk-specific · Static legendary encounters",changes:[
+    "Repeatable static legendary and mythical encounters remain available after a knockout, escape, teleport, or player loss and disappear permanently only after being caught.",
+    "The Route Encounters and Pokédex location views include the new static legendary placements and the older Brisk statics standardized to the same caught-only behavior."
   ]}
 ];
 function mergeCurrentBriskChanges(groups){
