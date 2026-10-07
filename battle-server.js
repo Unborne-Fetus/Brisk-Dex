@@ -1453,7 +1453,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==='POST'&&url.pathname==='/rooms'){
       const body=await readBody(req), code=roomCode(), playerId=id(), team=cleanTeam(body.team);
       if(!team.length) return json(res,400,{error:'Load a save with at least one party Pokémon first.'});
-      const room={code,phase:'lobby',turn:0,winner:null,reward:null,createdAt:Date.now(),updatedAt:Date.now(),log:[],weather:null,weatherTurns:0,terrain:null,terrainTurns:0,
+      const room={code,phase:'lobby',turn:0,winner:null,reward:null,kickedIds:[],createdAt:Date.now(),updatedAt:Date.now(),log:[],weather:null,weatherTurns:0,terrain:null,terrainTurns:0,
         rules:{format:'singles',teamSize:Math.max(1,Math.min(6,Number(body.rules&&body.rules.teamSize)||6))},
         players:[{id:playerId,name:cleanText(body.name,24)||'Host',team,ready:false,active:0,choice:null,side:{}}]};
       rooms.set(code,room); return json(res,200,{code,playerId,playerIndex:0,room:publicRoom(room,0)});
@@ -1464,6 +1464,7 @@ const server=http.createServer(async (req,res)=>{
     room.updatedAt=Date.now();
     if(req.method==='GET'&&!match[2]){
       const playerId=url.searchParams.get('playerId'); const pi=playerIndex(room,playerId);
+      if(pi<0&&Array.isArray(room.kickedIds)&&room.kickedIds.includes(playerId)) return json(res,410,{error:'You were removed from the room by the host.'});
       if(pi<0) return json(res,403,{error:'Invalid player token.'});
       return json(res,200,{room:publicRoom(room,pi),playerIndex:pi});
     }
@@ -1475,9 +1476,20 @@ const server=http.createServer(async (req,res)=>{
       log(room,room.players[1].name+' joined the room.'); return json(res,200,{code:room.code,playerId,playerIndex:1,room:publicRoom(room,1)});
     }
     if(req.method==='POST'&&match[2]==='action'){
-      const body=await readBody(req), pi=playerIndex(room,body.playerId); if(pi<0) return json(res,403,{error:'Invalid player token.'});
+      const body=await readBody(req), pi=playerIndex(room,body.playerId);
+      if(pi<0&&Array.isArray(room.kickedIds)&&room.kickedIds.includes(body.playerId)) return json(res,410,{error:'You were removed from the room by the host.'});
+      if(pi<0) return json(res,403,{error:'Invalid player token.'});
       const p=room.players[pi];
-      if(body.type==='forfeit'&&room.phase==='battle'){
+      if(body.type==='kick'&&room.phase==='lobby'){
+        if(pi!==0) return json(res,403,{error:'Only the host can remove players.'});
+        if(room.players.length<2) return json(res,400,{error:'There is no opponent to remove.'});
+        const removed=room.players[1];
+        room.kickedIds=Array.isArray(room.kickedIds)?room.kickedIds:[];
+        room.kickedIds.push(removed.id);
+        room.players.splice(1,1);
+        room.players[0].ready=false;
+        log(room,removed.name+' was removed from the room by the host.');
+      }else if(body.type==='forfeit'&&room.phase==='battle'){
         finishBattle(room,other(pi),p.name+' forfeited. '+room.players[other(pi)].name+' won the battle!');
       }else if(body.type==='ready'&&room.phase==='lobby'){
         p.ready=!!body.ready; if(room.players.length===2&&room.players.every(x=>x.ready)) beginBattle(room);
