@@ -743,10 +743,11 @@ function createBattleReward(room,winnerIndex){
   };
   return room.reward;
 }
-function finishBattle(room,winnerIndex,message){
+function finishBattle(room,winnerIndex,message,awardPrize=true){
   if(room.phase==='finished') return;
   room.phase='finished';room.winner=winnerIndex;room.players.forEach(x=>x.choice=null);
-  createBattleReward(room,winnerIndex);
+  if(awardPrize!==false)createBattleReward(room,winnerIndex);
+  else room.reward=null;
   if(message)log(room,message);
 }
 function faintCheck(room,pi){
@@ -1745,7 +1746,7 @@ setInterval(()=>{
       room.phase='finished';room.winner=null;room.players.forEach(p=>p.choice=null);log(room,'Battle ended because both players disconnected.');room.updatedAt=now;
     }else if(stale[0]||stale[1]){
       const loser=stale[0]?0:1,winner=other(loser);
-      finishBattle(room,winner,room.players[loser].name+' disconnected. '+room.players[winner].name+' won the battle!');room.updatedAt=now;
+      finishBattle(room,winner,room.players[loser].name+' disconnected. '+room.players[winner].name+' won the battle!',false);room.updatedAt=now;
     }
   }
 },2000).unref();
@@ -1839,7 +1840,7 @@ const server=http.createServer(async (req,res)=>{
         room.players[0].ready=false;
         log(room,removed.name+' was removed from the room by the host.');
       }else if(body.type==='forfeit'&&room.phase==='battle'){
-        finishBattle(room,other(pi),p.name+' forfeited. '+room.players[other(pi)].name+' won the battle!');
+        finishBattle(room,other(pi),p.name+' forfeited. '+room.players[other(pi)].name+' won the battle!',false);
       }else if(body.type==='ready'&&room.phase==='lobby'){
         p.ready=!!body.ready; if(room.players.length===2&&room.players.every(x=>x.ready)) beginBattle(room);
       }else if(body.type==='move'&&room.phase==='battle'){
