@@ -1053,7 +1053,7 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
         <div class="online-card"><h4>Offline Wonder Trade</h4><p class="route-intro">Open a Pokémon from your party or PC and choose Wonder Trade. Offline trades use Brisk's bundled eligible species pool and now enforce trusted provenance.</p></div>
         <div class="online-card"><h4>Wonder Box</h4><p class="route-intro">Deposit up to 10 Pokémon. Matches happen independently, like Pokémon HOME's Wonder Box.</p><div class="online-actions"><button class="primary" id="wonderbox-deposit">Deposit selected</button><button id="wonderbox-check">Check / claim matches</button></div><div id="wonderbox-list" class="online-status"></div></div>
         <div class="online-card"><h4>Link Trade</h4><div class="online-form"><label>Room code <input id="linktrade-code" maxlength="6" placeholder="ABC123"></label><div class="online-actions"><button class="primary" id="linktrade-host">Host</button><button id="linktrade-join">Join</button><button id="linktrade-confirm">Confirm trade</button></div><div id="linktrade-status" class="online-status"></div></div></div>
-        <div class="online-card"><h4>GTS</h4><div class="online-form"><label>Requested species # (0 = any) <input id="gts-species" type="number" min="0" step="1" value="0"></label><label>Requested type (blank = any) <input id="gts-type" placeholder="e.g. Water"></label><div style="display:flex;gap:8px"><label style="flex:1">Min Lv <input id="gts-min" type="number" min="1" max="100" value="1"></label><label style="flex:1">Max Lv <input id="gts-max" type="number" min="1" max="100" value="100"></label></div><div class="online-actions"><button class="primary" id="gts-deposit">Deposit selected</button><button id="gts-search">Search listings</button></div><div id="gts-list" class="online-status"></div></div></div>
+        <div class="online-card"><h4>GTS</h4><div class="online-form"><label>Requested species # (0 = any) <input id="gts-species" type="number" min="0" step="1" value="0"></label><label>Requested type (blank = any) <input id="gts-type" placeholder="e.g. Water"></label><div style="display:flex;gap:8px"><label style="flex:1">Min Lv <input id="gts-min" type="number" min="1" max="100" value="1"></label><label style="flex:1">Max Lv <input id="gts-max" type="number" min="1" max="100" value="100"></label></div><div class="online-actions"><button class="primary" id="gts-deposit">Deposit selected</button><button id="gts-search">Search listings</button><button id="gts-check">Check my listing</button></div><div id="gts-list" class="online-status"></div></div></div>
       </div>
     </div>
   </section>
@@ -6256,6 +6256,13 @@ async function gtsDeposit(){
  var d=await tradeFetch('/trades/gts/list',{method:'POST',body:JSON.stringify({ownerToken:TRADE_STATE.ownerToken,trainer:currentSave&&currentSave.trainerName||'Trainer',raw80:mon.rewardRaw80,request:request})});
  localStorage.setItem('briskdex_gts_'+d.listingId,mon.key);out.textContent='GTS listing posted. Listing '+d.listingId.slice(0,8)+'…';}catch(e){out.textContent=e.message;}
 }
+async function gtsCheckMine(){
+ var out=document.getElementById('gts-list');try{var d=await tradeFetch('/trades/gts/mine?ownerToken='+encodeURIComponent(TRADE_STATE.ownerToken),{method:'GET'}),messages=[];
+ for(var i=0;i<d.completed.length;i++){var x=d.completed[i],key=localStorage.getItem('briskdex_gts_'+x.listingId);if(!key)continue;var claimed=await tradeFetch('/trades/gts/claim',{method:'POST',body:JSON.stringify({ownerToken:TRADE_STATE.ownerToken,listingId:x.listingId})});await replaceTradeSource(key,claimed.received);localStorage.removeItem('briskdex_gts_'+x.listingId);messages.push('Trade complete: received '+speciesName(claimed.receivedMon.species)+'.');}
+ if(!messages.length&&d.active.length)messages.push(d.active.length+' GTS listing'+(d.active.length===1?' is':'s are')+' still waiting.');
+ out.textContent=messages.length?messages.join(' '):'You have no active or completed GTS listings.';
+ }catch(e){out.textContent=e.message;}
+}
 async function gtsSearch(){
  var out=document.getElementById('gts-list');try{var d=await tradeFetch('/trades/gts?ownerToken='+encodeURIComponent(TRADE_STATE.ownerToken),{method:'GET'});
  if(!d.listings.length){out.textContent='No GTS listings are available right now.';return;}
@@ -6271,6 +6278,7 @@ document.getElementById('linktrade-join').addEventListener('click',joinLinkTrade
 document.getElementById('linktrade-confirm').addEventListener('click',confirmLinkTrade);
 document.getElementById('gts-deposit').addEventListener('click',gtsDeposit);
 document.getElementById('gts-search').addEventListener('click',gtsSearch);
+document.getElementById('gts-check').addEventListener('click',gtsCheckMine);
 
 /* ============================================================
    Wiring
