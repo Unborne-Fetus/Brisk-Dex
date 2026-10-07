@@ -401,6 +401,22 @@ input[type=file]{ display:none; }
 @media(max-width:600px){.battle-sim-field{margin:0;min-height:390px}.battle-side-panel{display:none}.battle-combatant.foe{right:-1%;top:13%}.battle-combatant.me{left:-4%;bottom:4%}.battle-sprite{width:150px;height:150px}.battle-combatant.me .battle-sprite{width:170px;height:170px}.battle-hud{width:48%}.battle-hud.foe{left:3%;top:20%}.battle-hud.me{right:3%;bottom:24%}.battle-turn-badge{left:8px;top:8px}.battle-sim-bottom{grid-template-columns:1fr}}
 
 
+
+/* ---------- Online trainer/outfit presentation ---------- */
+.battle-trainer-sprite{display:block;max-width:88px;max-height:120px;object-fit:contain;image-rendering:pixelated;filter:drop-shadow(0 5px 4px #0004)}
+.battle-side-panel.left .battle-trainer-sprite{transform:scaleX(1)}
+.battle-side-panel.right .battle-trainer-sprite{transform:scaleX(-1)}
+.battle-side-trainer-wrap{height:120px;display:flex;align-items:flex-end;justify-content:center;margin-bottom:4px}
+.battle-field-trainer{position:absolute;z-index:3;bottom:6%;width:100px;height:145px;display:flex;align-items:flex-end;justify-content:center;opacity:.96;pointer-events:none}
+.battle-field-trainer.me{left:1%}.battle-field-trainer.foe{right:1%;top:8%;bottom:auto}
+.battle-field-trainer img{max-width:100px;max-height:145px;object-fit:contain;image-rendering:pixelated;filter:drop-shadow(0 8px 5px #0005)}
+.battle-field-trainer.foe img{transform:scaleX(-1)}
+.battle-trainer-enter-me{animation:trainerEnterMe .7s ease-out both}.battle-trainer-enter-foe{animation:trainerEnterFoe .7s ease-out both}
+@keyframes trainerEnterMe{from{transform:translateX(-55px);opacity:0}to{transform:translateX(0);opacity:.96}}
+@keyframes trainerEnterFoe{from{transform:translateX(55px);opacity:0}to{transform:translateX(0);opacity:.96}}
+.online-lobby-trainer{display:flex;align-items:center;gap:10px;margin-bottom:10px}.online-lobby-trainer img{width:64px;height:84px;object-fit:contain;image-rendering:pixelated}
+@media(max-width:850px){.battle-field-trainer{display:none}.battle-trainer-sprite{max-width:64px;max-height:90px}.battle-side-trainer-wrap{height:90px}}
+
 /* ---------- Battle move animations ---------- */
 .battle-combatant{will-change:transform,filter,opacity}
 .battle-attack-fx{position:absolute;z-index:10;pointer-events:none;left:0;top:0;transform:translate(-50%,-50%);}
@@ -2749,9 +2765,13 @@ function formatPlaytime(t){
 }
 
 function trainerSpritePath(trainer){
-  var gender = trainer.gender === 'Female' ? 'female' : 'male';
-  var outfitId = trainer.outfitId === 2 ? 2 : 1;
+  var gender = trainer&&trainer.gender === 'Female' ? 'female' : 'male';
+  var outfitId = trainer&&trainer.outfitId === 2 ? 2 : 1;
   return './brisk-dex-trainers/outfit-' + outfitId + '-' + gender + '.png';
+}
+function onlineTrainerAppearance(){
+  var t=currentSave&&currentSave.trainer?currentSave.trainer:{gender:'Male',outfitId:1};
+  return {gender:t.gender==='Female'?'Female':'Male',outfitId:t.outfitId===2?2:1};
 }
 
 function renderTrainerCard(save){
@@ -5101,7 +5121,7 @@ async function hostOnlineBattle(){
     }
     var data=await battleRequest('/rooms',{method:'POST',body:JSON.stringify({
       name:(name&&name.value.trim())||(currentSave&&currentSave.trainer&&currentSave.trainer.name)||'Host',
-      team:team,rules:{format:'singles',teamSize:Math.min(6,team.length)}
+      trainer:onlineTrainerAppearance(),team:team,rules:{format:'singles',teamSize:Math.min(6,team.length)}
     })});
     ONLINE_STATE.roomCode=data.code;ONLINE_STATE.playerId=data.playerId;ONLINE_STATE.playerIndex=data.playerIndex;ONLINE_STATE.room=data.room;ONLINE_STATE.lastAnimationSeq=Number(data.room&&data.room.animationSeq||0);persistOnlineSession();
     startBattlePolling();renderOnlineBattle();
@@ -5120,7 +5140,7 @@ async function joinOnlineBattle(){
   ONLINE_STATE.busy=true;
   try{
     var data=await battleRequest('/rooms/'+roomCode+'/join',{method:'POST',body:JSON.stringify({
-      name:(name&&name.value.trim())||(currentSave&&currentSave.trainer&&currentSave.trainer.name)||'Challenger',team:team
+      name:(name&&name.value.trim())||(currentSave&&currentSave.trainer&&currentSave.trainer.name)||'Challenger',trainer:onlineTrainerAppearance(),team:team
     })});
     ONLINE_STATE.roomCode=data.code;ONLINE_STATE.playerId=data.playerId;ONLINE_STATE.playerIndex=data.playerIndex;ONLINE_STATE.room=data.room;ONLINE_STATE.lastAnimationSeq=Number(data.room&&data.room.animationSeq||0);persistOnlineSession();
     startBattlePolling();renderOnlineBattle();
@@ -5256,6 +5276,11 @@ function battleMoveEffectiveness(move,defender){
   if(mult>1)return {multiplier:mult,label:'Super effective ×'+mult,className:'effect-super'};
   if(mult<1)return {multiplier:mult,label:'Not very effective ×'+mult,className:'effect-resist'};
   return {multiplier:1,label:'Neutral',className:'effect-neutral'};
+}
+function onlineTrainerImage(player,className){
+  var wrap=el('div',{class:className||''});
+  var img=el('img',{src:trainerSpritePath(player&&player.trainer||{}),alt:(player&&player.name||'Trainer')+' outfit'});
+  img.decoding='async';img.addEventListener('error',function(){wrap.remove();});wrap.appendChild(img);return wrap;
 }
 function renderOnlineBattle(){
   var root=document.getElementById('online-root');if(!root)return;
@@ -5408,9 +5433,11 @@ function renderOnlineBattle(){
   var leave=el('button',{class:'ghost',text:'Leave Room'});leave.addEventListener('click',leaveOnlineBattle);topActions.appendChild(leave);top.appendChild(topActions);root.appendChild(top);
   if(room.phase==='lobby'){
     var lobby=el('div',{class:'online-shell',style:'margin-top:12px;'});
-    var a=el('section',{class:'online-card'});a.appendChild(el('h4',{text:(me&&me.name)||'You'}));appendOnlineTeam(a,(me&&me.team)||[]);lobby.appendChild(a);
+    var a=el('section',{class:'online-card'});a.appendChild(el('h4',{text:(me&&me.name)||'You'}));
+    if(me){var myTrainer=el('div',{class:'online-lobby-trainer'});myTrainer.appendChild(onlineTrainerImage(me,''));myTrainer.appendChild(el('span',{text:(me.trainer&&me.trainer.gender||'Trainer')+' · Outfit '+(me.trainer&&me.trainer.outfitId||1)}));a.appendChild(myTrainer);}
+    appendOnlineTeam(a,(me&&me.team)||[]);lobby.appendChild(a);
     var b=el('section',{class:'online-card'});b.appendChild(el('h4',{text:(foe&&foe.name)||'Opponent'}));
-    if(foe) appendOnlineTeam(b,foe.team); else b.appendChild(el('div',{class:'route-empty',text:'Share room '+room.code+' with your opponent.'}));
+    if(foe){var foeTrainer=el('div',{class:'online-lobby-trainer'});foeTrainer.appendChild(onlineTrainerImage(foe,''));foeTrainer.appendChild(el('span',{text:(foe.trainer&&foe.trainer.gender||'Trainer')+' · Outfit '+(foe.trainer&&foe.trainer.outfitId||1)}));b.appendChild(foeTrainer);appendOnlineTeam(b,foe.team);} else b.appendChild(el('div',{class:'route-empty',text:'Share room '+room.code+' with your opponent.'}));
     lobby.appendChild(b);root.appendChild(lobby);return;
   }
   if(!me||!foe)return;
@@ -5454,6 +5481,8 @@ function renderOnlineBattle(){
   var active=me.team[me.active],foeActive=foe.team[foe.active];
   function battleSidePanel(player,sideName){
     var panel=el('div',{class:'battle-side-panel '+sideName});
+    var trainerWrap=el('div',{class:'battle-side-trainer-wrap'}),trainerImg=el('img',{class:'battle-trainer-sprite',src:trainerSpritePath(player.trainer||{}),alt:player.name+' trainer'});
+    trainerImg.decoding='async';trainerImg.addEventListener('error',function(){trainerWrap.remove();});trainerWrap.appendChild(trainerImg);panel.appendChild(trainerWrap);
     panel.appendChild(el('div',{class:'battle-side-name',text:player.name}));
     var team=el('div',{class:'battle-side-team'});
     (player.team||[]).forEach(function(mon,index){team.appendChild(el('span',{class:'battle-side-ball'+(mon.hp<=0?' fainted':'')+(index===player.active?' active':''),title:mon.name}));});
@@ -5467,6 +5496,8 @@ function renderOnlineBattle(){
   var scene=el('div',{class:'battle-sim-field'+battleWeatherClass(room.weather)});
   scene.appendChild(el('div',{class:'battle-turn-badge',text:'Turn '+room.turn}));
   scene.appendChild(el('div',{class:'battle-platform foe'}));scene.appendChild(el('div',{class:'battle-platform me'}));
+  var myFieldTrainer=onlineTrainerImage(me,'battle-field-trainer me battle-trainer-enter-me'),foeFieldTrainer=onlineTrainerImage(foe,'battle-field-trainer foe battle-trainer-enter-foe');
+  scene.appendChild(myFieldTrainer);scene.appendChild(foeFieldTrainer);
   scene.appendChild(combatant(foeActive,false));scene.appendChild(combatant(active,true));
   scene.appendChild(battleHud(foe,false));scene.appendChild(battleHud(me,true));
   var banner=el('div',{class:'battle-field-banner'});
