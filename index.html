@@ -1243,6 +1243,7 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
           <p><strong>Why is a sprite, cry, description, or location missing?</strong><br>The current Brisk data bundle may not contain that asset or field yet. Updating Brisk Dex and its Brisk Emerald reference data may resolve it.</p>
           <p><strong>Does External Storage belong to my Emerald save?</strong><br>No. It is Brisk Dex storage kept separately from an individual game save.</p>
           <p><strong>Can I use boxed or externally stored Pok&eacute;mon online?</strong><br>Yes. The Online Battle team picker can use eligible Pok&eacute;mon from the party, PC boxes, or External Storage.</p>
+          <p><strong>Why is one of my Pok&eacute;mon missing from the competitive team picker?</strong><br>Competitive play only accepts checksum-valid Pok&eacute;mon with Brisk Emerald's trusted acquisition marker and legal species, ability, EV, IV, held-item, and move data. Debug-created, save-edited, hacked, corrupted, and older unverified Pok&eacute;mon are excluded.</p>
         </div>
       </details>
     </div>
@@ -1695,6 +1696,12 @@ function decodePokemon(rec, isPartySlot){
     dataView.setUint32(w*4, dec, true);
   }
 
+  var calculatedChecksum = 0;
+  for (var cw=0; cw<24; cw++) calculatedChecksum = (calculatedChecksum + dataView.getUint16(cw*2, true)) & 0xFFFF;
+  var checksumValid = calculatedChecksum === checksum;
+  // Bit 15 of the word at 0x1E is reserved by Brisk Emerald as the competitive provenance bit.
+  var competitiveLegal = ((u16(view, 0x1E) >>> 15) & 1) === 1;
+
   var order = SUB_ORDERS[personality % 24];
   var subOffsets = {};
   for (var i=0;i<4;i++){ subOffsets[order[i]] = i*12; }
@@ -1766,7 +1773,8 @@ function decodePokemon(rec, isPartySlot){
     evs: evs, ivs: ivs, isEgg: isEgg, abilitySlot: abilitySlot,
     nature: nature, isShiny: isShiny,
     pokerus: pokerusRaw, metLocation: metLocation, levelMet: levelMet,
-    gameOfOrigin: gameOfOrigin, ballCaught: ballCaught
+    gameOfOrigin: gameOfOrigin, ballCaught: ballCaught,
+    checksumValid: checksumValid, competitiveLegal: competitiveLegal
   };
 
   if (isPartySlot && rec.length >= 100){
@@ -4876,8 +4884,48 @@ function calculateBattleStats(mon,species){
   }
   return {level:level,maxHP:stats[0],atk:stats[1],def:stats[2],speed:stats[3],spAtk:stats[4],spDef:stats[5]};
 }
+function competitiveLegality(mon){
+  if(!mon||mon.empty)return {ok:false,reason:'Empty Pokémon slot.'};
+  if(mon.isEgg)return {ok:false,reason:'Eggs cannot be used in competitive play.'};
+  if(!mon.checksumValid)return {ok:false,reason:'Invalid Pokémon checksum.'};
+  if(!mon.competitiveLegal)return {ok:false,reason:'Unverified acquisition. Pokémon from debug tools, save editors, or older unverified builds cannot enter competitive play.'};
+
+  var species=NAME_DATA.species[String(mon.species)];
+  if(!species||typeof species!=='object')return {ok:false,reason:'Unknown or unavailable species.'};
+
+  var level=Number(mon.level)||estimateLevelFromExp(Number(mon.experience)||0,species.growthRate);
+  if(level<1||level>100)return {ok:false,reason:'Invalid level.'};
+
+  var ev=mon.evs||{}, evValues=[ev.hp,ev.atk,ev.def,ev.spd,ev.spa,ev.spdef].map(function(v){return Number(v)||0;});
+  if(evValues.some(function(v){return v<0||v>252;}))return {ok:false,reason:'A stat has more than 252 EVs.'};
+  if(evValues.reduce(function(a,b){return a+b;},0)>510)return {ok:false,reason:'Total EVs exceed 510.'};
+
+  var iv=mon.ivs||{}, ivValues=[iv.hp,iv.atk,iv.def,iv.spd,iv.spa,iv.spdef].map(function(v){return Number(v);});
+  if(ivValues.some(function(v){return !Number.isInteger(v)||v<0||v>31;}))return {ok:false,reason:'Invalid IVs.'};
+
+  var abilityList=Array.isArray(species.abilities)?species.abilities.filter(Boolean):[];
+  if(!abilityList.length||Number(mon.abilitySlot)<0||Number(mon.abilitySlot)>=abilityList.length)
+    return {ok:false,reason:'Invalid ability slot for this species.'};
+
+  var held=Number(mon.heldItem)||0;
+  if(held && !NAME_DATA.items[String(held)])return {ok:false,reason:'Unknown held item.'};
+
+  var moves=(mon.moves||[]).filter(function(id){return Number(id)>0;}).map(Number);
+  if(!moves.length)return {ok:false,reason:'Competitive Pokémon must know at least one move.'};
+  var learnable=Array.isArray(species.learnableMoves)?new Set(species.learnableMoves.map(Number)):null;
+  for(var i=0;i<moves.length;i++){
+    if(!MOVE_DETAILS[String(moves[i])]&&!NAME_DATA.moves[String(moves[i])])
+      return {ok:false,reason:'Unknown move detected.'};
+    if(learnable&&learnable.size&&!learnable.has(moves[i]))
+      return {ok:false,reason:moveName(moves[i])+' is not legal for '+speciesName(mon.species)+'.'};
+  }
+  return {ok:true,reason:''};
+}
+
 function battleCandidateFromMon(mon,key,sourceLabel){
   if(!mon||mon.empty||mon.isEgg)return null;
+  var legality=competitiveLegality(mon);
+  if(!legality.ok)return null;
   var species=NAME_DATA.species[String(mon.species)]||{}, abilityList=Array.isArray(species.abilities)?species.abilities.filter(Boolean):[];
   var ability=abilityList[Math.min(Number(mon.abilitySlot)||0,Math.max(0,abilityList.length-1))]||abilityList[0]||'';
   var calculated=calculateBattleStats(mon,species);
@@ -4906,6 +4954,7 @@ function battleCandidateFromMon(mon,key,sourceLabel){
   return {
     key:key,sourceLabel:sourceLabel,personality:Number(mon.personality)||0,otId:Number(mon.otId)||0,
     rewardRaw80:(mon.rawRecord&&mon.rawRecord.length>=80)?bytesToBase64(mon.rawRecord.subarray(0,80)):'',
+    checksumValid:!!mon.checksumValid,competitiveLegal:!!mon.competitiveLegal,
     species:Number(mon.species),name:mon.nickname||speciesName(mon.species),level:stats.level,friendship:Number(mon.friendship)||0,
     weight:Number(species.weight||species.weightHg||0),ivs:Object.assign({},mon.ivs||{}),
     types:(species.types||[]).filter(Boolean).slice(0,2),ability:ability,item:itemName(mon.heldItem||0),
