@@ -678,19 +678,41 @@ function makeRankedRoom(a,b){
   [better,otherEntry].forEach((entry,index)=>{const t=rankedTickets.get(entry.ticket);if(t){t.status='matched';t.roomCode=code;t.playerId=entry.playerId;t.playerIndex=index;t.hostIndex=0;t.updatedAt=Date.now();}});
   return room;
 }
+function rankedSearchRange(entry,now){
+  const waited=Math.max(0,(now-entry.createdAt)/1000);
+  // Start tight, then gradually relax the skill window so low-population queues still resolve.
+  return Math.min(500,75+Math.floor(waited/10)*25);
+}
 function tryRankedMatch(){
+  const now=Date.now();
   rankedQueue.sort((a,b)=>a.createdAt-b.createdAt);
-  for(let i=0;i<rankedQueue.length;i++){
-    const a=rankedQueue[i];if(!rankedTickets.has(a.ticket))continue;
-    const waited=Math.max(0,(Date.now()-a.createdAt)/1000),range=Math.min(500,100+Math.floor(waited/5)*25);
-    let best=-1,bestDiff=Infinity;
-    for(let j=i+1;j<rankedQueue.length;j++){
-      const b=rankedQueue[j];if(!rankedTickets.has(b.ticket)||a.profileKey===b.profileKey)continue;
-      const diff=Math.abs(a.rating-b.rating);if(diff<=range&&diff<bestDiff){best=j;bestDiff=diff;}
+  for(const entry of rankedQueue){
+    const state=rankedTickets.get(entry.ticket);if(!state)continue;
+    state.searchRange=rankedSearchRange(entry,now);
+    state.waitSeconds=Math.max(0,Math.floor((now-entry.createdAt)/1000));
+    state.updatedAt=now;
+  }
+  while(rankedQueue.length>=2){
+    let best=null;
+    for(let i=0;i<rankedQueue.length-1;i++){
+      const a=rankedQueue[i],ta=rankedTickets.get(a.ticket);if(!ta||ta.status!=='searching')continue;
+      const rangeA=rankedSearchRange(a,now);
+      for(let j=i+1;j<rankedQueue.length;j++){
+        const b=rankedQueue[j],tb=rankedTickets.get(b.ticket);if(!tb||tb.status!=='searching'||a.profileKey===b.profileKey)continue;
+        const rangeB=rankedSearchRange(b,now),diff=Math.abs(a.rating-b.rating);
+        // Both players must currently accept the rating gap.
+        if(diff>Math.min(rangeA,rangeB))continue;
+        const oldest=Math.min(a.createdAt,b.createdAt),combinedWait=(now-a.createdAt)+(now-b.createdAt);
+        const candidate={i,j,a,b,diff,oldest,combinedWait};
+        if(!best||candidate.diff<best.diff||
+          (candidate.diff===best.diff&&candidate.oldest<best.oldest)||
+          (candidate.diff===best.diff&&candidate.oldest===best.oldest&&candidate.combinedWait>best.combinedWait))best=candidate;
+      }
     }
-    if(best>=0){
-      const b=rankedQueue[best];rankedQueue.splice(best,1);rankedQueue.splice(i,1);makeRankedRoom(a,b);i=-1;
-    }
+    if(!best)break;
+    rankedQueue.splice(best.j,1);rankedQueue.splice(best.i,1);
+    const room=makeRankedRoom(best.a,best.b);
+    room.matchmaking={skillBased:true,ratingGap:best.diff,ratings:[best.a.rating,best.b.rating]};
   }
 }
 function hasType(mon,type){ return (mon.types||[]).includes(type); }
@@ -2116,7 +2138,7 @@ const server=http.createServer(async (req,res)=>{
       if(team.length!==6)return json(res,400,{error:'Ranked requires exactly 6 verified Pokémon.'});
       if(rankedQueue.some(x=>x.profileKey===profile.key))return json(res,409,{error:'You are already in the Ranked queue.'});
       const ticket=id(),playerId=id(),entry={ticket,playerId,profileKey:profile.key,rating:profile.rating,name:cleanText(body.name,24)||profile.name,trainer:cleanTrainerAppearance(body.trainer),team,latency:cleanLatency(body.latency),createdAt:Date.now()};
-      rankedTickets.set(ticket,{ticket,status:'searching',playerId,createdAt:Date.now(),updatedAt:Date.now(),rating:profile.rating});rankedQueue.push(entry);tryRankedMatch();
+      rankedTickets.set(ticket,{ticket,status:'searching',playerId,createdAt:entry.createdAt,updatedAt:entry.createdAt,rating:profile.rating,searchRange:75,waitSeconds:0,skillBased:true});rankedQueue.push(entry);tryRankedMatch();
       return json(res,200,rankedTickets.get(ticket));
     }
     if(req.method==='GET'&&url.pathname==='/ranked/status'){
