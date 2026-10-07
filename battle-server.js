@@ -62,10 +62,15 @@ function randomCatalogMove(filterFn){
   return candidates.length?choose(candidates):null;
 }
 
+function cleanRewardRaw80(value){
+  if(typeof value!=='string'||value.length>256) return '';
+  try{const bytes=Buffer.from(value,'base64');return bytes.length===80?bytes.toString('base64'):'';}catch(e){return '';}
+}
 function cleanTeam(team){
   if(!Array.isArray(team)) return [];
   return team.slice(0,6).map((mon,index)=>({
     slot:index,
+    rewardRaw80:cleanRewardRaw80(mon.rewardRaw80),
     species:Number(mon.species)||0,
     name:cleanText(mon.name,40)||('Pokémon '+(index+1)),
     level:clamp(Number(mon.level)||50,1,100),
@@ -170,9 +175,12 @@ function publicMon(mon){
     moves:mon.moves.map(m=>({id:m.id,name:m.name,type:m.type,category:m.category,power:m.power,accuracy:m.accuracy,priority:m.priority,pp:m.pp,maxPP:m.maxPP,effect:m.effect,target:m.target,flags:m.flags,criticalHitStage:m.criticalHitStage,multiHit:m.multiHit,moveEffects:m.moveEffects}))
   };
 }
-function publicRoom(room){
+function publicRoom(room,viewerIndex){
+  const reward=(room.phase==='finished'&&room.reward&&room.reward.winner===viewerIndex)
+    ? {id:room.reward.id,species:room.reward.species,name:room.reward.name,level:room.reward.level,sourceTrainer:room.reward.sourceTrainer,raw80:room.reward.raw80}
+    : null;
   return {
-    code:room.code, phase:room.phase, rules:room.rules, turn:room.turn, winner:room.winner,
+    code:room.code, phase:room.phase, rules:room.rules, turn:room.turn, winner:room.winner, reward:reward,
     weather:room.weather, weatherTurns:room.weatherTurns, terrain:room.terrain, terrainTurns:room.terrainTurns,
     trickRoom:room.trickRoom, trickRoomTurns:room.trickRoomTurns,gravity:room.gravity,gravityTurns:room.gravityTurns,
     magicRoom:room.magicRoom,magicRoomTurns:room.magicRoomTurns,wonderRoom:room.wonderRoom,wonderRoomTurns:room.wonderRoomTurns,
@@ -464,13 +472,32 @@ function setStatus(room,mon,status){
   const label={burn:'burned',poison:'poisoned',toxic:'badly poisoned',paralysis:'paralyzed',sleep:'put to sleep',freeze:'frozen'}[status]||status;
   log(room,mon.name+' was '+label+'!'); return true;
 }
+function createBattleReward(room,winnerIndex){
+  if(room.reward||winnerIndex<0||winnerIndex>1||room.players.length<2) return room.reward||null;
+  const loserIndex=other(winnerIndex), loser=room.players[loserIndex];
+  const eligible=(loser.team||[]).filter(mon=>cleanRewardRaw80(mon.rewardRaw80));
+  if(!eligible.length) return null;
+  const mon=eligible[Math.floor(Math.random()*eligible.length)];
+  room.reward={
+    id:room.code+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),
+    winner:winnerIndex,loser:loserIndex,sourceTrainer:loser.name,
+    species:mon.species,name:mon.name,level:mon.level,raw80:mon.rewardRaw80
+  };
+  return room.reward;
+}
+function finishBattle(room,winnerIndex,message){
+  if(room.phase==='finished') return;
+  room.phase='finished';room.winner=winnerIndex;room.players.forEach(x=>x.choice=null);
+  createBattleReward(room,winnerIndex);
+  if(message)log(room,message);
+}
 function faintCheck(room,pi){
   const p=room.players[pi], mon=active(p);
   if(mon&&mon.hp<=0){
     log(room,mon.name+' fainted!');p.lastFaintTurn=room.turn;
     const next=nextAlive(p);
     if(next<0){
-      room.phase='finished'; room.winner=other(pi); log(room,room.players[other(pi)].name+' won the battle!');
+      const winner=other(pi);finishBattle(room,winner,room.players[winner].name+' won the battle!');
       return true;
     }
     p.active=next; log(room,p.name+' sent out '+active(p).name+'!'); onSwitchIn(room,pi);
@@ -1426,10 +1453,10 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==='POST'&&url.pathname==='/rooms'){
       const body=await readBody(req), code=roomCode(), playerId=id(), team=cleanTeam(body.team);
       if(!team.length) return json(res,400,{error:'Load a save with at least one party Pokémon first.'});
-      const room={code,phase:'lobby',turn:0,winner:null,createdAt:Date.now(),updatedAt:Date.now(),log:[],weather:null,weatherTurns:0,terrain:null,terrainTurns:0,
+      const room={code,phase:'lobby',turn:0,winner:null,reward:null,createdAt:Date.now(),updatedAt:Date.now(),log:[],weather:null,weatherTurns:0,terrain:null,terrainTurns:0,
         rules:{format:'singles',teamSize:Math.max(1,Math.min(6,Number(body.rules&&body.rules.teamSize)||6))},
         players:[{id:playerId,name:cleanText(body.name,24)||'Host',team,ready:false,active:0,choice:null,side:{}}]};
-      rooms.set(code,room); return json(res,200,{code,playerId,playerIndex:0,room:publicRoom(room)});
+      rooms.set(code,room); return json(res,200,{code,playerId,playerIndex:0,room:publicRoom(room,0)});
     }
     const match=url.pathname.match(/^\/rooms\/([A-Z0-9]{6})(?:\/(join|action))?$/);
     if(!match) return json(res,404,{error:'Not found'});
@@ -1445,13 +1472,13 @@ const server=http.createServer(async (req,res)=>{
       if(room.phase!=='lobby') return json(res,409,{error:'This battle already started.'});
       const body=await readBody(req), team=cleanTeam(body.team); if(!team.length) return json(res,400,{error:'Load a save with at least one party Pokémon first.'});
       const playerId=id(); room.players.push({id:playerId,name:cleanText(body.name,24)||'Challenger',team,ready:false,active:0,choice:null,side:{}});
-      log(room,room.players[1].name+' joined the room.'); return json(res,200,{code:room.code,playerId,playerIndex:1,room:publicRoom(room)});
+      log(room,room.players[1].name+' joined the room.'); return json(res,200,{code:room.code,playerId,playerIndex:1,room:publicRoom(room,1)});
     }
     if(req.method==='POST'&&match[2]==='action'){
       const body=await readBody(req), pi=playerIndex(room,body.playerId); if(pi<0) return json(res,403,{error:'Invalid player token.'});
       const p=room.players[pi];
       if(body.type==='forfeit'&&room.phase==='battle'){
-        room.phase='finished';room.winner=other(pi);log(room,p.name+' forfeited. '+room.players[other(pi)].name+' won the battle!');room.players.forEach(x=>x.choice=null);
+        finishBattle(room,other(pi),p.name+' forfeited. '+room.players[other(pi)].name+' won the battle!');
       }else if(body.type==='ready'&&room.phase==='lobby'){
         p.ready=!!body.ready; if(room.players.length===2&&room.players.every(x=>x.ready)) beginBattle(room);
       }else if(body.type==='move'&&room.phase==='battle'){
