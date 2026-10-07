@@ -236,7 +236,7 @@ function publicRoom(room,viewerIndex){
     animationSeq:room.animationSeq||0, animations:(room.animations||[]).slice(-24),
     log:room.log.slice(-100),
     players:room.players.map(p=>({
-      name:p.name,trainer:p.trainer||{gender:'Male',outfitId:1},ready:p.ready,connected:true,active:p.active,active2:Number.isInteger(p.active2)?p.active2:null,latency:p.latency||null,hasChoice:room.rules&&room.rules.format==='doubles'?!!(p.choice&&p.choice[0]&&p.choice[1]):!!p.choice,
+      name:p.name,trainer:p.trainer||{gender:'Male',outfitId:1},ready:p.ready,connected:true,active:p.active,active2:Number.isInteger(p.active2)?p.active2:null,latency:p.latency||null,choiceSlots:room.rules&&room.rules.format==='doubles'?[!!(p.choice&&p.choice[0]),!!(p.choice&&p.choice[1])]:null,hasChoice:room.rules&&room.rules.format==='doubles'?!!(p.choice&&p.choice[0]&&p.choice[1]):!!p.choice,
       usedMega:p.usedMega,usedGmax:p.usedGmax,usedTera:p.usedTera,
       side:p.side, team:p.team.map(publicMon)
     }))
