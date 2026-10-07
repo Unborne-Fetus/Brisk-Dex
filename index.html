@@ -2106,7 +2106,7 @@ async function wonderTradeAtLocation(mon, loc){
     recomputeChecksum(currentSave, 1);
     currentSave.party[loc.index] = received;
   }else{
-    var logicalOffset = 4 + (loc.box*30 + loc.slot)*80;
+    var logicalOffset = 4+(loc.box*(Number(currentSave.profile&&currentSave.profile.pc&&currentSave.profile.pc.slotsPerBox)||30)+loc.slot)*80;
     var touched = writeLogicalPCBytes(currentSave, logicalOffset, received.rawRecord.subarray(0, 80));
     touched.forEach(function(id){ recomputeChecksum(currentSave, id); });
     currentSave.boxes[loc.box][loc.slot] = decodePokemon(received.rawRecord.subarray(0, 80), false);
@@ -2160,7 +2160,7 @@ async function changePokemonTeraType(mon, loc, newType){
     recomputeChecksum(currentSave, 1);
     currentSave.party[loc.index] = decodePokemon(updatedRecord, true);
   }else if (loc.type === 'box'){
-    var logicalOffset = 4 + (loc.box*30 + loc.slot)*80;
+    var logicalOffset = 4+(loc.box*(Number(currentSave.profile&&currentSave.profile.pc&&currentSave.profile.pc.slotsPerBox)||30)+loc.slot)*80;
     var touched = writeLogicalPCBytes(currentSave, logicalOffset, updatedRecord.subarray(0,80));
     touched.forEach(function(id){ recomputeChecksum(currentSave, id); });
     currentSave.boxes[loc.box][loc.slot] = decodePokemon(updatedRecord.subarray(0,80), false);
@@ -2660,7 +2660,7 @@ async function depositFromBox(boxIndex, slotIndex){
   var mon = currentSave.boxes[boxIndex][slotIndex];
   if (!mon || mon.empty) return;
   await addToStorage(mon);
-  var logicalOffset = 4 + (boxIndex*30 + slotIndex)*80;
+  var logicalOffset = 4+(boxIndex*(Number(currentSave.profile&&currentSave.profile.pc&&currentSave.profile.pc.slotsPerBox)||30)+slotIndex)*80;
   var touched = writeLogicalPCBytes(currentSave, logicalOffset, new Uint8Array(80));
   touched.forEach(function(id){ recomputeChecksum(currentSave, id); });
   currentSave.boxes[boxIndex][slotIndex] = { empty:true };
@@ -2698,15 +2698,16 @@ function withdrawToSlot(storageId, boxIndex, slotIndex){
   var idx = externalStorage.findIndex(function(e){ return e.id === storageId; });
   if (idx === -1) return false;
   if (pendingWithdrawals[storageId] === saveSessionId){ showError('This Pokémon is already queued for the current save.'); return false; }
-  var entry = externalStorage[idx];
-  var entryProfile = entry.profileId || 'brisk-emerald';
-  var saveProfile = currentSave.profileId || 'brisk-emerald';
-  if(entryProfile !== saveProfile){
-    showError('This stored Pokémon uses the '+entryProfile+' record profile and cannot be inserted byte-for-byte into a '+saveProfile+' save yet.');
-    return false;
+  var entry=externalStorage[idx],entryProfileId=entry.profileId||'brisk-emerald',saveProfileId=currentSave.profileId||'emerald';
+  var raw80=base64ToBytes(entry.raw80);
+  if(entryProfileId!==saveProfileId){
+    try{
+      var sourceProfile=window.EmeraldCompat&&EmeraldCompat.profileForId(entryProfileId);
+      if(!sourceProfile)throw new Error('The source profile '+entryProfileId+' is not installed.');
+      raw80=EmeraldCompat.convertPokemonRecord(raw80,sourceProfile,currentSave.profile);
+    }catch(err){showError('This Pokémon cannot be converted for the loaded save: '+err.message);return false;}
   }
-  var raw80 = base64ToBytes(entry.raw80);
-  var logicalOffset = 4 + (boxIndex*30 + slotIndex)*80;
+  var logicalOffset = 4+(boxIndex*(Number(currentSave.profile&&currentSave.profile.pc&&currentSave.profile.pc.slotsPerBox)||30)+slotIndex)*80;
   var touched = writeLogicalPCBytes(currentSave, logicalOffset, raw80);
   touched.forEach(function(id){ recomputeChecksum(currentSave, id); });
   currentSave.boxes[boxIndex][slotIndex] = decodePokemon(raw80, false);
@@ -2832,8 +2833,8 @@ function moveBoxPokemon(fromBox,fromSlot,toBox,toSlot){
   var sourceRaw=source.rawRecord ? source.rawRecord.subarray(0,80) : new Uint8Array(80);
   var targetRaw=(target && !target.empty && target.rawRecord) ? target.rawRecord.subarray(0,80) : new Uint8Array(80);
   var touched=new Set();
-  writeLogicalPCBytes(currentSave,4+(toBox*30+toSlot)*80,sourceRaw).forEach(function(id){touched.add(id);});
-  writeLogicalPCBytes(currentSave,4+(fromBox*30+fromSlot)*80,targetRaw).forEach(function(id){touched.add(id);});
+  writeLogicalPCBytes(currentSave,4+(toBox*(Number(currentSave.profile&&currentSave.profile.pc&&currentSave.profile.pc.slotsPerBox)||30)+toSlot)*80,sourceRaw).forEach(function(id){touched.add(id);});
+  writeLogicalPCBytes(currentSave,4+(fromBox*(Number(currentSave.profile&&currentSave.profile.pc&&currentSave.profile.pc.slotsPerBox)||30)+fromSlot)*80,targetRaw).forEach(function(id){touched.add(id);});
   touched.forEach(function(id){recomputeChecksum(currentSave,id);});
   currentSave.boxes[toBox][toSlot]=decodePokemon(sourceRaw,false);
   currentSave.boxes[fromBox][fromSlot]=(target && !target.empty)?decodePokemon(targetRaw,false):{empty:true};
@@ -3360,7 +3361,8 @@ function renderStoragePanel(){
     try{
       var raw80 = base64ToBytes(entry.raw80);
       if (raw80.length !== 80) return;
-      var mon = decodePokemon(raw80, false);
+      var entryProfile=(window.EmeraldCompat&&EmeraldCompat.profileForId(entry.profileId||'brisk-emerald'))||window.ACTIVE_EMERALD_PROFILE;
+      var mon=decodePokemon(raw80,false,entryProfile);
       if (!mon || mon.empty) return;
       var searchable = [mon.nickname, speciesName(mon.species), mon.level, mon.nature,
         itemName(mon.heldItem), entry.sourceTrainer, entry.sourceId,
@@ -5247,7 +5249,7 @@ async function receiveOnlineBattleReward(room){
     var destination='';
     var emptySlot=firstEmptyBattleRewardSlot();
     if(currentSave&&emptySlot){
-      var logicalOffset=4+(emptySlot.box*30+emptySlot.slot)*80;
+      var logicalOffset=4+(emptySlot.box*(Number(currentSave.profile&&currentSave.profile.pc&&currentSave.profile.pc.slotsPerBox)||30)+emptySlot.slot)*80;
       var touched=writeLogicalPCBytes(currentSave,logicalOffset,raw80);
       touched.forEach(function(id){recomputeChecksum(currentSave,id);});
       currentSave.boxes[emptySlot.box][emptySlot.slot]=decodePokemon(raw80,false);
@@ -6617,19 +6619,33 @@ function coreBallIcon(id){
   return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
 }
 var BAG_POCKETS=[{offset:0x560,count:30,category:'other'},{offset:0x5d8,count:30,category:'key'},{offset:0x650,count:16,category:'balls'},{offset:0x690,count:64,category:'tms'},{offset:0x790,count:46,category:'berries'}];
-function readSaveBag(view,key){
-  var result={};
-  BAG_POCKETS.forEach(function(p){for(var i=0;i<p.count;i++){var at=p.offset+i*4,id=view.getUint16(at,true),qty=view.getUint16(at+2,true)^(key&65535);if(id&&qty)result[id]=(result[id]||0)+qty;}});
+function activeBagPockets(profile){
+  return window.EmeraldCompat?EmeraldCompat.bagPockets(profile||currentSave&&currentSave.profile):BAG_POCKETS.slice();
+}
+function readSaveBag(view,key,profile){
+  var result={},pockets=activeBagPockets(profile),encrypted=!(profile&&profile.bag&&profile.bag.quantityEncrypted===false);
+  pockets.forEach(function(p){for(var i=0;i<p.count;i++){
+    var at=p.offset+i*4,rawId=view.getUint16(at,true),qty=view.getUint16(at+2,true);
+    if(encrypted)qty^=(key&65535);
+    var id=window.EmeraldCompat?EmeraldCompat.mapId(profile,'items',rawId,true):rawId;
+    if(id&&qty)result[id]=(result[id]||0)+qty;
+  }});
   return result;
 }
 function writeSaveBag(items){
+  assertSaveWritable(currentSave);
+  var profile=currentSave.profile,pockets=activeBagPockets(profile),maxStack=Number(profile&&profile.bag&&profile.bag.maxStack)||999;
+  var encrypted=!(profile&&profile.bag&&profile.bag.quantityEncrypted===false);
   var view=currentSave._internal.sectionView[1],dv=new DataView(view.buffer,view.byteOffset,view.length),plans=[];
-  for(var p of BAG_POCKETS){
-    var ids=Object.keys(items).filter(function(id){var c=bagItemCategory(id);return (p.category==='other'?!['key','balls','tms','berries'].includes(c):c===p.category)&&items[id]>0;});
-    if(ids.length>p.count || ids.some(function(id){return items[id]>999;})){showError('That stack will not fit in the game Bag.');return false;}
+  for(var p of pockets){
+    var ids=Object.keys(items).filter(function(id){var cat=bagItemCategory(id);return (p.category==='other'?!['key','balls','tms','berries'].includes(cat):cat===p.category)&&items[id]>0;});
+    if(ids.length>p.count||ids.some(function(id){return items[id]>maxStack;})){showError('That stack will not fit in the selected game profile Bag.');return false;}
     plans.push(ids);
   }
-  BAG_POCKETS.forEach(function(p,pi){for(var i=0;i<p.count;i++){var id=Number(plans[pi][i]||0),qty=id?items[id]:0;dv.setUint16(p.offset+i*4,id,true);dv.setUint16(p.offset+i*4+2,qty^(currentSave.securityKey&65535),true);}});
+  pockets.forEach(function(p,pi){for(var i=0;i<p.count;i++){
+    var displayId=Number(plans[pi][i]||0),rawId=displayId&&window.EmeraldCompat?EmeraldCompat.mapId(profile,'items',displayId,false):displayId,qty=displayId?items[displayId]:0;
+    dv.setUint16(p.offset+i*4,rawId,true);dv.setUint16(p.offset+i*4+2,encrypted?(qty^(currentSave.securityKey&65535)):qty,true);
+  }});
   recomputeChecksum(currentSave,1);markDirty();return true;
 }
 var uiSettings={language:'en',theme:'system',zoom:'1',emeraldProfile:'auto'};
