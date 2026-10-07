@@ -417,6 +417,17 @@ input[type=file]{ display:none; }
 .online-lobby-trainer{display:flex;align-items:center;gap:10px;margin-bottom:10px}.online-lobby-trainer img{width:64px;height:84px;object-fit:contain;image-rendering:pixelated}
 @media(max-width:850px){.battle-field-trainer{display:none}.battle-trainer-sprite{max-width:64px;max-height:90px}.battle-side-trainer-wrap{height:90px}}
 
+
+.mystery-mode-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:12px}
+.mystery-mode{display:flex;flex-direction:column;gap:4px;text-align:left;padding:12px;background:var(--panel-2);border:1px solid var(--line);border-radius:7px}
+.mystery-mode strong{font-size:13px}.mystery-mode small{font-size:10px;color:var(--muted);line-height:1.35}
+.mystery-searching{margin:12px 0;padding:13px;border:1px solid var(--line);background:var(--panel-2);font-weight:700}
+.battle-combatant.pos1.me{left:31%;bottom:10%}.battle-combatant.pos1.foe{right:31%;top:14%}
+.battle-hud.pos1.me{right:35%;bottom:10%}.battle-hud.pos1.foe{left:35%;top:10%}
+.battle-targets{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0}.battle-targets button{padding:7px 10px;font-size:10px}.battle-targets button.selected{outline:2px solid #e1b900}
+.battle-active-picker{display:flex;gap:7px;margin:0 0 9px}.battle-active-picker button{padding:7px 10px;font-size:10px}.battle-active-picker button.selected{outline:2px solid #4b89d0}
+@media(max-width:700px){.mystery-mode-grid{grid-template-columns:1fr}.battle-combatant.pos1.me{left:26%}.battle-combatant.pos1.foe{right:26%}.battle-hud.pos1{display:none}}
+
 /* ---------- Battle move animations ---------- */
 .battle-combatant{will-change:transform,filter,opacity}
 .battle-attack-fx{position:absolute;z-index:10;pointer-events:none;left:0;top:0;transform:translate(-50%,-50%);}
@@ -5454,6 +5465,22 @@ function renderOnlineBattle(){
     }else teamCard.appendChild(el('div',{class:'route-empty',text:'Load a save or add Pokémon to External Storage to build a battle team.'}));
 
     shell.appendChild(teamCard);
+    var mysteryCard=el('section',{class:'online-card',style:'grid-column:1 / -1;'});
+    mysteryCard.appendChild(el('h4',{text:'Mystery Battles'}));
+    mysteryCard.appendChild(el('div',{class:'dex-muted',text:'Automatic 6-Pokémon matchmaking. Mystery battles never award an opponent Pokémon.'}));
+    if(ONLINE_STATE.matchmakingTicket){
+      var elapsed=Math.max(0,Math.floor((Date.now()-ONLINE_STATE.matchmakingStartedAt)/1000));
+      mysteryCard.appendChild(el('div',{class:'mystery-searching',text:'Searching for a '+(ONLINE_STATE.matchmakingMode==='doubles'?'Doubles 6v6':ONLINE_STATE.matchmakingMode==='random'?'Random 6v6':'Singles 6v6')+' opponent… '+elapsed+'s'}));
+      var cancel=el('button',{class:'ghost',text:'Cancel Search'});cancel.addEventListener('click',cancelMysteryBattle);mysteryCard.appendChild(cancel);
+    }else{
+      var mysteryActions=el('div',{class:'mystery-mode-grid'});
+      [['singles','Singles 6v6','Use your selected six Pokémon.'],['doubles','Doubles 6v6','Two active Pokémon per side; use your selected six.'],['random','Random 6v6','Six generated competitive Pokémon: exactly 1 Legendary + 1 Mythical.']].forEach(function(row){
+        var btn=el('button',{class:'mystery-mode'});
+        btn.appendChild(el('strong',{text:row[1]}));btn.appendChild(el('small',{text:row[2]}));btn.addEventListener('click',function(){startMysteryBattle(row[0]);});mysteryActions.appendChild(btn);
+      });
+      mysteryCard.appendChild(mysteryActions);
+    }
+    shell.appendChild(mysteryCard);
     var lanCard=el('section',{class:'online-card',id:'lan-battles-card',style:'grid-column:1 / -1;'});
     var lanHead=el('div',{style:'display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;'});
     var lanTitle=el('div');lanTitle.appendChild(el('h4',{text:'LAN Battles',style:'margin:0;'}));
@@ -5550,12 +5577,12 @@ function renderOnlineBattle(){
   function battlePips(player){
     var pips=el('div',{class:'battle-team-pips'});
     (player.team||[]).forEach(function(mon,index){
-      pips.appendChild(el('span',{class:'battle-team-pip'+(mon.hp<=0?' fainted':'')+(index===player.active?' active':''),title:mon.name+(mon.hp<=0?' · fainted':'')}));
+      pips.appendChild(el('span',{class:'battle-team-pip'+(mon.hp<=0?' fainted':'')+((index===player.active||index===player.active2)?' active':''),title:mon.name+(mon.hp<=0?' · fainted':'')}));
     });
     return pips;
   }
-  function battleHud(player,isMe){
-    var mon=player.team[player.active],hud=el('div',{class:'battle-hud '+(isMe?'me':'foe')});
+  function battleHud(player,isMe,pos){
+    pos=pos===1?1:0;var idx=pos===1?player.active2:player.active,mon=player.team[idx],hud=el('div',{class:'battle-hud '+(isMe?'me':'foe')+' pos'+pos});
     var row=el('div',{class:'battle-hud-row'});
     var left=el('div');left.appendChild(el('div',{class:'battle-hud-name',text:mon.name+(mon.transformedKind?' · '+mon.transformedKind:'')}));
     if(mon.status)left.appendChild(el('span',{class:'battle-hud-status',text:String(mon.status)}));
@@ -5565,13 +5592,21 @@ function renderOnlineBattle(){
     fill.style.width=(pct*100)+'%';fill.style.background=hpColor(pct);hp.appendChild(fill);hpRow.appendChild(hp);hud.appendChild(hpRow);
     hud.appendChild(el('div',{class:'battle-hud-hp-text',text:mon.hp+' / '+mon.maxHP}));hud.appendChild(battlePips(player));return hud;
   }
-  function combatant(mon,isMe){
-    var wrap=el('div',{class:'battle-combatant '+(isMe?'me':'foe')}),url=battleSpriteFor(mon,isMe);
+  function combatant(mon,isMe,pos){
+    pos=pos===1?1:0;var wrap=el('div',{class:'battle-combatant '+(isMe?'me':'foe')+' pos'+pos}),url=battleSpriteFor(mon,isMe);
     if(url){var img=el('img',{class:'battle-sprite',src:url,alt:mon.name});img.loading='eager';img.decoding='async';wrap.appendChild(img);}
     else wrap.appendChild(makeIconEl({species:mon.species,isShiny:false},'battle-fallback-sprite'));
     return wrap;
   }
-  var active=me.team[me.active],foeActive=foe.team[foe.active];
+  var isDoubles=room.rules&&room.rules.format==='doubles';
+  var choiceSlots=Array.isArray(me.choiceSlots)?me.choiceSlots:[false,false];
+  if(isDoubles){
+    if(choiceSlots[ONLINE_STATE.doubleActorPos])ONLINE_STATE.doubleActorPos=choiceSlots[0]?(choiceSlots[1]?0:1):0;
+    if(!Number.isInteger(ONLINE_STATE.doubleTargetPos)||ONLINE_STATE.doubleTargetPos<0||ONLINE_STATE.doubleTargetPos>1)ONLINE_STATE.doubleTargetPos=0;
+  }else ONLINE_STATE.doubleActorPos=0;
+  var actorPos=isDoubles?ONLINE_STATE.doubleActorPos:0,targetPos=isDoubles?ONLINE_STATE.doubleTargetPos:0;
+  var active=me.team[actorPos===1?me.active2:me.active],foeActive=foe.team[targetPos===1?foe.active2:foe.active];
+  var meSecondary=isDoubles?me.team[me.active2]:null,foeSecondary=isDoubles?foe.team[foe.active2]:null;
   function battleSidePanel(player,sideName){
     var panel=el('div',{class:'battle-side-panel '+sideName});
     var trainerWrap=el('div',{class:'battle-side-trainer-wrap'}),trainerImg=el('img',{class:'battle-trainer-sprite',src:trainerSpritePath(player.trainer||{}),alt:player.name+' trainer'});
@@ -5584,15 +5619,19 @@ function renderOnlineBattle(){
   var sim=el('div',{class:'battle-sim'});
   var simTop=el('div',{class:'battle-sim-topbar'});
   simTop.appendChild(el('strong',{text:me.name+' vs '+foe.name}));
-  simTop.appendChild(el('span',{text:room.phase==='finished'?'Battle complete':'Turn '+room.turn+' · Singles'}));
+  simTop.appendChild(el('span',{text:room.phase==='finished'?'Battle complete':'Turn '+room.turn+' · '+(isDoubles?'Doubles':'Singles')+(room.rules&&room.rules.mystery?' · Mystery':'')}));
   sim.appendChild(simTop);
   var scene=el('div',{class:'battle-sim-field'+battleWeatherClass(room.weather)});
   scene.appendChild(el('div',{class:'battle-turn-badge',text:'Turn '+room.turn}));
   scene.appendChild(el('div',{class:'battle-platform foe'}));scene.appendChild(el('div',{class:'battle-platform me'}));
   var myFieldTrainer=onlineTrainerImage(me,'battle-field-trainer me battle-trainer-enter-me'),foeFieldTrainer=onlineTrainerImage(foe,'battle-field-trainer foe battle-trainer-enter-foe');
   scene.appendChild(myFieldTrainer);scene.appendChild(foeFieldTrainer);
-  scene.appendChild(combatant(foeActive,false));scene.appendChild(combatant(active,true));
-  scene.appendChild(battleHud(foe,false));scene.appendChild(battleHud(me,true));
+  scene.appendChild(combatant(foe.team[foe.active],false,0));scene.appendChild(combatant(me.team[me.active],true,0));
+  scene.appendChild(battleHud(foe,false,0));scene.appendChild(battleHud(me,true,0));
+  if(isDoubles&&meSecondary&&foeSecondary){
+    scene.appendChild(combatant(foeSecondary,false,1));scene.appendChild(combatant(meSecondary,true,1));
+    scene.appendChild(battleHud(foe,false,1));scene.appendChild(battleHud(me,true,1));
+  }
   var banner=el('div',{class:'battle-field-banner'});
   var fieldBits=[];
   if(room.weather)fieldBits.push('Weather · '+room.weather+(room.weatherTurns?' '+room.weatherTurns:''));
@@ -5611,19 +5650,29 @@ function renderOnlineBattle(){
       result.appendChild(makeIconEl({species:room.reward.species,isShiny:false},'encounter-icon'));
       result.appendChild(el('strong',{text:'Prize · '+(room.reward.name||speciesName(room.reward.species))+' · Lv'+room.reward.level}));
       if(ONLINE_STATE.rewardMessage)result.appendChild(el('div',{class:'online-status',text:ONLINE_STATE.rewardMessage}));
+    }else if(room.rules&&room.rules.mystery){
+      result.appendChild(el('div',{class:'online-status',text:'Mystery Battles do not award a Pokémon prize.'}));
     }
     overlay.appendChild(result);scene.appendChild(overlay);
   }
   sim.appendChild(battleSidePanel(me,'left'));sim.appendChild(battleSidePanel(foe,'right'));sim.appendChild(scene);
   var bottom=el('div',{class:'battle-sim-bottom'}),command=el('section',{class:'battle-command'});
   if(room.phase==='battle'){
-    command.appendChild(el('h4',{text:me.hasChoice?'Action selected · waiting for opponent':'What will '+active.name+' do?'}));
+    if(isDoubles){
+      var actorPicker=el('div',{class:'battle-active-picker'});
+      [0,1].forEach(function(pos){var idx=pos===1?me.active2:me.active,mon=me.team[idx];if(!mon)return;var b=el('button',{class:(actorPos===pos?'selected ':'')+(choiceSlots[pos]?'ghost':'primary'),text:(choiceSlots[pos]?'✓ ':'')+mon.name});b.disabled=!!choiceSlots[pos];b.addEventListener('click',function(){ONLINE_STATE.doubleActorPos=pos;renderOnlineBattle();});actorPicker.appendChild(b);});
+      command.appendChild(actorPicker);
+      var targets=el('div',{class:'battle-targets'});targets.appendChild(el('span',{class:'dex-muted',text:'Target:'}));
+      [0,1].forEach(function(pos){var idx=pos===1?foe.active2:foe.active,mon=foe.team[idx];if(!mon||mon.hp<=0)return;var b=el('button',{class:targetPos===pos?'selected':'',text:mon.name+' · HP '+mon.hp+'/'+mon.maxHP});b.addEventListener('click',function(){ONLINE_STATE.doubleTargetPos=pos;renderOnlineBattle();});targets.appendChild(b);});
+      command.appendChild(targets);
+    }
+    command.appendChild(el('h4',{text:me.hasChoice?'Actions selected · waiting for opponent':'What will '+active.name+' do?'}));
     var stageText=Object.keys(active.stages||{}).filter(function(k){return active.stages[k];}).map(function(k){return k.toUpperCase()+' '+(active.stages[k]>0?'+':'')+active.stages[k];}).join(' · ');
     if(stageText)command.appendChild(el('div',{class:'online-status',text:'Stat stages · '+stageText}));
     var gimmicks=el('div',{class:'battle-gimmicks'});
     function gimmickButton(label,kind,formIndex,disabled){
       var selected=ONLINE_STATE.gimmickChoice&&ONLINE_STATE.gimmickChoice.kind===kind&&Number(ONLINE_STATE.gimmickChoice.formIndex||0)===Number(formIndex||0);
-      var btn=el('button',{class:selected?'primary':'ghost',text:label});btn.disabled=!!me.hasChoice||!!active.transformed||!!disabled;
+      var btn=el('button',{class:selected?'primary':'ghost',text:label});btn.disabled=!!choiceSlots[actorPos]||!!me.hasChoice||!!active.transformed||!!disabled;
       btn.addEventListener('click',function(){ONLINE_STATE.gimmickChoice=selected?null:{kind:kind,formIndex:Number(formIndex)||0};renderOnlineBattle();});gimmicks.appendChild(btn);
     }
     (active.transformations||[]).forEach(function(form,index){
@@ -5645,8 +5694,8 @@ function renderOnlineBattle(){
       var encored=active.volatile&&active.volatile.encore>0&&active.volatile.encoreMove!==null&&active.volatile.encoreMove!==undefined&&Number(active.volatile.encoreMove)!==index;
       var disabled=active.volatile&&active.volatile.disableTurns>0&&Number(active.volatile.disabledMove)===index;
       var tormented=active.volatile&&active.volatile.torment&&active.lastMoveIndex!==null&&active.lastMoveIndex!==undefined&&Number(active.lastMoveIndex)===index;
-      btn.disabled=!!me.hasChoice||move.pp<=0||locked||encored||disabled||tormented;
-      btn.addEventListener('click',function(){var gimmick=ONLINE_STATE.gimmickChoice;battleAction('move',{moveIndex:index,gimmick:gimmick&&gimmick.kind,formIndex:gimmick&&gimmick.formIndex});ONLINE_STATE.gimmickChoice=null;});moves.appendChild(btn);
+      btn.disabled=!!me.hasChoice||(isDoubles&&!!choiceSlots[actorPos])||move.pp<=0||locked||encored||disabled||tormented;
+      btn.addEventListener('click',function(){var gimmick=ONLINE_STATE.gimmickChoice;battleAction('move',{moveIndex:index,gimmick:gimmick&&gimmick.kind,formIndex:gimmick&&gimmick.formIndex,actorPos:actorPos,targetPos:targetPos});ONLINE_STATE.gimmickChoice=null;});moves.appendChild(btn);
     });
     command.appendChild(moves);
     var roster=el('div',{class:'battle-switch-grid'}),foeAbility=String(foeActive.ability||'').toLowerCase();
@@ -5654,8 +5703,8 @@ function renderOnlineBattle(){
       var selfTrapped=active.volatile&&(active.volatile.trapped||active.volatile.ingrain);
       var abilityTrap=foeAbility==='shadow tag'||(foeAbility==='magnet pull'&&(active.types||[]).includes('Steel'))||(foeAbility==='arena trap'&&!(active.types||[]).includes('Flying')&&String(active.ability||'').toLowerCase()!=='levitate');
       var btn=el('button',{class:'battle-switch'});btn.appendChild(makeIconEl({species:mon.species,isShiny:false},'encounter-icon'));
-      var text=el('span');text.appendChild(el('strong',{text:mon.name}));text.appendChild(el('small',{text:(mon.hp<=0?'Fainted':'HP '+mon.hp+'/'+mon.maxHP)+(index===me.active?' · Active':'')}));btn.appendChild(text);
-      btn.disabled=!!me.hasChoice||index===me.active||mon.hp<=0||selfTrapped||abilityTrap;btn.addEventListener('click',function(){battleAction('switch',{slot:index});});roster.appendChild(btn);
+      var text=el('span');text.appendChild(el('strong',{text:mon.name}));text.appendChild(el('small',{text:(mon.hp<=0?'Fainted':'HP '+mon.hp+'/'+mon.maxHP)+((index===me.active||index===me.active2)?' · Active':'')}));btn.appendChild(text);
+      btn.disabled=!!me.hasChoice||(isDoubles&&!!choiceSlots[actorPos])||index===me.active||index===me.active2||mon.hp<=0||selfTrapped||abilityTrap;btn.addEventListener('click',function(){battleAction('switch',{slot:index,actorPos:actorPos});});roster.appendChild(btn);
     });
     command.appendChild(roster);
   }else{
