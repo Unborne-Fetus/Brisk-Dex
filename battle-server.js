@@ -2104,13 +2104,13 @@ const server=http.createServer(async (req,res)=>{
       saveProfiles();return json(res,200,{ok:true,profile:publicProfile(profile),shop:SHOP_CATALOG});
     }
     if(req.method==='GET'&&url.pathname==='/ranked/leaderboard'){
-      const leaders=Object.values(PROFILE_DB.profiles).filter(p=>(Number(p.rankedGames)||0)>0).sort((a,b)=>(b.rating||1000)-(a.rating||1000)||(b.rankedWins||0)-(a.rankedWins||0)).slice(0,100).map((p,i)=>({rank:i+1,name:p.name,rating:p.rating,rankedWins:p.rankedWins,rankedLosses:p.rankedLosses}));
+      const leaders=Object.values(PROFILE_DB.profiles).filter(p=>(Number(p.rankedGames)||0)>0).sort((a,b)=>(b.rating||1000)-(a.rating||1000)||(b.rankedWins||0)-(a.rankedWins||0)).slice(0,100).map((p,i)=>({rank:i+1,name:p.name,rating:p.rating,rankedWins:p.rankedWins,rankedLosses:p.rankedLosses,winStreak:Number(p.winStreak)||0,bestWinStreak:Number(p.bestWinStreak)||0}));
       return json(res,200,{ok:true,leaders});
     }
     if(req.method==='GET'&&url.pathname==='/leaderboard'){
       const leaders=Object.values(PROFILE_DB.profiles).filter(p=>(Number(p.lifetimeWins)||0)>0||(Number(p.rankedLosses)||0)>0).sort((a,b)=>(b.lifetimeWins||0)-(a.lifetimeWins||0)||(b.rankedWins||0)-(a.rankedWins||0)||(a.rankedLosses||0)-(b.rankedLosses||0)).slice(0,100).map((p,i)=>{
         const wins=Number(p.lifetimeWins)||0,losses=Number(p.lifetimeLosses)||0;
-        return {rank:i+1,name:p.name,wins,losses,winLossRatio:losses?wins/losses:wins?null:0,record:wins+'–'+losses};
+        return {rank:i+1,name:p.name,wins,losses,winLossRatio:losses?wins/losses:wins?null:0,record:wins+'–'+losses,winStreak:Number(p.winStreak)||0,bestWinStreak:Number(p.bestWinStreak)||0};
       });
       return json(res,200,{ok:true,leaders});
     }
