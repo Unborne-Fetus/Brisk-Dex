@@ -166,6 +166,19 @@ function hasType(mon,type){ return (mon.types||[]).includes(type); }
 function hasAbility(mon,name){ return normalizeName(mon.ability)===normalizeName(name); }
 function hasItem(mon,name){ return !(mon.volatile&&mon.volatile.embargo>0) && normalizeName(mon.item)===normalizeName(name); }
 function log(room,msg){ room.log.push(msg); if(room.log.length>250) room.log.splice(0,room.log.length-250); }
+function battleAnimation(room,attackerIndex,move){
+  room.animationSeq=(room.animationSeq||0)+1;
+  const event={
+    seq:room.animationSeq,turn:room.turn,attacker:attackerIndex,target:other(attackerIndex),
+    move:{id:Number(move.id)||0,name:move.name,type:move.type,category:move.category,power:Number(move.power)||0,
+      flags:Array.isArray(move.flags)?move.flags.slice(0,16):[]},
+    hit:true,createdAt:Date.now()
+  };
+  room.animations=Array.isArray(room.animations)?room.animations:[];
+  room.animations.push(event);
+  if(room.animations.length>24)room.animations.splice(0,room.animations.length-24);
+  return event;
+}
 
 function publicMon(mon){
   return {
@@ -184,6 +197,7 @@ function publicRoom(room,viewerIndex){
     weather:room.weather, weatherTurns:room.weatherTurns, terrain:room.terrain, terrainTurns:room.terrainTurns,
     trickRoom:room.trickRoom, trickRoomTurns:room.trickRoomTurns,gravity:room.gravity,gravityTurns:room.gravityTurns,
     magicRoom:room.magicRoom,magicRoomTurns:room.magicRoomTurns,wonderRoom:room.wonderRoom,wonderRoomTurns:room.wonderRoomTurns,
+    animationSeq:room.animationSeq||0, animations:(room.animations||[]).slice(-24),
     log:room.log.slice(-100),
     players:room.players.map(p=>({
       name:p.name,ready:p.ready,connected:true,active:p.active,hasChoice:!!p.choice,
@@ -200,7 +214,7 @@ function resetTurnVolatiles(room){
   });
 }
 function beginBattle(room){
-  room.phase='battle'; room.turn=1; room.lastMove=null; room.fairyLock=0;room.ionDeluge=false;room.waterSport=0;room.mudSport=0; room.weather=null; room.weatherTurns=0; room.terrain=null; room.terrainTurns=0; room.trickRoom=false; room.trickRoomTurns=0; room.gravity=false;room.gravityTurns=0;room.magicRoom=false;room.magicRoomTurns=0;room.wonderRoom=false;room.wonderRoomTurns=0;
+  room.phase='battle'; room.turn=1; room.lastMove=null; room.animationSeq=0; room.animations=[]; room.fairyLock=0;room.ionDeluge=false;room.waterSport=0;room.mudSport=0; room.weather=null; room.weatherTurns=0; room.terrain=null; room.terrainTurns=0; room.trickRoom=false; room.trickRoomTurns=0; room.gravity=false;room.gravityTurns=0;room.magicRoom=false;room.magicRoomTurns=0;room.wonderRoom=false;room.wonderRoomTurns=0;
   room.players.forEach(p=>{
     p.side={stealthRock:false,spikes:0,toxicSpikes:0,stickyWeb:false,reflect:0,lightScreen:0,auroraVeil:0,safeguard:0,mist:0,luckyChant:0,tailwind:0,wish:null,futureSight:null,healingWish:null}; p.usedMega=false;p.usedGmax=false;p.usedTera=false;p.lastFaintTurn=0;
     p.team.forEach(mon=>{ mon.hp=mon.maxHP; mon.status=null; mon.choiceLock=null;mon.lastMoveIndex=null;mon.transformed=false;mon.transformedKind=null;mon.originalTypes=null; mon.statusTurns=0; mon.toxicCounter=0; mon.stages={atk:0,def:0,spa:0,spd:0,spe:0,acc:0,eva:0}; mon.volatile={protect:false,protectCounter:0,flinch:false,confusion:0,seeded:false,taunt:0,encore:0,encoreMove:null,substitute:0,
@@ -1074,6 +1088,7 @@ function resolveAttack(room,pi,choice){
   }
   if(!canAct(room,mon)){faintCheck(room,pi);return;}
   mon.volatile.actedTurn=room.turn;
+  const animationEvent=battleAnimation(room,pi,move);
   let accuracy=move.accuracy;
   if(mon.volatile.lockOn){accuracy=100;mon.volatile.lockOn=false;}
   if(room.gravity&&accuracy>0)accuracy*=5/3;
@@ -1081,6 +1096,7 @@ function resolveAttack(room,pi,choice){
     accuracy*=accuracyMultiplier(mon.stages.acc||0)/accuracyMultiplier(target.stages.eva||0);
     if(hasAbility(mon,'Compound Eyes')) accuracy*=1.3;
     if(!chance(clamp(accuracy,1,100))){
+      animationEvent.hit=false;
       log(room,mon.name+' used '+move.name+', but it missed!');mon.volatile.lastMoveFailed=true;
       if(effectKey(move)==='recoilifmiss'&&!hasAbility(mon,'Magic Guard'))hurt(room,mon,Math.max(1,Math.floor(mon.maxHP/2)),'crash damage');
       return;
@@ -1453,7 +1469,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==='POST'&&url.pathname==='/rooms'){
       const body=await readBody(req), code=roomCode(), playerId=id(), team=cleanTeam(body.team);
       if(!team.length) return json(res,400,{error:'Load a save with at least one party Pokémon first.'});
-      const room={code,phase:'lobby',turn:0,winner:null,reward:null,kickedIds:[],createdAt:Date.now(),updatedAt:Date.now(),log:[],weather:null,weatherTurns:0,terrain:null,terrainTurns:0,
+      const room={code,phase:'lobby',turn:0,winner:null,reward:null,kickedIds:[],animationSeq:0,animations:[],createdAt:Date.now(),updatedAt:Date.now(),log:[],weather:null,weatherTurns:0,terrain:null,terrainTurns:0,
         rules:{format:'singles',teamSize:Math.max(1,Math.min(6,Number(body.rules&&body.rules.teamSize)||6))},
         players:[{id:playerId,name:cleanText(body.name,24)||'Host',team,ready:false,active:0,choice:null,side:{}}]};
       rooms.set(code,room); return json(res,200,{code,playerId,playerIndex:0,room:publicRoom(room,0)});
