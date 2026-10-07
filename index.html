@@ -400,6 +400,17 @@ input[type=file]{ display:none; }
 @media(max-width:850px){.battle-sim-field{margin:0 72px}.battle-side-panel{width:72px}.battle-side-team{grid-template-columns:repeat(2,18px)}.battle-combatant.foe{right:8%}.battle-combatant.me{left:5%}.battle-hud.foe{left:4%;width:40%}.battle-hud.me{right:4%;width:40%}}
 @media(max-width:600px){.battle-sim-field{margin:0;min-height:390px}.battle-side-panel{display:none}.battle-combatant.foe{right:-1%;top:13%}.battle-combatant.me{left:-4%;bottom:4%}.battle-sprite{width:150px;height:150px}.battle-combatant.me .battle-sprite{width:170px;height:170px}.battle-hud{width:48%}.battle-hud.foe{left:3%;top:20%}.battle-hud.me{right:3%;bottom:24%}.battle-turn-badge{left:8px;top:8px}.battle-sim-bottom{grid-template-columns:1fr}}
 
+
+/* ---------- Battle move animations ---------- */
+.battle-combatant{will-change:transform,filter,opacity}
+.battle-attack-fx{position:absolute;z-index:10;pointer-events:none;left:0;top:0;transform:translate(-50%,-50%);}
+.battle-attack-orb{width:30px;height:30px;border-radius:50%;box-shadow:0 0 12px currentColor,0 0 26px currentColor inset;border:2px solid #ffffffaa}
+.battle-attack-beam{height:12px;border-radius:999px;transform-origin:left center;box-shadow:0 0 12px currentColor;background:currentColor;opacity:.9}
+.battle-attack-slash{width:68px;height:68px;border-radius:50%;border:5px solid currentColor;border-left-color:transparent;border-bottom-color:transparent;filter:drop-shadow(0 0 6px currentColor)}
+.battle-attack-burst{width:70px;height:70px;border-radius:50%;border:6px solid currentColor;box-shadow:0 0 20px currentColor inset,0 0 16px currentColor}
+.battle-attack-wave{width:90px;height:90px;border-radius:50%;border:5px solid currentColor;opacity:.8}
+.battle-attack-label{position:absolute;z-index:11;pointer-events:none;padding:4px 8px;border-radius:4px;background:#ffffffea;color:#222;border:1px solid #777;font-size:10px;font-weight:900;white-space:nowrap;box-shadow:0 2px 8px #0003}
+
 /* ---------- Brisk Pokédex ---------- */
 .dex-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
 .dex-tools input,.dex-tools select{min-height:38px;color:var(--text);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:8px 11px;font:inherit;}
@@ -2129,7 +2140,7 @@ var ONLINE_STATE = {
   playerIndex: Number(sessionStorage.getItem('briskdex_player_index') || -1),
   room: null, polling: null, busy: false, gimmickChoice:null, selectedTeamKeys:[], teamSearch:'', teamSource:'all',
   lanScanning:false, lanScanDone:false, lanRelay:null, lanRooms:[], lanError:'',
-  rewardProcessing:false, rewardMessage:''
+  rewardProcessing:false, rewardMessage:'', lastAnimationSeq:0, animationQueue:[], animationPlaying:false
 };
 function persistOnlineSession(){
   if(ONLINE_STATE.roomCode&&ONLINE_STATE.playerId){
@@ -5057,7 +5068,7 @@ function startBattlePolling(){
       var data=await battleRequest('/rooms/'+ONLINE_STATE.roomCode+'?playerId='+encodeURIComponent(ONLINE_STATE.playerId),{method:'GET'});
       ONLINE_STATE.room=data.room; ONLINE_STATE.playerIndex=data.playerIndex;
       if(data.room.phase==='finished'){await receiveOnlineBattleReward(data.room);stopBattlePolling();}
-      renderOnlineBattle();
+      renderOnlineBattle();enqueueBattleAnimations(data.room);
     }catch(err){
       if(/removed from the room by the host/i.test(err.message||'')){
         stopBattlePolling();
@@ -5092,7 +5103,7 @@ async function hostOnlineBattle(){
       name:(name&&name.value.trim())||(currentSave&&currentSave.trainer&&currentSave.trainer.name)||'Host',
       team:team,rules:{format:'singles',teamSize:Math.min(6,team.length)}
     })});
-    ONLINE_STATE.roomCode=data.code;ONLINE_STATE.playerId=data.playerId;ONLINE_STATE.playerIndex=data.playerIndex;ONLINE_STATE.room=data.room;persistOnlineSession();
+    ONLINE_STATE.roomCode=data.code;ONLINE_STATE.playerId=data.playerId;ONLINE_STATE.playerIndex=data.playerIndex;ONLINE_STATE.room=data.room;ONLINE_STATE.lastAnimationSeq=Number(data.room&&data.room.animationSeq||0);persistOnlineSession();
     startBattlePolling();renderOnlineBattle();
   }catch(err){battleConnectionStatus('Could not host battle: '+err.message);showError('Could not host battle: '+err.message);}
   finally{ONLINE_STATE.busy=false;}
@@ -5111,7 +5122,7 @@ async function joinOnlineBattle(){
     var data=await battleRequest('/rooms/'+roomCode+'/join',{method:'POST',body:JSON.stringify({
       name:(name&&name.value.trim())||(currentSave&&currentSave.trainer&&currentSave.trainer.name)||'Challenger',team:team
     })});
-    ONLINE_STATE.roomCode=data.code;ONLINE_STATE.playerId=data.playerId;ONLINE_STATE.playerIndex=data.playerIndex;ONLINE_STATE.room=data.room;persistOnlineSession();
+    ONLINE_STATE.roomCode=data.code;ONLINE_STATE.playerId=data.playerId;ONLINE_STATE.playerIndex=data.playerIndex;ONLINE_STATE.room=data.room;ONLINE_STATE.lastAnimationSeq=Number(data.room&&data.room.animationSeq||0);persistOnlineSession();
     startBattlePolling();renderOnlineBattle();
   }catch(err){battleConnectionStatus('Could not join battle: '+err.message);showError('Could not join battle: '+err.message);}
   finally{ONLINE_STATE.busy=false;}
@@ -5124,13 +5135,13 @@ async function battleAction(type,payload){
     var data=await battleRequest('/rooms/'+ONLINE_STATE.roomCode+'/action',{method:'POST',body:JSON.stringify(body)});
     ONLINE_STATE.room=data.room;ONLINE_STATE.playerIndex=data.playerIndex;
     if(data.room.phase==='finished')await receiveOnlineBattleReward(data.room);
-    renderOnlineBattle();
+    renderOnlineBattle();enqueueBattleAnimations(data.room);
   }catch(err){showError('Battle action failed: '+err.message);}
   finally{ONLINE_STATE.busy=false;}
 }
 function leaveOnlineBattle(){
   stopBattlePolling();
-  ONLINE_STATE.roomCode='';ONLINE_STATE.playerId='';ONLINE_STATE.playerIndex=-1;ONLINE_STATE.room=null;ONLINE_STATE.gimmickChoice=null;ONLINE_STATE.rewardMessage='';persistOnlineSession();
+  ONLINE_STATE.roomCode='';ONLINE_STATE.playerId='';ONLINE_STATE.playerIndex=-1;ONLINE_STATE.room=null;ONLINE_STATE.gimmickChoice=null;ONLINE_STATE.rewardMessage='';ONLINE_STATE.lastAnimationSeq=0;ONLINE_STATE.animationQueue=[];ONLINE_STATE.animationPlaying=false;persistOnlineSession();
   renderOnlineBattle();
 }
 function appendOnlineTeam(parent,team){
@@ -5143,6 +5154,87 @@ function appendOnlineTeam(parent,team){
     row.appendChild(info);row.appendChild(el('span',{text:(mon.moves||[]).length+' moves',class:'dex-muted'}));wrap.appendChild(row);
   });
   parent.appendChild(wrap);
+}
+function battleAnimationKind(move){
+  var name=String(move&&move.name||'').toLowerCase().replace(/[^a-z0-9]/g,''),flags=(move&&move.flags||[]).map(function(x){return String(x).toLowerCase();});
+  if(move&&move.category==='Status')return 'status';
+  if(flags.some(function(x){return x.indexOf('contact')>=0;})||/punch|kick|tackle|slam|headbutt|claw|fang|bite|crunch|chop|strike|rush|charge|closecombat|playrough|ironhead|bravebird|flareblitz|woodhammer|wildcharge/.test(name))return 'contact';
+  if(/beam|laser|ray|cannon|pulse|hyperbeam|aurasphere|flashcannon|icebeam|signalbeam/.test(name))return 'beam';
+  if(/slash|cut|blade|leafblade|nightslash|psychocut|xscissor|sacredsword|razorshell/.test(name))return 'slash';
+  if(/wave|surf|eruption|earthquake|boomburst|discharge|heatwave|blizzard|rockslide|muddywater/.test(name))return 'wave';
+  return 'projectile';
+}
+function battleAnimationColor(type){
+  return TYPE_COLORS[type]||'#f4f4f4';
+}
+function battleCombatantCenter(node,field){
+  var a=node.getBoundingClientRect(),b=field.getBoundingClientRect();
+  return {x:a.left-b.left+a.width/2,y:a.top-b.top+a.height/2};
+}
+function playBattleAnimationEvent(event){
+  return new Promise(function(resolve){
+    var field=document.querySelector('.battle-sim-field');if(!field){resolve();return;}
+    var attackerIsMe=Number(event.attacker)===ONLINE_STATE.playerIndex;
+    var attacker=document.querySelector('.battle-combatant.'+(attackerIsMe?'me':'foe'));
+    var target=document.querySelector('.battle-combatant.'+(attackerIsMe?'foe':'me'));
+    if(!attacker||!target){resolve();return;}
+    var move=event.move||{},kind=battleAnimationKind(move),color=battleAnimationColor(move.type);
+    var from=battleCombatantCenter(attacker,field),to=battleCombatantCenter(target,field);
+    var label=el('div',{class:'battle-attack-label',text:move.name||'Move'});label.style.left=from.x+'px';label.style.top=Math.max(18,from.y-95)+'px';field.appendChild(label);
+    label.animate([{opacity:0,transform:'translate(-50%,8px)'},{opacity:1,transform:'translate(-50%,0)'},{opacity:1},{opacity:0}],{duration:900,easing:'ease-out'});
+    setTimeout(function(){label.remove();},920);
+    function hitReact(){
+      if(event.hit===false)return;
+      target.animate([{transform:'translateX(0)'},{transform:'translateX('+(attackerIsMe?'10px':'-10px')+')'},{transform:'translateX('+(attackerIsMe?'-7px':'7px')+')'},{transform:'translateX(0)'}],{duration:260,easing:'ease-out'});
+      target.animate([{filter:'brightness(1)'},{filter:'brightness(1.8)'},{filter:'brightness(1)'}],{duration:240});
+    }
+    if(kind==='contact'){
+      var dx=(to.x-from.x)*0.34,dy=(to.y-from.y)*0.34;
+      attacker.animate([{transform:'translate(0,0)'},{transform:'translate('+dx+'px,'+dy+'px) scale(1.05)'},{transform:'translate(0,0)'}],{duration:520,easing:'cubic-bezier(.2,.8,.3,1)'});
+      setTimeout(hitReact,210);setTimeout(resolve,560);return;
+    }
+    if(kind==='status'){
+      var ring=el('div',{class:'battle-attack-fx battle-attack-wave'});ring.style.left=from.x+'px';ring.style.top=from.y+'px';ring.style.color=color;field.appendChild(ring);
+      ring.animate([{transform:'translate(-50%,-50%) scale(.2)',opacity:.95},{transform:'translate(-50%,-50%) scale(1.7)',opacity:0}],{duration:700,easing:'ease-out'});
+      attacker.animate([{filter:'brightness(1)'},{filter:'brightness(1.5)'},{filter:'brightness(1)'}],{duration:500});
+      setTimeout(function(){ring.remove();resolve();},720);return;
+    }
+    if(kind==='beam'){
+      var beam=el('div',{class:'battle-attack-fx battle-attack-beam'}),dx2=to.x-from.x,dy2=to.y-from.y,len=Math.sqrt(dx2*dx2+dy2*dy2),angle=Math.atan2(dy2,dx2)*180/Math.PI;
+      beam.style.left=from.x+'px';beam.style.top=from.y+'px';beam.style.width=len+'px';beam.style.color=color;beam.style.transform='translateY(-50%) rotate('+angle+'deg) scaleX(0)';field.appendChild(beam);
+      beam.animate([{transform:'translateY(-50%) rotate('+angle+'deg) scaleX(0)',opacity:0},{transform:'translateY(-50%) rotate('+angle+'deg) scaleX(1)',opacity:1},{transform:'translateY(-50%) rotate('+angle+'deg) scaleX(1)',opacity:0}],{duration:520,easing:'ease-out'});
+      setTimeout(hitReact,270);setTimeout(function(){beam.remove();resolve();},560);return;
+    }
+    if(kind==='slash'){
+      var slash=el('div',{class:'battle-attack-fx battle-attack-slash'});slash.style.left=to.x+'px';slash.style.top=to.y+'px';slash.style.color=color;field.appendChild(slash);
+      slash.animate([{transform:'translate(-50%,-50%) rotate(-55deg) scale(.3)',opacity:0},{transform:'translate(-50%,-50%) rotate(35deg) scale(1)',opacity:1},{transform:'translate(-50%,-50%) rotate(80deg) scale(1.2)',opacity:0}],{duration:380,easing:'ease-out'});
+      attacker.animate([{transform:'translate(0,0)'},{transform:'translate('+((to.x-from.x)*.18)+'px,'+((to.y-from.y)*.18)+'px)'},{transform:'translate(0,0)'}],{duration:380});
+      setTimeout(hitReact,150);setTimeout(function(){slash.remove();resolve();},420);return;
+    }
+    if(kind==='wave'){
+      var wave=el('div',{class:'battle-attack-fx battle-attack-wave'});wave.style.left=from.x+'px';wave.style.top=from.y+'px';wave.style.color=color;field.appendChild(wave);
+      wave.animate([{transform:'translate(-50%,-50%) scale(.25)',opacity:.9},{transform:'translate(-50%,-50%) scale(4)',opacity:0}],{duration:600,easing:'ease-out'});
+      setTimeout(hitReact,260);setTimeout(function(){wave.remove();resolve();},640);return;
+    }
+    var orb=el('div',{class:'battle-attack-fx battle-attack-orb'});orb.style.left=from.x+'px';orb.style.top=from.y+'px';orb.style.color=color;orb.style.background=color;field.appendChild(orb);
+    orb.animate([{transform:'translate(-50%,-50%) scale(.55)',opacity:.3},{transform:'translate('+(to.x-from.x-15)+'px,'+(to.y-from.y-15)+'px) scale(1)',opacity:1}],{duration:500,easing:'cubic-bezier(.25,.7,.25,1)'});
+    setTimeout(hitReact,430);setTimeout(function(){orb.remove();resolve();},540);
+  });
+}
+function enqueueBattleAnimations(room){
+  var events=(room&&room.animations)||[],fresh=events.filter(function(ev){return Number(ev.seq)>Number(ONLINE_STATE.lastAnimationSeq||0);});
+  fresh.sort(function(a,b){return a.seq-b.seq;});
+  fresh.forEach(function(ev){ONLINE_STATE.animationQueue.push(ev);ONLINE_STATE.lastAnimationSeq=Math.max(ONLINE_STATE.lastAnimationSeq,Number(ev.seq)||0);});
+  if(ONLINE_STATE.animationPlaying||!ONLINE_STATE.animationQueue.length)return;
+  ONLINE_STATE.animationPlaying=true;
+  (async function(){
+    while(ONLINE_STATE.animationQueue.length){
+      var ev=ONLINE_STATE.animationQueue.shift();
+      await playBattleAnimationEvent(ev);
+      await new Promise(function(r){setTimeout(r,90);});
+    }
+    ONLINE_STATE.animationPlaying=false;
+  })();
 }
 var BATTLE_TYPE_CHART={
   Normal:{Rock:.5,Ghost:0,Steel:.5},Fire:{Fire:.5,Water:.5,Grass:2,Ice:2,Bug:2,Rock:.5,Dragon:.5,Steel:2},
