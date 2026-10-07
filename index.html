@@ -3033,7 +3033,7 @@ function renderTrainerCard(save){
     statBlock('Money', formatMoney(save.money)),
     statBlock('Play Time', formatPlaytime(t)),
     statBlock('Party', save.party.length + ' / 6'),
-    statBlock('Boxed', countBoxed(save) + ' / ' + (save.boxes.length * BOX_SLOTS)),
+    statBlock('Boxed', countBoxed(save) + ' / ' + (save.boxes.length * (Number(save.profile&&save.profile.pc&&save.profile.pc.slotsPerBox)||BOX_SLOTS))),
     statBlock('Profile', save.profileName || 'Pokémon Emerald')
   ]);
   c.appendChild(idBlock);
