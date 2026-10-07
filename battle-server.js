@@ -170,6 +170,9 @@ function nextAlive(player){ return player.team.findIndex((mon,i)=>mon.hp>0&&i!==
 function other(i){ return i===0?1:0; }
 function playerIndex(room,playerId){ return room.players.findIndex(p=>p.id===playerId); }
 function activeAt(player,pos){return pos===1?player.team[player.active2]:player.team[player.active];}
+function doublesActionReady(player){
+  return [0,1].every(pos=>{const mon=activeAt(player,pos);return !mon||mon.hp<=0||!!(player.choice&&player.choice[pos]);});
+}
 function availableBench(player,exclude){
   const blocked=new Set((exclude||[]).filter(x=>Number.isInteger(x)));
   return player.team.findIndex((m,i)=>m.hp>0&&!blocked.has(i));
@@ -236,7 +239,7 @@ function publicRoom(room,viewerIndex){
     animationSeq:room.animationSeq||0, animations:(room.animations||[]).slice(-24),
     log:room.log.slice(-100),
     players:room.players.map(p=>({
-      name:p.name,trainer:p.trainer||{gender:'Male',outfitId:1},ready:p.ready,connected:true,active:p.active,active2:Number.isInteger(p.active2)?p.active2:null,latency:p.latency||null,choiceSlots:room.rules&&room.rules.format==='doubles'?[!!(p.choice&&p.choice[0]),!!(p.choice&&p.choice[1])]:null,hasChoice:room.rules&&room.rules.format==='doubles'?!!(p.choice&&p.choice[0]&&p.choice[1]):!!p.choice,
+      name:p.name,trainer:p.trainer||{gender:'Male',outfitId:1},ready:p.ready,connected:true,active:p.active,active2:Number.isInteger(p.active2)?p.active2:null,latency:p.latency||null,choiceSlots:room.rules&&room.rules.format==='doubles'?[!!(p.choice&&p.choice[0]),!!(p.choice&&p.choice[1])]:null,hasChoice:room.rules&&room.rules.format==='doubles'?doublesActionReady(p):!!p.choice,
       usedMega:p.usedMega,usedGmax:p.usedGmax,usedTera:p.usedTera,
       side:p.side, team:p.team.map(publicMon)
     }))
@@ -1487,8 +1490,8 @@ function doublesSpeed(room,pi,pos){
   const p=room.players[pi],saved=p.active;p.active=pos===1?p.active2:p.active;const v=effectiveSpeed(room,pi);p.active=saved;return v;
 }
 function resolveDoublesTurn(room){
-  if(!room.players.every(p=>p.choice&&p.choice[0]&&p.choice[1]))return;
-  const entries=[];room.players.forEach((p,pi)=>[0,1].forEach(pos=>entries.push({pi,pos,choice:p.choice[pos]})));
+  if(!room.players.every(doublesActionReady))return;
+  const entries=[];room.players.forEach((p,pi)=>[0,1].forEach(pos=>{const mon=activeAt(p,pos),choice=p.choice&&p.choice[pos];if(mon&&mon.hp>0&&choice)entries.push({pi,pos,choice});}));
   entries.filter(e=>e.choice.type==='switch').forEach(e=>{
     if(room.phase!=='battle')return;const p=room.players[e.pi],slot=Number(e.choice.slot);
     if(p.team[slot]&&p.team[slot].hp>0&&slot!==p.active&&slot!==p.active2)doublesContext(room,e.pi,e.pos,0,()=>doSwitch(room,e.pi,slot));
