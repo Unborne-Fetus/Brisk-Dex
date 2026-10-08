@@ -63,22 +63,43 @@ English and bundled reference data work offline. Other languages use an online t
 
 Multiplayer needs a connection to the relay. Building and downloading app packages also needs internet access.
 
-## Build Windows, Android, and iOS together
+## Build files
 
-On Windows:
+There are two Windows launchers in the repository root:
 
-1. Download or pull the **complete repository**, including the `tools` folder.
-2. Double-click **build.bat**.
-3. Sign in to GitHub if prompted.
-4. Leave the window open while the builds finish.
+- **`build.bat`** builds the **Windows installer (.exe)** and **Android APK (.apk)** locally on the Windows PC.
+- **`build-all.bat`** builds **Windows, Android, Linux, macOS, and iOS** without GitHub Actions.
 
-The script uses GitHub Actions to compile all three platforms and download their outputs. It installs GitHub CLI through winget if available and needed; otherwise install [GitHub CLI](https://cli.github.com/) first. Your GitHub account must have access to the repository and permission to run its workflow.
+Both place finished release files in `dist`.
 
-**It builds the latest committed `main` branch on GitHub. Local uncommitted changes are not included.**
+### build.bat — Windows + Android
 
-Finished installers are copied into `dist`. The original downloads are also kept under `dist/build-<run-id>`. If one platform fails, available outputs from successful platforms are still downloaded.
+Double-click `build.bat`. It runs the compatibility release checks, builds the Windows installer, prepares the Android project, builds the APK, and copies the APK to `dist/Brisk-Dex-Android.apk`.
 
-The iOS build runs on a Mac runner and produces an **unsigned IPA**. Signing and installation are separate steps.
+This path requires Node.js, Java 21, and the Android SDK.
+
+### build-all.bat — every platform
+
+Double-click `build-all.bat`.
+
+It builds every target from the same clean committed `compat-branch` revision:
+
+1. Windows EXE and Android APK on the Windows PC.
+2. Linux AppImage and DEB through WSL.
+3. macOS DMG and an unsigned iOS IPA on a Mac over SSH.
+
+Windows cannot natively compile macOS or iOS applications, so the Apple stage needs access to a Mac with Xcode and SSH enabled. If `BRISK_MAC_HOST` is not already set, the script asks for the Mac SSH target, for example `username@192.168.1.50`.
+
+You may optionally set:
+
+```bat
+setx BRISK_MAC_HOST "username@192.168.1.50"
+setx BRISK_MAC_BUILD_DIR "~/BriskDexBuild"
+```
+
+Open a new terminal after using `setx`. The Mac needs Node.js 22+, npm, Xcode, the Xcode command-line tools, SSH access, `unzip`, and `zip`.
+
+The iOS output is an **unsigned IPA**. Signing/installing it is a separate step.
 
 ## Run or build locally
 
@@ -168,7 +189,7 @@ The engine's effect-family coverage check accounts for all families in its gener
 | Instructions still say to start the relay manually | You may be running an older installed build. Rebuild and install the new EXE/APK. |
 | PowerShell blocks npm.ps1 | Run `npm.cmd` instead. |
 | build.bat reports a missing PowerShell file | Pull or extract the entire repository, including `tools/build_all.ps1`. |
-| One platform build fails | Open the run URL printed by the script and inspect that platform's failed step. Successful platform artifacts may still be available. |
+| One platform build fails | Read the failed step printed in the build window. `build.bat` covers Windows/Android; `build-all.bat` also reports whether WSL/Linux or the remote Mac/Apple stage failed. |
 | Save changes are not in the emulator | On browser/iOS fallback, export the updated save and replace the emulator's copy. Also check that the emulator did not overwrite it. |
 | Some translated text stays English | Connect to the internet; uncached translations depend on service availability and limits. |
 
