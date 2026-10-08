@@ -8,11 +8,11 @@ const webDir = path.join(root, 'www');
 await fs.rm(webDir, { recursive: true, force: true });
 await fs.mkdir(webDir, { recursive: true });
 
-for (const file of ['brisk-dex-data.json', 'brisk-dex-trainer-teams.json', 'localization.js', 'asset-loader.js']) {
+for (const file of ['brisk-dex-data.json', 'brisk-dex-trainer-teams.json', 'localization.js', 'asset-loader.js', 'emerald-compat.js']) {
   await fs.copyFile(path.join(root, file), path.join(webDir, file));
 }
 
-for (const dir of ['brisk-dex-asset-patches', 'brisk-dex-icons', 'brisk-dex-trainers', 'brisk-dex-items', 'brisk-dex-trainer-pics', 'brisk-dex-sprites', 'brisk-dex-cries']) {
+for (const dir of ['brisk-dex-asset-patches', 'brisk-dex-icons', 'brisk-dex-trainers', 'brisk-dex-items', 'brisk-dex-trainer-pics', 'brisk-dex-sprites', 'brisk-dex-cries', 'compatibility']) {
   try {
     await fs.cp(path.join(root, dir), path.join(webDir, dir), { recursive: true });
   } catch (err) {
