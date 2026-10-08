@@ -2,13 +2,13 @@
   "name": "brisk-dex",
   "productName": "Brisk Dex",
   "version": "1.0.0",
-  "description": "Companion app for Pokémon Brisk Emerald",
+  "description": "Companion app for Pokémon Brisk Emerald with profile-based Pokémon Emerald save compatibility",
   "main": "main.js",
   "author": {
     "name": "Brisk Emerald",
     "email": "noreply@briskemerald.local"
   },
-  "license": "UNLICENSED",
+  "license": "SEE LICENSE IN LICENSE",
   "private": true,
   "scripts": {
     "start": "electron .",
