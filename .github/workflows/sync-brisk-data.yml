@@ -1,0 +1,74 @@
+name: Sync Brisk Emerald game data
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [brisk-emerald-updated]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-brisk-emerald-main
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out Brisk Dex main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Check out current Brisk Emerald master
+        uses: actions/checkout@v4
+        with:
+          repository: Unborne-Fetus/Pokemon-Brisk-Emerald
+          ref: master
+          path: .brisk-game-source
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install extraction dependencies
+        run: python -m pip install Pillow
+      - name: Regenerate game data and art
+        run: python tools/extract_data.py .brisk-game-source
+      - name: Validate refreshed reference data
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('brisk-dex-data.json').read_text(encoding='utf-8'))
+          trainers = json.loads(Path('brisk-dex-trainer-teams.json').read_text(encoding='utf-8'))
+          assert len(data['species']) > 1000, 'Species extraction unexpectedly small'
+          assert len(trainers['trainers']) > 100, 'Trainer extraction unexpectedly small'
+          wanted = ('XURKITREE','CELESTEELA','GUZZLORD','NIHILEGO')
+          by_name = {value.get('constant'): int(key) for key,value in data['species'].items()}
+          for pokemon in wanted:
+              sid=by_name[pokemon]
+              sites=[r['name'] for r in data['routeEncounters'] for method in r.get('methods',[])
+                     for slot in method.get('slots',[]) if int(slot['species']) == sid and method.get('type') == 'static']
+              assert sites, f'Missing static encounter for {pokemon}'
+              print(pokemon, sites)
+          print('Species:',len(data['species']),'Trainers:',len(trainers['trainers']))
+          PY
+      - name: Record exact Brisk Emerald source revision
+        run: git -C .brisk-game-source rev-parse HEAD > brisk-emerald-data-revision.txt
+      - name: Commit refreshed assets and data
+        shell: bash
+        run: |
+          git config user.name "Brisk Dex data sync"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add brisk-dex-data.json brisk-dex-trainer-teams.json brisk-emerald-data-revision.txt
+          for dir in brisk-dex-icons brisk-dex-items brisk-dex-trainer-pics brisk-dex-sprites brisk-dex-cries brisk-dex-trainers; do
+            if [ -d "$dir" ]; then git add -A "$dir"; fi
+          done
+          if git diff --cached --quiet; then
+            echo "No game-data changes"
+          else
+            git commit -m "Sync Dex game data with Brisk Emerald master"
+            git push origin HEAD:main
+          fi
