@@ -6,6 +6,8 @@ on:
     paths:
       - '.github/workflows/sync-brisk-data.yml'
   workflow_dispatch:
+  schedule:
+    - cron: '17 */6 * * *'
   repository_dispatch:
     types: [brisk-emerald-updated]
 
@@ -66,7 +68,7 @@ jobs:
         run: |
           git config user.name "Brisk Dex data sync"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add brisk-dex-data.json brisk-dex-trainer-teams.json brisk-emerald-data-revision.txt
+          git add brisk-dex-data.json brisk-dex-trainer-teams.json brisk-battle-effects.json brisk-emerald-data-revision.txt
           for dir in brisk-dex-icons brisk-dex-items brisk-dex-trainer-pics brisk-dex-sprites brisk-dex-cries brisk-dex-trainers; do
             if [ -d "$dir" ]; then git add -A "$dir"; fi
           done
