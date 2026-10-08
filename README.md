@@ -190,6 +190,24 @@ npm run battle:coverage
 npm run battle:smoke
 ```
 
+## Emerald compatibility build
+
+The `compat-branch` release adds profile-based support for standard Pokémon Emerald saves and Emerald-derived ROM hacks while preserving Brisk Emerald's expanded format.
+
+- Unknown Emerald-derived saves open read-only unless a trusted profile is selected.
+- Compatibility packs can define save offsets, checksums, PC layouts, Bag layouts, Pokédex storage, Pokémon field encoding, ID maps, and fingerprints.
+- Cross-profile Pokémon transfers require compatible ID namespaces or explicit mappings.
+- Save writes keep an untouched backup and run checksum + round-trip validation before touching the original file.
+- Compatibility pack documentation and schema live in `compatibility/`.
+
+Release validation commands:
+
+```bash
+npm run release:test
+npm run android:prepare
+node tools/verify_release.js --mobile
+```
+
 ## License and credits
 
 Brisk Dex's original source code is licensed under the **PolyForm Noncommercial License 1.0.0**. Study, modification, and redistribution are permitted for noncommercial purposes under its terms. Commercial use, including selling copies or derivative versions, is not permitted. See [LICENSE](LICENSE) for the complete terms.
