@@ -2524,6 +2524,37 @@ function normalizeBundledReferenceData(){
 
 }
 
+// Keep newly placed event encounters visible in existing installs even before
+// the complete Brisk Emerald source-data extraction is rerun.
+function supplementCurrentBriskStaticEncounters(data){
+  var entries = [
+    ['XURKITREE', 'MAP_NEW_MAUVILLE_INSIDE_2', 'New Mauville Inside 2'],
+    ['CELESTEELA', 'MAP_SKY_PILLAR_TOP', 'Sky Pillar Top'],
+    ['GUZZLORD', 'MAP_METEOR_FALLS_B1F_2R', 'Meteor Falls B1F 2R'],
+    ['NIHILEGO', 'MAP_SHOAL_CAVE_LOW_TIDE_LOWER_ROOM', 'Shoal Cave Low Tide Lower Room']
+  ];
+  var routes = Array.isArray(data.routeEncounters) ? data.routeEncounters : [];
+  var species = data.species || {};
+  entries.forEach(function(entry){
+    var id = Object.keys(species).find(function(key){ return species[key] && species[key].constant === entry[0]; });
+    if (!id) return;
+    var map = routes.find(function(area){ return area.id === entry[1]; });
+    if (!map){
+      map = {id:entry[1], name:entry[2], mapType:'', gameRegion:'', region:'', methods:[]};
+      routes.push(map);
+    }
+    if (!Array.isArray(map.methods)) map.methods = [];
+    var method = map.methods.find(function(m){ return m.type === 'static' && m.name === 'Static'; });
+    if (!method){
+      method = {name:'Static',type:'static',encounterRate:0,slots:[]};
+      map.methods.push(method);
+    }
+    if (!method.slots.some(function(slot){ return Number(slot.species) === Number(id); }))
+      method.slots.push({species:Number(id),minLevel:70,maxLevel:70});
+  });
+  data.routeEncounters = routes;
+}
+
 async function loadBundledGameData(){
 
   try{
@@ -2559,6 +2590,7 @@ async function loadBundledGameData(){
     normalizeBundledReferenceData();
     MOVE_DETAILS = Object.assign({}, BUNDLED_DATA.moveDetails || {}, USER_DATA.moveDetails || {});
     ABILITY_DETAILS = Object.assign({}, BUNDLED_DATA.abilityDetails || {}, USER_DATA.abilityDetails || {});
+    supplementCurrentBriskStaticEncounters(data);
     ROUTE_DATA = Array.isArray(data.routeEncounters) ? data.routeEncounters : [];
     MOVE_LEARNERS_INDEX = null; ABILITY_USERS_INDEX = null;
     rebuildNameData();
