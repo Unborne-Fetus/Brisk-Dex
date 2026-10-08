@@ -46,7 +46,7 @@ try {
     }
 
     $windowsPath = (Get-Location).Path
-    $wslPath = (& wsl.exe wslpath -a ($windowsPath -replace '\','/')).Trim()
+    $wslPath = (& wsl.exe wslpath -a -u $windowsPath).Trim()
     if (-not $wslPath) { throw 'Could not convert the repository path for WSL.' }
 
     Invoke-Step 'Build Linux AppImage and DEB in WSL' {
@@ -85,15 +85,15 @@ The Mac only needs SSH enabled, Node.js 22+, npm, Xcode, and the Xcode command-l
         & scp.exe $archive "$($macHost):$remoteArchive"
     }
 
-    $remoteScript = @"
+    $remoteScript = @'
 set -e
-REMOTE_BASE=$remoteBase
-ARCHIVE=$remoteArchive
-WORK="\$REMOTE_BASE/$($commit.Substring(0,12))"
-rm -rf "\$WORK"
-mkdir -p "\$WORK"
-unzip -q "\$ARCHIVE" -d "\$WORK"
-cd "\$WORK"
+REMOTE_BASE='__REMOTE_BASE__'
+ARCHIVE='__REMOTE_ARCHIVE__'
+WORK="$REMOTE_BASE/__COMMIT__"
+rm -rf "$WORK"
+mkdir -p "$WORK"
+unzip -q "$ARCHIVE" -d "$WORK"
+cd "$WORK"
 command -v node >/dev/null
 command -v npm >/dev/null
 command -v xcodebuild >/dev/null
@@ -118,10 +118,11 @@ mkdir -p Payload
 cp -R build-ios/Build/Products/Release-iphoneos/App.app Payload/BriskDex.app
 rm -f Brisk-Dex-iOS-Unsigned.ipa
 zip -qry Brisk-Dex-iOS-Unsigned.ipa Payload
-DMG=\$(find dist -maxdepth 1 -name '*.dmg' -type f | head -n 1)
-test -n "\$DMG"
-cp "\$DMG" Brisk-Dex-macOS.dmg
-"@
+DMG=$(find dist -maxdepth 1 -name '*.dmg' -type f | head -n 1)
+test -n "$DMG"
+cp "$DMG" Brisk-Dex-macOS.dmg
+'@
+    $remoteScript = $remoteScript.Replace('__REMOTE_BASE__',$remoteBase).Replace('__REMOTE_ARCHIVE__',$remoteArchive).Replace('__COMMIT__',$commit.Substring(0,12))
 
     Invoke-Step 'Build macOS DMG and unsigned iOS IPA on Mac' {
         $remoteScript | & ssh.exe $macHost 'bash -s'
