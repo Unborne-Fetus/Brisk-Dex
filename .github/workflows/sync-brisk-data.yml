@@ -1,6 +1,10 @@
 name: Sync Brisk Emerald game data
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/sync-brisk-data.yml'
   workflow_dispatch:
   repository_dispatch:
     types: [brisk-emerald-updated]
