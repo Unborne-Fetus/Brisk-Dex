@@ -14,6 +14,30 @@ function Invoke-Step {
     }
 }
 
+
+function Invoke-NpmDependencies {
+    $attempts = 3
+    for ($attempt = 1; $attempt -le $attempts; $attempt++) {
+        Write-Host "npm dependency install attempt $attempt of $attempts..."
+        & npm.cmd ci --no-audit --no-fund
+        if ($LASTEXITCODE -eq 0) { return }
+
+        $ciExit = $LASTEXITCODE
+        Write-Host "npm ci failed with exit code $ciExit." -ForegroundColor Yellow
+
+        if ($attempt -lt $attempts) {
+            Write-Host "Retrying after a short delay (Windows can temporarily lock files in node_modules)..." -ForegroundColor Yellow
+            Start-Sleep -Seconds (2 * $attempt)
+        }
+    }
+
+    Write-Host "npm ci is still blocked. Falling back to a non-destructive npm install so an existing node_modules folder does not have to be deleted." -ForegroundColor Yellow
+    & npm.cmd install --no-audit --no-fund
+    if ($LASTEXITCODE -ne 0) {
+        throw "Install dependencies failed with exit code $LASTEXITCODE. Windows is still blocking npm from accessing a file. Close any running Brisk Dex/Electron/Node process and rerun build.bat."
+    }
+}
+
 try {
     if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
         throw 'Node.js is required. Install Node.js 22 or newer and run build.bat again.'
@@ -42,7 +66,7 @@ try {
     New-Item -ItemType Directory -Force -Path 'dist' | Out-Null
 
     Invoke-Step 'Install dependencies' {
-        & npm.cmd ci
+        Invoke-NpmDependencies
     }
 
     Invoke-Step 'Verify battle effect coverage' {
