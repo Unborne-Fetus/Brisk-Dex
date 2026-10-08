@@ -2274,7 +2274,7 @@ var ONLINE_STATE = {
   lanScanning:false, lanScanDone:false, lanRelay:null, lanRooms:[], lanError:'',
   rewardProcessing:false, rewardMessage:'', lastAnimationSeq:0, animationQueue:[], animationPlaying:false,
   matchmakingTicket:'', matchmakingMode:'', matchmakingTimer:null, matchmakingStartedAt:0, doubleActorPos:0, doubleTargetPos:0,
-  profile:null,shop:[],profileLoading:false,rankedTicket:'',rankedTimer:null,rankedStartedAt:0,leaderboard:[]
+  profile:null,shop:[],profileLoading:false,rankedTicket:'',rankedMode:'',rankedTimer:null,rankedStartedAt:0,rankedStatus:null,leaderboard:[]
 };
 function onlineProfileToken(){
   var token=localStorage.getItem('briskdex_battle_profile_token');
@@ -2318,28 +2318,31 @@ function stopRankedPolling(){if(ONLINE_STATE.rankedTimer){clearInterval(ONLINE_S
 async function cancelRankedBattle(){
   var ticket=ONLINE_STATE.rankedTicket;stopRankedPolling();
   if(ticket){try{await battleRequest('/ranked/cancel',{method:'POST',body:JSON.stringify({ticket:ticket})});}catch(e){}}
-  ONLINE_STATE.rankedTicket='';ONLINE_STATE.rankedStartedAt=0;renderOnlineBattle();
+  ONLINE_STATE.rankedTicket='';ONLINE_STATE.rankedMode='';ONLINE_STATE.rankedStatus=null;ONLINE_STATE.rankedStartedAt=0;renderOnlineBattle();
 }
-async function startRankedBattle(){
+async function startRankedBattle(mode){
   if(ONLINE_STATE.busy||ONLINE_STATE.rankedTicket)return;
-  var team=battlePartySnapshot();if(team.length!==6){showError('Ranked Singles requires exactly 6 Pokémon.');return;}
+  mode=['singles','doubles','mystery'].includes(mode)?mode:'singles';
+  var team=battlePartySnapshot(),label=mode==='doubles'?'Doubles':mode==='mystery'?'Mystery':'Singles';
+  if(team.length!==6){showError('Ranked '+label+' requires exactly 6 verified Pokémon.');return;}
   ONLINE_STATE.busy=true;
   try{
     await ensureMysteryBattleRelay();await refreshBattleProfile(false);
     var latency=await measureBattleLatency();if(latency>=9999)throw new Error('The relay stopped responding during the latency check.');
-    var data=await battleRequest('/ranked/join',{method:'POST',body:JSON.stringify({profileToken:onlineProfileToken(),name:onlineProfileName(),trainer:onlineTrainerAppearance(),team:team,latency:latency})});
-    ONLINE_STATE.rankedTicket=data.ticket;ONLINE_STATE.rankedStartedAt=Date.now();
+    var data=await battleRequest('/ranked/join',{method:'POST',body:JSON.stringify({mode:mode,profileToken:onlineProfileToken(),name:onlineProfileName(),trainer:onlineTrainerAppearance(),team:team,latency:latency})});
+    ONLINE_STATE.rankedTicket=data.ticket;ONLINE_STATE.rankedMode=mode;ONLINE_STATE.rankedStatus=data;ONLINE_STATE.rankedStartedAt=Date.now();
     function checkRanked(){
       if(!ONLINE_STATE.rankedTicket)return;
       battleRequest('/ranked/status?ticket='+encodeURIComponent(ONLINE_STATE.rankedTicket),{method:'GET'}).then(function(state){
+        ONLINE_STATE.rankedStatus=state;
         if(state.status==='matched'&&state.room){
           stopRankedPolling();ONLINE_STATE.roomCode=state.roomCode;ONLINE_STATE.playerId=state.playerId;ONLINE_STATE.playerIndex=state.playerIndex;ONLINE_STATE.room=state.room;
-          ONLINE_STATE.rankedTicket='';ONLINE_STATE.lastAnimationSeq=Number(state.room.animationSeq||0);persistOnlineSession();startBattlePolling();renderOnlineBattle();showNotice('Ranked match found.');
+          ONLINE_STATE.rankedTicket='';ONLINE_STATE.rankedMode='';ONLINE_STATE.rankedStatus=null;ONLINE_STATE.doubleActorPos=0;ONLINE_STATE.doubleTargetPos=0;ONLINE_STATE.lastAnimationSeq=Number(state.room.animationSeq||0);persistOnlineSession();startBattlePolling();renderOnlineBattle();showNotice('Ranked '+label+' match found.');
         }else renderOnlineBattle();
-      }).catch(function(err){stopRankedPolling();ONLINE_STATE.rankedTicket='';showError('Ranked matchmaking failed: '+err.message);renderOnlineBattle();});
+      }).catch(function(err){stopRankedPolling();ONLINE_STATE.rankedTicket='';ONLINE_STATE.rankedMode='';ONLINE_STATE.rankedStatus=null;showError('Ranked matchmaking failed: '+err.message);renderOnlineBattle();});
     }
     checkRanked();ONLINE_STATE.rankedTimer=setInterval(checkRanked,900);renderOnlineBattle();
-  }catch(err){showError('Could not enter Ranked matchmaking: '+err.message);}
+  }catch(err){showError('Could not enter Ranked '+label+' matchmaking: '+err.message);}
   finally{ONLINE_STATE.busy=false;}
 }
 function persistOnlineSession(){
@@ -5912,13 +5915,18 @@ function renderOnlineBattle(){
       loadProfile.addEventListener('click',async function(){try{await refreshBattleProfile(true);renderOnlineBattle();}catch(err){showError('Battle profile: '+err.message);}});progressionCard.appendChild(loadProfile);
     }else{
       var p=ONLINE_STATE.profile,stats=el('div',{class:'battle-profile-stats'});
-      [['Wins',p.wins],['Lifetime Wins',p.lifetimeWins],['Rating',p.rating],['Ranked',p.rankedWins+'–'+p.rankedLosses]].forEach(function(row){var box=el('div',{class:'battle-profile-stat'});box.appendChild(el('span',{text:row[0]}));box.appendChild(el('strong',{text:String(row[1])}));stats.appendChild(box);});
+      [['Wins',p.wins],['Win Streak',p.winStreak||0],['Best Streak',p.bestWinStreak||0],['Lifetime Wins',p.lifetimeWins],['Rating',p.rating],['Ranked',p.rankedWins+'–'+p.rankedLosses]].forEach(function(row){var box=el('div',{class:'battle-profile-stat'});box.appendChild(el('span',{text:row[0]}));box.appendChild(el('strong',{text:String(row[1])}));stats.appendChild(box);});
       progressionCard.appendChild(stats);
-      var ranked=el('div',{class:'ranked-panel'});ranked.appendChild(el('h5',{text:'Ranked Singles 6v6'}));
+      var ranked=el('div',{class:'ranked-panel'});ranked.appendChild(el('h5',{text:'Ranked 6v6'}));
       if(ONLINE_STATE.rankedTicket){
-        ranked.appendChild(el('div',{class:'mystery-searching',text:'Searching near rating '+p.rating+'… '+Math.floor((Date.now()-ONLINE_STATE.rankedStartedAt)/1000)+'s'}));
+        var rmode=ONLINE_STATE.rankedMode==='doubles'?'Doubles':ONLINE_STATE.rankedMode==='mystery'?'Mystery':'Singles',rs=ONLINE_STATE.rankedStatus||{};
+        ranked.appendChild(el('div',{class:'mystery-searching',text:'Searching Ranked '+rmode+' near rating '+p.rating+' · ±'+(rs.searchRange||75)+' · '+Math.floor((Date.now()-ONLINE_STATE.rankedStartedAt)/1000)+'s'}));
         var cancelRanked=el('button',{class:'ghost',text:'Cancel Ranked Search'});cancelRanked.addEventListener('click',cancelRankedBattle);ranked.appendChild(cancelRanked);
-      }else{var rankedBtn=el('button',{class:'primary',text:'Find Ranked Match'});rankedBtn.addEventListener('click',startRankedBattle);ranked.appendChild(rankedBtn);}
+      }else{
+        [['singles','Singles','Standard 6v6 singles with team preview.'],['doubles','Doubles','6v6 doubles with two active Pokémon per side.'],['mystery','Mystery','6v6 singles; the opponent team stays hidden during lead selection.']].forEach(function(row){
+          var rankedBtn=el('button',{class:'mystery-mode'});rankedBtn.appendChild(el('strong',{text:row[1]}));rankedBtn.appendChild(el('small',{text:row[2]}));rankedBtn.addEventListener('click',function(){startRankedBattle(row[0]);});ranked.appendChild(rankedBtn);
+        });
+      }
       progressionCard.appendChild(ranked);
       var shop=el('div',{class:'wins-shop-grid'});
       (ONLINE_STATE.shop||[]).forEach(function(item){
@@ -5936,12 +5944,12 @@ function renderOnlineBattle(){
         var publicLeaders=el('div',{class:'ranked-leaderboard'});publicLeaders.appendChild(el('h5',{text:'Public Wins Leaderboard'}));
         ONLINE_STATE.winsLeaderboard.slice(0,25).forEach(function(row){
           var ratio=row.winLossRatio===null?'∞':Number(row.winLossRatio||0).toFixed(2);
-          publicLeaders.appendChild(el('div',{class:'ranked-leader-row',text:'#'+row.rank+' · '+row.name+' · '+row.wins+' wins · '+row.record+' · '+ratio+' W/L'}));
+          publicLeaders.appendChild(el('div',{class:'ranked-leader-row',text:'#'+row.rank+' · '+row.name+' · '+row.wins+' wins · '+row.record+' · '+ratio+' W/L · Streak '+(row.winStreak||0)+' · Best '+(row.bestWinStreak||0)}));
         });progressionCard.appendChild(publicLeaders);
       }
       if((ONLINE_STATE.leaderboard||[]).length){
         var leaders=el('div',{class:'ranked-leaderboard'});leaders.appendChild(el('h5',{text:'Ranked Rating Leaderboard'}));
-        ONLINE_STATE.leaderboard.slice(0,10).forEach(function(row){leaders.appendChild(el('div',{class:'ranked-leader-row',text:'#'+row.rank+' · '+row.name+' · '+row.rating+' · '+row.rankedWins+'–'+row.rankedLosses}));});progressionCard.appendChild(leaders);
+        ONLINE_STATE.leaderboard.slice(0,10).forEach(function(row){leaders.appendChild(el('div',{class:'ranked-leader-row',text:'#'+row.rank+' · '+row.name+' · '+row.rating+' · '+row.rankedWins+'–'+row.rankedLosses+' · Streak '+(row.winStreak||0)+' · Best '+(row.bestWinStreak||0)}));});progressionCard.appendChild(leaders);
       }
     }
     shell.appendChild(progressionCard);
@@ -6009,6 +6017,7 @@ function renderOnlineBattle(){
   if(room.phase==='finished'){
     var won=room.winner===ONLINE_STATE.playerIndex;
     top.appendChild(el('h3',{text:won?'Victory!':'Defeat'}));
+    if(won&&room.winAward&&room.winAward.winnerIndex===ONLINE_STATE.playerIndex){result.appendChild(el('div',{class:'ranked-rating-change',text:'+'+room.winAward.amount+' Wins · '+room.winAward.streak+' win streak'}));}
     if(won&&room.reward){
       var rewardCard=el('div',{class:'online-status'});
       rewardCard.appendChild(makeIconEl({species:room.reward.species,isShiny:false},'encounter-icon'));
@@ -6042,13 +6051,14 @@ function renderOnlineBattle(){
   }
   if(!me||!foe)return;
   if(room.phase==='preview'){
-    var preview=el('div',{class:'battle-preview'});
-    preview.appendChild(el('h3',{text:'Team Preview · Choose your lead'}));
-    preview.appendChild(el('p',{class:'online-status',text:'Matchmaking succeeded. Both full teams are visible. Choose your lead before the battle starts.'}));
+    var preview=el('div',{class:'battle-preview'}),rankedMystery=!!(room.rules&&room.rules.ranked&&room.rules.rankedMode==='mystery');
+    preview.appendChild(el('h3',{text:(rankedMystery?'Mystery Preview':'Team Preview')+' · Choose your lead'}));
+    preview.appendChild(el('p',{class:'online-status',text:rankedMystery?'Matchmaking succeeded. Your opponent’s team is hidden until the battle begins. Choose your lead blind.':'Matchmaking succeeded. Both full teams are visible. Choose your lead before the battle starts.'}));
     var cols=el('div',{class:'online-shell'});
     function previewTeam(player,isMe){
       var card=el('section',{class:'online-card'});card.appendChild(el('h4',{text:(isMe?'Your team · ':'Opponent · ')+player.name}));
       var grid=el('div',{class:'battle-preview-team'});
+      if(!isMe&&rankedMystery&&!player.team.length)grid.appendChild(el('div',{class:'route-empty',text:'Opponent team hidden in Ranked Mystery.'}));
       (player.team||[]).forEach(function(mon,index){
         var row=el('div',{class:'battle-preview-mon'+(isMe&&player.leadSelected===index?' selected':'')});
         row.appendChild(makeIconEl({species:mon.species,isShiny:false},'encounter-icon'));
