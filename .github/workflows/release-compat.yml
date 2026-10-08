@@ -1,0 +1,137 @@
+name: Release Gate - Compat Branch
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [compat-branch]
+
+jobs:
+  verify:
+    name: Tests and packaging audit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run release tests
+        run: npm run release:test
+      - name: Prepare mobile bundle
+        run: npm run android:prepare
+      - name: Verify packaged runtime
+        run: node tools/verify_release.js --mobile
+
+  windows:
+    name: Windows installer
+    needs: verify
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run dist:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Brisk-Dex-Compat-Windows
+          path: dist/*.exe
+          if-no-files-found: error
+
+  android:
+    name: Android APK
+    needs: verify
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: npm ci
+      - run: npm run android:prepare
+      - run: npx cap add android
+      - run: node tools/patch_android.mjs
+      - run: npx cap sync android
+      - name: Build APK
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew assembleDebug
+      - run: cp android/app/build/outputs/apk/debug/app-debug.apk Brisk-Dex-Compat-Android.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Brisk-Dex-Compat-Android
+          path: Brisk-Dex-Compat-Android.apk
+          if-no-files-found: error
+
+  linux:
+    name: Linux packages
+    needs: verify
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run dist:linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Brisk-Dex-Compat-Linux
+          path: |
+            dist/*.AppImage
+            dist/*.deb
+          if-no-files-found: error
+
+  apple:
+    name: macOS DMG and unsigned iOS IPA
+    needs: verify
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Build macOS app
+        run: npm run dist:mac
+      - name: Prepare iOS web bundle
+        run: npm run ios:prepare
+      - name: Create iOS project
+        run: npx cap add ios
+      - run: npx cap sync ios
+      - name: Build unsigned iPhone app
+        run: |
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build-ios \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p Payload
+          cp -R build-ios/Build/Products/Release-iphoneos/App.app Payload/BriskDex.app
+          zip -qry Brisk-Dex-Compat-iOS-Unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Brisk-Dex-Compat-Apple
+          path: |
+            dist/*.dmg
+            Brisk-Dex-Compat-iOS-Unsigned.ipa
+          if-no-files-found: error
