@@ -6,8 +6,8 @@ on:
     branches: [compat-branch]
 
 jobs:
-  verify:
-    name: Tests and packaging audit
+  battle-tests:
+    name: Battle coverage and relay smoke
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -15,18 +15,39 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-      - name: Install dependencies
-        run: npm ci
-      - name: Run release tests
-        run: npm run release:test
-      - name: Prepare mobile bundle
-        run: npm run android:prepare
-      - name: Verify packaged runtime
-        run: node tools/verify_release.js --mobile
+      - run: npm ci
+      - run: npm run battle:coverage
+      - run: npm run battle:smoke
+
+  compat-tests:
+    name: Emerald compatibility tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run compat:test
+
+  package-audit:
+    name: Desktop and mobile packaging audit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run release:verify
+      - run: npm run android:prepare
+      - run: node tools/verify_release.js --mobile
 
   windows:
     name: Windows installer
-    needs: verify
+    needs: [battle-tests, compat-tests, package-audit]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
@@ -44,7 +65,7 @@ jobs:
 
   android:
     name: Android APK
-    needs: verify
+    needs: [battle-tests, compat-tests, package-audit]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -75,7 +96,7 @@ jobs:
 
   linux:
     name: Linux packages
-    needs: verify
+    needs: [battle-tests, compat-tests, package-audit]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -95,7 +116,7 @@ jobs:
 
   apple:
     name: macOS DMG and unsigned iOS IPA
-    needs: verify
+    needs: [battle-tests, compat-tests, package-audit]
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v5
