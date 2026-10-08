@@ -27,7 +27,8 @@
     "battle-server": "node battle-server.js",
     "battle:coverage": "node tools/check_battle_coverage.js",
     "battle:smoke": "node tools/test_battle_server.js",
-    "compat:test": "node tools/test_emerald_compat.js"
+    "compat:test": "node tools/test_emerald_compat.js",
+    "release:test": "npm run battle:coverage && npm run battle:smoke && npm run compat:test"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.0.0",
@@ -56,7 +57,9 @@
       "translation-service.js",
       "asset-loader.js",
       "brisk-dex-asset-patches/**/*",
-      "brisk-dex-icon-manifest.json"
+      "brisk-dex-icon-manifest.json",
+      "emerald-compat.js",
+      "compatibility/**/*"
     ],
     "directories": {
       "output": "dist"
