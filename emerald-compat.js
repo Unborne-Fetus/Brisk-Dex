@@ -38,6 +38,7 @@ var BASE_PROFILE={
   pokemonEncoding:'vanilla-gen3',
   speciesMapping:'emerald-internal',
   idLimits:{species:386,moves:354,items:376,abilities:77},
+  idNamespaces:{species:'national',moves:'gen3',items:'emerald-vanilla',abilities:'slot'},
   idMaps:{species:{},moves:{},items:{},abilities:{}},
   save:{
     minimumSize:0x1C000,
@@ -97,6 +98,7 @@ var BUILTINS={
     writePolicy:'readonly',
     speciesMapping:'national-direct',
     idLimits:{species:2047,moves:2047,items:1023,abilities:1023},
+    idNamespaces:{species:'national',moves:'expansion',items:'expansion',abilities:'slot'},
     pokemon:{speciesMask:0x07FF,heldItemMask:0x03FF,experienceMask:0x001FFFFF,moveMask:0x07FF,ppMask:0x7F,abilityMode:'expansion-bits29-30'},
     dex:{kind:'unknown',flagBytes:0},
     features:{tera:false,provenance:false,shinyOverride:false,outfits:false,expandedBoxes:false}
@@ -110,6 +112,7 @@ var BUILTINS={
     pokemonEncoding:'brisk-expansion',
     speciesMapping:'national-direct',
     idLimits:{species:2047,moves:2047,items:1023,abilities:1023},
+    idNamespaces:{species:'national',moves:'expansion',items:'expansion',abilities:'slot'},
     pokemon:{
       speciesMask:0x07FF,heldItemMask:0x03FF,experienceMask:0x001FFFFF,moveMask:0x07FF,ppMask:0x7F,
       teraShift:11,teraMask:0x1F,abilityMode:'expansion-bits29-30',provenanceBit:15,shinyOverrideBit:14,shinyThreshold:8
@@ -306,13 +309,28 @@ function checksumSize(profile,sectionId){
 }
 function bagPockets(profile){return deepClone((profile&&profile.bag&&profile.bag.pockets)||DEFAULT_BAG);}
 
-function validateContentForProfile(mon,destinationProfile){
+function hasExplicitMap(profile,kind,rawOrDisplay){
+  var map=profile&&profile.idMaps&&profile.idMaps[kind]||{},value=Number(rawOrDisplay)||0;
+  if(Object.prototype.hasOwnProperty.call(map,String(value)))return true;
+  return Object.keys(map).some(function(k){return Number(map[k])===value;});
+}
+function namespacesCompatible(source,dest,kind){
+  var a=source&&source.idNamespaces&&source.idNamespaces[kind],b=dest&&dest.idNamespaces&&dest.idNamespaces[kind];
+  return !!a&&!!b&&a===b;
+}
+function validateContentForProfile(mon,destinationProfile,sourceProfile){
   var p=destinationProfile||BUILTINS.emerald,issues=[];
   if(!mon||mon.empty)return {ok:false,issues:['Empty Pokémon record.']};
   var limits=p.idLimits||{};
   if(Number(mon.species)>Number(limits.species||65535))issues.push('Species #'+mon.species+' is not supported by '+p.name+'.');
-  (mon.moves||[]).filter(Boolean).forEach(function(id){if(Number(id)>Number(limits.moves||65535))issues.push('Move #'+id+' is not supported by '+p.name+'.');});
+  (mon.moves||[]).filter(Boolean).forEach(function(id){
+    if(Number(id)>Number(limits.moves||65535))issues.push('Move #'+id+' is not supported by '+p.name+'.');
+    else if(sourceProfile&&!namespacesCompatible(sourceProfile,p,'moves')&&!hasExplicitMap(p,'moves',id))
+      issues.push('Move #'+id+' has no verified ID mapping for '+p.name+'.');
+  });
   if(Number(mon.heldItem||0)>Number(limits.items||65535))issues.push('Held item #'+mon.heldItem+' is not supported by '+p.name+'.');
+  else if(Number(mon.heldItem||0)>0&&sourceProfile&&!namespacesCompatible(sourceProfile,p,'items')&&!hasExplicitMap(p,'items',mon.heldItem))
+    issues.push('Held item #'+mon.heldItem+' has no verified ID mapping for '+p.name+'.');
   if(mon.teraType!=null && mon.teraType!==0 && !(p.features&&p.features.tera))issues.push('The destination profile does not store Tera Types.');
   return {ok:issues.length===0,issues:issues};
 }
@@ -361,7 +379,7 @@ function convertPokemonRecord(raw,sourceProfile,destinationProfile){
   var source=typeof sourceProfile==='string'?profileForId(sourceProfile):sourceProfile;
   var dest=typeof destinationProfile==='string'?profileForId(destinationProfile):destinationProfile;
   if(!source||!dest)throw new Error('Both source and destination compatibility profiles are required.');
-  var summary=recordSummary(raw,source),check=validateContentForProfile(summary,dest);
+  var summary=recordSummary(raw,source),check=validateContentForProfile(summary,dest,source);
   if(!check.ok)throw new Error(check.issues.join(' '));
 
   var d=decryptRecord(raw),dv=d.dv,g=d.offsets.G,a=d.offsets.A,m=d.offsets.M,sp=source.pokemon||{},dp=dest.pokemon||{};
