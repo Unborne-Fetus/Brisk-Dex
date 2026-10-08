@@ -27,4 +27,22 @@ dv.setUint32(0,1,true);dv.setUint32(4,2,true);
 const key=3;for(let i=0;i<12;i++)dv.setUint32(0x20+i*4,key,true);
 const converted=EmeraldCompat.convertPokemonRecord(raw,vanilla,brisk);
 assert(converted.length===80,'Cross-profile conversion changed record size');
+
+// ID namespace safety: a nonzero held item cannot silently cross from an
+// expansion namespace into vanilla Emerald without a verified mapping.
+const expansion=EmeraldCompat.profileForId('pokeemerald-expansion-generic');
+const itemRaw=raw.slice(),itemDv=new DataView(itemRaw.buffer);
+const itemKey=(itemDv.getUint32(0,true)^itemDv.getUint32(4,true))>>>0;
+const itemPlain=new Uint8Array(48),itemPlainDv=new DataView(itemPlain.buffer);
+for(let w=0;w<12;w++)itemPlainDv.setUint32(w*4,(itemDv.getUint32(0x20+w*4,true)^itemKey)>>>0,true);
+const order=['GAEM','GAME','GEAM','GEMA','GMAE','GMEA','AGEM','AGME','AEGM','AEMG','AMGE','AMEG','EGAM','EGMA','EAGM','EAMG','EMGA','EMAG','MGAE','MGEA','MAGE','MAEG','MEGA','MEAG'][itemDv.getUint32(0,true)%24],offsets={};
+for(let i=0;i<4;i++)offsets[order[i]]=i*12;
+itemPlainDv.setUint16(offsets.G+2,1,true);
+let sum=0;for(let i=0;i<24;i++)sum=(sum+itemPlainDv.getUint16(i*2,true))&0xffff;
+itemDv.setUint16(0x1c,sum,true);
+for(let w=0;w<12;w++)itemDv.setUint32(0x20+w*4,(itemPlainDv.getUint32(w*4,true)^itemKey)>>>0,true);
+let blocked=false;
+try{EmeraldCompat.convertPokemonRecord(itemRaw,expansion,vanilla);}catch(e){blocked=/mapping|namespace/i.test(e.message);}
+assert(blocked,'ID namespace safety did not block an unmapped cross-profile held item');
+
 console.log('Emerald compatibility tests passed');
