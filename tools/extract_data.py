@@ -1779,8 +1779,11 @@ def main():
             if key == "iris":
                 candidates.append("iris_bw2")
             source_name = next((available[k] for k in candidates if k in available), None)
-            if key in custom_portraits and os.path.isfile(target_path):
-                trainer["portrait"] = trainer_pics_out + "/" + target
+            if key in custom_portraits:
+                if os.path.isfile(target_path):
+                    trainer["portrait"] = trainer_pics_out + "/" + target
+                else:
+                    print("Custom portrait missing (not replacing with game art):", target)
             elif source_name:
                 shutil.copyfile(os.path.join(trainer_front_dir, source_name), target_path)
                 trainer["portrait"] = trainer_pics_out + "/" + target
