@@ -6017,7 +6017,6 @@ function renderOnlineBattle(){
   if(room.phase==='finished'){
     var won=room.winner===ONLINE_STATE.playerIndex;
     top.appendChild(el('h3',{text:won?'Victory!':'Defeat'}));
-    if(won&&room.winAward&&room.winAward.winnerIndex===ONLINE_STATE.playerIndex){result.appendChild(el('div',{class:'ranked-rating-change',text:'+'+room.winAward.amount+' Wins · '+room.winAward.streak+' win streak'}));}
     if(won&&room.reward){
       var rewardCard=el('div',{class:'online-status'});
       rewardCard.appendChild(makeIconEl({species:room.reward.species,isShiny:false},'encounter-icon'));
@@ -6163,6 +6162,9 @@ function renderOnlineBattle(){
     if(room.rules&&room.rules.ranked&&room.ratingChanges){
       var delta=Number(room.ratingChanges[ONLINE_STATE.playerIndex]||0);
       result.appendChild(el('div',{class:'ranked-rating-change',text:'Ranked rating '+(delta>=0?'+':'')+delta}));
+    }
+    if(won&&room.winAward&&room.winAward.winnerIndex===ONLINE_STATE.playerIndex){
+      result.appendChild(el('div',{class:'ranked-rating-change',text:'+'+room.winAward.amount+' Wins · '+room.winAward.streak+' win streak'}));
     }
     if(won&&room.reward){
       result.appendChild(makeIconEl({species:room.reward.species,isShiny:false},'encounter-icon'));
