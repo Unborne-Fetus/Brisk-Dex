@@ -892,6 +892,54 @@ def extract_route_encounters(repo, species_ids):
                 area["methods"].append(method)
             method["slots"].append({"species": species_id, "minLevel": level, "maxLevel": level})
 
+    # Brisk's reusable legendary script macro expands to setwildbattle at build
+    # time, so scanning the map's scripts.inc alone misses these encounters.
+    # Match placed object events to macro declarations rather than assuming
+    # every declared legendary is actually obtainable on a map.
+    legendary_file = os.path.join(repo, "data", "brisk_static_legendaries.inc")
+    if os.path.isfile(legendary_file):
+        definitions = {}
+        for event, constant, level in re.findall(
+            r"\\bbrisk_static_legendary\\s+([A-Za-z0-9_]+)\\s*,\\s*SPECIES_([A-Z0-9_]+)\\s*,\\s*(\\d+)\\s*,",
+            strip_comments(read(legendary_file))):
+            definitions[event] = (constant, int(level))
+        for root, _, files in os.walk(maps_dir):
+            if "map.json" not in files:
+                continue
+            try:
+                info = json.loads(read(os.path.join(root, "map.json")))
+            except (OSError, ValueError, TypeError):
+                continue
+            map_id = info.get("id")
+            if not map_id or info.get("region") == "REGION_KANTO":
+                continue
+            for obj in info.get("object_events", []):
+                declaration = definitions.get(obj.get("script"))
+                if not declaration:
+                    continue
+                constant, level = declaration
+                species_id = species_ids.get(constant)
+                if not species_id:
+                    continue
+                signature = (map_id, "static", species_id, level)
+                if signature in static_seen:
+                    continue
+                static_seen.add(signature)
+                area = area_by_id.get(map_id)
+                if area is None:
+                    name = info.get("name") or map_id.removeprefix("MAP_").replace("_", " ").title()
+                    area = {"id": map_id, "name": name, "mapType": info.get("map_type", ""),
+                            "gameRegion": info.get("region", ""),
+                            "region": (info.get("region_map_section") or "").removeprefix("MAPSEC_").replace("_", " ").title(),
+                            "methods": []}
+                    out.append(area)
+                    area_by_id[map_id] = area
+                method = next((m for m in area["methods"] if m["type"] == "static" and m["name"] == "Static"), None)
+                if method is None:
+                    method = {"name": "Static", "type": "static", "encounterRate": 0, "slots": []}
+                    area["methods"].append(method)
+                method["slots"].append({"species": species_id, "minLevel": level, "maxLevel": level})
+
     # Keep the encounter browser in the order players reach these places during
     # the Hoenn story, with caves and side areas beside their nearest route.
     progression = [
