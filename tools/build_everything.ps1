@@ -58,17 +58,16 @@ try {
     $deb = Get-ChildItem 'dist' -Filter '*.deb' -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if (-not $appImage -or -not $deb) { throw 'Linux build did not produce both AppImage and DEB outputs.' }
 
+    Invoke-Step 'Restore Windows Node dependencies after WSL build' {
+        & npm.cmd ci
+    }
+
     $macHost = $env:BRISK_MAC_HOST
     if (-not $macHost) {
-        throw @'
-Apple builds need access to a Mac because Xcode only runs on macOS.
-
-Set BRISK_MAC_HOST to an SSH destination, for example:
-  setx BRISK_MAC_HOST "username@192.168.1.50"
-
-Then open a new terminal and run build-all.bat again.
-The Mac only needs SSH enabled, Node.js 22+, npm, Xcode, and the Xcode command-line tools.
-'@
+        Write-Host ''
+        Write-Host 'Apple builds need access to a Mac because Xcode only runs on macOS.' -ForegroundColor Yellow
+        $macHost = Read-Host 'Mac SSH target (example: username@192.168.1.50)'
+        if (-not $macHost) { throw 'No Mac SSH target was provided, so macOS/iOS cannot be built.' }
     }
 
     $remoteBase = if ($env:BRISK_MAC_BUILD_DIR) { $env:BRISK_MAC_BUILD_DIR } else { '~/BriskDexBuild' }
