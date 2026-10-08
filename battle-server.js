@@ -54,16 +54,16 @@ function profileKeyForToken(token){
 function ensureProfile(token,name){
   const key=profileKeyForToken(token);if(!key)return null;
   let p=PROFILE_DB.profiles[key];
-  if(!p)p=PROFILE_DB.profiles[key]={key,name:cleanText(name,24)||'Trainer',wins:0,lifetimeWins:0,lifetimeLosses:0,rating:1000,rankedWins:0,rankedLosses:0,rankedGames:0,purchases:[],gachaPokemon:[],equipped:{title:'',accent:'default',arena:'stadium'},createdAt:Date.now(),updatedAt:Date.now()};
+  if(!p)p=PROFILE_DB.profiles[key]={key,name:cleanText(name,24)||'Trainer',wins:0,lifetimeWins:0,lifetimeLosses:0,winStreak:0,bestWinStreak:0,rating:1000,rankedWins:0,rankedLosses:0,rankedGames:0,purchases:[],gachaPokemon:[],equipped:{title:'',accent:'default',arena:'stadium'},createdAt:Date.now(),updatedAt:Date.now()};
   if(name)p.name=cleanText(name,24)||p.name;
-  p.wins=Math.max(0,Number(p.wins)||0);p.lifetimeWins=Math.max(0,Number(p.lifetimeWins)||0);p.lifetimeLosses=Math.max(0,Number(p.lifetimeLosses)||0);p.rating=Math.max(100,Math.round(Number(p.rating)||1000));
+  p.wins=Math.max(0,Number(p.wins)||0);p.lifetimeWins=Math.max(0,Number(p.lifetimeWins)||0);p.lifetimeLosses=Math.max(0,Number(p.lifetimeLosses)||0);p.winStreak=Math.max(0,Number(p.winStreak)||0);p.bestWinStreak=Math.max(p.winStreak,Math.max(0,Number(p.bestWinStreak)||0));p.rating=Math.max(100,Math.round(Number(p.rating)||1000));
   p.rankedWins=Math.max(0,Number(p.rankedWins)||0);p.rankedLosses=Math.max(0,Number(p.rankedLosses)||0);p.rankedGames=Math.max(0,Number(p.rankedGames)||0);
   if(!Array.isArray(p.purchases))p.purchases=[];if(!Array.isArray(p.gachaPokemon))p.gachaPokemon=[];if(!p.equipped)p.equipped={title:'',accent:'default',arena:'stadium'};
   p.updatedAt=Date.now();return p;
 }
 function publicProfile(p){
   if(!p)return null;
-  return {name:p.name,wins:p.wins,lifetimeWins:p.lifetimeWins,lifetimeLosses:p.lifetimeLosses,rating:p.rating,rankedWins:p.rankedWins,rankedLosses:p.rankedLosses,rankedGames:p.rankedGames,purchases:p.purchases.slice(),gachaPokemon:p.gachaPokemon.slice(-50),equipped:Object.assign({},p.equipped)};
+  return {name:p.name,wins:p.wins,lifetimeWins:p.lifetimeWins,lifetimeLosses:p.lifetimeLosses,winStreak:p.winStreak,bestWinStreak:p.bestWinStreak,rating:p.rating,rankedWins:p.rankedWins,rankedLosses:p.rankedLosses,rankedGames:p.rankedGames,purchases:p.purchases.slice(),gachaPokemon:p.gachaPokemon.slice(-50),equipped:Object.assign({},p.equipped)};
 }
 function shopItem(id){return SHOP_CATALOG.find(x=>x.id===id)||null;}
 function ratingDelta(winnerRating,loserRating){
@@ -76,7 +76,19 @@ function recordBattleResult(room,winnerIndex,awardWinCurrency){
   const winner=room.players[winnerIndex],loser=room.players[other(winnerIndex)];
   const wp=winner&&!winner.isBot&&winner.profileKey?PROFILE_DB.profiles[winner.profileKey]:null;
   const lp=loser&&!loser.isBot&&loser.profileKey?PROFILE_DB.profiles[loser.profileKey]:null;
-  if(awardWinCurrency&&wp){wp.wins=(Number(wp.wins)||0)+1;wp.lifetimeWins=(Number(wp.lifetimeWins)||0)+1;wp.updatedAt=Date.now();}if(awardWinCurrency&&lp){lp.lifetimeLosses=(Number(lp.lifetimeLosses)||0)+1;lp.updatedAt=Date.now();}
+  if(awardWinCurrency&&wp){
+    wp.winStreak=(Number(wp.winStreak)||0)+1;
+    wp.bestWinStreak=Math.max(Number(wp.bestWinStreak)||0,wp.winStreak);
+    wp.wins=(Number(wp.wins)||0)+wp.winStreak;
+    wp.lifetimeWins=(Number(wp.lifetimeWins)||0)+1;
+    room.winAward={winnerIndex,amount:wp.winStreak,streak:wp.winStreak};
+    wp.updatedAt=Date.now();
+  }
+  if(lp){
+    lp.winStreak=0;
+    if(awardWinCurrency)lp.lifetimeLosses=(Number(lp.lifetimeLosses)||0)+1;
+    lp.updatedAt=Date.now();
+  }
   if(room.rules&&room.rules.ranked&&wp&&lp){
     const wr=Number(wp.rating)||1000,lr=Number(lp.rating)||1000,delta=ratingDelta(wr,lr);
     wp.rating=wr+delta;lp.rating=Math.max(100,lr-delta);
@@ -666,10 +678,11 @@ function tryMatchmake(mode){
   }
   matchmaking.set(mode,q);
 }
+function rankedModeKey(value){return ['singles','doubles','mystery'].includes(String(value||'').toLowerCase())?String(value).toLowerCase():'singles';}
 function makeRankedRoom(a,b){
-  const better=a.latency<=b.latency?a:b,otherEntry=better===a?b:a,code=roomCode();
+  const better=a.latency<=b.latency?a:b,otherEntry=better===a?b:a,code=roomCode(),mode=rankedModeKey(a.mode),format=mode==='doubles'?'doubles':'singles';
   const room={code,phase:'preview',turn:0,winner:null,reward:null,kickedIds:[],animationSeq:0,animations:[],createdAt:Date.now(),updatedAt:Date.now(),log:[],weather:null,weatherTurns:0,terrain:null,terrainTurns:0,
-    rules:{format:'singles',teamSize:6,ranked:true,hostByLatency:true},
+    rules:{format,teamSize:6,ranked:true,rankedMode:mode,mystery:mode==='mystery',noPrize:true,hostByLatency:true},
     players:[
       {id:better.playerId,name:better.name,trainer:better.trainer,profileKey:better.profileKey,rating:better.rating,team:better.team,ready:true,active:0,leadSelected:null,previewReady:false,choice:null,side:{},latency:better.latency,lastSeen:Date.now()},
       {id:otherEntry.playerId,name:otherEntry.name,trainer:otherEntry.trainer,profileKey:otherEntry.profileKey,rating:otherEntry.rating,team:otherEntry.team,ready:true,active:0,leadSelected:null,previewReady:false,choice:null,side:{},latency:otherEntry.latency,lastSeen:Date.now()}
@@ -678,19 +691,41 @@ function makeRankedRoom(a,b){
   [better,otherEntry].forEach((entry,index)=>{const t=rankedTickets.get(entry.ticket);if(t){t.status='matched';t.roomCode=code;t.playerId=entry.playerId;t.playerIndex=index;t.hostIndex=0;t.updatedAt=Date.now();}});
   return room;
 }
+function rankedSearchRange(entry,now){
+  const waited=Math.max(0,(now-entry.createdAt)/1000);
+  // Start tight, then gradually relax the skill window so low-population queues still resolve.
+  return Math.min(500,75+Math.floor(waited/10)*25);
+}
 function tryRankedMatch(){
+  const now=Date.now();
   rankedQueue.sort((a,b)=>a.createdAt-b.createdAt);
-  for(let i=0;i<rankedQueue.length;i++){
-    const a=rankedQueue[i];if(!rankedTickets.has(a.ticket))continue;
-    const waited=Math.max(0,(Date.now()-a.createdAt)/1000),range=Math.min(500,100+Math.floor(waited/5)*25);
-    let best=-1,bestDiff=Infinity;
-    for(let j=i+1;j<rankedQueue.length;j++){
-      const b=rankedQueue[j];if(!rankedTickets.has(b.ticket)||a.profileKey===b.profileKey)continue;
-      const diff=Math.abs(a.rating-b.rating);if(diff<=range&&diff<bestDiff){best=j;bestDiff=diff;}
+  for(const entry of rankedQueue){
+    const state=rankedTickets.get(entry.ticket);if(!state)continue;
+    state.searchRange=rankedSearchRange(entry,now);
+    state.waitSeconds=Math.max(0,Math.floor((now-entry.createdAt)/1000));
+    state.updatedAt=now;
+  }
+  while(rankedQueue.length>=2){
+    let best=null;
+    for(let i=0;i<rankedQueue.length-1;i++){
+      const a=rankedQueue[i],ta=rankedTickets.get(a.ticket);if(!ta||ta.status!=='searching')continue;
+      const rangeA=rankedSearchRange(a,now);
+      for(let j=i+1;j<rankedQueue.length;j++){
+        const b=rankedQueue[j],tb=rankedTickets.get(b.ticket);if(!tb||tb.status!=='searching'||a.profileKey===b.profileKey||rankedModeKey(a.mode)!==rankedModeKey(b.mode))continue;
+        const rangeB=rankedSearchRange(b,now),diff=Math.abs(a.rating-b.rating);
+        // Both players must currently accept the rating gap.
+        if(diff>Math.min(rangeA,rangeB))continue;
+        const oldest=Math.min(a.createdAt,b.createdAt),combinedWait=(now-a.createdAt)+(now-b.createdAt);
+        const candidate={i,j,a,b,diff,oldest,combinedWait};
+        if(!best||candidate.diff<best.diff||
+          (candidate.diff===best.diff&&candidate.oldest<best.oldest)||
+          (candidate.diff===best.diff&&candidate.oldest===best.oldest&&candidate.combinedWait>best.combinedWait))best=candidate;
+      }
     }
-    if(best>=0){
-      const b=rankedQueue[best];rankedQueue.splice(best,1);rankedQueue.splice(i,1);makeRankedRoom(a,b);i=-1;
-    }
+    if(!best)break;
+    rankedQueue.splice(best.j,1);rankedQueue.splice(best.i,1);
+    const room=makeRankedRoom(best.a,best.b);
+    room.matchmaking={skillBased:true,ratingGap:best.diff,ratings:[best.a.rating,best.b.rating]};
   }
 }
 function hasType(mon,type){ return (mon.types||[]).includes(type); }
@@ -725,16 +760,16 @@ function publicRoom(room,viewerIndex){
     ? {id:room.reward.id,species:room.reward.species,name:room.reward.name,level:room.reward.level,sourceTrainer:room.reward.sourceTrainer,raw80:room.reward.raw80}
     : null;
   return {
-    code:room.code, phase:room.phase, rules:room.rules, turn:room.turn, winner:room.winner, reward:reward, ratingChanges:room.ratingChanges||null, profileUpdates:room.profileUpdates||null,
+    code:room.code, phase:room.phase, rules:room.rules, turn:room.turn, winner:room.winner, reward:reward, ratingChanges:room.ratingChanges||null, winAward:room.winAward||null, profileUpdates:room.profileUpdates||null,
     weather:room.weather, weatherTurns:room.weatherTurns, terrain:room.terrain, terrainTurns:room.terrainTurns,
     trickRoom:room.trickRoom, trickRoomTurns:room.trickRoomTurns,gravity:room.gravity,gravityTurns:room.gravityTurns,
     magicRoom:room.magicRoom,magicRoomTurns:room.magicRoomTurns,wonderRoom:room.wonderRoom,wonderRoomTurns:room.wonderRoomTurns,
     animationSeq:room.animationSeq||0, animations:(room.animations||[]).slice(-24),
     log:room.log.slice(-100),
-    players:room.players.map(p=>({
+    players:room.players.map((p,playerPos)=>({
       name:p.name,trainer:p.trainer||{gender:'Male',outfitId:1},leadSelected:Number.isInteger(p.leadSelected)?p.leadSelected:null,previewReady:!!p.previewReady,rating:p.profileKey&&PROFILE_DB.profiles[p.profileKey]?PROFILE_DB.profiles[p.profileKey].rating:(p.rating||null),title:p.profileKey&&PROFILE_DB.profiles[p.profileKey]?(PROFILE_DB.profiles[p.profileKey].equipped.title||''):'',ready:p.ready,connected:true,active:p.active,active2:Number.isInteger(p.active2)?p.active2:null,latency:p.latency||null,choiceSlots:room.rules&&room.rules.format==='doubles'?[!!(p.choice&&p.choice[0]),!!(p.choice&&p.choice[1])]:null,hasChoice:room.rules&&room.rules.format==='doubles'?doublesActionReady(p):!!p.choice,
       usedMega:p.usedMega,usedGmax:p.usedGmax,usedTera:p.usedTera,
-      side:p.side, team:p.team.map(publicMon)
+      side:p.side, team:(room.rules&&room.rules.rankedMode==='mystery'&&room.phase==='preview'&&playerPos!==viewerIndex)?[]:p.team.map(publicMon)
     }))
   };
 }
@@ -2069,13 +2104,13 @@ const server=http.createServer(async (req,res)=>{
       saveProfiles();return json(res,200,{ok:true,profile:publicProfile(profile),shop:SHOP_CATALOG});
     }
     if(req.method==='GET'&&url.pathname==='/ranked/leaderboard'){
-      const leaders=Object.values(PROFILE_DB.profiles).filter(p=>(Number(p.rankedGames)||0)>0).sort((a,b)=>(b.rating||1000)-(a.rating||1000)||(b.rankedWins||0)-(a.rankedWins||0)).slice(0,100).map((p,i)=>({rank:i+1,name:p.name,rating:p.rating,rankedWins:p.rankedWins,rankedLosses:p.rankedLosses}));
+      const leaders=Object.values(PROFILE_DB.profiles).filter(p=>(Number(p.rankedGames)||0)>0).sort((a,b)=>(b.rating||1000)-(a.rating||1000)||(b.rankedWins||0)-(a.rankedWins||0)).slice(0,100).map((p,i)=>({rank:i+1,name:p.name,rating:p.rating,rankedWins:p.rankedWins,rankedLosses:p.rankedLosses,winStreak:Number(p.winStreak)||0,bestWinStreak:Number(p.bestWinStreak)||0}));
       return json(res,200,{ok:true,leaders});
     }
     if(req.method==='GET'&&url.pathname==='/leaderboard'){
       const leaders=Object.values(PROFILE_DB.profiles).filter(p=>(Number(p.lifetimeWins)||0)>0||(Number(p.rankedLosses)||0)>0).sort((a,b)=>(b.lifetimeWins||0)-(a.lifetimeWins||0)||(b.rankedWins||0)-(a.rankedWins||0)||(a.rankedLosses||0)-(b.rankedLosses||0)).slice(0,100).map((p,i)=>{
         const wins=Number(p.lifetimeWins)||0,losses=Number(p.lifetimeLosses)||0;
-        return {rank:i+1,name:p.name,wins,losses,winLossRatio:losses?wins/losses:wins?null:0,record:wins+'–'+losses};
+        return {rank:i+1,name:p.name,wins,losses,winLossRatio:losses?wins/losses:wins?null:0,record:wins+'–'+losses,winStreak:Number(p.winStreak)||0,bestWinStreak:Number(p.bestWinStreak)||0};
       });
       return json(res,200,{ok:true,leaders});
     }
@@ -2110,13 +2145,13 @@ const server=http.createServer(async (req,res)=>{
       return json(res,200,{ok:true,profile:publicProfile(profile)});
     }
     if(req.method==='POST'&&url.pathname==='/ranked/join'){
-      const body=await readBody(req),verified=cleanVerifiedTeam(body.team),team=verified.team,profile=ensureProfile(body.profileToken,body.name);
+      const body=await readBody(req),mode=rankedModeKey(body.mode),verified=cleanVerifiedTeam(body.team),team=verified.team,profile=ensureProfile(body.profileToken,body.name);
       if(!profile)return json(res,400,{error:'Missing ranked player profile.'});
       if(verified.errors.length)return json(res,400,{error:'Ranked team rejected: '+verified.errors.join(' ')});
-      if(team.length!==6)return json(res,400,{error:'Ranked requires exactly 6 verified Pokémon.'});
+      if(team.length!==6)return json(res,400,{error:'Ranked '+(mode==='doubles'?'Doubles':mode==='mystery'?'Mystery':'Singles')+' requires exactly 6 verified Pokémon.'});
       if(rankedQueue.some(x=>x.profileKey===profile.key))return json(res,409,{error:'You are already in the Ranked queue.'});
-      const ticket=id(),playerId=id(),entry={ticket,playerId,profileKey:profile.key,rating:profile.rating,name:cleanText(body.name,24)||profile.name,trainer:cleanTrainerAppearance(body.trainer),team,latency:cleanLatency(body.latency),createdAt:Date.now()};
-      rankedTickets.set(ticket,{ticket,status:'searching',playerId,createdAt:Date.now(),updatedAt:Date.now(),rating:profile.rating});rankedQueue.push(entry);tryRankedMatch();
+      const ticket=id(),playerId=id(),entry={ticket,playerId,mode,profileKey:profile.key,rating:profile.rating,name:cleanText(body.name,24)||profile.name,trainer:cleanTrainerAppearance(body.trainer),team,latency:cleanLatency(body.latency),createdAt:Date.now()};
+      rankedTickets.set(ticket,{ticket,status:'searching',mode,playerId,createdAt:entry.createdAt,updatedAt:entry.createdAt,rating:profile.rating,searchRange:75,waitSeconds:0,skillBased:true});rankedQueue.push(entry);tryRankedMatch();
       return json(res,200,rankedTickets.get(ticket));
     }
     if(req.method==='GET'&&url.pathname==='/ranked/status'){
