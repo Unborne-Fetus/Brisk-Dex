@@ -189,7 +189,7 @@ The engine's effect-family coverage check accounts for all families in its gener
 | Instructions still say to start the relay manually | You may be running an older installed build. Rebuild and install the new EXE/APK. |
 | PowerShell blocks npm.ps1 | Run `npm.cmd` instead. |
 | build.bat reports a missing PowerShell file | Pull or extract the entire repository, including `tools/build_all.ps1`. |
-| One platform build fails | Open the run URL printed by the script and inspect that platform's failed step. Successful platform artifacts may still be available. |
+| One platform build fails | Read the failed step printed in the build window. `build.bat` covers Windows/Android; `build-all.bat` also reports whether WSL/Linux or the remote Mac/Apple stage failed. |
 | Save changes are not in the emulator | On browser/iOS fallback, export the updated save and replace the emulator's copy. Also check that the emulator did not overwrite it. |
 | Some translated text stays English | Connect to the internet; uncached translations depend on service availability and limits. |
 
