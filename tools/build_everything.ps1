@@ -19,6 +19,22 @@ function Quote-Bash {
     return "'" + ($Value -replace "'", "'\''") + "'"
 }
 
+
+function Invoke-WindowsNpmDependencies {
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        & npm.cmd ci --no-audit --no-fund
+        if ($LASTEXITCODE -eq 0) { return }
+        Write-Host "npm ci failed with exit code $LASTEXITCODE; retrying because Windows may have a temporary file lock..." -ForegroundColor Yellow
+        Start-Sleep -Seconds (2 * $attempt)
+    }
+
+    Write-Host "Falling back to npm install to avoid deleting a locked node_modules tree." -ForegroundColor Yellow
+    & npm.cmd install --no-audit --no-fund
+    if ($LASTEXITCODE -ne 0) {
+        throw "Windows dependency restore failed with exit code $LASTEXITCODE."
+    }
+}
+
 try {
     Write-Host "Brisk Dex full local release build" -ForegroundColor Green
     Write-Host "Source branch: main"
@@ -59,7 +75,7 @@ try {
     if (-not $appImage -or -not $deb) { throw 'Linux build did not produce both AppImage and DEB outputs.' }
 
     Invoke-Step 'Restore Windows Node dependencies after WSL build' {
-        & npm.cmd ci
+        Invoke-WindowsNpmDependencies
     }
 
     $macHost = $env:BRISK_MAC_HOST
