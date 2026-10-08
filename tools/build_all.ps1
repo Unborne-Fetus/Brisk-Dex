@@ -45,12 +45,8 @@ try {
         & npm.cmd ci
     }
 
-    Invoke-Step 'Verify battle effect coverage' {
-        & npm.cmd run battle:coverage
-    }
-
-    Invoke-Step 'Smoke test online battle relay' {
-        & npm.cmd run battle:smoke
+    Invoke-Step 'Run release test suite' {
+        & npm.cmd run release:test
     }
 
     Invoke-Step 'Build Windows installer' {
@@ -59,6 +55,10 @@ try {
 
     Invoke-Step 'Prepare Android web bundle' {
         & npm.cmd run android:prepare
+    }
+
+    Invoke-Step 'Verify prepared mobile bundle' {
+        & node tools/verify_release.js --mobile
     }
 
     if (-not (Test-Path 'android')) {
