@@ -1761,8 +1761,11 @@ def main():
     trainer_front_dir = os.path.join(repo, "graphics", "trainers", "front_pics")
     trainer_pics_out = "brisk-dex-trainer-pics"
     os.makedirs(trainer_pics_out, exist_ok=True)
+    # These four portraits are hand-selected higher-detail Dex assets, not
+    # Emerald's 64x64 indexed battle sprites. Never overwrite them on sync.
+    custom_portraits = {"volo", "diantha", "leon", "nemona"}
     for filename in os.listdir(trainer_pics_out):
-        if filename.endswith(".png"):
+        if filename.endswith(".png") and os.path.splitext(filename)[0].lower() not in custom_portraits:
             os.remove(os.path.join(trainer_pics_out, filename))
     if os.path.isdir(trainer_front_dir):
         available = {os.path.splitext(fn)[0].lower(): fn for fn in os.listdir(trainer_front_dir) if fn.lower().endswith(".png")}
@@ -1770,11 +1773,16 @@ def main():
             pic = (trainer.get("pic") or "").strip()
             key = re.sub(r'^TRAINER_PIC_(?:FRONT_)?', '', pic, flags=re.I).lower()
             key = key.replace(" ", "_")
+            target = re.sub(r'[^a-z0-9_]+', '_', key) + ".png"
+            target_path = os.path.join(trainer_pics_out, target)
             candidates = [key, key.replace("pkmn_", "pokemon_")]
+            if key == "iris":
+                candidates.append("iris_bw2")
             source_name = next((available[k] for k in candidates if k in available), None)
-            if source_name:
-                target = re.sub(r'[^a-z0-9_]+', '_', key) + ".png"
-                shutil.copyfile(os.path.join(trainer_front_dir, source_name), os.path.join(trainer_pics_out, target))
+            if key in custom_portraits and os.path.isfile(target_path):
+                trainer["portrait"] = trainer_pics_out + "/" + target
+            elif source_name:
+                shutil.copyfile(os.path.join(trainer_front_dir, source_name), target_path)
                 trainer["portrait"] = trainer_pics_out + "/" + target
 
     # Asset paths are added after the first JSON pass, so rewrite the generated
