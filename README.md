@@ -190,6 +190,23 @@ npm run battle:coverage
 npm run battle:smoke
 ```
 
+## Local release builds
+
+There are two Windows entry points:
+
+- `build.bat` builds the **Windows installer (.exe)** and **Android APK (.apk)** into `dist/`.
+- `build-all.bat` builds **Windows, Android, Linux, macOS, and iOS** from the same committed `compat-branch` source.
+
+`build-all.bat` uses WSL for the Linux AppImage/DEB and an SSH-accessible Mac for the macOS DMG and unsigned iOS IPA. Configure the Mac once with:
+
+```bat
+setx BRISK_MAC_HOST "username@your-mac-address"
+```
+
+The Mac needs SSH enabled, Node.js 22+, npm, Xcode, and Xcode command-line tools. An alternate remote build folder can be set with `BRISK_MAC_BUILD_DIR`; otherwise `~/BriskDexBuild` is used.
+
+All completed artifacts are copied into `dist/`.
+
 ## Emerald compatibility build
 
 The `compat-branch` release adds profile-based support for standard Pokémon Emerald saves and Emerald-derived ROM hacks while preserving Brisk Emerald's expanded format.
