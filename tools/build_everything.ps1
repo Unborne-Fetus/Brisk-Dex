@@ -37,9 +37,16 @@ try {
     if (-not (Get-ChildItem 'dist' -Filter '*.AppImage' -File)) { throw 'Linux AppImage was not found in dist.' }
     if (-not (Get-ChildItem 'dist' -Filter '*.deb' -File)) { throw 'Linux DEB was not found in dist.' }
 
+    Invoke-Step 'Restore Windows Node dependencies after WSL build' {
+        & npm.cmd ci
+    }
+
     $macHost = $env:BRISK_MAC_HOST
     if (-not $macHost) {
-        throw 'Apple builds require a Mac. Set BRISK_MAC_HOST to an SSH target such as username@192.168.1.50, optionally set BRISK_MAC_PATH, then run build-all.bat again.'
+        Write-Host ''
+        Write-Host 'Apple builds require access to a Mac with SSH enabled.' -ForegroundColor Yellow
+        $macHost = Read-Host 'Mac SSH target (example: username@192.168.1.50)'
+        if (-not $macHost) { throw 'No Mac SSH target was provided, so macOS/iOS cannot be built.' }
     }
     Require-Command 'ssh.exe' 'OpenSSH Client is required for the Mac build.'
     Require-Command 'scp.exe' 'OpenSSH Client scp is required for the Mac build.'
