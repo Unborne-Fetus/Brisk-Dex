@@ -10,11 +10,11 @@ The web edition needs **no installation** for players. Once GitHub Pages is enab
 
 https://unborne-fetus.github.io/Brisk-Dex/
 
-The web edition is packaged independently from Windows, Android, and iOS. Each relevant push to `main` triggers **Publish Brisk Dex Web**; the workflow also supports manual runs. The workflow generates a downloadable `Brisk-Dex-Web` artifact even when Pages deployment cannot complete.
+The public web build intentionally hides online battles and trading; those features remain in the installed app versions. The web edition is packaged independently from Windows, Android, and iOS. Each relevant push to `main` triggers **Publish Brisk Dex Web**; the workflow also supports manual runs. The workflow generates a downloadable `Brisk-Dex-Web` artifact even when Pages deployment cannot complete.
 
 To build a portable set of site files without installing npm dependencies, run `node tools/build_web.mjs`. The resulting `web-dist/` folder can also be deployed to any static HTTPS host. Serve it over HTTP(S); opening `index.html` directly as a file prevents browsers from loading bundled JSON.
 
-Browser saves and external storage are private to that browser profile and web origin. Export your edited `.sav` or `.srm` after editing, and keep a backup. The web version cannot silently overwrite the emulator's original save. Online battles, ranked, GTS, and online trades require a separate **public HTTPS battle relay** supporting the game's APIs and CORS; GitHub Pages hosts only the static client. Do not use `localhost` for a public multiplayer relay.
+Browser saves and external storage are private to that browser profile and web origin. Export your edited `.sav` or `.srm` after editing, and keep a backup. The web version cannot silently overwrite the emulator's original save. GitHub Pages hosts the static, offline-focused web edition; online battle and trading tabs are excluded from its interface. The repository is currently private, so a public site also depends on the GitHub account's Pages permissions and the repository's Pages settings. If Pages cannot publish from this private repository, deploy the `web-dist/` directory using a separate public site repository or another static host; there is no need to expose the original source repository.
 
 ## Features
 
