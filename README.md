@@ -4,6 +4,18 @@ Brisk Dex is a companion app for [Pokémon Brisk Emerald](https://github.com/Unb
 
 Species, forms, stats, moves, abilities, items, encounters, and trainer teams come from Brisk Emerald's source. Brisk changes many things from the official games, so its bundled data is the reference used by this app.
 
+## Standalone web edition
+
+The web edition needs **no installation** for players. Once GitHub Pages is enabled for this repository with **GitHub Actions** as its build source, it is published at:
+
+https://unborne-fetus.github.io/Brisk-Dex/
+
+The web edition is packaged independently from Windows, Android, and iOS. Each relevant push to `main` triggers **Publish Brisk Dex Web**; the workflow also supports manual runs. The workflow generates a downloadable `Brisk-Dex-Web` artifact even when Pages deployment cannot complete.
+
+To build a portable set of site files without installing npm dependencies, run `node tools/build_web.mjs`. The resulting `web-dist/` folder can also be deployed to any static HTTPS host. Serve it over HTTP(S); opening `index.html` directly as a file prevents browsers from loading bundled JSON.
+
+Browser saves and external storage are private to that browser profile and web origin. Export your edited `.sav` or `.srm` after editing, and keep a backup. The web version cannot silently overwrite the emulator's original save. Online battles, ranked, GTS, and online trades require a separate **public HTTPS battle relay** supporting the game's APIs and CORS; GitHub Pages hosts only the static client. Do not use `localhost` for a public multiplayer relay.
+
 ## Features
 
 - **Pokédex:** search Pokémon and forms, inspect stats and evolutions, look up encounters, view sprites, and play cries. Track None, Seen, Caught, and Shiny status from a save, with manual overrides.
