@@ -63,6 +63,11 @@ html = html.replace(guard, 'if (false && location.protocol === \'file:\') {');
 const reconnect = 'if(ONLINE_STATE.roomCode&&ONLINE_STATE.playerId){';
 if(!html.includes(reconnect)) throw new Error('Online reconnect guard changed');
 html = html.replace(reconnect, 'if(false && ONLINE_STATE.roomCode && ONLINE_STATE.playerId){');
+const cryFunction = 'function playDexCry(url){';
+const cryAudio = 'dexCryAudio=new Audio(url);';
+if(!html.includes(cryFunction) || !html.includes(cryAudio)) throw new Error('Dex cry playback changed');
+html = html.replace(cryFunction, 'async function playDexCry(url){');
+html = html.replace(cryAudio, 'dexCryAudio=new Audio(await window.BriskStandalone.assetUrl(url));');
 
 const bootstrap = `
 <style>
@@ -132,7 +137,16 @@ const observer = new MutationObserver(records=>{
 });
 observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['src']});
 document.addEventListener('DOMContentLoaded', ()=>scan(document.body));
-window.BriskStandalone = {assetCount:Object.keys(packed).length};
+window.BriskStandalone = {
+  assetCount:Object.keys(packed).length,
+  assetUrl:async function(url) {
+    const key=keyFor(url);
+    if(!key) return url;
+    if(!urls.has(key)) urls.set(key, bytesFor(key).then(bytes=>
+      URL.createObjectURL(new Blob([bytes],{type:packed[key][0]}))));
+    return urls.get(key);
+  }
+};
 })();
 </script>`;
 html = html.replace('</head>', bootstrap.replace('__PACKED__', JSON.stringify(packed)) + '\n</head>');
