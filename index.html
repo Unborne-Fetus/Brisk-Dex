@@ -2557,6 +2557,10 @@ function supplementCurrentBriskStaticEncounters(data){
 
 async function loadBundledGameData(){
 
+  if (location.protocol === 'file:' && !IS_ELECTRON && !IS_ANDROID && !IS_IOS) {
+    showError('Browser security blocks loading the Dex data directly from index.html. Run launch-browser.bat (Windows), then open the local browser address it displays. Save files stay on your device.');
+    return;
+  }
   try{
     var data, trainerData, icons;
     if (IS_ELECTRON){
