@@ -19,5 +19,14 @@ for(const name of names){
   if(match)(match[2]?shinyIcons:icons)[match[1]]='brisk-dex-icons/'+name;
 }
 await fs.writeFile(path.join(output,'brisk-dex-icon-manifest.json'),JSON.stringify({icons,shinyIcons}));
+// Browser-only edition: retain hidden elements so existing initialization bindings stay valid.
+let html = await fs.readFile(path.join(output, 'index.html'), 'utf8');
+html = html.replace('</head>', `<style id="web-edition-styles">
+#tab-online, #tab-trading, #online-tab-panel, #trading-tab-panel { display: none !important; }
+</style></head>`);
+const reconnect = "if(ONLINE_STATE.roomCode&&ONLINE_STATE.playerId){";
+if (!html.includes(reconnect)) throw new Error('Could not find automatic multiplayer reconnect guard');
+html = html.replace(reconnect, "if(false && ONLINE_STATE.roomCode && ONLINE_STATE.playerId){");
+await fs.writeFile(path.join(output, 'index.html'), html);
 await fs.writeFile(path.join(output,'.nojekyll'),'');
 console.log('Web edition ready in web-dist; '+Object.keys(icons).length+' normal icons.');
