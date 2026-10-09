@@ -27,7 +27,8 @@
     "battle-server": "node battle-server.js",
     "battle:coverage": "node tools/check_battle_coverage.js",
     "battle:smoke": "node tools/test_battle_server.js",
-    "web:build": "node tools/build_web.mjs"
+    "web:build": "node tools/build_web.mjs",
+    "index:build": "node tools/build_standalone.mjs"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.0.0",
