@@ -38,7 +38,8 @@ const server = http.createServer((req,res)=>{
     fs.createReadStream(file).pipe(res);
   });
 });
-server.listen(0,host,()=>{
+server.on('error',error=>{ console.error('Could not start Brisk Dex browser server on port 8788: '+error.message); process.exitCode=1; });
+server.listen(8788,host,()=>{
   const address=server.address();
   const url=`http://${host}:${address.port}/`;
   console.log('Brisk Dex browser: '+url);
