@@ -4,7 +4,15 @@ Brisk Dex is a companion app for [Pokémon Brisk Emerald](https://github.com/Unb
 
 Species, forms, stats, moves, abilities, items, encounters, and trainer teams come from Brisk Emerald's source. Brisk changes many things from the official games, so its bundled data is the reference used by this app.
 
-## Standalone web edition
+## Single-file offline version (no website needed)
+
+Run **`build-index.bat`** from the repository on a Windows development computer (Node.js is required **only to build** the file). Alternatively run `npm run index:build` or `node tools/build_standalone.mjs`.
+
+This creates **`standalone/index.html`** — a self-contained HTML file with the Brisk Dex reference data, icons, sprites, scripts, and cries embedded. Share that **one file** with players; they only double-click it in a current Chromium-based browser. They do not need Node.js, a launcher, internet access, a running server, or the repository. The normal source `index.html` remains unchanged for desktop/mobile builds; **do not distribute that raw source file instead of `standalone/index.html`**.
+
+The standalone version hides online battles/trades. Save edits are persisted in browser recovery storage, not silently written to the selected original file: export the updated `.sav` or `.srm` and back up external storage. Browser storage access for local HTML files varies by browser and settings; clearing browser data or moving the file may lose access to the stored recovery copy. The single file may be large because it contains all graphics and data.
+
+## Optional hosted web edition
 
 The web edition needs **no installation** for players. Once GitHub Pages is enabled for this repository with **GitHub Actions** as its build source, it is published at:
 
@@ -14,7 +22,7 @@ The public web build intentionally hides online battles and trading; those featu
 
 To build a portable set of site files without installing npm dependencies, run `node tools/build_web.mjs`. The resulting `web-dist/` folder can also be deployed to any static HTTPS host. Serve it over HTTP(S); opening `index.html` directly as a file prevents browsers from loading bundled JSON.
 
-Browser saves and external storage are private to that browser profile and web origin. Export your edited `.sav` or `.srm` after editing, and keep a backup. The web version cannot silently overwrite the emulator's original save. GitHub Pages hosts the static, offline-focused web edition; online battle and trading tabs are excluded from its interface. The repository is currently private, so a public site also depends on the GitHub account's Pages permissions and the repository's Pages settings. If Pages cannot publish from this private repository, deploy the `web-dist/` directory using a separate public site repository or another static host; there is no need to expose the original source repository.
+Browser saves and external storage are private to that browser profile and web origin. Export your edited `.sav` or `.srm` after editing, and keep a backup. The web version cannot silently overwrite the emulator's original save. GitHub Pages hosts the static, offline-focused web edition; online battle and trading tabs are excluded from its interface. GitHub Pages deployment depends on the repository's Pages settings and Actions availability. For a download-and-double-click experience, use the single-file offline build described above instead.
 
 ## Features
 
