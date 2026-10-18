@@ -142,6 +142,16 @@ ipcMain.handle('load-bundled-icons', async () => {
     const target = match[2] ? shinyIcons : icons;
     target[match[1]] = `data:image/png;base64,${data.toString('base64')}`;
   }
+  const manifest = JSON.parse(await fs.readFile(path.join(__dirname, 'brisk-dex-asset-patches/manifest.json'), 'utf8'));
+  const packs = new Set(Object.entries(manifest).filter(([key]) => key.startsWith('brisk-dex-icons/')).map(([,file]) => file));
+  for (const file of packs) {
+    const compressed = JSON.parse(await fs.readFile(path.join(__dirname, 'brisk-dex-asset-patches', file), 'utf8'));
+    const entries = JSON.parse(require('node:zlib').gunzipSync(Buffer.from(compressed, 'base64')).toString('utf8'));
+    for (const [key, value] of Object.entries(entries)) {
+      const match = /^brisk-dex-icons\/(\d+)(_shiny)?\.png$/i.exec(key);
+      if (match) (match[2] ? shinyIcons : icons)[match[1]] = value;
+    }
+  }
   return { icons, shinyIcons };
 });
 
@@ -190,7 +200,7 @@ ipcMain.handle('open-icon-folder', async () => {
 
 
 ipcMain.handle('load-asset-patch', async (_, file) => {
- if(typeof file!=='string'||!/^brisk-dex-asset-patches\/(manifest|[0-9]+|tm-[0-9]+)\.json$/.test(file))throw new Error('Invalid graphic pack');
+ if(typeof file!=='string'||!/^brisk-dex-asset-patches\/(manifest|[0-9]+|tm-[0-9]+|sync-[0-9a-f]+)\.json$/.test(file))throw new Error('Invalid graphic pack');
  return fs.readFile(path.join(__dirname,file),'utf8');
 });
 

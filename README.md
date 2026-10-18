@@ -277,3 +277,20 @@ Pokémon names, characters, graphics, game data, trademarks, and other official 
 Brisk Dex was originally made with Claude-assisted coding, with subsequent development and fixes assisted by OpenAI Codex/ChatGPT.
 
 If a third-party system, asset pack, or contributor has been unintentionally omitted, that credit should be added rather than removed from the original source material.
+
+## Current game sync
+
+The bundled reference includes the Orange Islands, custom Fakémon and Mega forms,
+Mega Dragonite Y alongside the original Mega Dragonite, updated stones/items,
+trainer teams, artwork/shinies, and source-derived movepools. Rhydon branches to
+Rhyfortress at level 60 or Rhyperior with a Protector. Mega Snorlax uses 75 Defense
+and 120 Special Defense. The Changes tab explains the Adventure, Birch swapping,
+rhythm-contest, difficulty, capsule and Options features.
+
+`refresh-game-data.bat` also refreshes lazy graphic packs and the icon manifest.
+The extractor resolves renamed species aliases and actual C graphic declarations,
+so artist folder names and shared base-form icons no longer hide custom artwork.
+Web, mobile, desktop and standalone builds include the packed graphics.
+
+Validation: `python tools/test_extracted_data.py`, `npm run web:build`,
+and `npm run index:build`.

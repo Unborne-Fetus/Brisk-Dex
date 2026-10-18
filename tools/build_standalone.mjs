@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { gzipSync } from 'node:zlib';
+import { gzipSync, gunzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 
 // Run this once by the developer; users only receive standalone/index.html.
@@ -37,6 +37,17 @@ async function addDir(folder) {
   }
 }
 for(const dir of assetDirs) await addDir(dir);
+// Materialize packed corrections before creating standalone URLs. This also
+// includes new species whose media is stored only in lazy graphic packs.
+const graphicManifest=JSON.parse(await fs.readFile(path.join(root,'brisk-dex-asset-patches/manifest.json'),'utf8'));
+for(const file of new Set(Object.values(graphicManifest))) {
+  const compressed=JSON.parse(await fs.readFile(path.join(root,'brisk-dex-asset-patches',file),'utf8'));
+  const entries=JSON.parse(gunzipSync(Buffer.from(compressed,'base64')).toString('utf8'));
+  for(const [name,url] of Object.entries(entries)) {
+    if(graphicManifest[name] !== file) continue;
+    add(name,Buffer.from(url.slice(url.indexOf(',')+1),'base64'));
+  }
+}
 for(const filename of ['brisk-dex-data.json','brisk-dex-trainer-teams.json']) {
   add(filename, await fs.readFile(path.join(root, filename)));
 }

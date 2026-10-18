@@ -13,7 +13,8 @@ for(const dir of dirs){
   catch(error){if(error.code!=='ENOENT')throw error;}
 }
 const names = await fs.readdir(path.join(root,'brisk-dex-icons'));
-const icons={},shinyIcons={};
+const bundled=JSON.parse(await fs.readFile(path.join(root,'brisk-dex-icon-manifest.json'),'utf8'));
+const icons={...bundled.icons},shinyIcons={...bundled.shinyIcons};
 for(const name of names){
   const match=name.match(/^(\d+)(_shiny)?\.png$/i);
   if(match)(match[2]?shinyIcons:icons)[match[1]]='brisk-dex-icons/'+name;

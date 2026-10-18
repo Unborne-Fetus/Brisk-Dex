@@ -21,8 +21,9 @@ for (const dir of ['brisk-dex-asset-patches', 'brisk-dex-icons', 'brisk-dex-trai
 }
 
 const iconFiles = await fs.readdir(path.join(root, 'brisk-dex-icons'));
-const icons = {};
-const shinyIcons = {};
+const bundled = JSON.parse(await fs.readFile(path.join(root, 'brisk-dex-icon-manifest.json'), 'utf8'));
+const icons = {...bundled.icons};
+const shinyIcons = {...bundled.shinyIcons};
 for (const name of iconFiles) {
   const match = name.match(/^(\d+)(_shiny)?\.png$/i);
   if (!match) continue;

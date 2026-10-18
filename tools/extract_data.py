@@ -18,6 +18,7 @@ Then in Brisk Dex: "Load species/move data" -> brisk-dex-data.json
                     "Load icon folder"       -> the brisk-dex-icons folder
 """
 import json
+from pathlib import Path
 import os
 import re
 import shutil
@@ -342,6 +343,22 @@ def extract_feature_catalog(repo):
         ("Maps & Events", "Rayquaza-related progression can award the Mystic Ticket."),
         ("Storage & Systems", "Brisk expands and modifies internal systems beyond vanilla Emerald, including save-backed Pokémon data and modern species/forms from pokeemerald-expansion.")
     ]
+    brisk.extend([
+        ("Dynamax Adventures", "Enter through the Route 146 research cave. Choose from twelve distinct level-70 rentals; the omniscient-AI rival chooses their own partner. Route bosses have five times HP, the level-100 legendary finale seven times HP, and each generated Pokémon has independent 1/100 shiny odds."),
+        ("Dynamax Adventures", "Battles remain 2v1 regardless of the global format. Mega/G-Max route bosses and persistent Dynamax/G-Max final bosses face ordinary rentals that may activate their own Mega/G-Max. The Bag is disabled; post-battle recruitment remains free."),
+        ("Dynamax Adventures", "Rental HP scales by difficulty: Easy x4, Normal x2, Hard x1, Extreme x1/2. PP restores every round. Easy heals HP/status, Normal heals HP, Hard restores half max HP and Extreme one quarter; Extreme bosses also deal double damage."),
+        ("Dynamax Adventures", "Birch accompanies the expedition into rest rooms. Talk to him to switch to an earlier catch not already used by either teammate. Benched health/status/PP persist and the original party stays safe. At the end, keep one catch."),
+        ("Dynamax Adventures", "Six full-size rental icons appear in a two-column grid. Route previews reveal only the primary type. The boss has one large HP bar; inflated HP animates in under a second and team boosts skip empty slots."),
+        ("Contests", "Solo contest appeals announce a random target beat: 2, 3 or 4. Press A on that beat for four bonus hearts on Perfect timing or two on Good; missing leaves ordinary appeal unchanged. Higher ranks tighten timing and improve NPC accuracy; link contests keep their original rules."),
+        ("Options & Quality of Life", "Options include Regular/Singles/Doubles battle format, follower Pokémon, display types, battle Bag use, move-learning prompts, level-cap removal, infinite trainer rematches, shiny odds and fast shiny-hunting mode. Adventure Bag/type restrictions always apply; ordinary Bag use still follows difficulty rules."),
+        ("Options & Quality of Life", "Switch between light/dark themes, rename the player at any time, use the two-in-one bike, and select modern or legacy EXP Share. The modern EXP Share is a Key Item and is not sold in Lilycove."),
+        ("Options & Quality of Life", "Multi-use candies retain gained levels and trigger evolutions. The summary-screen move relearner switches between level-up, TM and Egg moves. Ball replacement is available with Master Ball restrictions."),
+        ("Ball Capsules", "Visual capsule seals include hearts, stars, lines, smoke, electricity, bubbles, fire, confetti, flowers, music notes and letters. Send-out messages are a separate feature with custom text."),
+        ("Difficulty", "Easy uses base prices, basic AI, zero trainer IVs/EVs, no level caps and 200% shared EXP. Normal uses double prices, original trainer training and normal shared EXP. Hard uses quadruple prices, smarter choices, perfect IVs, reduced caps and 50% shared EXP. Extreme uses tenfold prices, omniscient AI, optimized IVs/EVs, reduced caps, no shared EXP and an EXP stop at the cap."),
+        ("Orange Islands", "Orange City and Routes 143–146 have increased grass encounter rates (15 rather than 7). The optional Islands shiny boost is 1/50. Benches heal the party without moving the whiteout destination, and Routes 148/149 are connected by teleporter."),
+        ("Custom Pokémon & Megas", "Added Fakémon and artist-created Mega forms are included with their Brisk stats, moves, artwork and evolution methods. Custom Mega Stones are sold only in Orange City. Mega Dragonite Y and Dragoninite Y are separate from the original Mega Dragonite."),
+        ("Custom Pokémon & Megas", "Rhydon has a split evolution: Rhyfortress at level 60, or Rhyperior using a Protector. Mega Snorlax now has 75 Defense and 120 Special Defense."),
+    ])
     brisk_map = {}
     for category, change in brisk:
         brisk_map.setdefault(category, []).append(change)
@@ -438,6 +455,17 @@ def parse_constants(text, prefix):
     out = {}
     out.update(parse_enums(text, prefix))
     out.update(parse_defines(text, prefix))  # #define (if any) takes priority when both exist
+    # Compatibility names often alias renamed forms; resolve without allocating
+    # a second species number (for example Dragonite Mega CDRX -> Mega Y).
+    aliases = re.findall(r'^\s*#define\s+' + re.escape(prefix) + r'(\w+)\s+' + re.escape(prefix) + r'(\w+)\s*(?://[^\n]*)?$', text or "", re.M)
+    for _ in range(len(aliases)):
+        changed = False
+        for alias, target in aliases:
+            if alias not in out and target in out:
+                out[alias] = out[target]
+                changed = True
+        if not changed:
+            break
     return out
 
 def extract_blocks(text, prefix):
@@ -1108,12 +1136,21 @@ def main():
     print("  item constants:", len(item_ids))
 
     print("Reading data tables (this can take a moment)...")
+    graphics_text = read_dir_concat(os.path.join(repo, "src/data/graphics"))
+    graphics_files = dict(re.findall(r'\b(gMon(?:Icon|FrontPic80|FrontPic|BackPic80|BackPic)_\w+)\s*\[\s*\]\s*=\s*INCGFX_\w+\("([^"\n]+)"', graphics_text))
+    asset_folders = {}
     species_text = find_source(repo, "src/data/pokemon/species_info.h", "src/data/pokemon/species_info")
     moves_text = find_source(repo, "src/data/moves_info.h", "src/data/moves_info")
     abilities_text = find_source(repo, "src/data/abilities.h", "src/data/abilities")
     items_text = find_source(repo, "src/data/items.h", "src/data/items")
     types_info_text = find_source(repo, "src/data/types_info.h")
     z_move_text = find_source(repo, "src/battle_z_move.c")
+    learnset_source = read_dir_concat(os.path.join(repo, "src/data/pokemon"))
+    learnset_moves = {
+        match.group(1): list(dict.fromkeys(re.findall(r'\bMOVE_([A-Z0-9_]+)', match.group(2))))
+        for match in re.finditer(r'\b(s\w+(?:LevelUp|Teachable|EggMove)Learnset)\s*\[\s*\]\s*=\s*\{(.*?)\};', learnset_source, re.S)
+    }
+    direct_learnables = {}
     all_learnables = {}
     learnables_path = os.path.join(repo, "src/data/pokemon/all_learnables.json")
     if os.path.isfile(learnables_path):
@@ -1140,17 +1177,28 @@ def main():
     with_abilities = 0
     first_block_sample = None
     for name, sid in species_ids.items():
-        if sid == 0:
+        if sid == 0 or name in ("CUSTOM_START", "CUSTOM_END", "SHINY_TAG"):
             continue
         # Totem-only species are expansion compatibility entries and are not
         # separate obtainable forms in Brisk Emerald.
         if re.search(r'(^|_)TOTEM(?:_|$)', name):
             continue
+        if str(sid) in out_species:
+            continue
         block = species_blocks.get(name)
+        if block is None:
+            block = next((species_blocks[alias] for alias, alias_id in species_ids.items()
+                          if alias_id == sid and alias in species_blocks), None)
+            if block is not None:
+                species_blocks[name] = block
         if block is None:
             unresolved_species += 1
             continue
         data_block = add_invoked_species_macros(block, species_macros)
+        direct_moves = []
+        for symbol in re.findall(r'\.(?:levelUpLearnset|teachableLearnset|eggMoveLearnset)\s*=\s*(s\w+)', data_block):
+            direct_moves.extend(learnset_moves.get(symbol, []))
+        direct_learnables[name] = list(dict.fromkeys(direct_moves))
         if first_block_sample is None:
             first_block_sample = (name, block)
         display_name = extract_string_field(block, '.speciesName') or name.replace('_', ' ').title()
@@ -1166,6 +1214,12 @@ def main():
             ab_name = extract_string_field(ab_block, '.name') if ab_block else None
             ability_names.append(ab_name or a.replace('_', ' ').title())
         growth = re.search(r'\.growthRate\s*=\s*GROWTH_([A-Za-z0-9_]+)', data_block)
+        front_symbol = re.search(r'\.(?:frontPic80|frontPic)\s*=\s*(gMonFrontPic(?:80)?_\w+)', data_block)
+        # Prefer the native front's folder over a borrowed base-form icon.
+        native_symbol = re.search(r'\.frontPic80\s*=\s*(gMonFrontPic80_\w+)', data_block)
+        symbol = native_symbol or front_symbol
+        if symbol and symbol.group(1) in graphics_files:
+            asset_folders[str(sid)] = os.path.dirname(os.path.join(repo, graphics_files[symbol.group(1)]))
         icon_sprite = re.search(r'\.iconSprite\s*=\s*gMonIcon_([A-Za-z0-9_]+)', data_block)
         nat_dex_match = re.search(r'\.natDexNum\s*=\s*NATIONAL_DEX_([A-Za-z0-9_]+)', data_block)
         nat_dex_name = nat_dex_match.group(1) if nat_dex_match else None
@@ -1363,8 +1417,11 @@ def main():
         while learnable is None and '_' in parent:
             parent = parent.rsplit('_', 1)[0]
             learnable = all_learnables.get(parent)
+        # Newly imported species may not yet exist in the generated cache.
+        # Merge their referenced source learnsets so legal move lists stay complete.
+        learnable = list(learnable or []) + direct_learnables.get(constant, [])
         numeric_moves = []
-        for move_constant in learnable or []:
+        for move_constant in learnable:
             move_name = move_constant.removeprefix("MOVE_")
             move_id = move_ids.get(move_name)
             if move_id and move_id < 2048 and str(move_id) in out_moves and move_id not in numeric_moves:
@@ -1543,6 +1600,12 @@ def main():
             if sprite_key == 'zygarde':
                 by_sprite.setdefault('zygarde50', root)
 
+        # Resolve actual C graphics symbols. Artist-specific prefixes do not
+        # necessarily match their directories (CDRX vs cdrx73, for example).
+        for symbol, relative in graphics_files.items():
+            if symbol.startswith("gMonIcon_") and os.path.isfile(os.path.join(repo, relative)):
+                by_sprite[re.sub(r'[_-]', '', symbol.removeprefix("gMonIcon_")).lower()] = os.path.dirname(os.path.join(repo, relative))
+
         for sid, species in out_species.items():
             sprite_name = species.get("iconSprite") or species.get("constant", "").replace("_", "").title()
             sprite_key = re.sub(r'[_-]', '', sprite_name).lower()
@@ -1642,7 +1705,7 @@ def main():
     for sid, species in out_species.items():
         sprite_name = species.get("iconSprite") or species.get("constant", "").replace("_", "").title()
         sprite_key = re.sub(r'[_-]', '', sprite_name).lower()
-        folder = by_sprite.get(sprite_key)
+        folder = asset_folders.get(sid) or by_sprite.get(sprite_key)
         if not folder:
             parts = re.findall(r'[A-Z]?[a-z0-9]+|[A-Z]+(?=[A-Z]|$)', sprite_name)
             while len(parts) > 1 and not folder:
@@ -1650,8 +1713,8 @@ def main():
                 folder = by_sprite.get(''.join(parts).lower())
         if not folder:
             continue
-        front_source = next((os.path.join(folder, fn) for fn in ("front.png", "anim_front.png") if os.path.isfile(os.path.join(folder, fn))), None)
-        back_source = next((os.path.join(folder, fn) for fn in ("back.png", "anim_back.png") if os.path.isfile(os.path.join(folder, fn))), None)
+        front_source = next((os.path.join(folder, fn) for fn in ("front_80.png", "front_normal.png", "front.png", "anim_front.png") if os.path.isfile(os.path.join(folder, fn))), None)
+        back_source = next((os.path.join(folder, fn) for fn in ("back_80.png", "back_normal.png", "back.png", "anim_back.png") if os.path.isfile(os.path.join(folder, fn))), None)
         front_anim_source = os.path.join(folder, "anim_front.png") if os.path.isfile(os.path.join(folder, "anim_front.png")) else None
         back_anim_source = os.path.join(folder, "anim_back.png") if os.path.isfile(os.path.join(folder, "anim_back.png")) else None
         current = folder
@@ -1677,7 +1740,12 @@ def main():
                 final = os.path.join(sprites_out, sid + "_" + side + suffix + ".png")
                 temporary = os.path.join(sprites_out, sid + "_" + side + suffix + "_sheet.png")
                 rendered = False
-                if shiny_palette and normal_palette:
+                native = os.path.basename(source) in (side + "_80.png", side + "_normal.png")
+                supplied_shiny = next((os.path.join(folder, fn) for fn in (side + "_shiny_80.png", side + "_shiny.png") if os.path.isfile(os.path.join(folder, fn))), None)
+                if native and (not want_shiny or supplied_shiny):
+                    normalize_sprite_png(supplied_shiny if want_shiny else source, final, first_frame=True, transparent_bg=True)
+                    rendered = True
+                elif shiny_palette and normal_palette:
                     rendered = palette_variant_png(source, normal_palette, shiny_palette, want_shiny, temporary)
                 if rendered:
                     normalize_sprite_png(temporary, final, first_frame=True, transparent_bg=True)
@@ -1819,6 +1887,8 @@ def main():
                     standing.save(os.path.join(trainers_out, f"outfit-{outfit_id}-{gender}.png"))
 
     print()
+    from package_game_assets import package
+    package(Path.cwd())
     print("Done. Desktop builds load brisk-dex-data.json and brisk-dex-icons automatically.")
 
 if __name__ == "__main__":

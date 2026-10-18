@@ -7,7 +7,7 @@
  }
  async function resolve(url){
   const key=String(url).replace(/^\.\//,'').split('?')[0];
-  if(!/^(brisk-dex-sprites|brisk-dex-items)\//.test(key))return null;
+  if(!/^(brisk-dex-sprites|brisk-dex-items|brisk-dex-icons)\//.test(key))return null;
   if(urls.has(key))return urls.get(key);
   if(!manifest)manifest=loadJSON('brisk-dex-asset-patches/manifest.json');
   const info=await manifest,file=info[key];if(!file)return null;

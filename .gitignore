@@ -2,3 +2,7 @@ node_modules/
 dist/
 standalone/
 web-dist/
+
+__pycache__/
+*.pyc
+www/
