@@ -42,7 +42,7 @@ jobs:
           java-version: "21"
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Prepare Brisk Dex web bundle
         run: npm run android:prepare
