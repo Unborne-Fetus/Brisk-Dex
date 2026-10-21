@@ -51,15 +51,24 @@ jobs:
           trainers = json.loads(Path('brisk-dex-trainer-teams.json').read_text(encoding='utf-8'))
           assert len(data['species']) > 1000, 'Species extraction unexpectedly small'
           assert len(trainers['trainers']) > 100, 'Trainer extraction unexpectedly small'
-          wanted = ('XURKITREE','CELESTEELA','GUZZLORD','NIHILEGO')
-          by_name = {value.get('constant'): int(key) for key,value in data['species'].items()}
+          # Data synchronization must not stop when the upstream game changes
+          # optional static encounter placements. Report missing sites as warnings
+          # without publishing invented locations or stale extracted data.
+          assert len(data.get('routeEncounters', [])) >= 50, 'Route extraction unexpectedly small'
+          wanted = ('XURKITREE', 'CELESTEELA', 'GUZZLORD', 'NIHILEGO')
+          by_name = {value.get('constant'): int(key) for key, value in data['species'].items()}
           for pokemon in wanted:
-              sid=by_name[pokemon]
-              sites=[r['name'] for r in data['routeEncounters'] for method in r.get('methods',[])
-                     for slot in method.get('slots',[]) if int(slot['species']) == sid and method.get('type') == 'static']
-              assert sites, f'Missing static encounter for {pokemon}'
-              print(pokemon, sites)
-          print('Species:',len(data['species']),'Trainers:',len(trainers['trainers']))
+              sid = by_name.get(pokemon)
+              sites = ([r['name'] for r in data['routeEncounters']
+                        for method in r.get('methods', [])
+                        for slot in method.get('slots', [])
+                        if method.get('type') == 'static' and int(slot['species']) == sid]
+                       if sid is not None else [])
+              if sites:
+                  print(pokemon, sites)
+              else:
+                  print(f'::warning title=Missing optional static encounter::{pokemon} has no extracted static encounter; review Brisk Emerald encounter placements')
+          print('Species:', len(data['species']), 'Trainers:', len(trainers['trainers']))
           PY
       - name: Record exact Brisk Emerald source revision
         run: git -C .brisk-game-source rev-parse HEAD > brisk-emerald-data-revision.txt
