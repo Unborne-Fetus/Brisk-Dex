@@ -20,12 +20,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out Brisk Dex
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: brisk-dex
 
       - name: Check out Brisk Emerald
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: Unborne-Fetus/Pokemon-Brisk-Emerald
           ref: master
