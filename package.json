@@ -10,6 +10,9 @@
   },
   "license": "UNLICENSED",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --publish never",
