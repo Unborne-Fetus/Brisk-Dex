@@ -3,11 +3,11 @@ import {Campaign,fieldWeather,migrateCampaign} from './world.mjs';
 import {LocalBattle,supportedMove} from './battle.mjs';
 import {SaveStore,encodeSave,decodeSave} from './storage.mjs';
 import {loadSprite} from './media.mjs';
-import {runScript} from './scripts.mjs';
+import {runInteractiveScript} from './scripts.mjs';
 import {drawNative} from './renderer.mjs';
 import {IntegrationBridge} from './integrations.mjs';
 const $=id=>document.getElementById(id),ctx=$('world').getContext('2d'),store=new SaveStore();
-let campaign,battle,battleEvent,pack,catalog,facing=[0,1],lastMove=0,busy=false,dirty=false,savedAt=0,saving=null;
+let campaign,battle,battleEvent,pack,catalog,facing=[0,1],lastMove=0,busy=false,dirty=false,savedAt=0,saving=null,storyActive=false,choiceCancel=null;
 const keys=new Set(),bridge=new IntegrationBridge();
 const notice=text=>$('notice').textContent=text;
 const button=(text,fn)=>{const b=document.createElement('button');b.textContent=text;b.onclick=()=>guard(fn);return b;};
@@ -15,7 +15,8 @@ async function guard(fn){try{await fn();}catch(e){notice(e.message);}}
 function sprite(mon,back=false){const s=catalog.species(mon.species);return '../'+(mon.shiny?(back?s.backShinySprite:s.frontShinySprite):(back?s.backSprite:s.frontSprite));}
 function modal(title,content){$('modal-title').textContent=title;$('modal-content').replaceChildren();if(typeof content==='string'){const p=document.createElement('p');p.textContent=content;$('modal-content').append(p);}else $('modal-content').append(...content);$('modal').showModal();}
 function close(){ $('modal').close();$('world').focus(); }
-$('modal-close').onclick=close;
+$('modal-close').onclick=()=>{if(choiceCancel){const cancel=choiceCancel;choiceCancel=null;close();cancel(null);}else close();};
+$('modal').addEventListener('cancel',()=>{if(choiceCancel){const cancel=choiceCancel;choiceCancel=null;cancel(null);}});
 function update(){
   if(!campaign)return;
   const s=campaign.state;$('map-name').textContent=campaign.map.name;$('money').textContent=`₽ ${s.money.toLocaleString()}`;
@@ -24,10 +25,10 @@ function update(){
   $('party').replaceChildren(...s.party.map((mon,index)=>{
     const row=document.createElement('div');row.className='party-mon';const img=document.createElement('img');loadSprite(img,sprite(mon));img.alt='';
     const info=document.createElement('div'),name=document.createElement('strong');name.textContent=mon.nickname+(mon.shiny?' ✦':'');const sub=document.createElement('small');sub.textContent=`Lv. ${mon.level} · ${mon.ability}`;const hp=document.createElement('progress');hp.value=mon.hp;hp.max=catalog.stats(mon)[0];hp.setAttribute('aria-label',`${mon.hp} of ${hp.max} HP`);info.append(name,sub,hp);
-    const action=button('Lead',()=>{if(battle)throw new Error('Use the battle switch action');campaign.setLead(index);dirty=true;update();});action.disabled=index===0||!!battle;const controls=document.createElement('div');controls.className='party-controls';controls.append(action,button('Info',()=>{if(!battle)partyDetails(mon);}));row.append(img,info,controls);
-    row.ondblclick=()=>{if(!battle)partyDetails(mon);};return row;
+    const action=button('Lead',()=>{if(battle||storyActive)throw new Error('Finish the active interaction first');campaign.setLead(index);dirty=true;update();});action.disabled=index===0||!!battle;const controls=document.createElement('div');controls.className='party-controls';controls.append(action,button('Info',()=>{if(!battle&&!storyActive)partyDetails(mon);}));row.append(img,info,controls);
+    row.ondblclick=()=>{if(!battle&&!storyActive)partyDetails(mon);};return row;
   }));
-  $('bag').replaceChildren(...Object.entries(s.inventory).filter(([,n])=>n>0).map(([id,n])=>{const p=document.createElement('div');const usable=[28,29,30,31,32,33,34].includes(Number(id))||/^ITEM_EXP_CANDY_/.test(catalog.data.itemDetails[id]?.constant||'');if(usable){p.append(button(`${catalog.data.items[id]} × ${n}`,()=>{if(battle)throw new Error('Use battle actions during a battle');modal('Use on which Pokémon?',s.party.map(mon=>button(mon.nickname,()=>{const candy=/^ITEM_EXP_CANDY_/.test(catalog.data.itemDetails[id]?.constant||'');let amount=1;if(candy){const input=prompt(`How many? (1–${Math.min(n,99)})`,'1');if(input===null)return;amount=Number(input);}campaign.useFieldItem(Number(id),mon.uid,amount);dirty=true;close();update();growthPrompts();})));}));}else p.textContent=`${catalog.data.items[id]} × ${n}`;return p;}));
+  $('bag').replaceChildren(...Object.entries(s.inventory).filter(([,n])=>n>0).map(([id,n])=>{const p=document.createElement('div');const usable=[28,29,30,31,32,33,34].includes(Number(id))||/^ITEM_EXP_CANDY_/.test(catalog.data.itemDetails[id]?.constant||'');if(usable){p.append(button(`${catalog.data.items[id]} × ${n}`,()=>{if(battle||storyActive)throw new Error('Finish the active interaction first');modal('Use on which Pokémon?',s.party.map(mon=>button(mon.nickname,()=>{const candy=/^ITEM_EXP_CANDY_/.test(catalog.data.itemDetails[id]?.constant||'');let amount=1;if(candy){const input=prompt(`How many? (1–${Math.min(n,99)})`,'1');if(input===null)return;amount=Number(input);}campaign.useFieldItem(Number(id),mon.uid,amount);dirty=true;close();update();growthPrompts();})));}));}else p.textContent=`${catalog.data.items[id]} × ${n}`;return p;}));
   $('world').hidden=!!battle;$('battle').hidden=!battle;
   if(battle)renderBattle();
 }
@@ -77,16 +78,16 @@ function growthPrompts(){
   const evolving=campaign.state.party.find(m=>catalog.evolution(m)&&m.evolutionDeclinedAt!==m.level);if(evolving){modal(`${evolving.nickname} can evolve`,[button('Evolve',()=>{campaign.evolve(evolving.uid);dirty=true;close();update();growthPrompts();}),button('Later',()=>{evolving.evolutionDeclinedAt=evolving.level;dirty=true;close();growthPrompts();})]);}
 }
 async function save(){
-  if(!campaign||battle)throw new Error('Finish the battle before saving');if(saving)return saving;
+  if(!campaign||battle||storyActive)throw new Error('Finish the active interaction before saving');if(saving)return saving;
   const current=campaign,snapshot=current.snapshot();busy=true;$('save').disabled=true;notice('Saving your journey…');
   saving=store.commit(snapshot).then(()=>{if(campaign===current)dirty=JSON.stringify(campaign.snapshot())!==JSON.stringify(snapshot);savedAt=performance.now();notice('Journey saved. Your previous save is kept as a backup.');}).finally(()=>{busy=false;saving=null;$('save').disabled=false;});return saving;
 }
 async function interact(){
-  if(!campaign||battle||busy||$('modal').open)return;
+  if(!campaign||battle||busy||storyActive||$('modal').open)return;
   const e=campaign.interact(...facing);if(!e){notice('Nothing to interact with here. Use a party member’s Info button for details.');return;}
   if(e.kind==='heal'){campaign.heal();if(campaign.map.sourceMap?.includes('POKEMON_CENTER'))campaign.state.respawn=structuredClone(campaign.state.position);dirty=true;notice(e.text);update();await save();}
   else if(e.kind==='dialogue'){
-    if(campaign.map.scriptText&&e.sourceScript){try{const lines=runScript(campaign,campaign.map.scriptText,e.sourceScript);dirty=true;modal('Conversation',lines.join('\n\n')||'There is nothing more to say.');update();}catch(error){modal('Event awaiting port',e.text+'\n\n'+error.message+'. No story effects were applied.');}}
+    if(campaign.map.scriptText&&e.sourceScript){try{storyActive=true;const lines=await runInteractiveScript(campaign,campaign.map.scriptText,e.sourceScript,{choose:request=>new Promise(resolve=>{choiceCancel=resolve;modal('Choose',[Object.assign(document.createElement('p'),{textContent:request.message}),...['Yes','No'].map((label,i)=>button(label,()=>{choiceCancel=null;close();resolve(i===0?1:0);}))]);})});storyActive=false;dirty=true;modal('Conversation',lines.join('\n\n')||'There is nothing more to say.');update();}catch(error){storyActive=false;modal('Event awaiting port',e.text+'\n\n'+error.message+'. No story effects were applied.');}}
     else modal('Field notes',e.text);
   }
   else if(e.kind==='trainer'){
@@ -95,7 +96,7 @@ async function interact(){
   }else if(e.kind==='shop')modal('Field supplies',e.stock.map(stock=>button(`${catalog.data.items[stock.item]} · ₽${stock.price*({easy:1,normal:2,hard:4,extreme:10}[campaign.state.options.difficulty]||1)}`,()=>{campaign.buy(stock.item,1,e);dirty=true;update();notice(`Bought ${catalog.data.items[stock.item]}.`);})));
 }
 function move(dx,dy){
-  if(!campaign||battle||$('modal').open||busy)return;facing=[dx,dy];const result=campaign.move(dx,dy);
+  if(!campaign||battle||storyActive||$('modal').open||busy)return;facing=[dx,dy];const result=campaign.move(dx,dy);
   if(result.kind==='encounter'){
     if(campaign.state.party.some(m=>m.hp>0))beginBattle(result.mon);else notice('Your party needs healing. Visit a bench or the lab.');
   }else if(result.kind==='warp')notice(`Entered ${result.map}.`);
@@ -109,16 +110,16 @@ $('save').onclick=()=>guard(save);$('interact').onclick=()=>guard(interact);
 $('encounters').onchange=e=>{if(campaign){campaign.state.options.encounters=e.target.checked;dirty=true;}};
 $('weather-effects').onchange=e=>{if(campaign){campaign.state.options.weather=e.target.checked;dirty=true;}};
 $('export').onclick=()=>guard(async()=>{
-  if(!campaign||battle)throw new Error('Finish the battle before exporting');const envelope=await encodeSave(campaign.snapshot()),url=URL.createObjectURL(new Blob([JSON.stringify(envelope)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='brisk-standalone-save.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  if(!campaign||battle||storyActive)throw new Error('Finish the active interaction before exporting');const envelope=await encodeSave(campaign.snapshot()),url=URL.createObjectURL(new Blob([JSON.stringify(envelope)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='brisk-standalone-save.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 });
 $('import').onchange=e=>guard(async()=>{
-  const file=e.target.files[0];e.target.value='';if(!file)return;if(battle)throw new Error('Finish the battle before importing');if(file.size>17000000)throw new Error('Save file is too large');
+  const file=e.target.files[0];e.target.value='';if(!file)return;if(battle||storyActive)throw new Error('Finish the active interaction before importing');if(file.size>17000000)throw new Error('Save file is too large');
   const candidate=migrateCampaign(await decodeSave(JSON.parse(await file.text())),pack,catalog);
   if(campaign&&!confirm('Replace this journey with the imported save? Your existing saved journey will become the backup.'))return;
   await store.commit(candidate.snapshot());campaign=candidate;dirty=false;update();close();notice('Imported standalone campaign.');
 });
-$('restore').onclick=()=>guard(async()=>{if(battle)throw new Error('Finish the battle first');const previous=await store.load('backup');if(!previous)throw new Error('No backup is available yet');const candidate=migrateCampaign(previous,pack,catalog);if(!confirm('Restore the previous saved journey?'))return;await store.commit(candidate.snapshot());campaign=candidate;dirty=false;update();notice('Previous save restored.');});
-$('new-game').onclick=()=>{if(battle){notice('Finish the battle first.');return;}if(!campaign||confirm('Start a new journey? Your current saved journey will become the backup.'))startSelection();};
+$('restore').onclick=()=>guard(async()=>{if(battle||storyActive)throw new Error('Finish the active interaction first');const previous=await store.load('backup');if(!previous)throw new Error('No backup is available yet');const candidate=migrateCampaign(previous,pack,catalog);if(!confirm('Restore the previous saved journey?'))return;await store.commit(candidate.snapshot());campaign=candidate;dirty=false;update();notice('Previous save restored.');});
+$('new-game').onclick=()=>{if(battle||storyActive){notice('Finish the active interaction first.');return;}if(!campaign||confirm('Start a new journey? Your current saved journey will become the backup.'))startSelection();};
 const directions={ArrowUp:[0,-1],w:[0,-1],ArrowDown:[0,1],s:[0,1],ArrowLeft:[-1,0],a:[-1,0],ArrowRight:[1,0],d:[1,0]};
 window.addEventListener('keydown',e=>{if($('modal').open||['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName))return;if(directions[e.key]){e.preventDefault();if(!e.repeat){guard(()=>move(...directions[e.key]));lastMove=performance.now();}keys.add(e.key);}if(['e','Enter',' '].includes(e.key)&&e.target.tagName!=='BUTTON'){e.preventDefault();guard(interact);}});
 window.addEventListener('keyup',e=>keys.delete(e.key));window.addEventListener('blur',()=>keys.clear());
@@ -128,7 +129,7 @@ function rect(x,y,w,h,color){ctx.fillStyle=color;ctx.fillRect(x,y,w,h);}
 function draw(time){
   requestAnimationFrame(draw);if(!campaign)return;
   if(time-lastMove>150&&keys.size){const key=[...keys].find(k=>directions[k]);if(key){guard(()=>move(...directions[key]));lastMove=time;}}
-  if(!battle&&dirty&&time-savedAt>30000&&!$('modal').open&&!busy){savedAt=time;busy=true;save().catch(e=>notice(`Autosave failed: ${e.message}. Export your save.`)).finally(()=>busy=false);}
+  if(!battle&&!storyActive&&dirty&&time-savedAt>30000&&!$('modal').open&&!busy){savedAt=time;busy=true;save().catch(e=>notice(`Autosave failed: ${e.message}. Export your save.`)).finally(()=>busy=false);}
   const m=campaign.map,tile=24;ctx.imageSmoothingEnabled=false;
   if(m.ground){drawNative(ctx,campaign,pack,facing,time);}else{
   for(let y=0;y<m.height;y++)for(let x=0;x<m.width;x++){
@@ -162,5 +163,5 @@ async function boot(){
 }
 boot().catch(e=>notice(`Unable to start: ${e.message}`));
 
-$('travel').onclick=()=>{if(!campaign||battle||busy)return;modal('Development travel', [...(pack.travel||[]).map(t=>button(pack.maps[t.map].name,()=>{campaign.travel(t.map,t.x,t.y);dirty=true;close();update();})),button('Original field station',()=>{campaign.travel('field',12,10);dirty=true;close();update();})]);};
-$('settings').onclick=()=>{if(!campaign||battle||busy)return;const nodes=[];for(const [key,label,values] of [['difficulty','Difficulty',['easy','normal','hard','extreme']],['expShare','Modern EXP Share',[true,false]],['battleBag','Battle Bag',[true,false]],['orangeShinies','Orange Islands 1/50',[true,false]],['shinyOdds','Shiny odds',[50,100,512,1024,4096,8192]]]){const row=document.createElement('label');row.textContent=label+' ';const select=document.createElement('select');for(const value of values){const option=document.createElement('option');option.value=String(value);option.textContent=typeof value==='boolean'?(value?'On':'Off'):String(value);option.selected=campaign.state.options[key]===value;select.append(option);}select.onchange=()=>{const value=values.find(v=>String(v)===select.value);campaign.state.options[key]=value;dirty=true;};row.append(select);nodes.push(row);}nodes.push(button('Rename trainer',()=>{const name=prompt('Trainer name',campaign.state.trainer.name);if(name?.trim()){campaign.state.trainer.name=name.trim().slice(0,24);dirty=true;}}));modal('Journey options',nodes);};
+$('travel').onclick=()=>{if(!campaign||battle||busy||storyActive)return;modal('Development travel', [...(pack.travel||[]).map(t=>button(pack.maps[t.map].name,()=>{campaign.travel(t.map,t.x,t.y);dirty=true;close();update();})),button('Original field station',()=>{campaign.travel('field',12,10);dirty=true;close();update();})]);};
+$('settings').onclick=()=>{if(!campaign||battle||busy||storyActive)return;const nodes=[];for(const [key,label,values] of [['difficulty','Difficulty',['easy','normal','hard','extreme']],['expShare','Modern EXP Share',[true,false]],['battleBag','Battle Bag',[true,false]],['orangeShinies','Orange Islands 1/50',[true,false]],['shinyOdds','Shiny odds',[50,100,512,1024,4096,8192]]]){const row=document.createElement('label');row.textContent=label+' ';const select=document.createElement('select');for(const value of values){const option=document.createElement('option');option.value=String(value);option.textContent=typeof value==='boolean'?(value?'On':'Off'):String(value);option.selected=campaign.state.options[key]===value;select.append(option);}select.onchange=()=>{const value=values.find(v=>String(v)===select.value);campaign.state.options[key]=value;dirty=true;};row.append(select);nodes.push(row);}nodes.push(button('Rename trainer',()=>{const name=prompt('Trainer name',campaign.state.trainer.name);if(name?.trim()){campaign.state.trainer.name=name.trim().slice(0,24);dirty=true;}}));modal('Journey options',nodes);};

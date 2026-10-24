@@ -36,5 +36,17 @@ const relay=require('node:child_process').spawn(process.execPath,[require('node:
    try{await records.writeMany([['test-a',3],['test-b',()=>{}]]);}catch{}
    return [await records.read('test-a'),await records.read('test-b')];
  });if(JSON.stringify(atomic)!=='[1,2]')throw Error('Failed content transaction changed active records');
+ await mobile.close();await page.evaluate(()=>new Promise((resolve,reject)=>{const request=indexedDB.deleteDatabase('brisk-native-campaign');request.onsuccess=resolve;request.onerror=()=>reject(request.error);}));await page.close();const storyPage=await context.newPage();
+ storyPage.on('pageerror',e=>errors.push(e.message));
+ const fixture=JSON.parse(require('fs').readFileSync(require('path').join(__dirname,'../game/content.json'),'utf8'));
+ fixture.start={map:'field',x:12,y:10};fixture.maps.field.scriptText='TestChoice::\n msgbox Ask, MSGBOX_YESNO\n goto_if_eq VAR_RESULT, NO, End\n giveitem ITEM_POTION, 2\nEnd::\n end\nAsk:\n .string "Accept supplies?$"';fixture.maps.field.events.push({kind:'dialogue',x:13,y:8,sourceScript:'TestChoice',text:'Supplies'});
+ await storyPage.route('**/game/content.json',route=>route.fulfill({json:fixture}));
+ await storyPage.goto('http://127.0.0.1:8790/game/index.html');await storyPage.getByRole('button',{name:'Treecko',exact:true}).click();await storyPage.waitForFunction(()=>document.getElementById('notice').textContent.includes('Journey saved'));
+ for(const key of ['ArrowUp','ArrowUp','ArrowRight','e'])await storyPage.keyboard.press(key);
+ await storyPage.getByRole('button',{name:'Yes',exact:true}).click();await storyPage.getByRole('heading',{name:'Conversation',exact:true}).waitFor();
+ if(!(await storyPage.locator('#bag').textContent()).includes('Potion × 7'))throw Error('Story choice did not grant exactly two Potions');
+ await storyPage.getByRole('button',{name:'Close',exact:true}).click();await storyPage.keyboard.press('e');await storyPage.getByRole('button',{name:'Close',exact:true}).click();
+ if(!(await storyPage.locator('#bag').textContent()).includes('Potion × 7'))throw Error('Cancelled story granted an item');
+ await storyPage.close();
  if(errors.length)throw Error(errors.join('\n'));console.log('Browser checks passed: starter, movement, healing, lab warp, Linking Cord purchase, persistence, trainer battle, mobile layout, disabled integrations, atomic content transaction rollback.');await browser.close();relay.kill();
 })().catch(e=>{console.error(e);relay.kill();process.exit(1);});

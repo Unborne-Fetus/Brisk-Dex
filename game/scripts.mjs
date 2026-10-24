@@ -3,13 +3,16 @@ import {assert,clone,integer} from './model.mjs';
 export function compileScripts(source){
   const labels={};let current=null;
   for(const raw of source.split(/\r?\n/)){
-    const line=raw.trim();const label=line.match(/^(\w+)::?$/);if(label){current=labels[label[1]]=[];continue;}
+    const line=raw.trim();const label=line.match(/^(\w+)::?$/);if(label){if(current)current.push('goto '+label[1]);current=labels[label[1]]=[];continue;}
     if(current&&line&&!line.startsWith('//'))current.push(line.replace(/\s+\/\/.*$/,''));
   }
   return labels;
 }
-const IGNORE=new Set(['lock','lockall','release','releaseall','faceplayer','waitmessage','closemessage','waitbuttonpress','waitfanfare','waitse','nop']);
-export function planScript(campaign,source,entry){
+const IGNORE=new Set(['lock','lockall','release','releaseall','faceplayer','waitmessage','closemessage','waitbuttonpress','waitfanfare','waitse','waitmovement','nop']);
+export class ScriptInputRequired extends Error {
+  constructor(key,request){super('Script input required');this.key=key;this.request=request;}
+}
+export function planScript(campaign,source,entry,decisions=null){
   const labels=compileScripts(source),draft=clone(campaign.snapshot()),messages=[],calls=[];let label=entry,index=0,steps=0,comparison=null;
   const itemIds=new Map(Object.entries(campaign.catalog.data.itemDetails).map(([id,item])=>[item.constant,Number(id)]));
   const value=token=>{token=String(token).trim();if(/^0x[0-9a-f]+$/i.test(token))return parseInt(token,16);if(/^\d+$/.test(token))return Number(token);if(token==='TRUE'||token==='YES')return 1;if(token==='FALSE'||token==='NO')return 0;if(/^VAR_/.test(token))return draft.vars?.[token]||0;throw new Error('Unresolved value '+token);};
@@ -35,7 +38,38 @@ export function planScript(campaign,source,entry){
       let target;if(args.length===3){comparison=value(args[0])-value(args[1]);target=args[2];}else target=args[0];assert(comparison!==null,'Comparison missing');const yes={goto_if_eq:comparison===0,goto_if_ne:comparison!==0,goto_if_lt:comparison<0,goto_if_gt:comparison>0,goto_if_le:comparison<=0,goto_if_ge:comparison>=0}[opcode];if(yes){label=target;index=0;}continue;
     }
     if(opcode==='msgbox'||opcode==='message'){
-      assert(!args.includes('MSGBOX_YESNO'),'A choice is required; this event is not ported');messages.push(text(args[0]));continue;
+      const message=text(args[0]);
+      if(args.includes('MSGBOX_YESNO')){const key=`${label}:${index}:${steps}`;assert(decisions,'A choice is required; this event is not ported');if(!decisions.has(key))throw new ScriptInputRequired(key,{kind:'yesno',message});const answer=decisions.get(key);assert(answer===0||answer===1,'Invalid choice');draft.vars??={};draft.vars.VAR_RESULT=answer;}
+      else messages.push(message);continue;
+    }
+    if(opcode==='warp'){
+      assert(args.length===3,'Unsupported warp signature');const map=args[0].toLowerCase(),x=value(args[1]),y=value(args[2]),destination=campaign.pack.maps[map];
+      assert(destination,'Warp destination is not ported');integer(x,0,destination.width-1,'warp x');integer(y,0,destination.height-1,'warp y');assert(!'#~h'.includes(destination.tiles[y][x]),'Warp destination is blocked');draft.position={map,x,y};continue;
+    }
+    if(opcode==='applymovement'){
+      assert(args[0]==='LOCALID_PLAYER','NPC movement is not ported');assert(labels[args[1]],'Movement table is not ported');
+      let finished=false;for(const command of labels[args[1]]){if(command==='step_end'){finished=true;break;}if(command.startsWith('goto '))break;
+        if(/^(?:face_|walk_in_place_|delay_)/.test(command))continue;
+        const movement=command.match(/^(?:walk|walk_fast|walk_faster|walk_slow|walk_fastest)_(up|down|left|right)$/);assert(movement,'Unsupported movement '+command);
+        const [dx,dy]={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]}[movement[1]],map=campaign.pack.maps[draft.position.map],x=draft.position.x+dx,y=draft.position.y+dy;
+        assert(x>=0&&y>=0&&x<map.width&&y<map.height&&!('#~h'.includes(map.tiles[y][x])),'Scripted movement is blocked');draft.position.x=x;draft.position.y=y;
+      }assert(finished,'Movement table has no ending');continue;
+    }
+    if(opcode==='checkitem'||opcode==='checkitemspace'||opcode==='removeitem'){
+      const id=itemIds.get(args[0]),count=args[1]?value(args[1]):1;assert(id,'Unknown item');integer(count,1,999,'item count');const current=draft.inventory[id]||0;draft.vars??={};
+      if(opcode==='removeitem'){assert(current>=count,'Not enough items');draft.inventory[id]=current-count;}else draft.vars.VAR_RESULT=opcode==='checkitem'?(current>=count?1:0):(current+count<=999999?1:0);continue;
+    }
+    if(['checkmoney','givemoney','takemoney'].includes(opcode)){
+      const amount=value(args[0]);integer(amount,0,999999999,'money amount');draft.vars??={};if(opcode==='checkmoney')draft.vars.VAR_RESULT=draft.money>=amount?1:0;
+      else if(opcode==='givemoney'){draft.money+=amount;integer(draft.money,0,999999999,'money');}else{assert(draft.money>=amount,'Not enough money');draft.money-=amount;}continue;
+    }
+    if(opcode==='givemon'){
+      const species=args[0].replace(/^SPECIES_/,''),level=value(args[1]);integer(level,1,100,'gift level');const temporary=new campaign.constructor(campaign.catalog,campaign.pack,draft),mon=temporary.createMon(species,level);
+      if(args[2]&&args[2]!=='ITEM_NONE'){const item=itemIds.get(args[2]);assert(item,'Unknown gift item');mon.item=item;}
+      temporary.catchMon(mon);temporary.snapshot();messages.push(`Received ${mon.nickname}!`);continue;
+    }
+    if(opcode==='special'&&args[0]==='HealPlayerParty'){
+      for(const mon of draft.party)campaign.catalog.heal(mon);continue;
     }
     if(opcode==='giveitem'){
       const id=itemIds.get(args[0]),count=args[1]?value(args[1]):1;assert(id,'Unknown reward item');integer(count,1,999,'reward quantity');const total=(draft.inventory[id]||0)+count;integer(total,0,999999,'bag capacity');draft.inventory[id]=total;messages.push(`Received ${campaign.catalog.data.items[id]} × ${count}!`);continue;
@@ -47,6 +81,22 @@ export function planScript(campaign,source,entry){
 export function runScript(campaign,source,entry){
   const result=planScript(campaign,source,entry);
   // Validate the entire result before committing any reward, variable or story flag.
-  const previous=campaign.state;try{campaign.state=result.state;campaign.validate();}catch(error){campaign.state=previous;throw error;}
+  const previous=campaign.state;try{campaign.state=result.state;campaign.validate();campaign.random.state=campaign.state.rng;}catch(error){campaign.state=previous;throw error;}
   return result.messages;
+}
+
+export async function runInteractiveScript(campaign,source,entry,host){
+  const before=JSON.stringify(campaign.snapshot()),decisions=new Map();
+  for(let resumes=0;resumes<64;resumes++){
+    let result;
+    try{result=planScript(campaign,source,entry,decisions);}catch(error){
+      if(!(error instanceof ScriptInputRequired))throw error;
+      assert(typeof host?.choose==='function','No choice interface installed');
+      const response=await host.choose(error.request);assert(response!==null&&response!==undefined,'Interaction cancelled');
+      assert(JSON.stringify(campaign.snapshot())===before,'Campaign changed during interaction');decisions.set(error.key,response);continue;
+    }
+    assert(JSON.stringify(campaign.snapshot())===before,'Campaign changed during interaction');
+    const previous=campaign.state;try{campaign.state=result.state;campaign.validate();campaign.random.state=campaign.state.rng;}catch(error){campaign.state=previous;throw error;}return result.messages;
+  }
+  throw new Error('Too many script choices');
 }
