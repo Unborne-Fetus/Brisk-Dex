@@ -8,12 +8,13 @@ const relay=require('node:child_process').spawn(process.execPath,[require('node:
  await page.goto('http://127.0.0.1:8790/game/index.html');await page.getByRole('button',{name:'Treecko',exact:true}).click();await page.waitForFunction(()=>window.BriskNative?.snapshot());
  await page.waitForFunction(()=>document.getElementById('notice').textContent.includes('Journey saved'));
  if(process.env.BRISK_SCREENSHOTS)await page.screenshot({path:require('node:path').join(process.env.BRISK_SCREENSHOTS,'brisk-prototype-desktop.png'),fullPage:true});
+ await page.getByRole('button',{name:'Travel · dev',exact:true}).click();await page.getByRole('button',{name:'Original field station',exact:true}).click();
  const press=async(key,n=1)=>{for(let i=0;i<n;i++)await page.keyboard.press(key);};
  await press('ArrowUp',2);await press('ArrowLeft');await press('e');await page.waitForFunction(()=>document.getElementById('notice').textContent.includes('Journey saved'));
  await press('ArrowDown');await press('ArrowLeft',6);await press('ArrowUp',3);
  await page.waitForFunction(()=>document.getElementById('map-name').textContent==='Research Lab');
  await press('ArrowUp',4);await press('ArrowRight',2);await press('ArrowUp');await press('e');
- await page.getByRole('button',{name:'Linking Cord · ₽3000',exact:true}).click();await page.getByRole('button',{name:'Close',exact:true}).click();
+ await page.getByRole('button',{name:'Close',exact:true}).click();await page.getByRole('button',{name:'Options',exact:true}).click();await page.locator('label').filter({hasText:'Difficulty'}).locator('select').selectOption('easy');await page.getByRole('button',{name:'Close',exact:true}).click();await press('e');await page.getByRole('button',{name:'Linking Cord · ₽3000',exact:true}).click();await page.getByRole('button',{name:'Close',exact:true}).click();
  await page.getByRole('button',{name:'Save',exact:true}).click();await page.waitForFunction(()=>document.getElementById('notice').textContent.includes('Journey saved'));await page.reload();await page.waitForFunction(()=>document.getElementById('map-name').textContent==='Research Lab');
  if(!(await page.locator('#bag').textContent()).includes('Linking Cord × 1'))throw Error('Shop save did not persist');
  await page.locator('#world').focus();await press('ArrowLeft',2);await press('ArrowDown',5);await page.waitForFunction(()=>document.getElementById('map-name').textContent==='Brisk Field Station');
@@ -26,6 +27,7 @@ const relay=require('node:child_process').spawn(process.execPath,[require('node:
    await page.locator('#battle-actions button').filter({hasText:/Pound|Quick Attack|Swift|Magical Leaf|Struggle/}).filter({visible:true}).first().click();
  }
  await page.waitForFunction(()=>document.getElementById('battle').hidden);
+ await page.getByRole('button',{name:'Save',exact:true}).click();await page.waitForFunction(()=>document.getElementById('notice').textContent.includes('Journey saved'));
  const mobile=await context.newPage();await mobile.setViewportSize({width:390,height:844});await mobile.goto('http://127.0.0.1:8790/game/index.html');await mobile.waitForFunction(()=>window.BriskNative?.snapshot());if(process.env.BRISK_SCREENSHOTS)await mobile.screenshot({path:require('node:path').join(process.env.BRISK_SCREENSHOTS,'brisk-prototype-mobile.png'),fullPage:true});
  if(await mobile.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Mobile page overflows');
  const enabled=await mobile.evaluate(()=>Object.values(window.BriskNative.capabilities).some(Boolean));if(enabled)throw Error('An integration is enabled');

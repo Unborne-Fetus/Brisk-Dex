@@ -1,64 +1,70 @@
-# Brisk Emerald standalone game foundation
+# Brisk Emerald standalone development
 
-This is the beginning of a native JavaScript remake, not a GBA emulator or a completed Hoenn port. It runs without a ROM and shares Brisk Dex's existing Pokémon catalog and sprites. It has its own rendering, world state, battles and saves. GBA ROM sizes and sprite-memory limits no longer govern this runtime, although devices still have normal memory/performance limits.
+This is a playable, partial JavaScript remake, not an emulator and not the complete ROM campaign. The normal Dex app still has no link to it; online connections, trades, ranked eligibility, GBA save writes and unattended updates remain disabled.
 
-## Try the development build
+## Run it
 
-Install Node.js 22 or newer, then run `launch-game-prototype.bat` or `npm run game:dev` and visit <http://127.0.0.1:8790/game/index.html>. No dependency installation is required for this entry. WASD/arrows move; E/Enter interacts with the tile you face. Touch movement buttons are available. Choose Treecko, Torchic or Mudkip at level 5.
+Use Node.js 22 or newer. Run `launch-game-prototype.bat` or `npm run game:dev`, then open <http://127.0.0.1:8790/game/index.html>. New journeys begin in the actual Brisk Littleroot map with a level-5 starter. Existing prototype-1 saves migrate while retaining their party, bag, flags and original field-station location.
 
-The field station has grass encounters using actual Brisk species, a level-3 Zigzagoon rival battle, a healing bench, an indoor lab with healing and supplies, a sheltered cave, and a protected sandstorm chamber. These are intentionally new test maps, not replacements for the ROM's maps. Go to the building door in the northwest for the lab; go north along the main path for the cave. The scientist/shopkeeper sells Poké Balls, Potions and Linking Cords. The field's bench is just northwest of the starting position. Use Info on a party member for stats, supported evolutions, and swapping with caught Pokémon in storage.
+WASD/arrows move; E/Enter interacts. NPCs, shopkeepers and nurses can be reached across counters. Info opens partner details, move relearning, held items and storage swaps. Bag buttons use supported healing items and EXP candies. Candies support multiple uses and queue move/evolution choices without losing levels. The old field station is retained for regression testing.
 
-The normal Dex interface/startup does not link to or launch this page. Desktop, web and mobile directory builds include its files for development, but no production tab, network endpoint, IPC handler or online transfer is enabled. The existing generated single-file Dex edition remains a companion-only app.
+**Travel · dev** provides explicit development travel among the converted outdoor maps, including Orange City. It is a test tool, not a replacement for Hoenn's story or unlock requirements. Options includes difficulty, battle Bag, modern EXP sharing, general shiny odds and the Orange Islands shiny override.
 
-## Implemented
+## What was ported
 
-- Seeded encounters and combat, grid collision, object interaction, warps, indoor/outdoor classification and protected map weather.
-- Species, types, stats, legal ability slots, IVs, EVs, natures, growth curves and artwork read from `brisk-dex-data.json`.
-- One-on-one battles with a small explicit basic-move allowlist, PP, type effectiveness, STAB, priority, speed, accuracy, critical hits, switching, Potions, catching, escape, victory EXP and trainer rewards. A defeated opponent cannot send an extra species.
-- Level growth, basic `EVO_LEVEL`/`EVO_ITEM` evolutions, a six-member party and overflow storage. Other evolution methods are deliberately unresolved rather than guessed.
-- Healing restores HP, PP and status without changing a respawn point.
-- Lead-ability field weather does not affect the lab or cave and cannot replace protected weather. Visual effects can be disabled.
-- Independent versioned campaign saves in IndexedDB, atomic current/previous-save commits, portable JSON exports with SHA-256 corruption checks, validated imports, and backup restore. Autosaves happen outside battles, roughly every 30 seconds after changes, and after leaving a battle/healing. Export is also available if persistent storage fails.
-- An explicit future content-release format, bounded HTTPS downloads, SHA-256/size/engine/schema checks, staged activation, compatibility validation, and transactional rollback records. No remote source or automatic update task is configured.
-- A source-map archiver for real Porymap data, preserving all events, native collision/elevation/metatile IDs, tileset references, connections and original scripts. It reports unresolved scripts/destinations instead of silently discarding story logic.
+- **34 source maps**, plus the four original testing maps: Littleroot and its lab/houses; Routes 101–104; Oldale and its houses/Mart/Center; Petalburg and its Mart/Center; Petalburg Woods; Rustboro and its Mart/Center/Gym; Slateport and its Mart; Orange City and its houses/Mart/Center; Routes 143–146.
+- Actual three-layer map graphics, palettes, source NPC/player sprites, map dimensions, connections, door warps, terrain collision, counter interaction and directional ledges. Foreground graphics render above actors. Missing destinations remain outside the playable port.
+- Brisk's existing catalog plus a source-derived native supplement: **1,676 level-up learnsets**, catch rates, EXP yields, EV-yield metadata, prices and Mega-item relationships. The unresolved learnsets are Greninja Bond, Mega Dragonite Y and Egg. Fallback moves are retained for incomplete records; Egg is not a playable species.
+- **191 encounter slots** across the playable content, preserving source levels and weights. Encounters use source map encounter rates. The exact GBA per-step encounter algorithm is not yet replicated.
+- **27 trainer interactions** using actual named teams, authored levels, moves, held items, natures, IVs and EVs where present. Variant names resolve by source constants so Alolan forms do not replace ordinary forms accidentally. Some source double-trainer interactions currently use sequential singles; local doubles controls remain unimplemented.
+- **67 custom Mega stones** in Orange City's Mart, including native-only item metadata missing from the companion catalog. The runtime checks the exact held stone before exposing a Mega transformation. Temporary battle forms and abilities do not overwrite the saved base species.
+- Source level-up moves replace the prototype's small generic move pool. Levels/EXP persist; moves can be learned/replaced or relearned; basic level/item evolutions work. Other evolution methods still need porting.
+- The existing Dex relay's battle functions now also run in an **isolated offline engine**: status and setup moves, move effects, abilities, held items, switches, multi-member opponents, weather and transformations use that shared logic instead of the eleven-move prototype. The relay's coverage checker reports 366 effect families, but coverage is not proof of exact ROM parity.
+- Held items, field Potions/Revives, multi-use EXP candies, healing Centers, party/storage swapping, catch-rate-based basic Poké/Great/Ultra/Master Ball logic, shiny settings and protected lead weather.
+- Difficulty options currently control shop multipliers, easy/hard trainer IV/EV adjustments, AI selection, battle Bag restrictions and EXP sharing. They do **not** yet reproduce every ROM difficulty rule, dynamic trainer-level adjustment or level-cap exception. The offline AI is the Dex relay's AI, not the ROM's OMNISCIENT implementation.
+- Independent IndexedDB saves, current/previous backups, checksum-verified JSON import/export and a compatible migration from prototype-1. Healing at a Center sets a recovery point; benches do not. GBA `.sav` conversion is still absent.
 
-## Boundaries and missing work
+## Battle engine generation
 
-The local battle module is a **prototype**, not battle-engine parity. Only eleven basic move IDs are supported. Starting moves are chosen from legal learnable moves in the catalog; the catalog does not contain a level-by-level learnset. Some catalog move extraction metadata is incomplete, so the allowlist prevents accidentally treating complex moves as basic attacks. Catch rates use a clearly marked temporary formula, not the ROM formula. Abilities have only a small implemented subset; held-item effects, all gimmicks, doubles, full status mechanics, move learning, EV rewards and story progression still need porting. The old online battle engine remains intact and separate.
+`game/relay-engine.mjs` is generated from `battle-server.js` by `npm run game:battle-build`. The generator parses JavaScript with Acorn, follows battle-function dependencies, and rejects host/network/profile dependencies. It replaces online reward/provenance handling with a local battle-finish operation. Each battle receives its own seeded random function; no global random function or live server is changed.
 
-There is no GBA `.sav` import, binary-save rewrite, online battle connection, trading, ranked eligibility, full map artwork conversion, story script interpreter, music port, or ROM auto-patching. A corrupt/incompatible save is reported, not silently replaced. Different content versions require a compatible migration/activation; downgrades and removed maps are not automatically remapped. Application/catalog upgrades will need explicit save migrations when IDs or stats change.
+The generated source is checked into the repository with the relay source SHA-256. Tests reject a stale copy after relay changes. Regenerate it whenever the shared battle logic changes. Native monsters never receive `rewardRaw80`, competitive-provenance bits, online prizes or ranked credentials. Integration DTOs remain a disconnected boundary.
 
-The content updater currently handles declarative map/event JSON only. It does not download executable JavaScript, replace the app, patch a GBA ROM, update the species catalog, or perform a live release. `ContentUpdates.activate()` returns a validated `{pack,state}` pair and writes content-specific active/campaign/rollback records; a future launcher must explicitly open those records together. It does not silently rewrite the prototype's current save. HTTPS + pinned origin + hash protect transport/integrity; the checksum is not a publisher signature. A production launcher should add signed release manifests and a release policy before enabling unattended installs.
+The local runtime currently uses singles controls. Its catch calculations, status persistence, stat transitions and AI are still approximations where the relay differs from the GBA engine. Full gimmick access rules, doubles input, all ball bonuses, EV rewards, level caps and complete move/evolution parity need more work.
 
-## Integration contracts (disconnected)
+## Source conversion
 
-`game/integrations.mjs` provides:
-
-- `partySnapshot(campaign)`: schema-versioned trainer/party data for a future read-only Dex panel.
-- `battleTeam(campaign)`: canonical catalog-derived stats/moves in the existing relay's broad team shape.
-- `IntegrationBridge.prepareBattle(campaign, 'singles' | 'doubles')`: a versioned battle request for a future host. Doubles here is a request format, not local doubles combat.
-- Frozen capability flags that are all false; connection and transfer methods explicitly reject calls.
-
-These DTOs never manufacture `rewardRaw80`, competitive-provenance flags, online prize records or ranked credentials. Existing relay verification must remain in place. Before connecting anything, add an authenticated native-campaign protocol to the server, reconstruct stats server-side, pin catalog/ruleset versions, and decide how standalone ownership is verified. Offline prototype monsters must not be accepted as verified GBA Pokémon or injected into ranked, trades or save-backed prize systems.
-
-## Source-map migration
+The checked-in source revision is recorded in `game/native-catalog.json`, `game/content.json` and `game/port-report.json`.
 
 ```sh
-node tools/import_native_maps.mjs "/path/to/Pokemon Brisk Emerald" world-archive.json LittlerootTown Route101 OldaleTown
+python tools/port_native_content.py "/path/to/Pokemon Brisk Emerald"
 ```
 
-Output is a staging archive, **not playable content** (`runtimeReady: false`). Porymap's metatile collision bits are preserved, but ledges, doors, surf, elevation transitions, flags and native scripts need explicit ports. Original graphics/tileset conversion and a runtime event interpreter are the next major tasks. Keep the archive outside the live prototype until those steps pass traversal/story checks.
+Requires Pillow. It reads a local source checkout only; it does not download or modify the ROM project. The selected map list is explicit in the tool. It converts source metatile data and indexed palettes into ground/foreground PNGs, preserves usable warps/connections, exports supported NPC interactions, and reports unresolved scripts and external destinations.
 
-## Build a future content release
+`game/port-report.json` currently lists **52 unresolved script interactions** and **34 external warp references**. Conditional conversations, cutscenes, map-entry scripts, movement scripts, native specials, item pickups, many gifts, flags and quest progression are not generally interpreted. Readable dialogue may be displayed with an unported-story notice, but its story effects are not executed. Source NPCs hidden by story flags are generally omitted. Camera/traversal does not yet cover surfing, every elevation rule, sideways stairs or the complete field-move system. Tiles are static rather than using native tileset animations; music is not ported.
+
+The older `tools/import_native_maps.mjs` remains useful for archiving arbitrary source maps and scripts before expanding the playable converter.
+
+## Existing systems and updates
+
+`game/integrations.mjs` supplies versioned read-only party data and canonical battle-team DTOs. All capability flags remain false. A future connection must add server-side authentication/ownership validation and catalog/ruleset pinning before allowing standalone monsters into any online economy. No normal Dex startup, matchmaking, trade or binary-save handler is connected to this runtime.
+
+The staged `ContentUpdates` module still has no production endpoint or timer. It validates a pinned HTTPS origin, download size/hash, engine version and content schema before activation; incompatible maps/saves fail before active records change. Activation returns a validated pack/state pair and stores content-specific rollback records. A future launcher must explicitly open them together. It does not silently rewrite the prototype save, update JavaScript/catalog/artwork, or patch a GBA ROM. Production unattended releases will need a signed manifest and a migration/asset policy.
 
 ```sh
 node tools/build_native_release.mjs game/content.json /tmp/brisk-native-release
 ```
 
-This writes `content.json` and a hashed `release.json`. It does not upload or publish them. A future host must supply an explicit HTTPS manifest URL and matching allowed origin to `ContentUpdates`, show/check release compatibility, and use `ContentRecords` for persistent transactional activation. Keep stable map/event/flag IDs between compatible releases.
+This generates declarative content plus a manifest locally; nothing is published.
 
-## Tests
+## Validation
 
-`npm run game:test` covers world traversal, weather exclusions, legality, level retention, evolution, storage, corruption detection, update integrity/rollback, disconnected integration contracts and source-map preservation. `npm run battle:coverage` and `npm run battle:smoke` verify the existing online system separately. The native workflow runs both test sets without connecting the new runtime to the relay.
+- `npm run game:test`: 37 tests, including source traversal, all encounter spawns, trainer construction, Mega ability/base-form retention, level-up moves, candy/save retention, migration and update rollback.
+- `npm run game:ui`: optional Playwright regression covering keyboard input, healing, shop purchase, save reload, trainer combat, mobile layout and atomic IndexedDB rollback.
+- `npm run battle:coverage` / `npm run battle:smoke`: existing online engine checks, separately from the native runtime.
+- `npm run web:build` / `npm run android:prepare`: include the runtime in directory builds without linking it from the live app. The generated single-file companion edition remains unchanged.
 
-Optional browser regression: install Playwright locally without changing the manifest (`npm install --no-save --package-lock=false playwright` and `npx playwright install chromium`), then run `npm run game:ui`. The script starts its own loopback server and checks desktop/mobile layout, starter selection, movement, healing, warps, shopping, real IndexedDB persistence, trainer battles, disabled online capabilities and rollback on a failed content transaction. `BRISK_PLAYWRIGHT_MODULE` and `BRISK_CHROMIUM_PATH` can point to existing test installations. `BRISK_SCREENSHOTS` optionally specifies an existing output directory for screenshots.
+For browser tests, install Playwright locally (`npm install --no-save --package-lock=false playwright`, then `npx playwright install chromium`) or set `BRISK_PLAYWRIGHT_MODULE`/`BRISK_CHROMIUM_PATH` to an existing installation. `BRISK_SCREENSHOTS` optionally selects an existing screenshot output directory. Normal development play needs no Playwright installation.
+
+Assets retain their Brisk source credits. Consult the Brisk Emerald and Brisk Dex credits for the original artists and systems; this converter does not replace those attributions.

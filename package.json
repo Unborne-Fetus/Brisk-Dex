@@ -36,10 +36,13 @@
     "game:test": "node --test test/game/*.test.mjs",
     "game:import-maps": "node tools/import_native_maps.mjs",
     "game:ui": "node tools/test_native_ui.cjs",
-    "game:release": "node tools/build_native_release.mjs"
+    "game:release": "node tools/build_native_release.mjs",
+    "game:battle-build": "node tools/build_native_battle.mjs",
+    "game:port": "python tools/port_native_content.py"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.0.0",
+    "acorn": "^8.19.0",
     "electron": "^44.5.1",
     "electron-builder": "^26.17.0",
     "esbuild": "^0.25.0"

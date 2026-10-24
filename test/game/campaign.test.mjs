@@ -29,7 +29,7 @@ test('healing restores HP, status and PP without relocating the player',()=>{
   const c=fresh(),before=structuredClone(c.state.position),m=c.state.party[0];m.hp=1;m.status='poison';m.moves[0].pp=0;c.heal();assert.equal(m.hp,catalog.stats(m)[0]);assert.equal(m.status,null);assert.equal(m.moves[0].pp,catalog.move(m.moves[0].id).pp);assert.deepEqual(c.state.position,before);
 });
 test('shop requires proximity, enough money, valid quantity and real stock',()=>{
-  const c=fresh(),shop=c.pack.maps.lab.events.find(e=>e.kind==='shop');assert.throws(()=>c.buy(796,1,shop));c.state.position={map:'lab',x:14,y:10};c.buy(796,1,shop);assert.equal(c.state.inventory[796],1);assert.equal(c.state.money,0);assert.throws(()=>c.buy(1,1,shop));assert.throws(()=>c.buy(1,-1,shop));assert.throws(()=>c.buy(2,1,shop));
+  const c=fresh();c.state.options.difficulty='easy';const shop=c.pack.maps.lab.events.find(e=>e.kind==='shop');assert.throws(()=>c.buy(796,1,shop));c.state.position={map:'lab',x:14,y:10};c.buy(796,1,shop);assert.equal(c.state.inventory[796],1);assert.equal(c.state.money,0);assert.throws(()=>c.buy(1,1,shop));assert.throws(()=>c.buy(1,-1,shop));assert.throws(()=>c.buy(2,1,shop));
 });
 test('level gain and evolution retain levels, damage and earned identity',()=>{
   const c=fresh(),mon=c.state.party[0],uid=mon.uid;mon.hp--;const damage=catalog.stats(mon)[0]-mon.hp;

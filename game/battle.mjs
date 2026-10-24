@@ -1,107 +1,77 @@
-import {assert, clone, integer} from './model.mjs';
-export const TYPE_CHART = {
-  Normal:{Rock:.5,Ghost:0,Steel:.5},
-  Fire:{Fire:.5,Water:.5,Grass:2,Ice:2,Bug:2,Rock:.5,Dragon:.5,Steel:2},
-  Water:{Fire:2,Water:.5,Grass:.5,Ground:2,Rock:2,Dragon:.5},
-  Electric:{Water:2,Electric:.5,Grass:.5,Ground:0,Flying:2,Dragon:.5},
-  Grass:{Fire:.5,Water:2,Grass:.5,Poison:.5,Ground:2,Flying:.5,Bug:.5,Rock:2,Dragon:.5,Steel:.5},
-  Ice:{Fire:.5,Water:.5,Grass:2,Ice:.5,Ground:2,Flying:2,Dragon:2,Steel:.5},
-  Fighting:{Normal:2,Ice:2,Poison:.5,Flying:.5,Psychic:.5,Bug:.5,Rock:2,Ghost:0,Dark:2,Steel:2,Fairy:.5},
-  Poison:{Grass:2,Poison:.5,Ground:.5,Rock:.5,Ghost:.5,Steel:0,Fairy:2},
-  Ground:{Fire:2,Electric:2,Grass:.5,Poison:2,Flying:0,Bug:.5,Rock:2,Steel:2},
-  Flying:{Electric:.5,Grass:2,Fighting:2,Bug:2,Rock:.5,Steel:.5},
-  Psychic:{Fighting:2,Poison:2,Psychic:.5,Dark:0,Steel:.5},
-  Bug:{Fire:.5,Grass:2,Fighting:.5,Poison:.5,Flying:.5,Psychic:2,Ghost:.5,Dark:2,Steel:.5,Fairy:.5},
-  Rock:{Fire:2,Ice:2,Fighting:.5,Ground:.5,Flying:2,Bug:2,Steel:.5},
-  Ghost:{Normal:0,Psychic:2,Ghost:2,Dark:.5},
-  Dragon:{Dragon:2,Steel:.5,Fairy:0},
-  Dark:{Fighting:.5,Psychic:2,Ghost:2,Dark:.5,Fairy:.5},
-  Steel:{Fire:.5,Water:.5,Electric:.5,Ice:2,Rock:2,Steel:.5,Fairy:2},
-  Fairy:{Fire:.5,Fighting:2,Poison:.5,Dragon:2,Dark:2,Steel:.5}
-};
-export function effectiveness(type, targets) { return targets.reduce((v,t)=>v*(TYPE_CHART[type]?.[t]??1),1); }
-export function supportedMove(move) { return ['Pound','Scratch','Vine Whip','Tackle','Water Gun','Peck','Rock Throw','Quick Attack','Swift','Magical Leaf','Disarming Voice'].includes(move.name) && move.effect==='Hit' && move.power>0 && !move.multiHit && !move.moveEffects?.length; }
-// Deliberately limited local battle implementation. Online engine is not modified.
+import {assert,clone,integer} from './model.mjs';
+import {createBattleEngine} from './relay-engine.mjs';
+import {battleTeam} from './integrations.mjs';
+export {TYPE_CHART} from './type-chart.mjs';
+import {TYPE_CHART} from './type-chart.mjs';
+export function effectiveness(type,targets){return targets.reduce((n,t)=>n*(TYPE_CHART[type]?.[t]??1),1);}
+export function supportedMove(move){return !!move?.name&&move.pp>0;}
+// Shares the relay's move/ability engine, but never imports or starts its server.
 export class LocalBattle {
-  constructor(campaign, opponent, {trainer=null}={}) {
-    this.campaign=campaign; this.catalog=campaign.catalog; this.random=campaign.random;
-    this.enemy=clone(opponent);this.trainer=trainer;this.active=campaign.state.party.findIndex(m=>m.hp>0);
-    assert(this.active>=0,'Heal your party first'); this.phase='battle';this.turn=0;this.log=[];
-    this.weather=null;this.weatherTurns=0;this.setWeather(this.player.ability);this.setWeather(this.enemy.ability);
-    campaign.mark('seen',opponent.species); this.say(`${trainer||'A wild '+opponent.nickname} appeared!`);
+  constructor(campaign,opponent,{trainer=null,format='singles'}={}){
+    this.campaign=campaign;this.catalog=campaign.catalog;this.random=campaign.random;this.trainer=trainer;this.phase='battle';this.awarded=new Set();
+    this.opponents=(Array.isArray(opponent)?opponent:[opponent]).map(clone);assert(campaign.state.party.some(m=>m.hp>0),'Heal your party first');assert(format==='singles','Local doubles controls are not yet ported');
+    this.engine=createBattleEngine(this.catalog.data,()=>this.random.next());
+    const enemyTeam=battleTeam({...campaign,state:{...campaign.state,party:this.opponents}}),own=battleTeam(campaign);
+    for(const [entries,mons] of [[own,campaign.state.party],[enemyTeam,this.opponents]])entries.forEach((m,i)=>{
+      const mon=mons[i];m.hp=mon.hp;m.status=mon.status;m.transformations=this.engine.verifiedTransformations({species:mon.species,speciesData:this.catalog.species(mon.species),level:mon.level},m);
+      // Native held-item form checks: no free Mega button for unrelated stones.
+      m.transformations=m.transformations.filter(f=>this.catalog.canTransform(mon,f.species));
+    });
+    this.room=this.engine.start([own,enemyTeam],{format,difficulty:campaign.state.options.difficulty==='extreme'?'expert':campaign.state.options.difficulty||'normal',names:[campaign.state.trainer.name,trainer||'Wild Pokémon']});
+    this.opponents.forEach(m=>campaign.mark('seen',m.species));this.sync();
   }
+  get active(){return this.room.players[0].active;}
   get player(){return this.campaign.state.party[this.active];}
-  say(message){this.log.push(message);this.log=this.log.slice(-80);}
-  setWeather(ability){const map={'Drizzle':'rain','Primordial Sea':'rain','Drought':'sun','Desolate Land':'sun','Orichalcum Pulse':'sun','Sand Stream':'sand','Sand Spit':'sand','Snow Warning':'snow'};if(map[ability]){this.weather=map[ability];this.weatherTurns=5;}}
-  available(mon) { return mon.moves.map((m,i)=>({m,i})).filter(({m})=>m.pp>0&&supportedMove(this.catalog.move(m.id))).map(({i})=>i); }
-  speed(mon){return this.catalog.stats(mon)[3]*(mon.status==='paralysis'?.5:1);}
-  attack(attacker,target,index) {
-    if(attacker.hp<=0||target.hp<=0)return;
-    if(attacker.status==='paralysis'&&this.random.next()<.25){this.say(`${attacker.nickname} is paralyzed!`);return;}
-    const slot=index===-1?null:attacker.moves[index];
-    const move=slot?this.catalog.move(slot.id):{name:'Struggle',power:50,type:'Normal',category:'Physical',accuracy:100,priority:0};
-    if(slot){assert(slot.pp>0&&supportedMove(move),'That move is not implemented in the prototype');slot.pp--;}
-    this.say(`${attacker.nickname} used ${move.name}!`);
-    if(move.accuracy>0&&this.random.int(1,100)>move.accuracy){this.say('The attack missed.');return;}
-    const own=this.catalog.stats(attacker),foe=this.catalog.stats(target),physical=move.category==='Physical';
-    const types=this.catalog.species(target.species).types,mod=index===-1?1:effectiveness(move.type,types);
-    if(mod===0){this.say('It had no effect.');return;}
-    let attack=own[physical?1:4],defense=foe[physical?2:5];
-    if(physical&&attacker.status==='burn'&&attacker.ability!=='Guts')attack*=.5;
-    if(physical&&attacker.ability==='Huge Power')attack*=2;
-    if(physical&&attacker.ability==='Pure Power')attack*=2;
-    if(target.ability==='Levitate'&&move.type==='Ground'){this.say('Levitate prevented the hit.');return;}
-    if((target.ability==='Water Absorb'&&move.type==='Water')||(target.ability==='Volt Absorb'&&move.type==='Electric')){target.hp=Math.min(foe[0],target.hp+Math.floor(foe[0]/4));this.say(`${target.nickname} absorbed the attack!`);return;}
-    let weather=this.weather==='sun'?(move.type==='Fire'?1.5:move.type==='Water'?.5:1):this.weather==='rain'?(move.type==='Water'?1.5:move.type==='Fire'?.5:1):1;
-    const stab=this.catalog.species(attacker.species).types.includes(move.type)?1.5:1;
-    const critical=this.random.int(1,24)===1?1.5:1;
-    let damage=Math.max(1,Math.floor((Math.floor(Math.floor((2*attacker.level/5+2)*move.power*attack/defense)/50)+2)*stab*mod*weather*critical*(this.random.int(85,100)/100)));
-    if(target.ability==='Sturdy'&&target.hp===foe[0]&&damage>=target.hp)damage=target.hp-1;
-    target.hp=Math.max(0,target.hp-damage);
-    if(critical>1)this.say('A critical hit!'); if(mod>1)this.say("It's super effective!");else if(mod<1)this.say("It's not very effective.");
-    if(index===-1)attacker.hp=Math.max(0,attacker.hp-Math.max(1,Math.floor(own[0]/4)));
-    if(target.hp===0)this.say(`${target.nickname} fainted!`);
+  get enemy(){const i=this.room.players[1].active,b=this.room.players[1].team[i];return {...this.opponents[i],species:b.species,nickname:b.name,hp:b.hp,status:b.status,moves:b.moves.map(m=>({id:m.id,pp:m.pp})),battleMaxHP:b.maxHP};}
+  get playerView(){const b=this.room.players[0].team[this.active];return {...this.player,species:b.species,nickname:b.name,hp:b.hp,battleMaxHP:b.maxHP};}
+  get log(){return this.room.log;}
+  get turn(){return this.room.turn;}
+  get weather(){return this.room.weather;}
+  say(text){this.room.log.push(text);}
+  available(mon){return mon.moves.map((m,i)=>m.pp>0?i:-1).filter(i=>i>=0);}
+  gimmicks(){const p=this.room.players[0],m=p.team[p.active];return m.transformed?[]:m.transformations.map((form,index)=>({...form,index})).filter(f=>f.kind==='Mega'?!p.usedMega:!p.usedGmax);}
+  sync(){
+    this.room.players[0].team.forEach((b,i)=>{const m=this.campaign.state.party[i],max=this.catalog.stats(m)[0];m.hp=b.hp<=0?0:Math.min(max,Math.ceil(b.hp*max/b.maxHP));m.status=b.status||null;m.moves.forEach((slot,k)=>{slot.pp=Math.max(0,Math.min(this.catalog.move(slot.id).pp,b.moves[k]?.pp??slot.pp));});});
+    this.room.players[1].team.forEach((b,i)=>{if(b.hp>0||this.awarded.has(i))return;this.awarded.add(i);const source=this.opponents[i],yieldValue=this.catalog.native?.species?.[source.species]?.expYield||60;
+      const amount=Math.max(1,Math.floor(yieldValue*source.level/7*(this.trainer?1.5:1))),active=this.player;
+      for(const m of this.campaign.state.party){if(!m.hp)continue;const share=m===active?1:this.campaign.state.options.expShare===false?0:({easy:2,normal:1,hard:.5,extreme:0}[this.campaign.state.options.difficulty]??1);if(!share)continue;const gain=this.catalog.gainExperience(m,Math.floor(amount*share));this.say(`${m.nickname} gained ${Math.floor(amount*share)} EXP.${gain.after>gain.before?' Grew to level '+m.level+'!':''}`);}
+    });
+    // Level changes and consumable items must survive subsequent turns and saving.
+    const items=new Map(Object.entries(this.catalog.data.items).map(([id,name])=>[name,Number(id)]));
+    this.room.players[0].team.forEach((b,i)=>{const m=this.campaign.state.party[i],stats=this.catalog.stats(m);m.item=items.get(b.item)||0;
+      if(!b.transformed){b.level=m.level;b.maxHP=stats[0];b.atk=stats[1];b.def=stats[2];b.speed=stats[3];b.spAtk=stats[4];b.spDef=stats[5];b.hp=m.hp;
+        while(b.moves.length<m.moves.length){const slot=m.moves[b.moves.length];b.moves.push({...this.engine.catalogMove(slot.id),pp:slot.pp});}
+      }
+    });
+    if(this.room.phase==='finished'){this.phase=this.room.winner===0?'won':'lost';if(this.phase==='won'&&this.trainer&&!this.rewarded){this.campaign.state.money=Math.min(999999999,this.campaign.state.money+this.opponents.reduce((n,m)=>n+m.level*20,0));this.rewarded=true;}}
   }
-  enemyAttack(){const choices=this.available(this.enemy);this.attack(this.enemy,this.player,choices.length?this.random.pick(choices):-1);}
-  residual(mon) {
-    if(mon.hp<=0)return;const max=this.catalog.stats(mon)[0],types=this.catalog.species(mon.species).types;
-    if(mon.status==='poison'&&mon.ability==='Poison Heal'){mon.hp=Math.min(max,mon.hp+Math.max(1,Math.floor(max/8)));return;}
-    let damage=mon.status==='poison'?Math.max(1,Math.floor(max/8)):mon.status==='burn'?Math.max(1,Math.floor(max/16)):0;
-    if(this.weather==='sand'&&!types.some(t=>['Rock','Ground','Steel'].includes(t))&&!['Sand Rush','Sand Veil','Sand Force','Magic Guard','Overcoat'].includes(mon.ability))damage+=Math.max(1,Math.floor(max/16));
-    if(mon.ability==='Magic Guard')damage=0;
-    mon.hp=Math.max(0,mon.hp-damage);if(damage)this.say(`${mon.nickname} took residual damage.`);
+  enemyTurn(){
+    const p=this.room.players[0],enemy=this.room.players[1];p.choice={type:'done'};enemy.choice=this.engine.botChoice(this.room,1);this.engine.resolveTurn(this.room);this.sync();
   }
-  checkEnd() {
-    if(this.enemy.hp<=0){this.phase='won';const amount=Math.max(15,this.enemy.level*12);const gains=this.catalog.gainExperience(this.player,amount);this.say(`Won! ${this.player.nickname} gained ${amount} EXP.`);if(gains.after>gains.before)this.say(`Grew to level ${gains.after}!`);if(this.trainer)this.campaign.state.money=Math.min(999999999,this.campaign.state.money+200);return true;}
-    if(this.player.hp<=0){const next=this.campaign.state.party.findIndex(m=>m.hp>0);if(next<0){this.phase='lost';this.say('Your party needs to rest.');}else {this.active=next;this.setWeather(this.player.ability);this.say(`Go, ${this.player.nickname}!`);}return true;}
-    return false;
-  }
-  finishTurn() {
-    if(!this.checkEnd()){this.residual(this.player);this.residual(this.enemy);this.checkEnd();}
-    if(this.weatherTurns>0&&--this.weatherTurns===0)this.weather=null;this.turn++;
-  }
-  act(action) {
-    assert(this.phase==='battle','Battle has ended');
+  act(action){
+    assert(this.phase==='battle','Battle has ended');const p=this.room.players[0],mon=p.team[p.active];
     if(action.type==='move'){
-      const choices=this.available(this.player);integer(action.index,-1,3,'move choice');assert(choices.includes(action.index)||(action.index===-1&&!choices.length),'Choose a supported move with PP');
-      const enemyChoices=this.available(this.enemy),enemyIndex=enemyChoices.length?this.random.pick(enemyChoices):-1;
-      const priority=(mon,i)=>i===-1?0:this.catalog.move(mon.moves[i].id).priority||0;
-      const first=priority(this.player,action.index)-priority(this.enemy,enemyIndex)||this.speed(this.player)-this.speed(this.enemy)||(this.random.next()<.5?1:-1);
-      if(first>=0){this.attack(this.player,this.enemy,action.index);if(this.enemy.hp>0)this.attack(this.enemy,this.player,enemyIndex);}
-      else{this.attack(this.enemy,this.player,enemyIndex);if(this.player.hp>0)this.attack(this.player,this.enemy,action.index);}
+      integer(action.index,-1,3,'move choice');const available=this.available(this.player);assert(available.includes(action.index)||(action.index===-1&&!available.length),'Choose a move with PP');
+      const index=action.index===-1?0:action.index;
+      // Relay resolves an exhausted chosen move as Struggle.
+      if(action.gimmick){assert(this.gimmicks().some(f=>f.kind===action.gimmick&&f.index===action.formIndex),'That transformation is unavailable');}
+      assert(mon.choiceLock===null||mon.choiceLock===index,'A held item locks you into another move');
+      assert(!(mon.volatile.disabledMove===index&&mon.volatile.disableTurns>0),'That move is disabled');
+      assert(!(mon.volatile.encore>0&&mon.volatile.encoreMove!==null&&mon.volatile.encoreMove!==index),'Encore forces another move');
+      p.choice={type:'move',moveIndex:index,gimmick:action.gimmick||null,formIndex:action.formIndex||0};
+      this.room.players[1].choice=this.engine.botChoice(this.room,1);this.engine.resolveTurn(this.room);this.sync();
     }else if(action.type==='switch'){
-      integer(action.index,0,this.campaign.state.party.length-1,'party slot');assert(action.index!==this.active&&this.campaign.state.party[action.index].hp>0,'Choose another healthy Pokémon');this.active=action.index;this.setWeather(this.player.ability);this.say(`Go, ${this.player.nickname}!`);this.enemyAttack();
+      integer(action.index,0,p.team.length-1,'party slot');assert(action.index!==p.active&&p.team[action.index].hp>0,'Choose another healthy Pokémon');assert(!this.engine.switchBlocked(this.room,0),'Your Pokémon is trapped');p.choice={type:'switch',slot:action.index};this.room.players[1].choice=this.engine.botChoice(this.room,1);this.engine.resolveTurn(this.room);this.sync();
     }else if(action.type==='potion'){
-      assert(this.player.hp<this.catalog.stats(this.player)[0],'HP is already full');this.campaign.consume(28);this.player.hp=Math.min(this.catalog.stats(this.player)[0],this.player.hp+20);this.say('Restored 20 HP.');this.enemyAttack();
+      assert(this.campaign.bagAllowed(),'Battle items are disabled by your difficulty/options');assert(mon.hp<mon.maxHP,'HP is already full');this.campaign.consume(28);mon.hp=Math.min(mon.maxHP,mon.hp+20);this.say('Used a Potion.');this.enemyTurn();
     }else if(action.type==='catch'){
-      assert(!this.trainer,"You cannot catch a trainer's Pokémon");this.campaign.consume(1);
-      // Placeholder catch formula until source catch rates are exported.
-      const odds=.2+.55*(1-this.enemy.hp/this.catalog.stats(this.enemy)[0]);
-      if(this.random.next()<odds){this.campaign.catchMon(clone(this.enemy));this.phase='caught';this.say(`Caught ${this.enemy.nickname}!`);return;}
-      this.say('It broke free!');this.enemyAttack();
-    }else if(action.type==='run'){
-      assert(!this.trainer,'You cannot run from a trainer');this.phase='escaped';this.say('Got away safely.');return;
-    }else throw new Error('Unknown battle action');
-    this.finishTurn();
+      assert(!this.trainer,"You cannot catch a trainer's Pokémon");assert(this.campaign.bagAllowed(),'Battle items are disabled');
+      const item=action.item||1;assert([1,2,3,4].includes(item),'Unsupported ball');this.campaign.consume(item);const rate=this.catalog.native?.species?.[this.opponents[this.room.players[1].active].species]?.catchRate||45;
+      const status=['sleep','freeze'].includes(this.enemy.status)?2.5:this.enemy.status?1.5:1,multiplier=item===2?1.5:item===3?2:1;
+      const odds=Math.min(1,((3*this.enemy.battleMaxHP-2*this.enemy.hp)*rate*multiplier*status)/(3*this.enemy.battleMaxHP*255));
+      if(item===4||this.random.next()<odds){const caught=this.enemy;delete caught.battleMaxHP;this.campaign.catchMon(caught);this.phase='caught';this.say(`Caught ${caught.nickname}!`);return;}
+      this.say('It broke free!');this.enemyTurn();
+    }else if(action.type==='run'){assert(!this.trainer,'You cannot run from a trainer');this.phase='escaped';this.say('Got away safely.');}
+    else throw new Error('Unknown battle action');
   }
 }

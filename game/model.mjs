@@ -26,8 +26,9 @@ export function experience(level, growth = 'medium_fast') {
   }
 }
 export class Catalog {
-  constructor(data) {
-    assert(data?.species && data?.moveDetails, 'Missing Brisk catalog'); this.data = data;
+  constructor(data, native = {}) {
+    this.native=native;
+    assert(data?.species && data?.moveDetails, 'Missing Brisk catalog'); this.data = {...data,items:{...data.items},itemDetails:{...data.itemDetails}};for(const [id,item]of Object.entries(native.extraItems||{})){this.data.items[id]=item.name;this.data.itemDetails[id]=item;}
     this.byConstant = new Map(Object.entries(data.species).map(([id, s]) => [s.constant, Number(id)]));
   }
   species(id) { const s = this.data.species[id]; assert(s && !['EGG','NONE'].includes(s.constant), `Unknown species ${id}`); return s; }
@@ -46,10 +47,9 @@ export class Catalog {
   }
   create(species, level, rng, uid) {
     const s = this.species(species);
-    // Prototype uses an explicit safe subset, not the unavailable level-up learnset.
-    const moves = s.learnableMoves.filter(id => {
-      const m = this.data.moveDetails[id]; return PROTOTYPE_MOVE_IDS.has(id) && m?.pp > 0 && m.power > 0 && m.power <= 60 && m.effect === 'Hit' && !m.multiHit && !m.moveEffects?.length;
-    }).sort((a,b) => (this.data.moveDetails[a].power-this.data.moveDetails[b].power)||a-b).slice(0,4);
+    const learnset=this.native.species?.[species]?.learnset;
+    const learned=learnset?.filter(e=>e.level<=level).map(e=>e.move).filter(id=>this.data.moveDetails[id]?.pp>0);
+    const moves=learned?.length?[...new Set(learned)].slice(-4):s.learnableMoves.filter(id=>PROTOTYPE_MOVE_IDS.has(id)&&this.data.moveDetails[id]?.pp>0).slice(0,4);
     assert(moves.length, `${s.name} has no supported prototype moves`);
     const mon = {uid, species, level, exp:experience(level,s.growthRate), nickname:s.name, nature:rng.int(0,24), ivs:Array.from({length:6},()=>rng.int(0,31)), evs:[0,0,0,0,0,0], ability:(s.abilities||[]).find(Boolean)||'', item:0, shiny:rng.int(1,8192)===1, moves:moves.map(id=>({id,pp:this.move(id).pp})), status:null, hp:1, origin:'native-prototype'};
     mon.hp=this.stats(mon)[0]; return mon;
@@ -65,22 +65,27 @@ export class Catalog {
     assert(typeof mon.shiny==='boolean'&&mon.origin==='native-prototype','Invalid Pokémon origin');
     integer(mon.exp,experience(mon.level,s.growthRate),experience(100,s.growthRate),'experience');
     assert(mon.level===100||mon.exp<experience(mon.level+1,s.growthRate),'Experience/level mismatch');
-    assert([null,'poison','burn','paralysis'].includes(mon.status),'Unsupported status');
+    assert([null,'poison','toxic','burn','paralysis','sleep','freeze'].includes(mon.status),'Unsupported status');
     integer(mon.hp,0,this.stats(mon)[0],'HP');
     assert(Array.isArray(mon.moves)&&mon.moves.length>=1&&mon.moves.length<=4,'Invalid moves');
     assert(new Set(mon.moves.map(m=>m.id)).size===mon.moves.length,'Duplicate moves');
-    for(const m of mon.moves) { assert(s.learnableMoves.includes(m.id),'Illegal move'); integer(m.pp,0,this.move(m.id).pp,'PP'); }
+    for(const m of mon.moves) { assert(s.learnableMoves.includes(m.id)||this.native.species?.[mon.species]?.learnset?.some(e=>e.move===m.id),'Illegal move'); integer(m.pp,0,this.move(m.id).pp,'PP'); }
+    assert(!mon.pendingMoves||Array.isArray(mon.pendingMoves)&&mon.pendingMoves.length<=100,'Invalid pending moves');for(const id of mon.pendingMoves||[])this.move(id);
     return mon;
   }
   heal(mon) { mon.hp=this.stats(mon)[0]; mon.status=null; for(const m of mon.moves)m.pp=this.move(m.id).pp; }
   gainExperience(mon, amount) {
-    integer(amount,0,1000000,'experience gain'); const s=this.species(mon.species), before=mon.level, hp=mon.hp;
+    integer(amount,0,10000000,'experience gain'); const s=this.species(mon.species), before=mon.level, hp=mon.hp;
     mon.exp=Math.min(experience(100,s.growthRate),mon.exp+amount);
     while(mon.level<100&&mon.exp>=experience(mon.level+1,s.growthRate)) {
       const oldHP=this.stats(mon)[0]; mon.level++; if(mon.hp)mon.hp+=this.stats(mon)[0]-oldHP;
     }
-    return {before,after:mon.level,wasFainted:hp===0};
+    const newMoves=(this.native.species?.[mon.species]?.learnset||[]).filter(e=>e.level>before&&e.level<=mon.level&&!mon.moves.some(m=>m.id===e.move));
+    for(const entry of newMoves){if(mon.moves.length<4)mon.moves.push({id:entry.move,pp:this.move(entry.move).pp});else if(!(mon.pendingMoves||[]).includes(entry.move))(mon.pendingMoves??=[]).push(entry.move);}
+    return {before,after:mon.level,wasFainted:hp===0,newMoves:newMoves.map(e=>e.move)};
   }
+  canTransform(mon,form){return (this.native.species?.[mon.species]?.megaItems||[]).some(e=>e.species===form&&e.item===mon.item);}
+  teach(mon,move,index){assert(this.species(mon.species).learnableMoves.includes(move)||this.native.species?.[mon.species]?.learnset?.some(e=>e.move===move),'Illegal move');integer(index,0,3,'move slot');assert(index<=mon.moves.length,'Invalid move slot');assert(!mon.moves.some(m=>m.id===move),'Already knows that move');mon.moves[index]={id:move,pp:this.move(move).pp};mon.pendingMoves=(mon.pendingMoves||[]).filter(id=>id!==move);}
   evolution(mon, item = null) {
     return (this.species(mon.species).evolutions||[]).find(e => e.method==='EVO_LEVEL'&&item===null&&mon.level>=Number(e.parameter) || e.method==='EVO_ITEM'&&item!==null&&e.parameter===item);
   }

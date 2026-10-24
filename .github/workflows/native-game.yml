@@ -2,9 +2,9 @@ name: Standalone game foundation
 on:
   push:
     branches: [main]
-    paths: ['game/**', 'test/game/**', 'tools/import_native_maps.mjs', 'tools/serve_native_game.mjs', '.github/workflows/native-game.yml']
+    paths: ['battle-server.js', 'tools/build_native_battle.mjs', 'game/**', 'test/game/**', 'tools/import_native_maps.mjs', 'tools/serve_native_game.mjs', '.github/workflows/native-game.yml']
   pull_request:
-    paths: ['game/**', 'test/game/**', 'tools/import_native_maps.mjs', '.github/workflows/native-game.yml']
+    paths: ['battle-server.js', 'tools/build_native_battle.mjs', 'game/**', 'test/game/**', 'tools/import_native_maps.mjs', '.github/workflows/native-game.yml']
   workflow_dispatch:
 jobs:
   test:

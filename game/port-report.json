@@ -1,0 +1,392 @@
+{
+  "source": "9529dff166dec8d1d2df1c101eb65cc0eb8dc97f",
+  "maps": [
+    "SlateportCity",
+    "SlateportCity_Mart",
+    "LittlerootTown",
+    "LittlerootTown_ProfessorBirchsLab",
+    "LittlerootTown_BrendansHouse_1F",
+    "LittlerootTown_BrendansHouse_2F",
+    "LittlerootTown_MaysHouse_1F",
+    "LittlerootTown_MaysHouse_2F",
+    "Route101",
+    "OldaleTown",
+    "OldaleTown_Mart",
+    "OldaleTown_PokemonCenter_1F",
+    "OldaleTown_House1",
+    "OldaleTown_House2",
+    "Route102",
+    "Route103",
+    "PetalburgCity",
+    "PetalburgCity_Mart",
+    "PetalburgCity_PokemonCenter_1F",
+    "Route104",
+    "PetalburgWoods",
+    "RustboroCity",
+    "RustboroCity_Mart",
+    "RustboroCity_PokemonCenter_1F",
+    "RustboroCity_Gym",
+    "OrangeCity",
+    "OrangeCity_Mart",
+    "OrangeCity_PokemonCenter_1F",
+    "OrangeCity_House1",
+    "OrangeCity_House2",
+    "Route143",
+    "Route144",
+    "Route145",
+    "Route146"
+  ],
+  "unresolvedEvents": [
+    {
+      "map": "MAP_SLATEPORT_CITY",
+      "script": "SlateportCity_EventScript_EffortRibbonWoman"
+    },
+    {
+      "map": "MAP_SLATEPORT_CITY",
+      "script": "SlateportCity_EventScript_BerryPowderClerk"
+    },
+    {
+      "map": "MAP_SLATEPORT_CITY",
+      "script": "SlateportCity_EventScript_StoneClerk"
+    },
+    {
+      "map": "MAP_SLATEPORT_CITY",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_SLATEPORT_CITY",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_SLATEPORT_CITY",
+      "script": "Common_EventScript_ShowPokemartSign"
+    },
+    {
+      "map": "MAP_SLATEPORT_CITY",
+      "script": "Common_EventScript_ShowPokemartSign"
+    },
+    {
+      "map": "MAP_SLATEPORT_CITY",
+      "script": "SlateportCity_EventScript_BerryCrushRankingsSign"
+    },
+    {
+      "map": "MAP_LITTLEROOT_TOWN",
+      "script": "LittlerootTown_EventScript_BrendansHouseSign"
+    },
+    {
+      "map": "MAP_LITTLEROOT_TOWN",
+      "script": "LittlerootTown_EventScript_MaysHouseSign"
+    },
+    {
+      "map": "MAP_LITTLEROOT_TOWN_PROFESSOR_BIRCHS_LAB",
+      "script": "LittlerootTown_ProfessorBirchsLab_EventScript_Aide"
+    },
+    {
+      "map": "MAP_LITTLEROOT_TOWN_BRENDANS_HOUSE_2F",
+      "script": "LittlerootTown_BrendansHouse_2F_EventScript_PC"
+    },
+    {
+      "map": "MAP_LITTLEROOT_TOWN_BRENDANS_HOUSE_2F",
+      "script": "LittlerootTown_BrendansHouse_2F_EventScript_WallClock"
+    },
+    {
+      "map": "MAP_LITTLEROOT_TOWN_MAYS_HOUSE_2F",
+      "script": "PlayersHouse_2F_EventScript_GameCube"
+    },
+    {
+      "map": "MAP_LITTLEROOT_TOWN_MAYS_HOUSE_2F",
+      "script": "PlayersHouse_2F_EventScript_Notebook"
+    },
+    {
+      "map": "MAP_LITTLEROOT_TOWN_MAYS_HOUSE_2F",
+      "script": "LittlerootTown_MaysHouse_2F_EventScript_WallClock"
+    },
+    {
+      "map": "MAP_LITTLEROOT_TOWN_MAYS_HOUSE_2F",
+      "script": "LittlerootTown_MaysHouse_2F_EventScript_PC"
+    },
+    {
+      "map": "MAP_OLDALE_TOWN",
+      "script": "OldaleTown_EventScript_MartEmployee"
+    },
+    {
+      "map": "MAP_OLDALE_TOWN",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_OLDALE_TOWN",
+      "script": "Common_EventScript_ShowPokemartSign"
+    },
+    {
+      "map": "MAP_OLDALE_TOWN",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_OLDALE_TOWN",
+      "script": "Common_EventScript_ShowPokemartSign"
+    },
+    {
+      "map": "MAP_ROUTE102",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE102",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE103",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE103",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE103",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_PETALBURG_CITY",
+      "script": "Common_EventScript_ShowPokemartSign"
+    },
+    {
+      "map": "MAP_PETALBURG_CITY",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_PETALBURG_CITY",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_PETALBURG_CITY",
+      "script": "Common_EventScript_ShowPokemartSign"
+    },
+    {
+      "map": "MAP_PETALBURG_CITY_POKEMON_CENTER_1F",
+      "script": "ProfileMan_EventScript_Man"
+    },
+    {
+      "map": "MAP_ROUTE104",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE104",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE104",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE104",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE104",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE104",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE104",
+      "script": "Route104_EventScript_ExpertF"
+    },
+    {
+      "map": "MAP_ROUTE104",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE104",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE104",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE104",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE104",
+      "script": "Route104_EventScript_Boy2"
+    },
+    {
+      "map": "MAP_PETALBURG_WOODS",
+      "script": "PetalburgWoods_EventScript_Girl"
+    },
+    {
+      "map": "MAP_RUSTBORO_CITY",
+      "script": "Common_EventScript_ShowPokemartSign"
+    },
+    {
+      "map": "MAP_RUSTBORO_CITY",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_RUSTBORO_CITY",
+      "script": "Common_EventScript_ShowPokemartSign"
+    },
+    {
+      "map": "MAP_RUSTBORO_CITY",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_RUSTBORO_CITY_MART",
+      "script": "RustboroCity_Mart_EventScript_Clerk"
+    },
+    {
+      "map": "MAP_RUSTBORO_CITY_GYM",
+      "script": "RustboroCity_Gym_EventScript_LeftGymStatue"
+    },
+    {
+      "map": "MAP_RUSTBORO_CITY_GYM",
+      "script": "RustboroCity_Gym_EventScript_RightGymStatue"
+    }
+  ],
+  "externalWarps": [
+    {
+      "map": "MAP_SLATEPORT_CITY",
+      "destination": "MAP_SLATEPORT_CITY_POKEMON_CENTER_1F"
+    },
+    {
+      "map": "MAP_SLATEPORT_CITY",
+      "destination": "MAP_SLATEPORT_CITY_STERNS_SHIPYARD_1F"
+    },
+    {
+      "map": "MAP_SLATEPORT_CITY",
+      "destination": "MAP_SLATEPORT_CITY_BATTLE_TENT_LOBBY"
+    },
+    {
+      "map": "MAP_SLATEPORT_CITY",
+      "destination": "MAP_SLATEPORT_CITY_POKEMON_FAN_CLUB"
+    },
+    {
+      "map": "MAP_SLATEPORT_CITY",
+      "destination": "MAP_SLATEPORT_CITY_OCEANIC_MUSEUM_1F"
+    },
+    {
+      "map": "MAP_SLATEPORT_CITY",
+      "destination": "MAP_SLATEPORT_CITY_NAME_RATERS_HOUSE"
+    },
+    {
+      "map": "MAP_SLATEPORT_CITY",
+      "destination": "MAP_SLATEPORT_CITY_OCEANIC_MUSEUM_1F"
+    },
+    {
+      "map": "MAP_SLATEPORT_CITY",
+      "destination": "MAP_SLATEPORT_CITY_HARBOR"
+    },
+    {
+      "map": "MAP_SLATEPORT_CITY",
+      "destination": "MAP_SLATEPORT_CITY_HARBOR"
+    },
+    {
+      "map": "MAP_SLATEPORT_CITY",
+      "destination": "MAP_SLATEPORT_CITY_HOUSE"
+    },
+    {
+      "map": "MAP_LITTLEROOT_TOWN",
+      "destination": "MAP_ROUTE135"
+    },
+    {
+      "map": "MAP_LITTLEROOT_TOWN",
+      "destination": "MAP_ROUTE135"
+    },
+    {
+      "map": "MAP_ROUTE101",
+      "destination": "MAP_EVOLUTION_CAVE"
+    },
+    {
+      "map": "MAP_OLDALE_TOWN_POKEMON_CENTER_1F",
+      "destination": "MAP_OLDALE_TOWN_POKEMON_CENTER_2F"
+    },
+    {
+      "map": "MAP_ROUTE103",
+      "destination": "MAP_ALTERING_CAVE"
+    },
+    {
+      "map": "MAP_PETALBURG_CITY",
+      "destination": "MAP_PETALBURG_CITY_HOUSE1"
+    },
+    {
+      "map": "MAP_PETALBURG_CITY",
+      "destination": "MAP_PETALBURG_CITY_WALLYS_HOUSE"
+    },
+    {
+      "map": "MAP_PETALBURG_CITY",
+      "destination": "MAP_PETALBURG_CITY_GYM"
+    },
+    {
+      "map": "MAP_PETALBURG_CITY",
+      "destination": "MAP_PETALBURG_CITY_HOUSE2"
+    },
+    {
+      "map": "MAP_PETALBURG_CITY_POKEMON_CENTER_1F",
+      "destination": "MAP_PETALBURG_CITY_POKEMON_CENTER_2F"
+    },
+    {
+      "map": "MAP_ROUTE104",
+      "destination": "MAP_ROUTE104_MR_BRINEYS_HOUSE"
+    },
+    {
+      "map": "MAP_ROUTE104",
+      "destination": "MAP_ROUTE104_PRETTY_PETAL_FLOWER_SHOP"
+    },
+    {
+      "map": "MAP_RUSTBORO_CITY",
+      "destination": "MAP_RUSTBORO_CITY_FLAT1_1F"
+    },
+    {
+      "map": "MAP_RUSTBORO_CITY",
+      "destination": "MAP_RUSTBORO_CITY_POKEMON_SCHOOL"
+    },
+    {
+      "map": "MAP_RUSTBORO_CITY",
+      "destination": "MAP_RUSTBORO_CITY_DEVON_CORP_1F"
+    },
+    {
+      "map": "MAP_RUSTBORO_CITY",
+      "destination": "MAP_RUSTBORO_CITY_DEVON_CORP_1F"
+    },
+    {
+      "map": "MAP_RUSTBORO_CITY",
+      "destination": "MAP_RUSTBORO_CITY_HOUSE1"
+    },
+    {
+      "map": "MAP_RUSTBORO_CITY",
+      "destination": "MAP_RUSTBORO_CITY_CUTTERS_HOUSE"
+    },
+    {
+      "map": "MAP_RUSTBORO_CITY",
+      "destination": "MAP_RUSTBORO_CITY_HOUSE2"
+    },
+    {
+      "map": "MAP_RUSTBORO_CITY",
+      "destination": "MAP_RUSTBORO_CITY_FLAT2_1F"
+    },
+    {
+      "map": "MAP_RUSTBORO_CITY",
+      "destination": "MAP_RUSTBORO_CITY_HOUSE3"
+    },
+    {
+      "map": "MAP_RUSTBORO_CITY_POKEMON_CENTER_1F",
+      "destination": "MAP_RUSTBORO_CITY_POKEMON_CENTER_2F"
+    },
+    {
+      "map": "MAP_ORANGE_CITY_POKEMON_CENTER_1F",
+      "destination": "MAP_ORANGE_CITY_POKEMON_CENTER_2F"
+    },
+    {
+      "map": "MAP_ROUTE146",
+      "destination": "MAP_DYNAMAX_ADVENTURE_CAVE"
+    }
+  ],
+  "missingLearnsets": [
+    "GRENINJA_BOND",
+    "DRAGONITE_MEGA_Y",
+    "EGG"
+  ]
+}
