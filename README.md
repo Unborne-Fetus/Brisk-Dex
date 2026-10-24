@@ -294,3 +294,7 @@ Web, mobile, desktop and standalone builds include the packed graphics.
 
 Validation: `python tools/test_extracted_data.py`, `npm run web:build`,
 and `npm run index:build`.
+
+### Standalone Brisk Emerald development
+
+A separate playable remake foundation is now included under `game/`. Run `launch-game-prototype.bat` or `npm run game:dev` to try the field station. It has exploration, basic battles, catching, party/storage management, healing, independent saves and staged content-update code. This is an early prototype, not the full game. The normal Dex interface and online features remain disconnected from it. See [development scope and migration plan](docs/STANDALONE_GAME.md).

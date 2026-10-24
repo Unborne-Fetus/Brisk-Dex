@@ -6,7 +6,7 @@ const output = path.join(root, 'web-dist');
 await fs.rm(output, {recursive:true,force:true});
 await fs.mkdir(output, {recursive:true});
 const files = ['index.html','brisk-dex-data.json','brisk-dex-trainer-teams.json','asset-loader.js','localization.js'];
-const dirs = ['brisk-dex-asset-patches','brisk-dex-icons','brisk-dex-trainers','brisk-dex-items','brisk-dex-trainer-pics','brisk-dex-sprites','brisk-dex-cries'];
+const dirs = ['game','brisk-dex-asset-patches','brisk-dex-icons','brisk-dex-trainers','brisk-dex-items','brisk-dex-trainer-pics','brisk-dex-sprites','brisk-dex-cries'];
 for(const filename of files) await fs.copyFile(path.join(root,filename),path.join(output,filename));
 for(const dir of dirs){
   try{await fs.cp(path.join(root,dir),path.join(output,dir),{recursive:true});}

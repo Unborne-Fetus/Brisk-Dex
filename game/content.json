@@ -1,0 +1,284 @@
+{
+  "format": "brisk-native-content",
+  "schema": 1,
+  "version": "prototype-1",
+  "start": {
+    "map": "field",
+    "x": 12,
+    "y": 10
+  },
+  "maps": {
+    "field": {
+      "id": "field",
+      "name": "Brisk Field Station",
+      "width": 26,
+      "height": 18,
+      "outdoor": true,
+      "weather": "clear",
+      "weatherLocked": false,
+      "tiles": [
+        "##########################",
+        "#...........pp...........#",
+        "#..hhhhhhh..pp....~~~~~~.#",
+        "#..hhhhhhh..pp....~~~~~~.#",
+        "#..hhhhhhh..pp....~~~~~~.#",
+        "#..hhhhhhh..pp....~~~~~~.#",
+        "#..hhhdhhh..pp....~~~~~~.#",
+        "#...........pp...........#",
+        "#...........pp...........#",
+        "#pppppppppppppppppppppppp#",
+        "#pppppppppppppppppppppppp#",
+        "#..gggggggg.pp..ggggggg..#",
+        "#..gggggggg.pp..ggggggg..#",
+        "#..gggggggg.pp..ggggggg..#",
+        "#..gggggggg.pp..ggggggg..#",
+        "#..gggggggg.pp..ggggggg..#",
+        "#...........pp...........#",
+        "##########################"
+      ],
+      "events": [
+        {
+          "kind": "warp",
+          "x": 6,
+          "y": 6,
+          "map": "lab",
+          "toX": 12,
+          "toY": 14
+        },
+        {
+          "kind": "heal",
+          "x": 11,
+          "y": 8,
+          "text": "Take a break. Your entire party is fully healed."
+        },
+        {
+          "kind": "dialogue",
+          "x": 15,
+          "y": 8,
+          "text": "This field station is a standalone prototype. Explore the grass, catch Pok\u00e9mon, and save your journey. The full Hoenn story is still being ported."
+        },
+        {
+          "kind": "trainer",
+          "id": "rival-test",
+          "x": 9,
+          "y": 10,
+          "text": "I\u2019m testing the new battle system. Let\u2019s see how your partner does!",
+          "species": "ZIGZAGOON",
+          "level": 3
+        },
+        {
+          "kind": "warp",
+          "x": 13,
+          "y": 1,
+          "map": "cave",
+          "toX": 12,
+          "toY": 14
+        }
+      ],
+      "encounters": [
+        {
+          "species": "POOCHYENA",
+          "min": 3,
+          "max": 5,
+          "weight": 4
+        },
+        {
+          "species": "ZIGZAGOON",
+          "min": 3,
+          "max": 5,
+          "weight": 4
+        },
+        {
+          "species": "WURMPLE",
+          "min": 3,
+          "max": 5,
+          "weight": 2
+        },
+        {
+          "species": "LOTAD",
+          "min": 3,
+          "max": 5,
+          "weight": 2
+        },
+        {
+          "species": "RALTS",
+          "min": 3,
+          "max": 5,
+          "weight": 1
+        }
+      ]
+    },
+    "lab": {
+      "id": "lab",
+      "name": "Research Lab",
+      "width": 26,
+      "height": 18,
+      "outdoor": false,
+      "weather": "clear",
+      "weatherLocked": false,
+      "tiles": [
+        "##########################",
+        "#..ffffffffffffffffffff..#",
+        "#..hhhhhhhhhhhhhhhhhhhh..#",
+        "#..ffffffffffffffffffff..#",
+        "#..ffffffffffffffffffff..#",
+        "#..ffffffffffffffffffff..#",
+        "#........................#",
+        "#........................#",
+        "#........................#",
+        "#........................#",
+        "#........................#",
+        "#........................#",
+        "#........................#",
+        "#........................#",
+        "#........................#",
+        "#........................#",
+        "#........................#",
+        "##########################"
+      ],
+      "events": [
+        {
+          "kind": "warp",
+          "x": 12,
+          "y": 15,
+          "map": "field",
+          "toX": 6,
+          "toY": 7
+        },
+        {
+          "kind": "heal",
+          "x": 10,
+          "y": 9,
+          "text": "Your Pok\u00e9mon have been healed. Their PP and status are restored too."
+        },
+        {
+          "kind": "shop",
+          "x": 14,
+          "y": 9,
+          "text": "Field supplies and evolution items.",
+          "stock": [
+            {
+              "item": 1,
+              "price": 200
+            },
+            {
+              "item": 28,
+              "price": 300
+            },
+            {
+              "item": 796,
+              "price": 3000
+            }
+          ]
+        },
+        {
+          "kind": "dialogue",
+          "x": 12,
+          "y": 6,
+          "text": "Welcome to the Brisk field station! Campaign saves are independent of Brisk Dex and the GBA game. Online battles and trading are not connected yet."
+        }
+      ],
+      "encounters": []
+    },
+    "cave": {
+      "id": "cave",
+      "name": "Sheltered Cave",
+      "width": 26,
+      "height": 18,
+      "outdoor": false,
+      "weather": "clear",
+      "weatherLocked": false,
+      "tiles": [
+        "##########################",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "##########################"
+      ],
+      "events": [
+        {
+          "kind": "warp",
+          "x": 12,
+          "y": 15,
+          "map": "field",
+          "toX": 13,
+          "toY": 2
+        },
+        {
+          "kind": "dialogue",
+          "x": 10,
+          "y": 9,
+          "text": "Lead Pok\u00e9mon cannot change weather inside this cave. The northern testing chamber has a protected natural sandstorm."
+        },
+        {
+          "kind": "warp",
+          "x": 12,
+          "y": 1,
+          "map": "desert",
+          "toX": 12,
+          "toY": 14
+        }
+      ],
+      "encounters": []
+    },
+    "desert": {
+      "id": "desert",
+      "name": "Sandstorm Test Chamber",
+      "width": 26,
+      "height": 18,
+      "outdoor": true,
+      "weather": "sand",
+      "weatherLocked": true,
+      "tiles": [
+        "##########################",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "#bbbbbbbbbbbbbbbbbbbbbbbb#",
+        "##########################"
+      ],
+      "events": [
+        {
+          "kind": "warp",
+          "x": 12,
+          "y": 15,
+          "map": "cave",
+          "toX": 12,
+          "toY": 2
+        },
+        {
+          "kind": "dialogue",
+          "x": 10,
+          "y": 9,
+          "text": "This natural sandstorm is protected. Drizzle and other lead abilities cannot overwrite it. This test chamber has no goggles gate."
+        }
+      ],
+      "encounters": []
+    }
+  }
+}

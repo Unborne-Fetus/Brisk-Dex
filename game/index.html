@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Brisk Emerald · Standalone Prototype</title><link rel="stylesheet" href="./style.css"></head>
+<body><header><div><span class="eyebrow">BRISK EMERALD</span><h1>A new field of possibilities.</h1></div><span class="badge">STANDALONE · DEVELOPMENT BUILD</span></header>
+<main><section class="play"><div class="map-heading"><div><span class="eyebrow">FIELD STATION</span><h2 id="map-name">Preparing the field…</h2></div><span id="weather">Clear</span></div>
+<canvas id="world" width="624" height="432" aria-label="Explorable Brisk field station" tabindex="0"></canvas>
+<section id="battle" hidden aria-label="Pokémon battle"><div class="battlefield"><div id="enemy-card" class="combatant enemy"></div><div id="player-card" class="combatant player"></div></div><div id="battle-log" role="status" aria-live="polite"></div><div id="battle-actions" class="actions"></div></section>
+<div class="bottom"><span>WASD / arrows · Move &nbsp; E / Enter · Interact</span><div><button id="interact">Interact</button><button id="save">Save</button></div></div>
+<p id="notice" role="status" aria-live="polite">Loading Brisk’s Pokémon data…</p><div class="touch" aria-label="Movement controls"><button data-dir="up" aria-label="Up">↑</button><div><button data-dir="left" aria-label="Left">←</button><button data-dir="down" aria-label="Down">↓</button><button data-dir="right" aria-label="Right">→</button></div></div></section>
+<aside><div class="aside-heading"><h2>Your field team</h2><span id="money"></span></div><div id="party"></div><div class="rule"></div><h3>Field kit</h3><div id="bag"></div><div class="settings"><label><input type="checkbox" id="encounters" checked> Grass encounters</label><label><input type="checkbox" id="weather-effects" checked> Weather effects</label></div><div class="file-actions"><button id="export">Export save</button><label class="button">Import save<input id="import" type="file" accept=".json" hidden></label><button id="restore">Restore backup</button><button id="new-game">New journey</button></div><p class="fine">An early playable foundation. The original story, full battle rules, and GBA save conversion are not ported yet. Dex, trading, and online services are disconnected.</p></aside></main>
+<dialog id="modal"><h2 id="modal-title"></h2><div id="modal-content"></div><button id="modal-close">Close</button></dialog>
+<script type="module" src="./app.mjs"></script></body></html>

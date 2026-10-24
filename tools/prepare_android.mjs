@@ -12,7 +12,7 @@ for (const file of ['brisk-dex-data.json', 'brisk-dex-trainer-teams.json', 'loca
   await fs.copyFile(path.join(root, file), path.join(webDir, file));
 }
 
-for (const dir of ['brisk-dex-asset-patches', 'brisk-dex-icons', 'brisk-dex-trainers', 'brisk-dex-items', 'brisk-dex-trainer-pics', 'brisk-dex-sprites', 'brisk-dex-cries']) {
+for (const dir of ['game','brisk-dex-asset-patches', 'brisk-dex-icons', 'brisk-dex-trainers', 'brisk-dex-items', 'brisk-dex-trainer-pics', 'brisk-dex-sprites', 'brisk-dex-cries']) {
   try {
     await fs.cp(path.join(root, dir), path.join(webDir, dir), { recursive: true });
   } catch (err) {
