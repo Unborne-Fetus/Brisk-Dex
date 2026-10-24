@@ -2,7 +2,7 @@
 import fs from 'node:fs/promises';
 import {parse} from 'acorn';
 import {createHash} from 'node:crypto';
-const root=new URL('../',import.meta.url),source=await fs.readFile(new URL('battle-server.js',root),'utf8');
+const root=new URL('../',import.meta.url),source=(await fs.readFile(new URL('battle-server.js',root),'utf8')).replace(/\r\n/g,'\n');
 const ast=parse(source,{ecmaVersion:'latest',sourceType:'script'}),defs=new Map();
 for(const node of ast.body){
   if(node.type==='FunctionDeclaration')defs.set(node.id.name,{node,source:source.slice(node.start,node.end)});

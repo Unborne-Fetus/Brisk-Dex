@@ -4,7 +4,7 @@ const fs=require('node:fs/promises'),os=require('node:os'),path=require('node:pa
 (async()=>{
  const root=path.resolve(__dirname,'..'),profile=await fs.mkdtemp(path.join(os.tmpdir(),'brisk-desktop-')),errors=[];let app;
  try{
-  app=await _electron.launch({executablePath:process.env.BRISK_ELECTRON_PATH||require('electron'),args:[...process.platform==='linux'?['--no-sandbox','--headless','--ozone-platform=headless']:[],'--disable-gpu',root],timeout:60000});
+  app=await _electron.launch({executablePath:process.env.BRISK_ELECTRON_PATH||require('electron'),args:[...process.platform==='linux'?['--no-sandbox','--headless','--ozone-platform=headless']:[],'--disable-gpu',process.env.BRISK_APP_PATH||root],timeout:60000});
   await app.evaluate(({app},folder)=>app.setPath('userData',folder),profile);
   let page;for(let attempt=0;attempt<100;attempt++){page=app.windows().find(p=>p.url().startsWith('brisk://app/'));if(page)break;await new Promise(resolve=>setTimeout(resolve,200));}if(!page)throw Error('Desktop main window did not open');page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept().catch(()=>{}));
   if(!page.url().startsWith('brisk://app/'))throw Error('Desktop did not use the bundled app origin');
