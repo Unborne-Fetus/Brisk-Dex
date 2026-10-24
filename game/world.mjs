@@ -46,6 +46,7 @@ export class Campaign {
     assert(typeof s.options?.encounters==='boolean'&&typeof s.options.weather==='boolean','Invalid options');
     if(s.options.difficulty!==undefined)assert(['easy','normal','hard','extreme'].includes(s.options.difficulty),'Invalid difficulty');if(s.options.shinyOdds!==undefined)integer(s.options.shinyOdds,50,8192,'shiny odds');for(const key of ['expShare','battleBag','orangeShinies'])if(s.options[key]!==undefined)assert(typeof s.options[key]==='boolean','Invalid option '+key);
     for(const k of ['seen','caught']) { assert(Array.isArray(s[k])&&s[k].length<=10000,'Invalid Pokédex'); s[k].forEach(id=>this.catalog.species(id)); }
+    if(s.vars){assert(typeof s.vars==='object'&&!Array.isArray(s.vars),'Invalid script variables');for(const [key,value]of Object.entries(s.vars)){assert(/^VAR_\w+$/.test(key),'Invalid script variable');integer(value,0,65535,'script variable');}}
     if(s.respawn){const m=this.pack.maps[s.respawn.map];assert(m&&m.tiles[s.respawn.y]?.[s.respawn.x]&&!('#~h'.includes(m.tiles[s.respawn.y][s.respawn.x])),'Invalid recovery point');}
     return s;
   }
@@ -81,7 +82,7 @@ export class Campaign {
     const normalized=s=>String(s).toLowerCase().replace(/[^a-z0-9]/g,''),byName=new Map(),moveNames=new Map(Object.entries(this.catalog.data.moves).map(([id,name])=>[normalized(name),Number(id)])),itemNames=new Map(Object.entries(this.catalog.data.items).map(([id,name])=>[normalized(name),Number(id)]));
     for(const [id,s]of Object.entries(this.catalog.data.species)){if(!byName.has(normalized(s.name)))byName.set(normalized(s.name),Number(id));byName.set(normalized(s.constant),Number(id));if(s.formLabel)byName.set(normalized(s.name+s.formLabel),Number(id));}
     return entries.map(entry=>{
-      const id=byName.get(normalized(entry.species));assert(id,'Unknown trainer species '+entry.species);const fields=entry.fields||{},s=this.catalog.species(id),mon=this.createMon(s.constant,Number(fields.Level)||5);mon.nickname=entry.nickname||s.name;
+      const id=byName.get(normalized(entry.species.replace(/\s*\([MF]\)$/i,'')));assert(id,'Unknown trainer species '+entry.species);const fields=entry.fields||{},s=this.catalog.species(id),mon=this.createMon(s.constant,Number(fields.Level)||5);mon.nickname=entry.nickname||s.name;
       const stats={HP:0,Atk:1,Def:2,Spe:3,SpA:4,SpD:5};
       for(const [field,key,max] of [['IVs','ivs',31],['EVs','evs',252]])for(const match of (fields[field]||'').matchAll(/(\d+) (HP|Atk|Def|Spe|SpA|SpD)/g))mon[key][stats[match[2]]]=Math.min(max,Number(match[1]));
       if(['hard','extreme'].includes(this.state.options.difficulty))mon.ivs.fill(31);if(this.state.options.difficulty==='easy'){mon.ivs.fill(0);mon.evs.fill(0);}

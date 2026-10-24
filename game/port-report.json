@@ -34,7 +34,63 @@
     "Route143",
     "Route144",
     "Route145",
-    "Route146"
+    "Route146",
+    "Route105",
+    "Route106",
+    "Route107",
+    "Route108",
+    "Route109",
+    "Route110",
+    "Route111",
+    "Route112",
+    "Route113",
+    "Route114",
+    "Route115",
+    "Route116",
+    "Route117",
+    "Route118",
+    "Route119",
+    "Route120",
+    "Route121",
+    "Route122",
+    "Route123",
+    "Route124",
+    "Route125",
+    "Route126",
+    "Route127",
+    "Route128",
+    "Route129",
+    "Route130",
+    "Route131",
+    "Route132",
+    "Route133",
+    "Route134",
+    "DewfordTown",
+    "DewfordTown_PokemonCenter_1F",
+    "GraniteCave_1F",
+    "GraniteCave_B1F",
+    "GraniteCave_B2F",
+    "GraniteCave_StevensRoom",
+    "MauvilleCity",
+    "MauvilleCity_Mart",
+    "MauvilleCity_PokemonCenter_1F",
+    "VerdanturfTown",
+    "VerdanturfTown_PokemonCenter_1F",
+    "RusturfTunnel",
+    "LavaridgeTown",
+    "LavaridgeTown_PokemonCenter_1F",
+    "FallarborTown",
+    "FallarborTown_PokemonCenter_1F",
+    "FortreeCity",
+    "FortreeCity_PokemonCenter_1F",
+    "LilycoveCity",
+    "LilycoveCity_PokemonCenter_1F",
+    "MossdeepCity",
+    "MossdeepCity_PokemonCenter_1F",
+    "SootopolisCity",
+    "SootopolisCity_PokemonCenter_1F",
+    "PacifidlogTown",
+    "PacifidlogTown_PokemonCenter_1F"
   ],
   "unresolvedEvents": [
     {
@@ -244,6 +300,835 @@
     {
       "map": "MAP_RUSTBORO_CITY_GYM",
       "script": "RustboroCity_Gym_EventScript_RightGymStatue"
+    },
+    {
+      "map": "MAP_ROUTE109",
+      "script": "Route109_EventScript_SoftSandGirl"
+    },
+    {
+      "map": "MAP_ROUTE110",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE110",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE110",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE110",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE110",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE110",
+      "script": "Route110_EventScript_POKEHIGHWAY"
+    },
+    {
+      "map": "MAP_ROUTE111",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE111",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE111",
+      "script": "Route111_EventScript_Girl"
+    },
+    {
+      "map": "MAP_ROUTE111",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE111",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE111",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE111",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE111",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE111",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE111",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE111",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE111",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE111",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE112",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE112",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE112",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE112",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE113",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE114",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE114",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE114",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE114",
+      "script": "Route114_EventScript_RoarGentleman"
+    },
+    {
+      "map": "MAP_ROUTE114",
+      "script": "Route114_EventScript_Man"
+    },
+    {
+      "map": "MAP_ROUTE114",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE114",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE114",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE114",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE114",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE114",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE115",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE115",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE115",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE115",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE115",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE115",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE115",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE115",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE115",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE115",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE115",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE115",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE115",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE115",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE115",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE115",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE116",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE116",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE116",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE116",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE116",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE116",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE116",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE116",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE117",
+      "script": "Route117_EventScript_DaycareMan"
+    },
+    {
+      "map": "MAP_ROUTE117",
+      "script": "0x0"
+    },
+    {
+      "map": "MAP_ROUTE117",
+      "script": "0x0"
+    },
+    {
+      "map": "MAP_ROUTE117",
+      "script": "0x0"
+    },
+    {
+      "map": "MAP_ROUTE117",
+      "script": "0x0"
+    },
+    {
+      "map": "MAP_ROUTE117",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE117",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE117",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE118",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE118",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE118",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE118",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE118",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE118",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE118",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE118",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE119",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE119",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE119",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE119",
+      "script": "Route119_EventScript_Takashi",
+      "reason": "Mothim catalog record missing"
+    },
+    {
+      "map": "MAP_ROUTE119",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE119",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE119",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE119",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE119",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE119",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE119",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE119",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE119",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE119",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE119",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE119",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE119",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE119",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE119",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE119",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE119",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE120",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE120",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE120",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE120",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE120",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE120",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE120",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE120",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE120",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE120",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE120",
+      "script": "Route120_EventScript_BerryBeauty"
+    },
+    {
+      "map": "MAP_ROUTE120",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE120",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE120",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE120",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE120",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE120",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE120",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE120",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE121",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE121",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE121",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE121",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE121",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE121",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE121",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE121",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE121",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE121",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE121",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE121",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE123",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE123",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE123",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE123",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE123",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE123",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE123",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE123",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE123",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE123",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE123",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE123",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE123",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE123",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE123",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE123",
+      "script": "Route123_EventScript_GigaDrainGirl"
+    },
+    {
+      "map": "MAP_ROUTE123",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE123",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE123",
+      "script": "BerryTreeScript"
+    },
+    {
+      "map": "MAP_ROUTE123",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE123",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE123",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE125",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE125",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE125",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE125",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE127",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE127",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE127",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE127",
+      "script": ""
+    },
+    {
+      "map": "MAP_ROUTE127",
+      "script": ""
+    },
+    {
+      "map": "MAP_DEWFORD_TOWN",
+      "script": "DewfordTown_EventScript_TrendyPhraseBoy"
+    },
+    {
+      "map": "MAP_DEWFORD_TOWN",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_DEWFORD_TOWN",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_GRANITE_CAVE_1F",
+      "script": "GraniteCave_1F_EventScript_Hiker"
+    },
+    {
+      "map": "MAP_MAUVILLE_CITY",
+      "script": "MauvilleCity_EventScript_SchoolKidM"
+    },
+    {
+      "map": "MAP_MAUVILLE_CITY",
+      "script": "MauvilleCity_EventScript_RolloutTutor"
+    },
+    {
+      "map": "MAP_MAUVILLE_CITY",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_MAUVILLE_CITY",
+      "script": "Common_EventScript_ShowPokemartSign"
+    },
+    {
+      "map": "MAP_MAUVILLE_CITY",
+      "script": "Common_EventScript_ShowPokemartSign"
+    },
+    {
+      "map": "MAP_MAUVILLE_CITY",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_MAUVILLE_CITY_POKEMON_CENTER_1F",
+      "script": "MauvilleCity_PokemonCenter_1F_EventScript_MauvilleOldMan"
+    },
+    {
+      "map": "MAP_VERDANTURF_TOWN",
+      "script": "Common_EventScript_ShowPokemartSign"
+    },
+    {
+      "map": "MAP_VERDANTURF_TOWN",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_VERDANTURF_TOWN",
+      "script": "Common_EventScript_ShowPokemartSign"
+    },
+    {
+      "map": "MAP_VERDANTURF_TOWN",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_VERDANTURF_TOWN_POKEMON_CENTER_1F",
+      "script": "VerdanturfTown_PokemonCenter_1F_EventScript_FuryCutterTutor"
+    },
+    {
+      "map": "MAP_LAVARIDGE_TOWN",
+      "script": "LavaridgeTown_EventScript_EggWoman"
+    },
+    {
+      "map": "MAP_LAVARIDGE_TOWN",
+      "script": "Common_EventScript_ShowPokemartSign"
+    },
+    {
+      "map": "MAP_LAVARIDGE_TOWN",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_LAVARIDGE_TOWN",
+      "script": "Common_EventScript_ShowPokemartSign"
+    },
+    {
+      "map": "MAP_LAVARIDGE_TOWN",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_FALLARBOR_TOWN",
+      "script": "Common_EventScript_ShowPokemartSign"
+    },
+    {
+      "map": "MAP_FALLARBOR_TOWN",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_FALLARBOR_TOWN",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_FALLARBOR_TOWN",
+      "script": "Common_EventScript_ShowPokemartSign"
+    },
+    {
+      "map": "MAP_FORTREE_CITY",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_FORTREE_CITY",
+      "script": "Common_EventScript_ShowPokemartSign"
+    },
+    {
+      "map": "MAP_FORTREE_CITY",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_FORTREE_CITY",
+      "script": "Common_EventScript_ShowPokemartSign"
+    },
+    {
+      "map": "MAP_LILYCOVE_CITY",
+      "script": "LilycoveCity_EventScript_BerryGentleman"
+    },
+    {
+      "map": "MAP_LILYCOVE_CITY",
+      "script": "LilycoveCity_EventScript_MuseumSign"
+    },
+    {
+      "map": "MAP_LILYCOVE_CITY",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_LILYCOVE_CITY",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_LILYCOVE_CITY_POKEMON_CENTER_1F",
+      "script": "LilycoveCity_PokemonCenter_1F_EventScript_LilycoveLady"
+    },
+    {
+      "map": "MAP_MOSSDEEP_CITY",
+      "script": "MossdeepCity_EventScript_KingsRockBoy"
+    },
+    {
+      "map": "MAP_MOSSDEEP_CITY",
+      "script": "MossdeepCity_EventScript_DynamicPunchTutor"
+    },
+    {
+      "map": "MAP_MOSSDEEP_CITY",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_MOSSDEEP_CITY",
+      "script": "Common_EventScript_ShowPokemartSign"
+    },
+    {
+      "map": "MAP_MOSSDEEP_CITY",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_MOSSDEEP_CITY",
+      "script": "Common_EventScript_ShowPokemartSign"
+    },
+    {
+      "map": "MAP_SOOTOPOLIS_CITY",
+      "script": "Common_EventScript_ShowPokemartSign"
+    },
+    {
+      "map": "MAP_SOOTOPOLIS_CITY",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_SOOTOPOLIS_CITY",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_SOOTOPOLIS_CITY",
+      "script": "Common_EventScript_ShowPokemartSign"
+    },
+    {
+      "map": "MAP_SOOTOPOLIS_CITY_POKEMON_CENTER_1F",
+      "script": "SootopolisCity_PokemonCenter_1F_EventScript_DoubleEdgeTutor"
+    },
+    {
+      "map": "MAP_PACIFIDLOG_TOWN",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_PACIFIDLOG_TOWN",
+      "script": "Common_EventScript_ShowPokemonCenterSign"
+    },
+    {
+      "map": "MAP_PACIFIDLOG_TOWN_POKEMON_CENTER_1F",
+      "script": "PacifidlogTown_PokemonCenter_1F_EventScript_ExplosionTutor"
     }
   ],
   "externalWarps": [
@@ -382,6 +1267,510 @@
     {
       "map": "MAP_ROUTE146",
       "destination": "MAP_DYNAMAX_ADVENTURE_CAVE"
+    },
+    {
+      "map": "MAP_ROUTE105",
+      "destination": "MAP_ISLAND_CAVE"
+    },
+    {
+      "map": "MAP_ROUTE108",
+      "destination": "MAP_ABANDONED_SHIP_DECK"
+    },
+    {
+      "map": "MAP_ROUTE109",
+      "destination": "MAP_ROUTE109_SEASHORE_HOUSE"
+    },
+    {
+      "map": "MAP_ROUTE110",
+      "destination": "MAP_NEW_MAUVILLE_ENTRANCE"
+    },
+    {
+      "map": "MAP_ROUTE110",
+      "destination": "MAP_ROUTE110_TRICK_HOUSE_ENTRANCE"
+    },
+    {
+      "map": "MAP_ROUTE110",
+      "destination": "MAP_ROUTE110_SEASIDE_CYCLING_ROAD_NORTH_ENTRANCE"
+    },
+    {
+      "map": "MAP_ROUTE110",
+      "destination": "MAP_ROUTE110_SEASIDE_CYCLING_ROAD_NORTH_ENTRANCE"
+    },
+    {
+      "map": "MAP_ROUTE110",
+      "destination": "MAP_ROUTE110_SEASIDE_CYCLING_ROAD_SOUTH_ENTRANCE"
+    },
+    {
+      "map": "MAP_ROUTE110",
+      "destination": "MAP_ROUTE110_SEASIDE_CYCLING_ROAD_SOUTH_ENTRANCE"
+    },
+    {
+      "map": "MAP_ROUTE111",
+      "destination": "MAP_ROUTE111_WINSTRATE_FAMILYS_HOUSE"
+    },
+    {
+      "map": "MAP_ROUTE111",
+      "destination": "MAP_DESERT_RUINS"
+    },
+    {
+      "map": "MAP_ROUTE111",
+      "destination": "MAP_ROUTE111_OLD_LADYS_REST_STOP"
+    },
+    {
+      "map": "MAP_ROUTE111",
+      "destination": "MAP_MIRAGE_TOWER_1F"
+    },
+    {
+      "map": "MAP_ROUTE111",
+      "destination": "MAP_TRAINER_HILL_ENTRANCE"
+    },
+    {
+      "map": "MAP_ROUTE112",
+      "destination": "MAP_ROUTE112_CABLE_CAR_STATION"
+    },
+    {
+      "map": "MAP_ROUTE112",
+      "destination": "MAP_ROUTE112_CABLE_CAR_STATION"
+    },
+    {
+      "map": "MAP_ROUTE112",
+      "destination": "MAP_JAGGED_PASS"
+    },
+    {
+      "map": "MAP_ROUTE112",
+      "destination": "MAP_JAGGED_PASS"
+    },
+    {
+      "map": "MAP_ROUTE112",
+      "destination": "MAP_FIERY_PATH"
+    },
+    {
+      "map": "MAP_ROUTE112",
+      "destination": "MAP_FIERY_PATH"
+    },
+    {
+      "map": "MAP_ROUTE113",
+      "destination": "MAP_ROUTE113_GLASS_WORKSHOP"
+    },
+    {
+      "map": "MAP_ROUTE113",
+      "destination": "MAP_TERRA_CAVE_ENTRANCE"
+    },
+    {
+      "map": "MAP_ROUTE113",
+      "destination": "MAP_TERRA_CAVE_ENTRANCE"
+    },
+    {
+      "map": "MAP_ROUTE114",
+      "destination": "MAP_METEOR_FALLS_1F_1R"
+    },
+    {
+      "map": "MAP_ROUTE114",
+      "destination": "MAP_ROUTE114_FOSSIL_MANIACS_HOUSE"
+    },
+    {
+      "map": "MAP_ROUTE114",
+      "destination": "MAP_ROUTE114_LANETTES_HOUSE"
+    },
+    {
+      "map": "MAP_ROUTE114",
+      "destination": "MAP_TERRA_CAVE_ENTRANCE"
+    },
+    {
+      "map": "MAP_ROUTE114",
+      "destination": "MAP_TERRA_CAVE_ENTRANCE"
+    },
+    {
+      "map": "MAP_ROUTE115",
+      "destination": "MAP_METEOR_FALLS_1F_1R"
+    },
+    {
+      "map": "MAP_ROUTE115",
+      "destination": "MAP_TERRA_CAVE_ENTRANCE"
+    },
+    {
+      "map": "MAP_ROUTE115",
+      "destination": "MAP_TERRA_CAVE_ENTRANCE"
+    },
+    {
+      "map": "MAP_ROUTE116",
+      "destination": "MAP_ROUTE116_TUNNELERS_REST_HOUSE"
+    },
+    {
+      "map": "MAP_ROUTE116",
+      "destination": "MAP_TERRA_CAVE_ENTRANCE"
+    },
+    {
+      "map": "MAP_ROUTE116",
+      "destination": "MAP_TERRA_CAVE_ENTRANCE"
+    },
+    {
+      "map": "MAP_ROUTE117",
+      "destination": "MAP_ROUTE117_POKEMON_DAY_CARE"
+    },
+    {
+      "map": "MAP_ROUTE118",
+      "destination": "MAP_TERRA_CAVE_ENTRANCE"
+    },
+    {
+      "map": "MAP_ROUTE118",
+      "destination": "MAP_TERRA_CAVE_ENTRANCE"
+    },
+    {
+      "map": "MAP_ROUTE119",
+      "destination": "MAP_ROUTE119_WEATHER_INSTITUTE_1F"
+    },
+    {
+      "map": "MAP_ROUTE119",
+      "destination": "MAP_ROUTE119_HOUSE"
+    },
+    {
+      "map": "MAP_ROUTE120",
+      "destination": "MAP_ANCIENT_TOMB"
+    },
+    {
+      "map": "MAP_ROUTE120",
+      "destination": "MAP_SCORCHED_SLAB"
+    },
+    {
+      "map": "MAP_ROUTE121",
+      "destination": "MAP_ROUTE121_SAFARI_ZONE_ENTRANCE"
+    },
+    {
+      "map": "MAP_ROUTE122",
+      "destination": "MAP_MT_PYRE_1F"
+    },
+    {
+      "map": "MAP_ROUTE123",
+      "destination": "MAP_ROUTE123_BERRY_MASTERS_HOUSE"
+    },
+    {
+      "map": "MAP_ROUTE124",
+      "destination": "MAP_ROUTE124_DIVING_TREASURE_HUNTERS_HOUSE"
+    },
+    {
+      "map": "MAP_ROUTE125",
+      "destination": "MAP_SHOAL_CAVE_LOW_TIDE_ENTRANCE_ROOM"
+    },
+    {
+      "map": "MAP_ROUTE131",
+      "destination": "MAP_SKY_PILLAR_ENTRANCE"
+    },
+    {
+      "map": "MAP_DEWFORD_TOWN",
+      "destination": "MAP_DEWFORD_TOWN_HALL"
+    },
+    {
+      "map": "MAP_DEWFORD_TOWN",
+      "destination": "MAP_DEWFORD_TOWN_GYM"
+    },
+    {
+      "map": "MAP_DEWFORD_TOWN",
+      "destination": "MAP_DEWFORD_TOWN_HOUSE1"
+    },
+    {
+      "map": "MAP_DEWFORD_TOWN",
+      "destination": "MAP_DEWFORD_TOWN_HOUSE2"
+    },
+    {
+      "map": "MAP_DEWFORD_TOWN_POKEMON_CENTER_1F",
+      "destination": "MAP_DEWFORD_TOWN_POKEMON_CENTER_2F"
+    },
+    {
+      "map": "MAP_MAUVILLE_CITY",
+      "destination": "MAP_MAUVILLE_CITY_GYM"
+    },
+    {
+      "map": "MAP_MAUVILLE_CITY",
+      "destination": "MAP_MAUVILLE_CITY_BIKE_SHOP"
+    },
+    {
+      "map": "MAP_MAUVILLE_CITY",
+      "destination": "MAP_MAUVILLE_CITY_HOUSE1"
+    },
+    {
+      "map": "MAP_MAUVILLE_CITY",
+      "destination": "MAP_MAUVILLE_CITY_GAME_CORNER"
+    },
+    {
+      "map": "MAP_MAUVILLE_CITY",
+      "destination": "MAP_MAUVILLE_CITY_HOUSE2"
+    },
+    {
+      "map": "MAP_MAUVILLE_CITY_POKEMON_CENTER_1F",
+      "destination": "MAP_MAUVILLE_CITY_POKEMON_CENTER_2F"
+    },
+    {
+      "map": "MAP_VERDANTURF_TOWN",
+      "destination": "MAP_VERDANTURF_TOWN_BATTLE_TENT_LOBBY"
+    },
+    {
+      "map": "MAP_VERDANTURF_TOWN",
+      "destination": "MAP_VERDANTURF_TOWN_MART"
+    },
+    {
+      "map": "MAP_VERDANTURF_TOWN",
+      "destination": "MAP_VERDANTURF_TOWN_WANDAS_HOUSE"
+    },
+    {
+      "map": "MAP_VERDANTURF_TOWN",
+      "destination": "MAP_VERDANTURF_TOWN_FRIENDSHIP_RATERS_HOUSE"
+    },
+    {
+      "map": "MAP_VERDANTURF_TOWN",
+      "destination": "MAP_VERDANTURF_TOWN_HOUSE"
+    },
+    {
+      "map": "MAP_VERDANTURF_TOWN_POKEMON_CENTER_1F",
+      "destination": "MAP_VERDANTURF_TOWN_POKEMON_CENTER_2F"
+    },
+    {
+      "map": "MAP_LAVARIDGE_TOWN",
+      "destination": "MAP_LAVARIDGE_TOWN_HERB_SHOP"
+    },
+    {
+      "map": "MAP_LAVARIDGE_TOWN",
+      "destination": "MAP_LAVARIDGE_TOWN_GYM_1F"
+    },
+    {
+      "map": "MAP_LAVARIDGE_TOWN",
+      "destination": "MAP_LAVARIDGE_TOWN_MART"
+    },
+    {
+      "map": "MAP_LAVARIDGE_TOWN",
+      "destination": "MAP_LAVARIDGE_TOWN_HOUSE"
+    },
+    {
+      "map": "MAP_LAVARIDGE_TOWN_POKEMON_CENTER_1F",
+      "destination": "MAP_LAVARIDGE_TOWN_POKEMON_CENTER_2F"
+    },
+    {
+      "map": "MAP_FALLARBOR_TOWN",
+      "destination": "MAP_FALLARBOR_TOWN_MART"
+    },
+    {
+      "map": "MAP_FALLARBOR_TOWN",
+      "destination": "MAP_FALLARBOR_TOWN_BATTLE_TENT_LOBBY"
+    },
+    {
+      "map": "MAP_FALLARBOR_TOWN",
+      "destination": "MAP_FALLARBOR_TOWN_COZMOS_HOUSE"
+    },
+    {
+      "map": "MAP_FALLARBOR_TOWN",
+      "destination": "MAP_FALLARBOR_TOWN_MOVE_RELEARNERS_HOUSE"
+    },
+    {
+      "map": "MAP_FALLARBOR_TOWN_POKEMON_CENTER_1F",
+      "destination": "MAP_FALLARBOR_TOWN_POKEMON_CENTER_2F"
+    },
+    {
+      "map": "MAP_FORTREE_CITY",
+      "destination": "MAP_FORTREE_CITY_HOUSE1"
+    },
+    {
+      "map": "MAP_FORTREE_CITY",
+      "destination": "MAP_FORTREE_CITY_GYM"
+    },
+    {
+      "map": "MAP_FORTREE_CITY",
+      "destination": "MAP_FORTREE_CITY_MART"
+    },
+    {
+      "map": "MAP_FORTREE_CITY",
+      "destination": "MAP_FORTREE_CITY_HOUSE2"
+    },
+    {
+      "map": "MAP_FORTREE_CITY",
+      "destination": "MAP_FORTREE_CITY_HOUSE3"
+    },
+    {
+      "map": "MAP_FORTREE_CITY",
+      "destination": "MAP_FORTREE_CITY_HOUSE4"
+    },
+    {
+      "map": "MAP_FORTREE_CITY",
+      "destination": "MAP_FORTREE_CITY_HOUSE5"
+    },
+    {
+      "map": "MAP_FORTREE_CITY",
+      "destination": "MAP_FORTREE_CITY_DECORATION_SHOP"
+    },
+    {
+      "map": "MAP_FORTREE_CITY_POKEMON_CENTER_1F",
+      "destination": "MAP_FORTREE_CITY_POKEMON_CENTER_2F"
+    },
+    {
+      "map": "MAP_LILYCOVE_CITY",
+      "destination": "MAP_LILYCOVE_CITY_DEPARTMENT_STORE_1F"
+    },
+    {
+      "map": "MAP_LILYCOVE_CITY",
+      "destination": "MAP_LILYCOVE_CITY_COVE_LILY_MOTEL_1F"
+    },
+    {
+      "map": "MAP_LILYCOVE_CITY",
+      "destination": "MAP_LILYCOVE_CITY_LILYCOVE_MUSEUM_1F"
+    },
+    {
+      "map": "MAP_LILYCOVE_CITY",
+      "destination": "MAP_LILYCOVE_CITY_CONTEST_LOBBY"
+    },
+    {
+      "map": "MAP_LILYCOVE_CITY",
+      "destination": "MAP_LILYCOVE_CITY_POKEMON_TRAINER_FAN_CLUB"
+    },
+    {
+      "map": "MAP_LILYCOVE_CITY",
+      "destination": "MAP_AQUA_HIDEOUT_1F"
+    },
+    {
+      "map": "MAP_LILYCOVE_CITY",
+      "destination": "MAP_LILYCOVE_CITY_MOVE_DELETERS_HOUSE"
+    },
+    {
+      "map": "MAP_LILYCOVE_CITY",
+      "destination": "MAP_LILYCOVE_CITY_HOUSE1"
+    },
+    {
+      "map": "MAP_LILYCOVE_CITY",
+      "destination": "MAP_LILYCOVE_CITY_HOUSE2"
+    },
+    {
+      "map": "MAP_LILYCOVE_CITY",
+      "destination": "MAP_LILYCOVE_CITY_HOUSE3"
+    },
+    {
+      "map": "MAP_LILYCOVE_CITY",
+      "destination": "MAP_LILYCOVE_CITY_HOUSE4"
+    },
+    {
+      "map": "MAP_LILYCOVE_CITY",
+      "destination": "MAP_LILYCOVE_CITY_HARBOR"
+    },
+    {
+      "map": "MAP_LILYCOVE_CITY",
+      "destination": "MAP_LILYCOVE_CITY_LILYCOVE_MUSEUM_1F"
+    },
+    {
+      "map": "MAP_LILYCOVE_CITY_POKEMON_CENTER_1F",
+      "destination": "MAP_LILYCOVE_CITY_POKEMON_CENTER_2F"
+    },
+    {
+      "map": "MAP_MOSSDEEP_CITY",
+      "destination": "MAP_MOSSDEEP_CITY_HOUSE1"
+    },
+    {
+      "map": "MAP_MOSSDEEP_CITY",
+      "destination": "MAP_MOSSDEEP_CITY_GYM"
+    },
+    {
+      "map": "MAP_MOSSDEEP_CITY",
+      "destination": "MAP_MOSSDEEP_CITY_HOUSE2"
+    },
+    {
+      "map": "MAP_MOSSDEEP_CITY",
+      "destination": "MAP_MOSSDEEP_CITY_MART"
+    },
+    {
+      "map": "MAP_MOSSDEEP_CITY",
+      "destination": "MAP_MOSSDEEP_CITY_HOUSE3"
+    },
+    {
+      "map": "MAP_MOSSDEEP_CITY",
+      "destination": "MAP_MOSSDEEP_CITY_STEVENS_HOUSE"
+    },
+    {
+      "map": "MAP_MOSSDEEP_CITY",
+      "destination": "MAP_MOSSDEEP_CITY_HOUSE4"
+    },
+    {
+      "map": "MAP_MOSSDEEP_CITY",
+      "destination": "MAP_MOSSDEEP_CITY_SPACE_CENTER_1F"
+    },
+    {
+      "map": "MAP_MOSSDEEP_CITY",
+      "destination": "MAP_MOSSDEEP_CITY_GAME_CORNER_1F"
+    },
+    {
+      "map": "MAP_MOSSDEEP_CITY_POKEMON_CENTER_1F",
+      "destination": "MAP_MOSSDEEP_CITY_POKEMON_CENTER_2F"
+    },
+    {
+      "map": "MAP_SOOTOPOLIS_CITY",
+      "destination": "MAP_SOOTOPOLIS_CITY_MART"
+    },
+    {
+      "map": "MAP_SOOTOPOLIS_CITY",
+      "destination": "MAP_SOOTOPOLIS_CITY_GYM_1F"
+    },
+    {
+      "map": "MAP_SOOTOPOLIS_CITY",
+      "destination": "MAP_CAVE_OF_ORIGIN_ENTRANCE"
+    },
+    {
+      "map": "MAP_SOOTOPOLIS_CITY",
+      "destination": "MAP_SOOTOPOLIS_CITY_HOUSE1"
+    },
+    {
+      "map": "MAP_SOOTOPOLIS_CITY",
+      "destination": "MAP_SOOTOPOLIS_CITY_HOUSE2"
+    },
+    {
+      "map": "MAP_SOOTOPOLIS_CITY",
+      "destination": "MAP_SOOTOPOLIS_CITY_HOUSE3"
+    },
+    {
+      "map": "MAP_SOOTOPOLIS_CITY",
+      "destination": "MAP_SOOTOPOLIS_CITY_HOUSE4"
+    },
+    {
+      "map": "MAP_SOOTOPOLIS_CITY",
+      "destination": "MAP_SOOTOPOLIS_CITY_HOUSE5"
+    },
+    {
+      "map": "MAP_SOOTOPOLIS_CITY",
+      "destination": "MAP_SOOTOPOLIS_CITY_HOUSE6"
+    },
+    {
+      "map": "MAP_SOOTOPOLIS_CITY",
+      "destination": "MAP_SOOTOPOLIS_CITY_HOUSE7"
+    },
+    {
+      "map": "MAP_SOOTOPOLIS_CITY",
+      "destination": "MAP_SOOTOPOLIS_CITY_LOTAD_AND_SEEDOT_HOUSE"
+    },
+    {
+      "map": "MAP_SOOTOPOLIS_CITY",
+      "destination": "MAP_SOOTOPOLIS_CITY_MYSTERY_EVENTS_HOUSE_1F"
+    },
+    {
+      "map": "MAP_SOOTOPOLIS_CITY_POKEMON_CENTER_1F",
+      "destination": "MAP_SOOTOPOLIS_CITY_POKEMON_CENTER_2F"
+    },
+    {
+      "map": "MAP_PACIFIDLOG_TOWN",
+      "destination": "MAP_PACIFIDLOG_TOWN_HOUSE1"
+    },
+    {
+      "map": "MAP_PACIFIDLOG_TOWN",
+      "destination": "MAP_PACIFIDLOG_TOWN_HOUSE2"
+    },
+    {
+      "map": "MAP_PACIFIDLOG_TOWN",
+      "destination": "MAP_PACIFIDLOG_TOWN_HOUSE3"
+    },
+    {
+      "map": "MAP_PACIFIDLOG_TOWN",
+      "destination": "MAP_PACIFIDLOG_TOWN_HOUSE4"
+    },
+    {
+      "map": "MAP_PACIFIDLOG_TOWN",
+      "destination": "MAP_PACIFIDLOG_TOWN_HOUSE5"
+    },
+    {
+      "map": "MAP_PACIFIDLOG_TOWN_POKEMON_CENTER_1F",
+      "destination": "MAP_PACIFIDLOG_TOWN_POKEMON_CENTER_2F"
     }
   ],
   "missingLearnsets": [

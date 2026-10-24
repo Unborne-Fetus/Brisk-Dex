@@ -3,6 +3,7 @@ import {Campaign,fieldWeather,migrateCampaign} from './world.mjs';
 import {LocalBattle,supportedMove} from './battle.mjs';
 import {SaveStore,encodeSave,decodeSave} from './storage.mjs';
 import {loadSprite} from './media.mjs';
+import {runScript} from './scripts.mjs';
 import {drawNative} from './renderer.mjs';
 import {IntegrationBridge} from './integrations.mjs';
 const $=id=>document.getElementById(id),ctx=$('world').getContext('2d'),store=new SaveStore();
@@ -84,7 +85,10 @@ async function interact(){
   if(!campaign||battle||busy||$('modal').open)return;
   const e=campaign.interact(...facing);if(!e){notice('Nothing to interact with here. Use a party member’s Info button for details.');return;}
   if(e.kind==='heal'){campaign.heal();if(campaign.map.sourceMap?.includes('POKEMON_CENTER'))campaign.state.respawn=structuredClone(campaign.state.position);dirty=true;notice(e.text);update();await save();}
-  else if(e.kind==='dialogue')modal(e.unresolved?'Story script awaiting port':'Field notes',e.text+(e.unresolved?'\n\nThis interaction’s story effects are not yet implemented.':''));
+  else if(e.kind==='dialogue'){
+    if(campaign.map.scriptText&&e.sourceScript){try{const lines=runScript(campaign,campaign.map.scriptText,e.sourceScript);dirty=true;modal('Conversation',lines.join('\n\n')||'There is nothing more to say.');update();}catch(error){modal('Event awaiting port',e.text+'\n\n'+error.message+'. No story effects were applied.');}}
+    else modal('Field notes',e.text);
+  }
   else if(e.kind==='trainer'){
     if(campaign.state.flags[e.id]){modal('Rival','Nice battle! Keep exploring while we prepare the rest of Hoenn.');return;}
     modal('A friendly battle',[Object.assign(document.createElement('p'),{textContent:e.text}),button('Battle',()=>{close();beginBattle(e.team?campaign.trainerTeam(e.team):campaign.createMon(e.species,e.level),e.trainerName||'Rival',e.id);})]);

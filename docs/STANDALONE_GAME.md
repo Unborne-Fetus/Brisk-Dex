@@ -12,11 +12,11 @@ WASD/arrows move; E/Enter interacts. NPCs, shopkeepers and nurses can be reached
 
 ## What was ported
 
-- **34 source maps**, plus the four original testing maps: Littleroot and its lab/houses; Routes 101–104; Oldale and its houses/Mart/Center; Petalburg and its Mart/Center; Petalburg Woods; Rustboro and its Mart/Center/Gym; Slateport and its Mart; Orange City and its houses/Mart/Center; Routes 143–146.
+- **90 source maps**, plus the four original testing maps: Littleroot and its lab/houses; Routes 101–104; Oldale and its houses/Mart/Center; Petalburg and its Mart/Center; Petalburg Woods; Rustboro and its Mart/Center/Gym; Slateport and its Mart; Orange City and its houses/Mart/Center; Routes 143–146.
 - Actual three-layer map graphics, palettes, source NPC/player sprites, map dimensions, connections, door warps, terrain collision, counter interaction and directional ledges. Foreground graphics render above actors. Missing destinations remain outside the playable port.
 - Brisk's existing catalog plus a source-derived native supplement: **1,676 level-up learnsets**, catch rates, EXP yields, EV-yield metadata, prices and Mega-item relationships. The unresolved learnsets are Greninja Bond, Mega Dragonite Y and Egg. Fallback moves are retained for incomplete records; Egg is not a playable species.
-- **191 encounter slots** across the playable content, preserving source levels and weights. Encounters use source map encounter rates. The exact GBA per-step encounter algorithm is not yet replicated.
-- **27 trainer interactions** using actual named teams, authored levels, moves, held items, natures, IVs and EVs where present. Variant names resolve by source constants so Alolan forms do not replace ordinary forms accidentally. Some source double-trainer interactions currently use sequential singles; local doubles controls remain unimplemented.
+- **517 encounter slots** across the playable content, preserving source levels and weights. Encounters use source map encounter rates. The exact GBA per-step encounter algorithm is not yet replicated.
+- **301 trainer interactions** using actual named teams, authored levels, moves, held items, natures, IVs and EVs where present. Variant names resolve by source constants so Alolan forms do not replace ordinary forms accidentally. Some source double-trainer interactions currently use sequential singles; local doubles controls remain unimplemented.
 - **67 custom Mega stones** in Orange City's Mart, including native-only item metadata missing from the companion catalog. The runtime checks the exact held stone before exposing a Mega transformation. Temporary battle forms and abilities do not overwrite the saved base species.
 - Source level-up moves replace the prototype's small generic move pool. Levels/EXP persist; moves can be learned/replaced or relearned; basic level/item evolutions work. Other evolution methods still need porting.
 - The existing Dex relay's battle functions now also run in an **isolated offline engine**: status and setup moves, move effects, abilities, held items, switches, multi-member opponents, weather and transformations use that shared logic instead of the eleven-move prototype. The relay's coverage checker reports 366 effect families, but coverage is not proof of exact ROM parity.
@@ -42,7 +42,7 @@ python tools/port_native_content.py "/path/to/Pokemon Brisk Emerald"
 
 Requires Pillow. It reads a local source checkout only; it does not download or modify the ROM project. The selected map list is explicit in the tool. It converts source metatile data and indexed palettes into ground/foreground PNGs, preserves usable warps/connections, exports supported NPC interactions, and reports unresolved scripts and external destinations.
 
-`game/port-report.json` currently lists **52 unresolved script interactions** and **34 external warp references**. Conditional conversations, cutscenes, map-entry scripts, movement scripts, native specials, item pickups, many gifts, flags and quest progression are not generally interpreted. Readable dialogue may be displayed with an unported-story notice, but its story effects are not executed. Source NPCs hidden by story flags are generally omitted. Camera/traversal does not yet cover surfing, every elevation rule, sideways stairs or the complete field-move system. Tiles are static rather than using native tileset animations; music is not ported.
+`game/port-report.json` lists unresolved script interactions and external warp references. Conditional conversations, cutscenes, map-entry scripts, movement scripts, native specials, item pickups, many gifts, flags and quest progression are not generally interpreted. Readable dialogue may be displayed with an unported-story notice, but its story effects are not executed. Source NPCs hidden by story flags are generally omitted. Camera/traversal does not yet cover surfing, every elevation rule, sideways stairs or the complete field-move system. Tiles are static rather than using native tileset animations; music is not ported.
 
 The older `tools/import_native_maps.mjs` remains useful for archiving arbitrary source maps and scripts before expanding the playable converter.
 
@@ -60,7 +60,7 @@ This generates declarative content plus a manifest locally; nothing is published
 
 ## Validation
 
-- `npm run game:test`: 37 tests, including source traversal, all encounter spawns, trainer construction, Mega ability/base-form retention, level-up moves, candy/save retention, migration and update rollback.
+- `npm run game:test`: 41 tests, including source traversal, all encounter spawns, trainer construction, Mega ability/base-form retention, level-up moves, candy/save retention, migration and update rollback.
 - `npm run game:ui`: optional Playwright regression covering keyboard input, healing, shop purchase, save reload, trainer combat, mobile layout and atomic IndexedDB rollback.
 - `npm run battle:coverage` / `npm run battle:smoke`: existing online engine checks, separately from the native runtime.
 - `npm run web:build` / `npm run android:prepare`: include the runtime in directory builds without linking it from the live app. The generated single-file companion edition remains unchanged.
@@ -68,3 +68,11 @@ This generates declarative content plus a manifest locally; nothing is published
 For browser tests, install Playwright locally (`npm install --no-save --package-lock=false playwright`, then `npx playwright install chromium`) or set `BRISK_PLAYWRIGHT_MODULE`/`BRISK_CHROMIUM_PATH` to an existing installation. `BRISK_SCREENSHOTS` optionally selects an existing screenshot output directory. Normal development play needs no Playwright installation.
 
 Assets retain their Brisk source credits. Consult the Brisk Emerald and Brisk Dex credits for the original artists and systems; this converter does not replace those attributions.
+
+## Further port: source event interpreter
+
+The playable source selection now also covers Routes 105–134, Dewford, Granite Cave, Mauville, Verdanturf, Rusturf Tunnel, Lavaridge, Fallarbor, Fortree, Lilycove, Mossdeep, Sootopolis and Pacifidlog with selected Centers/Marts. These remain a partial story port; surfing and scripted access restrictions are not fully implemented. Development travel lets testers inspect disconnected areas.
+
+`game/scripts.mjs` interprets source dialogue, flags, 16-bit variables, arithmetic, comparisons, branches, calls/returns and simple item gifts. It first plans the complete executed path against a copy, validates the result, and commits only when the path finishes successfully. Unsupported commands, missing shared labels, yes/no choices, variable overflows and loops cancel the whole interaction. No source is evaluated as JavaScript. Map-entry and coordinate-triggered story scripts, native specials, cutscenes and battle/script resumption are still unported. The original C script text is retained in the converted content for continued porting.
+
+The existing companion catalog lacks Mothim's record. Trainer events requiring it are explicitly deferred rather than silently replacing its species or crashing. Their original teams are retained as unported metadata.

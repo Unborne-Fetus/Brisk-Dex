@@ -297,4 +297,4 @@ and `npm run index:build`.
 
 ### Standalone Brisk Emerald development
 
-A separate playable remake is under `game/`. Run `launch-game-prototype.bat` or `npm run game:dev`. It now includes 34 converted Brisk maps, original map/player/NPC artwork, actual encounters and trainer teams, source level-up moves, offline use of the Dex battle engine, Mega stone checks, party/storage, healing and independent saves. This remains a partial port: the full story and several systems are unfinished. The normal Dex interface and online features remain disconnected. See [scope, testing and migration notes](docs/STANDALONE_GAME.md).
+A separate playable remake is under `game/`. Run `launch-game-prototype.bat` or `npm run game:dev`. It now includes 90 converted Brisk maps, original map/player/NPC artwork, actual encounters and trainer teams, source level-up moves, offline use of the Dex battle engine, Mega stone checks, party/storage, healing and independent saves. This remains a partial port: the full story and several systems are unfinished. The normal Dex interface and online features remain disconnected. See [scope, testing and migration notes](docs/STANDALONE_GAME.md).

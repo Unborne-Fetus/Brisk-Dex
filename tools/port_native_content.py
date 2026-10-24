@@ -9,6 +9,8 @@ from extract_data import extract_blocks,find_source,read_jasc_palette,parse_enum
 
 MAPS=['SlateportCity','SlateportCity_Mart','LittlerootTown','LittlerootTown_ProfessorBirchsLab','LittlerootTown_BrendansHouse_1F','LittlerootTown_BrendansHouse_2F','LittlerootTown_MaysHouse_1F','LittlerootTown_MaysHouse_2F','Route101','OldaleTown','OldaleTown_Mart','OldaleTown_PokemonCenter_1F','OldaleTown_House1','OldaleTown_House2','Route102','Route103','PetalburgCity','PetalburgCity_Mart','PetalburgCity_PokemonCenter_1F','Route104','PetalburgWoods','RustboroCity','RustboroCity_Mart','RustboroCity_PokemonCenter_1F','RustboroCity_Gym','OrangeCity','OrangeCity_Mart','OrangeCity_PokemonCenter_1F','OrangeCity_House1','OrangeCity_House2','Route143','Route144','Route145','Route146']
 
+MAPS += [f'Route{i}' for i in range(105,135)] + ['DewfordTown','DewfordTown_PokemonCenter_1F','GraniteCave_1F','GraniteCave_B1F','GraniteCave_B2F','GraniteCave_StevensRoom','MauvilleCity','MauvilleCity_Mart','MauvilleCity_PokemonCenter_1F','VerdanturfTown','VerdanturfTown_PokemonCenter_1F','RusturfTunnel','LavaridgeTown','LavaridgeTown_PokemonCenter_1F','FallarborTown','FallarborTown_PokemonCenter_1F','FortreeCity','FortreeCity_PokemonCenter_1F','LilycoveCity','LilycoveCity_PokemonCenter_1F','MossdeepCity','MossdeepCity_PokemonCenter_1F','SootopolisCity','SootopolisCity_PokemonCenter_1F','PacifidlogTown','PacifidlogTown_PokemonCenter_1F']
+
 def build(repo,out):
     repo=Path(repo).resolve();out=Path(out).resolve();assets=out/'assets';assets.mkdir(exist_ok=True)
     root=out.parent;catalog=json.loads((root/'brisk-dex-data.json').read_text());species={s['constant']:int(i) for i,s in catalog['species'].items()};moves={m['constant']:int(i) for i,m in catalog['moveDetails'].items()};items={m['constant']:int(i) for i,m in catalog['itemDetails'].items()}
@@ -135,6 +137,8 @@ def build(repo,out):
                     labels=re.findall(r'msgbox\s+(\w+)',body);text=textlabel(script,labels[0]) if labels else ''
                     event['text']=text or ("It's rude to read people's mail." if 'Mailbox' in label else 'This story interaction has not been ported yet.')
                     if not text or re.search(r'\b(?:goto_if|switch|compare|giveitem|givemon|special|setflag|setvar|call)\b',body):event['unresolved']=True;report['unresolvedEvents'].append({'map':map_['id'],'script':label})
+            if event['kind']=='trainer' and any(re.sub(r'\s*\([MF]\)$','',member['species'],flags=re.I).lower()=='mothim' for member in event['team']):
+                event.update(kind='dialogue',unresolved=True,text='This trainer uses Mothim, whose species record is missing from the current Dex catalog. This battle awaits that data port.');event['unportedTeam']=event.pop('team');report['unresolvedEvents'].append({'map':map_['id'],'script':label,'reason':'Mothim catalog record missing'})
             events.append(event)
         for warp in map_.get('warp_events',[]):
             x,y=warp['x'],warp['y'];destination=byid.get(warp['dest_map']);target=raw[destination]['warp_events'][int(warp['dest_warp_id'])] if destination and str(warp['dest_warp_id']).isdigit() and int(warp['dest_warp_id'])<len(raw[destination].get('warp_events',[])) else None
@@ -149,7 +153,7 @@ def build(repo,out):
                     s=catalog['species'].get(str(slot['species']))
                     if s:encounters.append({'species':s['constant'],'min':slot['minLevel'],'max':slot['maxLevel'],'weight':max(1,round(slot.get('chance',1)*100))})
         weather=map_.get('weather','WEATHER_SUNNY');natural={'WEATHER_RAIN':'rain','WEATHER_DOWNPOUR':'rain','WEATHER_SANDSTORM':'sand','WEATHER_DROUGHT':'sun','WEATHER_SNOW':'snow','WEATHER_FOG_HORIZONTAL':'fog','WEATHER_FOG_DIAGONAL':'fog'}
-        world[slug]={'id':slug,'name':re.sub(r'(?<=[a-z])(?=[A-Z])',' ',name).replace('_',' '),'width':w,'height':h,'outdoor':outdoor,'weather':natural.get(weather,'clear'),'weatherLocked':weather in ['WEATHER_DOWNPOUR','WEATHER_SANDSTORM','WEATHER_DROUGHT','WEATHER_ABNORMAL','WEATHER_VOLCANIC_ASH','WEATHER_FOG_HORIZONTAL','WEATHER_FOG_DIAGONAL'],'tiles':rows,'events':events,'encounters':encounters,'encounterRate':rate,'ground':f'assets/{slug}-ground.png','foreground':f'assets/{slug}-top.png','connections':[{**c,'map':c['map'].lower()} for c in (map_.get('connections') or []) if c['map'] in byid],'jumps':jumps,'counters':counters,'sourceMap':map_['id']}
+        world[slug]={'id':slug,'name':re.sub(r'(?<=[a-z])(?=[A-Z])',' ',name).replace('_',' '),'width':w,'height':h,'outdoor':outdoor,'weather':natural.get(weather,'clear'),'weatherLocked':weather in ['WEATHER_DOWNPOUR','WEATHER_SANDSTORM','WEATHER_DROUGHT','WEATHER_ABNORMAL','WEATHER_VOLCANIC_ASH','WEATHER_FOG_HORIZONTAL','WEATHER_FOG_DIAGONAL'],'tiles':rows,'events':events,'encounters':encounters,'encounterRate':rate,'ground':f'assets/{slug}-ground.png','foreground':f'assets/{slug}-top.png','connections':[{**c,'map':c['map'].lower()} for c in (map_.get('connections') or []) if c['map'] in byid],'jumps':jumps,'counters':counters,'sourceMap':map_['id'],'scriptText':script}
         report['maps'].append(name)
     # Imported warp targets can be doors marked blocked by the native collision bits.
     for m in world.values():
