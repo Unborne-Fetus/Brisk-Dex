@@ -30,6 +30,7 @@ export function applyFieldEffect(campaign,name){
     assert(fieldMoveUser(campaign.catalog,state,'FIELD_MOVE_WATERFALL')>=0,'Waterfall is locked');assert(campaign.mode==='surf'&&dy===-1&&campaign.behavior(p.x,p.y-1)==='MB_WATERFALL','Face the waterfall while Surfing');
     let y=p.y-1;for(;y>=0&&campaign.behavior(p.x,y)==='MB_WATERFALL';y--){assert(campaign.canOccupy(p.x,y,campaign.map,'surf',true),'The waterfall is blocked');frames.push({x:p.x,y,facing:'up'});}
     assert(y>=0&&campaign.tile(p.x,y)==='~'&&campaign.canOccupy(p.x,y,campaign.map,'surf'),'No waterfall landing');frames.push({x:p.x,y,facing:'up'});p.y=y;state.steps+=frames.length;
+  }else if(['FLDEFF_USE_CUT_ON_TREE','FLDEFF_USE_ROCK_SMASH','FLDEFF_USE_STRENGTH'].includes(name)){const move={FLDEFF_USE_CUT_ON_TREE:'CUT',FLDEFF_USE_ROCK_SMASH:'ROCK_SMASH',FLDEFF_USE_STRENGTH:'STRENGTH'}[name];assert(fieldMoveUser(campaign.catalog,state,'FIELD_MOVE_'+move)>=0,move+' is locked');if(move==='STRENGTH')state.flags.FLAG_SYS_USE_STRENGTH=true;
   }else throw new Error('Unsupported traversal effect '+name);
   return frames;
 }

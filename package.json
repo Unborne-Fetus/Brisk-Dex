@@ -1,7 +1,7 @@
 {
   "name": "brisk-dex",
   "productName": "Brisk Dex",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Companion app for Pok\u00e9mon Brisk Emerald",
   "main": "main.js",
   "author": {
@@ -41,14 +41,19 @@
     "game:port": "python tools/port_native_content.py",
     "index:test": "npm run index:build && node tools/test_standalone_game.mjs",
     "game:field-data": "python tools/export_field_data.py",
-    "game:ui:embedded": "node tools/test_embedded_game.cjs"
+    "game:ui:embedded": "node tools/test_embedded_game.cjs",
+    "game:story-data": "python tools/export_story_data.py",
+    "desktop:test": "node --test test/desktop/*.test.cjs",
+    "desktop:ui": "node tools/test_desktop_game.cjs",
+    "game:wild-sprites": "python tools/export_wild_sprites.py"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.0.0",
     "acorn": "^8.19.0",
-    "electron": "^44.5.1",
+    "electron": "^44.9.3",
     "electron-builder": "^26.17.0",
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.25.0",
+    "playwright": "^1.58.2"
   },
   "build": {
     "appId": "com.briskemerald.briskdex",
@@ -72,7 +77,8 @@
       "asset-loader.js",
       "brisk-dex-asset-patches/**/*",
       "brisk-dex-icon-manifest.json",
-      "game/**/*"
+      "game/**/*",
+      "desktop-content.js"
     ],
     "directories": {
       "output": "dist"

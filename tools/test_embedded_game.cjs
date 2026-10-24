@@ -12,7 +12,7 @@ const server=spawn(process.execPath,[path.join(__dirname,'serve_browser.mjs')],{
     browser=await chromium.launch({executablePath:process.env.BRISK_CHROMIUM_PATH,headless:true,args:['--no-sandbox','--no-zygote','--single-process']});
     const context=await browser.newContext({viewport:{width:1280,height:900},acceptDownloads:true}),page=await context.newPage(),errors=[];
     page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
-    await page.goto(url);await page.locator('#tab-game').click();const game=page.frameLocator('#brisk-game');await game.getByRole('button',{name:'Treecko',exact:true}).click();
+    await page.goto(url);await page.locator('#tab-game').click();const game=page.frameLocator('#brisk-game');await game.getByRole('button',{name:'Quick start',exact:true}).click();await game.getByRole('button',{name:'Treecko',exact:true}).click();
     await game.locator('#notice').filter({hasText:'Journey saved'}).waitFor();
     await game.locator('#import').setInputFiles({name:'shore.json',mimeType:'application/json',buffer:fixture});await game.locator('#notice').filter({hasText:'Imported standalone campaign'}).waitFor();
     await game.locator('#world').press('ArrowRight');await game.locator('#world').press('e');await game.getByRole('button',{name:'Yes',exact:true}).click();await game.getByRole('button',{name:'Continue',exact:true}).click();

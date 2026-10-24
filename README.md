@@ -313,3 +313,16 @@ and `npm run index:build`.
 ### Standalone Brisk Emerald development
 
 A separate playable remake is under `game/`. Run `launch-game-prototype.bat` or `npm run game:dev`. It now includes 90 converted Brisk maps, original map/player/NPC artwork, actual encounters and trainer teams, source level-up moves, offline use of the Dex battle engine, Mega stone checks, party/storage, healing and independent saves. This remains a partial port: the full story and several systems are unfinished. The normal Dex interface and online features remain disconnected. See [scope, testing and migration notes](docs/STANDALONE_GAME.md).
+
+
+### Play Brisk Emerald inside the Windows app
+
+Install the latest **Brisk-Dex-Windows** artifact from the **Build Brisk Dex - Windows + Android** workflow, launch Brisk Dex, and open **Play Brisk Emerald**. The game, source maps and Pokémon graphics are included in the installer; no browser, local server or separate game folder is needed. An older installed EXE must be replaced with the new installer to receive these changes.
+
+**New game** begins with Birch’s introduction, character/name selection and the moving truck. **Quick start** retains the starter shortcut. Brisk’s original nine-starter case is available during the Route 101 rescue. Early source story scenes now include moving in, setting the bedroom clock, the TV broadcast, meeting the rival, the starter delivery, first rival battle, Pokédex delivery and Wally’s tutorial. Later scripts use the shared transactional scene runner; this is not yet a verified complete playthrough of the entire source story. Wally’s catching demonstration currently uses staged dialogue.
+
+Visible encounters use map-specific source species/levels and the source overworld sheets where available, with shiny palettes, roaming, contact/interaction battles and persistent identity across saves. Toggle **Visible overworld encounters** in Options to return to random encounters. Interact with trees, rocks and boulders for Cut, Rock Smash and Strength. **Field moves** provides Flash, Dig, Teleport and Fly to visited towns when allowed; Surf, Dive and Waterfall retain their contextual source prompts and badge requirements.
+
+Windows campaign saves and their previous backup are written atomically under the app’s user data folder, outside the installation. Existing file-origin campaigns are migrated on startup. Export/import remains available for portable backups. Original GBA imports remain one-way conversions and archive the input bytes; they do not yet restore every GBA story flag.
+
+Developer verification: `npm run game:test`, `npm run desktop:test`, and `npm run desktop:ui`. The Windows installer workflow runs the game tests and an actual Electron opening/save/reload test before packaging.

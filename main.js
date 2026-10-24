@@ -1,8 +1,11 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, protocol, net } = require('electron');
 const path = require('path');
 const fs = require('fs/promises');
 const fsSync = require('fs');
 
+protocol.registerSchemesAsPrivileged([{scheme:'brisk',privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true,stream:true}}]);
+const {assetPath}=require('./desktop-content');
+const {pathToFileURL}=require('node:url');
 let mainWindow;
 let openedSavePath=null;
 const {translateText}=require('./translation-service');
@@ -29,10 +32,12 @@ function createWindow(){
       sandbox: true
     }
   });
-  mainWindow.loadFile(path.join(__dirname, 'index.html'));
+  mainWindow.loadURL('brisk://app/index.html');
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  protocol.handle('brisk',request=>{const target=assetPath(request.url,__dirname);return target?net.fetch(pathToFileURL(target).href):new Response('Not found',{status:404});});
+  await migrateLegacyCampaign();
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -40,6 +45,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  if(!mainWindow)return;
   if (process.platform !== 'darwin') app.quit();
 });
 
@@ -239,3 +245,23 @@ ipcMain.handle('start-battle-relay',async()=>{
   }catch(err){return {ok:false,error:err.message};}
 });
 app.on('before-quit',()=>{if(localBattleRelay)localBattleRelay.server.close();});
+
+let campaignQueue=Promise.resolve();
+function campaignPath(){return path.join(app.getPath('userData'),'brisk-emerald-campaign.json');}
+async function campaignRecords(){try{return JSON.parse(await fs.readFile(campaignPath(),'utf8'));}catch(e){if(e.code==='ENOENT')return {};throw e;}}
+ipcMain.handle('load-native-campaign',(_,key)=>{if(!['current','backup'].includes(key))throw Error('Invalid save slot');return campaignQueue.then(async()=> (await campaignRecords())[key]||null);});
+ipcMain.handle('save-native-campaign',(_,envelope)=>{
+ if(envelope?.format!=='brisk-native-backup'||envelope.version!==1||typeof envelope.payload!=='string'||envelope.payload.length>16000000)throw Error('Invalid campaign save');
+ const digest=require('node:crypto').createHash('sha256').update(envelope.payload).digest('hex');if(digest!==envelope.sha256)throw Error('Save checksum mismatch');
+ const operation=campaignQueue.then(async()=>{const records=await campaignRecords();await writeFileAtomically(campaignPath(),JSON.stringify({current:envelope,backup:records.current||records.backup||null}));});campaignQueue=operation.catch(()=>{});return operation;
+});
+
+async function migrateLegacyCampaign(){
+ if(fsSync.existsSync(campaignPath()))return;
+ const legacy=new BrowserWindow({show:false,webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true}});
+ try{
+  await legacy.loadFile(path.join(__dirname,'game/desktop-migrate.html'));
+  const records=await legacy.webContents.executeJavaScript(`new Promise((resolve,reject)=>{const request=indexedDB.open('brisk-native-campaign',1);request.onupgradeneeded=()=>request.result.createObjectStore('records');request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result,tx=db.transaction('records','readonly'),store=tx.objectStore('records'),current=store.get('current'),backup=store.get('backup');tx.oncomplete=()=>{db.close();resolve({current:current.result||null,backup:backup.result||null});};tx.onabort=()=>{db.close();reject(tx.error);};};})`);
+  if(records.current){for(const value of [records.current,records.backup].filter(Boolean)){if(value.format!=='brisk-native-backup'||typeof value.payload!=='string'||require('node:crypto').createHash('sha256').update(value.payload).digest('hex')!==value.sha256)throw Error('Invalid legacy campaign');}await writeFileAtomically(campaignPath(),JSON.stringify(records));}
+ }catch(error){console.warn('Legacy save migration:',error.message);}finally{legacy.destroy();}
+}

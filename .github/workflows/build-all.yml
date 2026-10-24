@@ -27,6 +27,10 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Verify game and desktop regressions
+        run: npm run game:test && npm run desktop:test
+      - name: Play embedded game in Electron
+        run: npm run desktop:ui
       - name: Verify battle effect coverage
         run: npm run battle:coverage
       - name: Smoke test online battle relay

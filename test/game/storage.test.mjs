@@ -5,7 +5,7 @@ import {encodeSave,decodeSave,sha256,MemoryRecords} from '../../game/storage.mjs
 import {ContentUpdates} from '../../game/updates.mjs';
 import {IntegrationBridge,partySnapshot} from '../../game/integrations.mjs';
 test('portable saves round-trip and detect corruption',async()=>{
-  const state=fresh().snapshot(),save=await encodeSave(state);assert.deepEqual(await decodeSave(save),state);save.payload+=' ';await assert.rejects(()=>decodeSave(save),/checksum/);await assert.rejects(()=>decodeSave({format:'GBA'}),/not a standalone/);
+  const state=fresh().snapshot(),save=await encodeSave(state);assert.deepEqual(await decodeSave(save),state);save.payload+=' ';await assert.rejects(()=>decodeSave(save),/checksum/);await assert.rejects(()=>decodeSave({format:'GBA'}),/not a native/);
 });
 test('integration DTO uses canonical data and never creates trusted GBA records',()=>{
   const c=fresh(),bridge=new IntegrationBridge(),request=bridge.prepareBattle(c,'doubles');assert.equal(request.format,'doubles');assert.equal(request.team[0].species,252);assert.equal(request.team[0].maxHP,c.catalog.stats(c.state.party[0])[0]);assert.equal(request.competitiveEligible,false);assert.equal(request.team[0].rewardRaw80,undefined);assert.ok(Object.entries(bridge.capabilities).filter(([key])=>key!=='gbaImport').every(([,v])=>v===false));assert.throws(()=>bridge.connect());assert.throws(()=>bridge.transfer());const snapshot=partySnapshot(c);snapshot.pokemon[0].hp=0;assert.notEqual(c.state.party[0].hp,0);

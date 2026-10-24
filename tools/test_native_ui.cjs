@@ -5,7 +5,7 @@ const relay=require('node:child_process').spawn(process.execPath,[require('node:
  const browser=await chromium.launch({...(process.env.BRISK_CHROMIUM_PATH?{executablePath:process.env.BRISK_CHROMIUM_PATH}:{}),headless:true,args:['--no-sandbox','--no-zygote','--single-process']});
  const context=await browser.newContext({viewport:{width:1280,height:900}}),page=await context.newPage(),errors=[];
  page.on('pageerror',e=>{errors.push(e.message);console.log('PAGE ERROR',e.message);});
- await page.goto('http://127.0.0.1:8790/game/index.html');await page.getByRole('button',{name:'Treecko',exact:true}).click();await page.waitForFunction(()=>window.BriskNative?.snapshot());
+ await page.goto('http://127.0.0.1:8790/game/index.html');await page.getByRole('button',{name:'Quick start',exact:true}).click();await page.getByRole('button',{name:'Treecko',exact:true}).click();await page.waitForFunction(()=>window.BriskNative?.snapshot());
  await page.waitForFunction(()=>document.getElementById('notice').textContent.includes('Journey saved'));
  if(process.env.BRISK_SCREENSHOTS)await page.screenshot({path:require('node:path').join(process.env.BRISK_SCREENSHOTS,'brisk-prototype-desktop.png'),fullPage:true});
  await page.getByRole('button',{name:'Travel · dev',exact:true}).click();await page.getByRole('button',{name:'Original field station',exact:true}).click();
@@ -41,7 +41,7 @@ const relay=require('node:child_process').spawn(process.execPath,[require('node:
  const fixture=JSON.parse(require('fs').readFileSync(require('path').join(__dirname,'../game/content.json'),'utf8'));
  fixture.start={map:'field',x:12,y:10};fixture.maps.field.scriptText='TestChoice::\n msgbox Ask, MSGBOX_YESNO\n goto_if_eq VAR_RESULT, NO, End\n giveitem ITEM_POTION, 2\nEnd::\n end\nAsk:\n .string "Accept supplies?$"';fixture.maps.field.events.push({kind:'dialogue',x:13,y:8,sourceScript:'TestChoice',text:'Supplies'});
  await storyPage.route('**/game/content.json',route=>route.fulfill({json:fixture}));
- await storyPage.goto('http://127.0.0.1:8790/game/index.html');await storyPage.getByRole('button',{name:'Treecko',exact:true}).click();await storyPage.waitForFunction(()=>document.getElementById('notice').textContent.includes('Journey saved'));
+ await storyPage.goto('http://127.0.0.1:8790/game/index.html');await storyPage.getByRole('button',{name:'Quick start',exact:true}).click();await storyPage.getByRole('button',{name:'Treecko',exact:true}).click();await storyPage.waitForFunction(()=>document.getElementById('notice').textContent.includes('Journey saved'));
  for(const key of ['ArrowUp','ArrowUp','ArrowRight','e'])await storyPage.keyboard.press(key);
  await storyPage.getByRole('button',{name:'Yes',exact:true}).click();await storyPage.waitForFunction(()=>!document.getElementById('modal').open&&document.getElementById('bag').textContent.includes('Potion × 7'));
  if(!(await storyPage.locator('#bag').textContent()).includes('Potion × 7'))throw Error('Story choice did not grant exactly two Potions');

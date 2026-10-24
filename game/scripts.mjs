@@ -1,14 +1,17 @@
+import {connectedPosition} from './connections.mjs';
 import {assert,clone,integer} from './model.mjs';
 import {applyFieldEffect,fieldMoveUser} from './traversal.mjs';
 import {fieldSpecial,setMetatile,tileAt} from './field-specials.mjs';
 // Native script DATA only: no eval, Function constructor or JavaScript imports.
+const compiled=new Map();
 export function compileScripts(source){
+  if(compiled.has(source))return compiled.get(source);
   const labels={};let current=null;
   for(const raw of source.split(/\r?\n/)){
     const line=raw.replace(/\s+@.*$/,'').trim();const label=line.match(/^(\w+)::?$/);if(label){if(current)current.push('goto '+label[1]);current=labels[label[1]]=[];continue;}
     if(current&&line&&!line.startsWith('//')&&!line.startsWith('@'))current.push(line.replace(/\s+\/\/.*$/,''));
   }
-  return labels;
+  if(compiled.size>=3)compiled.delete(compiled.keys().next().value);compiled.set(source,labels);return labels;
 }
 const IGNORE=new Set(['lock','lockall','release','releaseall','faceplayer','waitmessage','closemessage','waitbuttonpress','waitfanfare','waitse','waitmovement','nop']);
 export class ScriptInputRequired extends Error {
@@ -16,18 +19,53 @@ export class ScriptInputRequired extends Error {
 }
 export class ScriptBattleLost extends Error{constructor(state){super('Battle lost');this.state=state;}}
 export function planScript(campaign,source,entry,decisions=null){
-  const labels=compileScripts(source),draft=clone(campaign.snapshot()),messages=[],calls=[];let label=entry,index=0,steps=0,comparison=null,switchValue=null;const buffers={};let movementStart=null,pendingMovements=[];
+  const labels=compileScripts(source),draft=clone(campaign.snapshot()),messages=[],calls=[];let label=entry,index=0,steps=0,comparison=null,switchValue=null;const buffers={};let movementStart=null,pendingMovements=[],savedParty=null,wildSpec=null;
   const input=request=>{const key=`${label}:${index}:${steps}:${request.kind}`;assert(decisions,'Interactive '+request.kind+' requires a host');if(!decisions.has(key))throw new ScriptInputRequired(key,{...request,state:clone(draft)});return decisions.get(key);};
-  const constants=campaign.catalog.scriptData?.constants||{};
+  const constants={...campaign.catalog.scriptData?.constants,...campaign.catalog.storyData?.maps?.[draft.position.map]?.localIds};
+  const localId=token=>{if(token==='LOCALID_PLAYER'||token==='OBJ_EVENT_ID_PLAYER')return 'LOCALID_PLAYER';if(/^VAR_|^(?:0x[0-9a-f]+|[0-9]+)$/i.test(token)){const id=value(token);if(id===255)return 'LOCALID_PLAYER';return Object.entries(campaign.catalog.storyData?.maps?.[draft.position.map]?.localIds||{}).find(([,n])=>n===id)?.[0]||String(id);}return token;};
   const itemIds=new Map(Object.entries(campaign.catalog.data.itemDetails).map(([id,item])=>[item.constant,Number(id)]));
-  const value=token=>{token=String(token).trim();if(/^0x[0-9a-f]+$/i.test(token))return parseInt(token,16);if(/^\d+$/.test(token))return Number(token);if(token==='TRUE'||token==='YES')return 1;if(token==='FALSE'||token==='NO')return 0;if(/^VAR_/.test(token))return draft.vars?.[token]||0;if(Object.hasOwn(constants,token))return constants[token];throw new Error('Unresolved value '+token);};
+  const value=token=>{token=String(token).trim();if(/^0x[0-9a-f]+$/i.test(token))return parseInt(token,16);if(/^\d+$/.test(token))return Number(token);if(token==='TRUE'||token==='YES')return 1;if(token==='FALSE'||token==='NO')return 0;if(/^0x80[0-9a-f]{2}$/i.test(token))return draft.vars?.['VAR_0x'+token.slice(2).toUpperCase()]||0;if(/^VAR_/.test(token))return draft.vars?.[token]||0;if(Object.hasOwn(constants,token))return constants[token];throw new Error('Unresolved value '+token);};
   const text=target=>{
     assert(labels[target]||campaign.catalog.scriptData?.text?.[target],'Missing text '+target);const lines=labels[target]?labels[target].filter(line=>line.startsWith('.string')):['.string "'+campaign.catalog.scriptData.text[target]+'"'];
     assert(lines.length,'Missing text '+target);
     return lines.map(line=>{const match=line.match(/^\.string\s+"(.*)"$/);assert(match,'Unsupported text');return match[1].replace(/\\[nl]/g,' ').replace(/\\p/g,'\n\n').replace(/\\"/g,'"').replace(/\$/g,'');}).join('').replaceAll('{PLAYER}',draft.trainer.name).replaceAll('{RIVAL}',draft.trainer.gender==='Female'?'Brendan':'May').replace(/\{(STR_VAR_[123])\}/g,(_,key)=>buffers[key]||'');
   };
+  // Brisk resized Route 101; its original rescue trigger/movement still targets
+  // the old width. Align the player with the surviving rescue corridor.
+  if(entry==='Route101_EventScript_StartBirchRescue'&&draft.position.map==='map_route101')draft.position.x=9;
   while(++steps<=4096){
     assert(labels[label],'Unported script '+label);const line=labels[label][index++];assert(line!==undefined,'Script has no ending');const [opcode,...rest]=line.split(/\s+/),args=rest.join(' ').split(',').map(s=>s.trim());if(['setvar','copyvar','addvar','subvar'].includes(opcode)){if(args.length===1&&rest.length===2)args.splice(0,1,...rest);if(/^0x80[0-9a-f]{2}$/i.test(args[0]))args[0]='VAR_0x'+args[0].slice(2).toUpperCase();}
+    if(['applymovement','addobject','removeobject','setobjectxy','setobjectxyperm','turnobject','setobjectmovementtype'].includes(opcode))args[0]=localId(args[0]);
+    if(opcode==='isfollowerfieldmoveuser'){draft.vars??={};draft.vars[args[0]]=0;continue;}
+    if(opcode==='setrespawn'){const point=campaign.catalog.storyData?.healLocations?.[args[0]];assert(point,'Unknown recovery point '+args[0]);draft.respawn=clone(point);continue;}
+    if(opcode==='setdynamicwarp'){assert(args.length===3,'Unsupported dynamic warp');draft.dynamicWarp={map:args[0].toLowerCase(),x:value(args[1]),y:value(args[2])};continue;}
+    if(opcode==='bufferleadmonspeciesname'){buffers[args[0]]=campaign.catalog.species(draft.party[0].species).name;continue;}
+    if(opcode==='getpartysize'){draft.vars??={};draft.vars.VAR_RESULT=draft.party.length;continue;}
+    if(opcode==='special'&&args[0]==='InitBirchState'){draft.vars??={};draft.vars.VAR_BIRCH_STATE=0;continue;}
+    if(opcode==='special'&&args[0]==='SavePlayerParty'){savedParty=clone(draft.party);continue;}
+    if(opcode==='special'&&args[0]==='LoadWallyZigzagoon'){const temporary=new campaign.constructor(campaign.catalog,campaign.pack,draft);draft.party=[temporary.createMon('ZIGZAGOON',7)];draft.rng=temporary.random.state;continue;}
+    if(opcode==='special'&&args[0]==='StartWallyTutorialBattle'){input({kind:'tutorial',species:'RALTS',level:5});continue;}
+    if(opcode==='special'&&args[0]==='LoadPlayerParty'){assert(savedParty,'No saved party');draft.party=savedParty;savedParty=null;continue;}
+    if(opcode==='vsseeker_rematchid')continue;
+    if(opcode==='setorcopyvar'){draft.vars??={};draft.vars[args[0]]=value(args[1]);continue;}
+    if(opcode==='setwildbattle'){wildSpec={species:args[0].replace(/^SPECIES_/,''),level:value(args[1])};continue;}
+    if(opcode==='dowildbattle'||opcode==='special'&&args[0]==='RockSmashWildEncounter'){
+      const temporary=new campaign.constructor(campaign.catalog,campaign.pack,draft);let mon;
+      if(opcode==='dowildbattle'){assert(wildSpec,'Wild battle not configured');mon=temporary.createMon(wildSpec.species,wildSpec.level);}
+      else{const table=temporary.mapInfo.encounters?.rock_smash_mons;draft.vars??={};draft.vars.VAR_RESULT=0;if(!table||temporary.random.next()>=table.rate/100){draft.rng=temporary.random.state;continue;}mon=temporary.chooseEncounter(table.slots.filter(e=>e.species))?.mon;if(!mon)continue;draft.vars.VAR_RESULT=1;}
+      draft.rng=temporary.random.state;const result=input({kind:'wild-battle',mon});if(result?.phase==='lost')throw new ScriptBattleLost(result.state);assert(['won','caught','fled'].includes(result?.phase),'Wild battle unfinished');Object.assign(draft,new campaign.constructor(campaign.catalog,campaign.pack,clone(result.state)).snapshot());continue;
+    }
+    if(opcode==='special'&&args[0]==='GetRivalSonDaughterString'){buffers.STR_VAR_1=draft.trainer.gender==='Female'?'son':'daughter';continue;}
+    if(opcode==='special'&&['StartWallClock','Special_ViewWallClock'].includes(args[0])){
+      const response=input({kind:'clock',message:'Set the clock in your room.',view:args[0]==='Special_ViewWallClock',clock:draft.clock});if(!response)throw Error('Clock cancelled');draft.clock=response;continue;
+    }
+    if(opcode==='special'&&args[0]==='StartNewPokeballCaseUI'){
+      const starters=campaign.catalog.storyData?.starters||['TREECKO','TORCHIC','MUDKIP'],chosen=input({kind:'starter',starters});assert(starters.includes(chosen),'Invalid starter');const temporary=new campaign.constructor(campaign.catalog,campaign.pack,draft),mon=temporary.createMon(chosen,5);temporary.catchMon(mon);draft.vars??={};draft.vars.VAR_STARTER_MON=['BULBASAUR','TREECKO','SNIVY'].includes(chosen)?0:['CHARMANDER','TORCHIC','CHIMCHAR'].includes(chosen)?1:2;draft.intro=false;temporary.snapshot();continue;
+    }
+    if(opcode==='special'&&['EnableNationalPokedex','SetUnlockedPokedexFlags'].includes(args[0])){draft.flags.FLAG_SYS_NATIONAL_DEX=true;continue;}
+    if(opcode==='special'&&args[0]==='ChangePokemonNickname'){const mon=draft.party[draft.vars?.VAR_0x8004||0];assert(mon,'No Pokémon to nickname');const name=input({kind:'nickname',name:mon.nickname});assert(typeof name==='string'&&name.trim().length&&name.length<=24,'Invalid nickname');mon.nickname=name.trim();continue;}
+    if(opcode==='special'&&['TurnOffTVScreen','SetPlayerBedroomDecoration','SetSecretBase2F','InitSecretBaseDecorationSprites'].includes(args[0]))continue;
+    if(['setstepcallback','opendoor','closedoor','hideplayer','showplayer','incrementgamestat','setescapewarp'].includes(opcode))continue;
     if(opcode==='waitmovement'){if(pendingMovements.length&&decisions?.present)input({kind:'movement',startState:movementStart,actors:pendingMovements});pendingMovements=[];movementStart=null;continue;}
     if(opcode==='checkfieldmove'){
       const index=fieldMoveUser(campaign.catalog,draft,args[0],args[1]?!!value(args[1]):false);draft.vars??={};draft.vars.VAR_RESULT=index<0?6:index;if(index>=0)draft.vars.VAR_0x8004=draft.party[index].species;continue;
@@ -36,8 +74,8 @@ export function planScript(campaign,source,entry,decisions=null){
     if(opcode==='setfieldeffectargument')continue;
     if(opcode==='hidefollowernpc'){draft.flags.FLAG_TEMP_HIDE_FOLLOWER=true;continue;}
     if(opcode==='callnative'&&['FollowerNPC_WarpSetEnd','SetFollowerNPCSurfSpriteAfterDive'].includes(args[0])){draft.flags.FLAG_TEMP_HIDE_FOLLOWER=false;continue;}
-    if(opcode==='dofieldeffect'&&['FLDEFF_USE_SURF','FLDEFF_USE_DIVE','FLDEFF_USE_WATERFALL'].includes(args[0])){
-      const start=clone(draft),temporary=new campaign.constructor(campaign.catalog,campaign.pack,draft),frames=applyFieldEffect(temporary,args[0]);temporary.snapshot();if(frames.length&&decisions?.present)input({kind:'movement',startState:start,movementMode:temporary.mode,actors:[{localId:'LOCALID_PLAYER',frames}]});continue;
+    if(opcode==='dofieldeffect'&&['FLDEFF_USE_SURF','FLDEFF_USE_DIVE','FLDEFF_USE_WATERFALL','FLDEFF_USE_CUT_ON_TREE','FLDEFF_USE_ROCK_SMASH','FLDEFF_USE_STRENGTH'].includes(args[0])){
+      const start=clone(draft),temporary=new campaign.constructor(campaign.catalog,campaign.pack,draft),frames=applyFieldEffect(temporary,args[0]);temporary.snapshot();const user=fieldMoveUser(campaign.catalog,draft,{FLDEFF_USE_CUT_ON_TREE:'FIELD_MOVE_CUT',FLDEFF_USE_ROCK_SMASH:'FIELD_MOVE_ROCK_SMASH',FLDEFF_USE_STRENGTH:'FIELD_MOVE_STRENGTH'}[args[0]]);if(user>=0)buffers.STR_VAR_1=draft.party[user].nickname;if(frames.length&&decisions?.present)input({kind:'movement',startState:start,movementMode:temporary.mode,actors:[{localId:'LOCALID_PLAYER',frames}]});continue;
     }
     if(IGNORE.has(opcode))continue;
     if(['playse','playfanfare','delay','playbgm','fadedefaultbgm','fadescreen','fadescreenspeed','savebgm','fadeoutbgm','fadeinbgm','setbattlebgm','waitstate','nop1','nop2','hidebox','showmoneybox','updatemoneybox','hidemoneybox','waitdooranim','setdooropened','setdoorclosed','setdooropen','setdoorclose','dofieldeffect','waitfieldeffect'].includes(opcode))continue;
@@ -52,12 +90,14 @@ export function planScript(campaign,source,entry,decisions=null){
     if(opcode==='special'&&fieldSpecial(args[0],draft,campaign.pack.maps[draft.position.map],constants))continue;
     if(opcode==='setflashlevel'||opcode==='animateflash'){draft.flashLevel=value(args[0]);continue;}
     if(opcode==='setobjectmovementtype'||opcode==='turnobject'){
+      if(args[0]==='LOCALID_PLAYER'){draft.vars??={};draft.vars.VAR_FACING=value(args[1]);continue;}
       const map=campaign.pack.maps[draft.position.map];assert(map.events.some(e=>e.localId===args[0]),'Unknown object '+args[0]);draft.objects??={};draft.objects[map.id]??={};const obj=draft.objects[map.id][args[0]]??={};obj.movementType=opcode==='turnobject'?'MOVEMENT_TYPE_FACE_'+({1:'DOWN',2:'UP',3:'LEFT',4:'RIGHT'}[value(args[1])]):args[1];continue;
     }
     if(opcode==='register_matchcall'){draft.flags['REGISTERED_'+args[0]]=true;continue;}
     if(opcode==='specialvar'){
       draft.vars??={};assert(/^VAR_\w+$/.test(args[0]),'Invalid special result');const name=args[1];
-      if(name==='ShouldTryRematchBattle'||name==='IsTrainerReadyForRematch')draft.vars[args[0]]=0;
+      if(name==='TryUpdateRusturfTunnelState'){draft.vars[args[0]]=0;if(draft.position.map==='map_rusturf_tunnel'&&!draft.flags.FLAG_RUSTURF_TUNNEL_OPENED){if(draft.flags.FLAG_HIDE_RUSTURF_TUNNEL_ROCK_1){draft.vars.VAR_RUSTURF_TUNNEL_STATE=4;draft.vars[args[0]]=1;}else if(draft.flags.FLAG_HIDE_RUSTURF_TUNNEL_ROCK_2){draft.vars.VAR_RUSTURF_TUNNEL_STATE=5;draft.vars[args[0]]=1;}}}
+      else if(name==='ShouldTryRematchBattle'||name==='IsTrainerReadyForRematch')draft.vars[args[0]]=0;
       else if(name==='IsTrainerRegistered'){const id=Object.entries(constants).find(([key,id])=>key.startsWith('TRAINER_')&&id===value('VAR_0x8004'))?.[0];draft.vars[args[0]]=draft.flags['REGISTERED_'+id]?1:0;}
       else throw new Error('Unported special '+name);continue;
     }
@@ -93,9 +133,9 @@ export function planScript(campaign,source,entry,decisions=null){
       const defeat=args[noIntro?1:2];if(defeat){const message=text(defeat);messages.push(message);if(decisions?.present)input({kind:'message',message});}
       const after=args[double?4:3];if(after&&labels[after]){label=after;index=0;}continue;
     }
-    if(opcode==='warp'){
+    if(['warp','warpsilent','warpfadeout','warpdoor'].includes(opcode)){
       assert(args.length===3,'Unsupported warp signature');const map=args[0].toLowerCase(),x=value(args[1]),y=value(args[2]),destination=campaign.pack.maps[map];
-      assert(destination,'Warp destination is not ported');integer(x,0,destination.width-1,'warp x');integer(y,0,destination.height-1,'warp y');assert(!'#~h'.includes(destination.tiles[y][x]),'Warp destination is blocked');draft.position={map,x,y};continue;
+      assert(destination,'Warp destination is not ported');integer(x,0,destination.width-1,'warp x');integer(y,0,destination.height-1,'warp y');assert(!'#~h'.includes(destination.tiles[y][x]),'Warp destination is blocked');if(campaign.pack.maps[draft.position.map].outdoor)draft.escapeOrigin=clone(draft.position);draft.position={map,x,y};delete draft.sceneMap;delete draft.wildlife;delete draft.flashLevel;delete draft.flags.FLAG_SYS_USE_STRENGTH;for(const key of Object.keys(draft.flags))if(/^FLAG_TEMP_/.test(key))delete draft.flags[key];for(const key of Object.keys(draft.vars||{}))if(/^VAR_TEMP_/.test(key))delete draft.vars[key];continue;
     }
     if(['addobject','removeobject','setobjectxy','setobjectxyperm'].includes(opcode)){
       const map=campaign.pack.maps[draft.position.map],object=args[0]==='LOCALID_PLAYER'?draft.position:map.events.find(e=>e.localId===args[0]);assert(object,'Unknown object '+args[0]);
@@ -107,12 +147,12 @@ export function planScript(campaign,source,entry,decisions=null){
     if(opcode==='applymovement'){
       movementStart??=clone(draft);const frames=[];
       const map=campaign.pack.maps[draft.position.map],player=args[0]==='LOCALID_PLAYER',object=player?draft.position:map.events.find(e=>e.localId===args[0]);assert(object,'Unknown movement object '+args[0]);assert(labels[args[1]],'Movement table is not ported');
-      draft.objects??={};draft.objects[map.id]??={};const actor=player?draft.position:(draft.objects[map.id][args[0]]??={x:object.x,y:object.y});
+      draft.objects??={};draft.objects[map.id]??={};const actor=player?draft.position:(draft.objects[map.id][args[0]]={x:object.x,y:object.y,...draft.objects[map.id][args[0]]});
       let finished=false;for(const command of labels[args[1]]){if(command==='step_end'){finished=true;break;}if(command.startsWith('goto '))break;
-        const facing=command.match(/^(?:face_|walk_in_place_(?:fast_|faster_|slow_)?)(up|down|left|right)$/);if(facing){if(!player)actor.movementType='MOVEMENT_TYPE_FACE_'+facing[1].toUpperCase();frames.push({x:actor.x,y:actor.y,facing:facing[1]});continue;}if(/^delay_/.test(command))continue;
-        const movement=command.match(/^(?:walk|walk_fast|walk_faster|walk_slow|walk_fastest)_(up|down|left|right)$/);assert(movement,'Unsupported movement '+command);
-        const [dx,dy]={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]}[movement[1]],map=campaign.pack.maps[draft.position.map],x=actor.x+dx,y=actor.y+dy;
-        assert(x>=0&&y>=0&&x<map.width&&y<map.height&&!('#~h'.includes(tileAt(draft,map,x,y))),'Scripted movement is blocked');actor.x=x;actor.y=y;frames.push({x,y,facing:movement[1]});
+        const facing=command.match(/^(?:face_|walk_in_place_(?:fast_|faster_|slow_)?)(up|down|left|right)$/);if(facing){if(!player)actor.movementType='MOVEMENT_TYPE_FACE_'+facing[1].toUpperCase();frames.push({x:actor.x,y:actor.y,facing:facing[1]});continue;}if(/^(?:delay_|emote_|disable_ground_effects|enable_ground_effects|set_invisible|set_visible|face_original_direction|hide|show|cut_tree|rock_smash_break|pause|lock_facing_direction|unlock_facing_direction)/.test(command))continue;if(command==='face_player'){frames.push({x:actor.x,y:actor.y,facing:actor.x<draft.position.x?'right':actor.x>draft.position.x?'left':actor.y<draft.position.y?'down':'up'});continue;}
+        const movement=command.match(/^(?:walk|walk_fast|walk_faster|walk_slow|walk_fastest|jump|jump_2|jump_in_place)_(up|down|left|right)$/);assert(movement,'Unsupported movement '+command);
+        const [dx,dy]=command.startsWith('jump_in_place')?[0,0]:{up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]}[movement[1]],map=campaign.pack.maps[draft.position.map],x=actor.x+dx,y=actor.y+dy;
+        assert((connectedPosition(campaign.pack,map,x,y))&&(map.sourceMap||!('#~h'.includes(tileAt(draft,map,x,y)))),'Scripted movement is blocked: '+args[0]+' '+x+','+y+' in '+map.id);actor.x=x;actor.y=y;if(player&&(x<0||y<0||x>=map.width||y>=map.height))draft.sceneMap=map.id;frames.push({x,y,facing:movement[1]});
       }assert(finished,'Movement table has no ending');if(player&&frames.length){draft.vars??={};draft.vars.VAR_FACING={down:1,up:2,left:3,right:4}[frames.at(-1).facing];}pendingMovements.push({localId:args[0],frames});continue;
     }
     if(opcode==='checkitem'||opcode==='checkitemspace'||opcode==='removeitem'){

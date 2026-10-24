@@ -1,3 +1,5 @@
+import {connectedPosition} from './connections.mjs';
+import {refreshWildlife,meetWildlife} from './overworld.mjs';
 import {behaviorAt,sourceWater,fieldMoveUser,diveConnection} from './traversal.mjs';
 import {tileAt} from './field-specials.mjs';
 import {assert, integer, clone, Random, SAVE_FORMAT, SAVE_VERSION} from './model.mjs';
@@ -29,6 +31,7 @@ export function validatePack(pack) {
 }
 function startingFlags(pack){return {...clone(pack.initialFlags||{}),FLAG_SYS_POKEMON_GET:true,FLAG_RESCUED_BIRCH:true,FLAG_HIDE_ROUTE_101_BIRCH_ZIGZAGOON_BATTLE:true,FLAG_HIDE_ROUTE_101_BIRCH_STARTERS_BAG:true,FLAG_HIDE_ROUTE_101_ZIGZAGOON:true,FLAG_HIDE_LITTLEROOT_TOWN_BIRCHS_LAB_BIRCH:false};}
 export class Campaign {
+  get storyInfo(){return this.catalog.storyData?.maps?.[this.map.id]||{};}
   get mapInfo(){return this.catalog.fieldData?.maps?.[this.map.id]||{};}
   get mode(){return this.state.field?.mode||(this.mapInfo.mapType==='MAP_TYPE_UNDERWATER'?'underwater':'land');}
   behavior(x,y,map=this.map){return behaviorAt(this.catalog,this.state,map,x,y);}
@@ -37,7 +40,7 @@ export class Campaign {
     if(sourceWater(this.catalog,this.state,map,x,y)){if(change?.blocked||!change&&this.catalog.fieldData?.maps?.[map.id]?.blockedWater?.includes(`${x},${y}`))return '#';return '~';}
     return tileAt(this.state,map,x,y);
   }
-  canOccupy(x,y,map=this.map,mode=this.mode,waterfall=false){const tile=this.tile(x,y,map);return tile!==undefined&&!('#h'.includes(tile))&&(tile!=='~'||mode==='surf'||mode==='underwater')&&(waterfall||this.behavior(x,y,map)!=='MB_WATERFALL')&&!this.visibleEvents(map).some(e=>e.x===x&&e.y===y&&e.kind!=='warp'&&e.solid!==false);}
+  canOccupy(x,y,map=this.map,mode=this.mode,waterfall=false){if(map.id===this.map.id&&this.state.dynamicWarp&&this.storyInfo.warpEvents?.some(e=>e.x===x&&e.y===y&&e.dest_map==='MAP_DYNAMIC'))return true;const tile=this.tile(x,y,map);return tile!==undefined&&!('#h'.includes(tile))&&(tile!=='~'||mode==='surf'||mode==='underwater')&&(waterfall||this.behavior(x,y,map)!=='MB_WATERFALL')&&!this.visibleEvents(map).some(e=>e.x===x&&e.y===y&&e.kind!=='warp'&&e.solid!==false);}
   forcedDirection(){return this.mode==='surf'?{MB_EASTWARD_CURRENT:[1,0],MB_WESTWARD_CURRENT:[-1,0],MB_NORTHWARD_CURRENT:[0,-1],MB_SOUTHWARD_CURRENT:[0,1]}[this.behavior(this.state.position.x,this.state.position.y)]||null:null;}
   fishable(x,y){return this.tile(x,y)==='~'&&!!this.catalog.fieldData?.fishableBehaviors?.includes(this.behavior(x,y));}
   fieldScript(dx,dy,button='interact'){
@@ -48,6 +51,7 @@ export class Campaign {
     return null;
   }
   enterMap(position){
+    if(this.map.outdoor)this.state.escapeOrigin=clone(this.state.position);delete this.state.wildlife;delete this.state.flags.FLAG_SYS_USE_STRENGTH;delete this.state.flashLevel;
     this.state.position=position;if(this.catalog.fieldData?.maps?.[position.map]?.mapType==='MAP_TYPE_UNDERWATER')this.state.field={mode:'underwater'};else if(this.mode!=='land'&&this.tile(position.x,position.y)!=='~')this.state.field={mode:'land'};for(const key of Object.keys(this.state.flags))if(/^FLAG_TEMP_/.test(key))delete this.state.flags[key];for(const key of Object.keys(this.state.vars||{}))if(/^VAR_TEMP_/.test(key))delete this.state.vars[key];
     if(this.state.objects?.[position.map])for(const [key,obj]of Object.entries(this.state.objects[position.map]))if(!obj.persistent)delete this.state.objects[position.map][key];
   }
@@ -63,14 +67,17 @@ export class Campaign {
   constructor(catalog, pack, state) { this.catalog=catalog; this.pack=validatePack(pack); this.state=state; this.random=new Random(state.rng); this.validate(); }
   static start(catalog, pack, starter='TREECKO', seed=Date.now()) {
     const rng=new Random(seed), first=catalog.create(catalog.id(starter),5,rng,'mon-1');
-    return new Campaign(catalog,pack,{format:SAVE_FORMAT,schema:SAVE_VERSION,contentVersion:pack.version,vars:{VAR_STARTER_MON:{TREECKO:0,TORCHIC:1,MUDKIP:2}[starter]??0},trainer:{name:'Trainer'},position:clone(pack.start),party:[first],boxes:[],inventory:{'1':10,'28':5},money:3000,sourceObjectVersion:1,flags:startingFlags(pack),nextId:2,rng:rng.state,steps:0,options:{encounters:true,weather:true,difficulty:'normal',expShare:true,battleBag:true,shinyOdds:8192,orangeShinies:true},seen:[first.species],caught:[first.species]});
+    return new Campaign(catalog,pack,{format:SAVE_FORMAT,schema:SAVE_VERSION,contentVersion:pack.version,vars:{VAR_STARTER_MON:{TREECKO:0,TORCHIC:1,MUDKIP:2}[starter]??0},trainer:{name:'Trainer'},position:clone(pack.start),party:[first],boxes:[],inventory:{'1':10,'28':5},money:3000,sourceObjectVersion:1,flags:startingFlags(pack),nextId:2,rng:rng.state,steps:0,options:{encounters:true,overworldEncounters:false,weather:true,difficulty:'normal',expShare:true,battleBag:true,shinyOdds:8192,orangeShinies:true},seen:[first.species],caught:[first.species]});
+  }
+  static begin(catalog,pack,{name='Trainer',gender='Male'}={},seed=Date.now()){
+    const c=Campaign.start(catalog,pack,'TREECKO',seed);c.state.party=[];c.state.seen=[];c.state.caught=[];c.state.nextId=1;c.state.inventory={};c.state.flags=clone(pack.initialFlags||{});c.state.vars={};c.state.trainer={name,gender};c.state.intro=true;c.state.position={map:'map_inside_of_truck',x:2,y:2};c.state.options.overworldEncounters=true;c.random=new Random(seed);c.state.rng=c.random.state;return new Campaign(catalog,pack,c.state);
   }
   get map() { return this.pack.maps[this.state.position.map]; }
   validate() {
     const s=this.state; assert(s?.format===SAVE_FORMAT&&s.schema===SAVE_VERSION,'Unsupported save version'); assert(s.contentVersion===this.pack.version,'Save needs its matching content pack');
     assert(typeof s.trainer?.name==='string'&&s.trainer.name.length>0&&s.trainer.name.length<=24,'Invalid trainer name');
-    assert(this.map,'Saved map is unavailable'); integer(s.position.x,0,this.map.width-1,'saved x'); integer(s.position.y,0,this.map.height-1,'saved y'); assert(!'#h'.includes(this.tile(s.position.x,s.position.y))&&(this.tile(s.position.x,s.position.y)!=='~'||this.mode!=='land'),'Saved position is blocked');if(s.field)assert(['land','surf','underwater'].includes(s.field.mode),'Invalid field mode');
-    assert(Array.isArray(s.party)&&s.party.length>=1&&s.party.length<=6&&Array.isArray(s.boxes)&&s.boxes.length<=6000,'Invalid storage');
+    assert(this.map,'Saved map is unavailable'); const normalized=connectedPosition(this.pack,this.map,s.position.x,s.position.y);assert(normalized,'Invalid saved position');if(normalized.map!==this.map.id)assert(s.sceneMap===this.map.id,'Off-map save outside a scene');else assert(!'#h'.includes(this.tile(s.position.x,s.position.y))&&(this.tile(s.position.x,s.position.y)!=='~'||this.mode!=='land'),'Saved position is blocked');if(s.field)assert(['land','surf','underwater'].includes(s.field.mode),'Invalid field mode');
+    assert(Array.isArray(s.party)&&(s.party.length>=1||s.intro===true)&&s.party.length<=6&&Array.isArray(s.boxes)&&s.boxes.length<=6000,'Invalid storage');
     const mons=[...s.party,...s.boxes]; mons.forEach(m=>this.catalog.validateMon(m)); assert(new Set(mons.map(m=>m.uid)).size===mons.length,'Duplicate Pokémon identity');
     integer(s.nextId,1,10000000,'identity counter'); assert(mons.every(m=>/^mon-[1-9]\d*$/.test(m.uid)&&Number(m.uid.slice(4))<s.nextId),'Invalid identity counter');
     integer(s.money,0,999999999,'money'); integer(s.steps,0,Number.MAX_SAFE_INTEGER,'steps'); integer(s.rng,1,0xffffffff,'random state');
@@ -78,12 +85,13 @@ export class Campaign {
     for(const [id,count] of Object.entries(s.inventory)) { assert(this.catalog.data.items[id],'Unknown bag item'); integer(count,0,999999,'item count'); }
     assert(s.flags&&typeof s.flags==='object'&&!Array.isArray(s.flags),'Invalid flags'); assert(Object.keys(s.flags).length<=10000&&Object.values(s.flags).every(v=>typeof v==='boolean'),'Invalid flags');
     assert(typeof s.options?.encounters==='boolean'&&typeof s.options.weather==='boolean','Invalid options');
-    if(s.options.difficulty!==undefined)assert(['easy','normal','hard','extreme'].includes(s.options.difficulty),'Invalid difficulty');if(s.options.shinyOdds!==undefined)integer(s.options.shinyOdds,50,8192,'shiny odds');for(const key of ['expShare','battleBag','orangeShinies'])if(s.options[key]!==undefined)assert(typeof s.options[key]==='boolean','Invalid option '+key);
+    if(s.options.difficulty!==undefined)assert(['easy','normal','hard','extreme'].includes(s.options.difficulty),'Invalid difficulty');if(s.options.shinyOdds!==undefined)integer(s.options.shinyOdds,50,8192,'shiny odds');for(const key of ['expShare','battleBag','orangeShinies','overworldEncounters'])if(s.options[key]!==undefined)assert(typeof s.options[key]==='boolean','Invalid option '+key);
     for(const k of ['seen','caught']) { assert(Array.isArray(s[k])&&s[k].length<=10000,'Invalid Pokédex'); s[k].forEach(id=>this.catalog.species(id)); }
     if(s.metatiles){for(const [mapId,changes]of Object.entries(s.metatiles)){const map=this.pack.maps[mapId];assert(map,'Invalid tile map');for(const [key,tile]of Object.entries(changes)){const [x,y]=key.split(',').map(Number);integer(x,0,map.width-1,'tile x');integer(y,0,map.height-1,'tile y');integer(tile.id,0,1023,'tile id');assert(map.metatileAtlas?.behaviors[tile.id]!==undefined&&typeof tile.blocked==='boolean','Invalid map edit');}}}
-    if(s.objects){assert(typeof s.objects==='object'&&!Array.isArray(s.objects),'Invalid objects');for(const [mapId,objects]of Object.entries(s.objects)){const map=this.pack.maps[mapId];assert(map&&objects&&typeof objects==='object','Invalid object map');for(const obj of Object.values(objects)){if(obj.visible!==undefined)assert(typeof obj.visible==='boolean','Invalid object visibility');if(obj.x!==undefined)integer(obj.x,0,map.width-1,'object x');if(obj.y!==undefined)integer(obj.y,0,map.height-1,'object y');}}}
+    if(s.objects){assert(typeof s.objects==='object'&&!Array.isArray(s.objects),'Invalid objects');for(const [mapId,objects]of Object.entries(s.objects)){const map=this.pack.maps[mapId];assert(map&&objects&&typeof objects==='object','Invalid object map');for(const obj of Object.values(objects)){if(obj.visible!==undefined)assert(typeof obj.visible==='boolean','Invalid object visibility');if(obj.x!==undefined&&obj.y!==undefined)assert(connectedPosition(this.pack,map,obj.x,obj.y),'Invalid object position');else{if(obj.x!==undefined)integer(obj.x,0,map.width-1,'object x');if(obj.y!==undefined)integer(obj.y,0,map.height-1,'object y');}}}}
     if(s.vars){assert(typeof s.vars==='object'&&!Array.isArray(s.vars),'Invalid script variables');for(const [key,value]of Object.entries(s.vars)){assert(/^VAR_\w+$/.test(key),'Invalid script variable');integer(value,0,65535,'script variable');}}
     if(s.respawn){const m=this.pack.maps[s.respawn.map];assert(m&&m.tiles[s.respawn.y]?.[s.respawn.x]&&!('#~h'.includes(m.tiles[s.respawn.y][s.respawn.x])),'Invalid recovery point');}
+    if(s.wildlife){assert(s.wildlife.map===s.position.map&&Array.isArray(s.wildlife.actors)&&s.wildlife.actors.length<=3,'Invalid wildlife');for(const a of s.wildlife.actors){integer(a.x,0,this.map.width-1,'wild x');integer(a.y,0,this.map.height-1,'wild y');integer(a.born,0,s.steps,'wild age');this.catalog.validateMon(a.mon);assert(!mons.some(m=>m.uid===a.mon.uid),'Duplicate wild identity');}}
     return s;
   }
   snapshot() { this.state.rng=this.random.state; this.validate(); return clone(this.state); }
@@ -99,21 +107,22 @@ export class Campaign {
     const jump=this.map.jumps?.[`${x},${y}`],dir=dx===1?'east':dx===-1?'west':dy===1?'south':'north';
     if(jump===dir){const nx=x+dx,ny=y+dy;if(nx>=0&&ny>=0&&nx<this.map.width&&ny<this.map.height&&!('#~h'.includes(this.tile(nx,ny)))){p.x=nx;p.y=ny;this.state.steps++;return {kind:'step'};}}
     const warpHere=this.map.events.some(e=>e.x===x&&e.y===y&&e.kind==='warp');
-    if((!this.canOccupy(x,y)||this.tile(x,y)!=='~'&&!this.elevationAllows(x,y)&&!this.canDisembark(x,y))&&!warpHere)return {kind:'blocked'};
-    const obstacle=this.visibleEvents().find(e=>e.x===x&&e.y===y&&e.kind!=='warp'&&e.solid!==false); if(obstacle)return {kind:'blocked'};
+    if((!this.canOccupy(x,y)&&!(this.state.flags.FLAG_SYS_USE_STRENGTH&&this.visibleEvents().some(e=>e.x===x&&e.y===y&&e.sourceScript==='EventScript_StrengthBoulder'))||this.tile(x,y)!=='~'&&!this.elevationAllows(x,y)&&!this.canDisembark(x,y))&&!warpHere)return {kind:'blocked'};
+    const wild=meetWildlife(this,x,y);if(wild)return wild;
+    const obstacle=this.visibleEvents().find(e=>e.x===x&&e.y===y&&e.kind!=='warp'&&e.solid!==false); if(obstacle){if(obstacle.sourceScript==='EventScript_StrengthBoulder'&&this.state.flags.FLAG_SYS_USE_STRENGTH&&this.canOccupy(x+dx,y+dy)&&!this.map.events.some(e=>e.kind==='warp'&&e.x===x+dx&&e.y===y+dy)){this.state.objects??={};this.state.objects[this.map.id]??={};this.state.objects[this.map.id][obstacle.localId]={...this.state.objects[this.map.id][obstacle.localId],x:x+dx,y:y+dy};}else return {kind:'blocked'};}
     p.x=x;p.y=y;this.state.steps++;
-    const warp=this.map.events.find(e=>e.x===x&&e.y===y&&e.kind==='warp');
+    let warp=this.map.events.find(e=>e.x===x&&e.y===y&&e.kind==='warp');if(!warp&&this.state.dynamicWarp&&this.storyInfo.warpEvents?.some(e=>e.x===x&&e.y===y&&e.dest_map==='MAP_DYNAMIC'))warp={map:this.state.dynamicWarp.map,toX:this.state.dynamicWarp.x,toY:this.state.dynamicWarp.y};
     if(warp){this.enterMap({map:warp.map,x:warp.toX,y:warp.toY});return {kind:'warp',map:this.map.name};}
     if(this.mode==='surf'&&this.tile(x,y)!=='~')this.state.field={mode:'land'};
     const encountered=this.stepEncounter();if(encountered)return encountered;
     return {kind:'step'};
   }
-  chooseEncounter(pool){
+  chooseEncounter(pool,markSeen=true){
     const total=pool.reduce((n,e)=>n+e.weight,0);if(!total)return null;let roll=this.random.int(1,total);const entry=pool.find(e=>(roll-=e.weight)<=0);if(!entry?.species)return null;
-    const mon=this.createMon(entry.species,this.random.int(entry.min,entry.max));this.mark('seen',mon.species);return {kind:'encounter',mon};
+    const mon=this.createMon(entry.species,this.random.int(entry.min,entry.max));if(markSeen)this.mark('seen',mon.species);return {kind:'encounter',mon};
   }
   stepEncounter(){
-    if(!this.state.options.encounters)return null;const p=this.state.position,attrs=this.catalog.fieldData?.tileAttributes?.[this.behavior(p.x,p.y)],method=attrs?.surfable?'water_mons':'land_mons',source=this.mapInfo.encounters?.[method];
+    if(!this.state.options.encounters||!this.state.party.length)return null;if(this.state.options.overworldEncounters===true){refreshWildlife(this);return null;}const p=this.state.position,attrs=this.catalog.fieldData?.tileAttributes?.[this.behavior(p.x,p.y)],method=attrs?.surfable?'water_mons':'land_mons',source=this.mapInfo.encounters?.[method];
     if(source){if(!attrs?.encounters)return null;const pool=source.slots.filter(e=>e.species);if(pool.length&&this.random.next()<Math.min(.5,source.rate/100))return this.chooseEncounter(pool);return null;}
     if(this.tile(p.x,p.y)==='g'&&this.map.encounters?.length&&this.random.next()<Math.min(.5,(this.map.encounterRate??16)/100))return this.chooseEncounter(this.map.encounters);return null;
   }
