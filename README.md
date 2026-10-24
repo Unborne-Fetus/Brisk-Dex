@@ -10,6 +10,8 @@ Full story progression, native special functions, map callbacks, coordinate-trig
 
 Source story events now suspend for dialogue, choices, single/double battles, and parallel NPC/player movement groups, then resume the same script. Battle victories can execute the original badge, TM, gift, trainer-flag, and follow-up branches. Regression tests run the source badge scripts for all eight gym leaders; these tests simulate the victory result and separately exercise the local doubles engine. Map entry/frame/coordinate tables drive scene selection. Source metatile atlases and transactional tile overrides preserve puzzle graphics and collision, including Mauville's barrier deactivation and Petalburg's door changes. The generated script-data pack supplies numeric operands, shared text, and 863 trainer teams.
 
+Field traversal now follows Brisk's badge unlock rules and its custom rule that HMs do not need to be learned. Surf includes mounting, shoreline dismounting, ocean connections, and source rider/Surf-blob graphics. Dive and surfacing follow the source connection coordinates; Waterfall uses its source badge gate. Rod fishing selects from the rod's source encounter slots without consuming the rod. The field-data exporter reads the actual map encounter tables and metatile flags, restoring cave/indoor floor encounters that grouped Dex entries missed. Native water saves and GBA underwater locations retain their traversal mode; original GBA files remain byte-for-byte archived.
+
 Rebuild source maps with `npm run game:port -- /path/to/Pokemon-Brisk-Emerald`. Run `npm run game:test` for campaign/source tests and `npm run index:test` to rebuild and inspect the single-file game's script/resource packaging.
 
 

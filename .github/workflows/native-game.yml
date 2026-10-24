@@ -2,9 +2,9 @@ name: Native Emerald recreation
 on:
   push:
     branches: [main]
-    paths: ['index.html', 'tools/port_native_content.py', 'tools/source_script_data.py', 'tools/build_standalone.mjs', 'tools/test_standalone_game.mjs', 'battle-server.js', 'tools/build_native_battle.mjs', 'game/**', 'test/game/**', 'tools/import_native_maps.mjs', 'tools/serve_native_game.mjs', '.github/workflows/native-game.yml']
+    paths: ['index.html', 'tools/port_native_content.py', 'tools/source_script_data.py', 'tools/export_field_data.py', 'tools/test_embedded_game.cjs', 'tools/build_standalone.mjs', 'tools/test_standalone_game.mjs', 'battle-server.js', 'tools/build_native_battle.mjs', 'game/**', 'test/game/**', 'tools/import_native_maps.mjs', 'tools/serve_native_game.mjs', '.github/workflows/native-game.yml']
   pull_request:
-    paths: ['index.html', 'tools/port_native_content.py', 'tools/source_script_data.py', 'tools/build_standalone.mjs', 'tools/test_standalone_game.mjs', 'battle-server.js', 'tools/build_native_battle.mjs', 'game/**', 'test/game/**', 'tools/import_native_maps.mjs', '.github/workflows/native-game.yml']
+    paths: ['index.html', 'tools/port_native_content.py', 'tools/source_script_data.py', 'tools/export_field_data.py', 'tools/test_embedded_game.cjs', 'tools/build_standalone.mjs', 'tools/test_standalone_game.mjs', 'battle-server.js', 'tools/build_native_battle.mjs', 'game/**', 'test/game/**', 'tools/import_native_maps.mjs', '.github/workflows/native-game.yml']
   workflow_dispatch:
 jobs:
   test:

@@ -185,5 +185,7 @@ def build(repo,out):
     for t in old['travel']:
         m=world[t['map']];spots=[(x,y) for y,row in enumerate(m['tiles']) for x,c in enumerate(row) if c=='.' and 3<x<m['width']-3 and 3<y<m['height']-3 and not any(e['x']==x and e['y']==y for e in m['events'])];x,y=min(spots or [(x,y) for y,row in enumerate(m['tiles']) for x,c in enumerate(row) if c=='.'],key=lambda pos:(pos[0]-m['width']//2)**2+(pos[1]-m['height']//2)**2);t.update(x=x,y=y)
     (out/'content.json').write_text(json.dumps(old,separators=(',',':'))+'\n');(out/'port-report.json').write_text(json.dumps(report,indent=2)+'\n');print(f'Ported {len(world)} maps and {len(native["species"])} species records; {len(report["unresolvedEvents"])} events await script porting.')
+    from export_field_data import build as build_field_data
+    build_field_data(repo,out)
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('source');parser.add_argument('--output',default=str(Path(__file__).resolve().parents[1]/'game'));args=parser.parse_args();build(args.source,args.output)

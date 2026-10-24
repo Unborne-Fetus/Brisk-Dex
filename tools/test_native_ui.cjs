@@ -43,9 +43,9 @@ const relay=require('node:child_process').spawn(process.execPath,[require('node:
  await storyPage.route('**/game/content.json',route=>route.fulfill({json:fixture}));
  await storyPage.goto('http://127.0.0.1:8790/game/index.html');await storyPage.getByRole('button',{name:'Treecko',exact:true}).click();await storyPage.waitForFunction(()=>document.getElementById('notice').textContent.includes('Journey saved'));
  for(const key of ['ArrowUp','ArrowUp','ArrowRight','e'])await storyPage.keyboard.press(key);
- await storyPage.getByRole('button',{name:'Yes',exact:true}).click();await storyPage.getByRole('heading',{name:'Conversation',exact:true}).waitFor();
+ await storyPage.getByRole('button',{name:'Yes',exact:true}).click();await storyPage.waitForFunction(()=>!document.getElementById('modal').open&&document.getElementById('bag').textContent.includes('Potion × 7'));
  if(!(await storyPage.locator('#bag').textContent()).includes('Potion × 7'))throw Error('Story choice did not grant exactly two Potions');
- await storyPage.getByRole('button',{name:'Close',exact:true}).click();await storyPage.keyboard.press('e');await storyPage.getByRole('button',{name:'Close',exact:true}).click();
+ await storyPage.keyboard.press('e');await storyPage.getByRole('button',{name:'Close',exact:true}).click();
  if(!(await storyPage.locator('#bag').textContent()).includes('Potion × 7'))throw Error('Cancelled story granted an item');
  await storyPage.close();
  const gbaPage=await context.newPage();await gbaPage.goto('http://127.0.0.1:8790/game/index.html');await gbaPage.waitForFunction(()=>window.BriskNative?.snapshot());

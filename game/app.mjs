@@ -35,6 +35,8 @@ function update(){
   }));
   $('bag').replaceChildren(...Object.entries(s.inventory).filter(([,n])=>n>0).map(([id,n])=>{const p=document.createElement('div');const usable=[28,29,30,31,32,33,34].includes(Number(id))||/^ITEM_EXP_CANDY_/.test(catalog.data.itemDetails[id]?.constant||'');if(usable){p.append(button(`${catalog.data.items[id]} × ${n}`,()=>{if(battle||storyActive)throw new Error('Finish the active interaction first');modal('Use on which Pokémon?',s.party.map(mon=>button(mon.nickname,()=>{const candy=/^ITEM_EXP_CANDY_/.test(catalog.data.itemDetails[id]?.constant||'');let amount=1;if(candy){const input=prompt(`How many? (1–${Math.min(n,99)})`,'1');if(input===null)return;amount=Number(input);}campaign.useFieldItem(Number(id),mon.uid,amount);dirty=true;close();update();growthPrompts();})));}));}else p.textContent=`${catalog.data.items[id]} × ${n}`;return p;}));
   $('world').hidden=!!battle;$('battle').hidden=!battle;
+  $('save').disabled=!!battle||storyActive||busy;
+  $('dive').disabled=!!battle||storyActive||busy||!campaign.fieldScript(...facing,'dive');$('fish').disabled=!!battle||storyActive||busy||!campaign.fishable(s.position.x+facing[0],s.position.y+facing[1]);
   if(battle)renderBattle();
 }
 function partyDetails(mon){
@@ -92,7 +94,7 @@ async function save(){
 async function interact(){
   if(!campaign||battle||busy||storyActive||$('modal').open)return;
   campaign.state.vars??={};campaign.state.vars.VAR_FACING=facing[0]===1?4:facing[0]===-1?3:facing[1]===-1?2:1;
-  const e=campaign.interact(...facing);if(!e){notice('Nothing to interact with here. Use a party member’s Info button for details.');return;}
+  const e=campaign.interact(...facing);if(!e){const entry=campaign.fieldScript(...facing);if(entry)await fieldScene(entry);else notice('Nothing to interact with here.');return;}
   if(e.kind==='heal'){campaign.heal();if(campaign.map.sourceMap?.includes('POKEMON_CENTER'))campaign.state.respawn=structuredClone(campaign.state.position);dirty=true;notice(e.text);update();await save();}
   else if((e.kind==='dialogue'||e.kind==='trainer')&&campaign.map.scriptText&&e.sourceScript){await playScene(e.sourceScript,e.text);}
   else if(e.kind==='dialogue')modal('Conversation',e.text);
@@ -111,7 +113,7 @@ async function playScene(entry,fallback='',present=true){
       if(request.kind==='message')return sceneChoice(request.message);
       if(request.kind==='yesno'){const answer=await sceneChoice(request.message,['Yes','No']);return answer===null?null:answer===0?1:0;}
       if(request.kind==='movement'){
-        const previous=campaign;campaign=new Campaign(catalog,pack,request.startState);
+        const previous=campaign;campaign=new Campaign(catalog,pack,request.startState);if(request.movementMode)campaign.state.field={mode:request.movementMode};
         try{for(let frame=0;frame<Math.max(...request.actors.map(actor=>actor.frames.length));frame++){
           for(const actor of request.actors){const point=actor.frames[frame];if(!point)continue;
             if(actor.localId==='LOCALID_PLAYER'){Object.assign(campaign.state.position,{x:point.x,y:point.y});facing={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]}[point.facing];}
@@ -133,10 +135,11 @@ async function playScene(entry,fallback='',present=true){
     return false;
   }finally{campaign=original;storyActive=false;update();}
 }
+async function fieldScene(entry){const before=campaign.map.id;campaign.state.vars??={};campaign.state.vars.VAR_FACING=facing[0]===1?4:facing[0]===-1?3:facing[1]===-1?2:1;await playScene(entry);if(campaign.map.id!==before)await enterMap();}
 async function enterMap(){for(const entry of mapEntryScripts(campaign.map))await playScene(entry,'',false);const frame=frameScript(campaign);if(frame)await playScene(frame);}
 async function stepScene(){const entry=coordinateScript(campaign);if(entry)await playScene(entry);const frame=frameScript(campaign);if(frame)await playScene(frame);}
 async function move(dx,dy){
-  if(!appVisible||!campaign||battle||storyActive||$('modal').open||busy)return;facing=[dx,dy];const result=campaign.move(dx,dy);
+  if(!appVisible||!campaign||battle||storyActive||$('modal').open||busy)return;const forced=campaign.forcedDirection();if(forced)[dx,dy]=forced;facing=[dx,dy];const result=campaign.move(dx,dy);
   if(result.kind==='encounter'){
     if(campaign.state.party.some(m=>m.hp>0))beginBattle(result.mon);else notice('Your party needs healing. Visit a bench or the lab.');
   }else if(result.kind==='warp'){notice(`Entered ${result.map}.`);await enterMap();}else if(result.kind==='step')await stepScene();
@@ -146,6 +149,8 @@ function startSelection(){
   const nodes=['TREECKO','TORCHIC','MUDKIP'].map(constant=>{const id=catalog.id(constant),s=catalog.species(id);const b=button(s.name,async()=>{campaign=Campaign.start(catalog,pack,constant);battle=null;dirty=true;close();update();await save();});b.className='starter';const img=document.createElement('img');loadSprite(img,'../'+s.frontSprite);img.alt='';b.prepend(img);return b;});
   modal('Choose your first partner',nodes);
 }
+$('dive').onclick=()=>guard(async()=>{if(!campaign||battle||storyActive||busy)return;const entry=campaign.fieldScript(...facing,'dive');if(entry)await fieldScene(entry);});
+$('fish').onclick=()=>guard(()=>{if(!campaign||battle||storyActive||busy)return;const rods=['old_rod','good_rod','super_rod'].filter(rod=>Object.entries(catalog.data.itemDetails).some(([id,item])=>item.constant==='ITEM_'+rod.toUpperCase()&&(campaign.state.inventory[id]||0)>0));if(!rods.length){notice('There is no fishing rod in the Bag.');return;}modal('Choose a fishing rod',rods.map(rod=>button(rod.replaceAll('_',' '),()=>{close();const result=campaign.fish(rod,...facing);dirty=true;if(result.kind==='encounter')beginBattle(result.mon);else notice('Not even a nibble…');update();})));});
 $('save').onclick=()=>guard(save);$('interact').onclick=()=>guard(interact);
 $('encounters').onchange=e=>{if(campaign){campaign.state.options.encounters=e.target.checked;dirty=true;}};
 $('weather-effects').onchange=e=>{if(campaign){campaign.state.options.weather=e.target.checked;dirty=true;}};
@@ -168,6 +173,7 @@ window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.return
 function rect(x,y,w,h,color){ctx.fillStyle=color;ctx.fillRect(x,y,w,h);}
 function draw(time){
   requestAnimationFrame(draw);if(!appVisible||!campaign)return;
+  if(time-lastMove>150&&campaign.forcedDirection()&&!battle&&!storyActive&&!$('modal').open&&!busy){guard(()=>move(...campaign.forcedDirection()));lastMove=time;}
   if(time-lastMove>150&&keys.size){const key=[...keys].find(k=>directions[k]);if(key){guard(()=>move(...directions[key]));lastMove=time;}}
   if(!battle&&!storyActive&&dirty&&time-savedAt>30000&&!$('modal').open&&!busy){savedAt=time;busy=true;save().catch(e=>notice(`Autosave failed: ${e.message}. Export your save.`)).finally(()=>busy=false);}
   const m=campaign.map,tile=24,width=m.ground?480:624,height=m.ground?320:432;if(ctx.canvas.width!==width||ctx.canvas.height!==height){ctx.canvas.width=width;ctx.canvas.height=height;}ctx.imageSmoothingEnabled=false;
@@ -194,7 +200,7 @@ function draw(time){
 function person(x,y,color,player){rect(x+5,y+19,14,3,'#193e3444');rect(x+8,y+16,3,5,'#293f3b');rect(x+14,y+16,3,5,'#293f3b');rect(x+6,y+9,13,9,color);rect(x+8,y+3,9,8,'#e2ba86');rect(x+6,y+1,13,5,player?'#a94f3c':'#6b6443');if(player)rect(x+(facing[0]<0?6:15),y+6,2,2,'#2c3631');}
 async function boot(){
   const json=async url=>{const r=await fetch(url);if(!r.ok)throw new Error('Could not load '+url);return r.json();};
-  const [data,content,native,scriptData]=await Promise.all([json('../brisk-dex-data.json'),json('./content.json'),json('./native-catalog.json'),json('./script-data.json')]);catalog=new Catalog(data,native);catalog.scriptData=scriptData;pack=content;
+  const [data,content,native,scriptData,fieldData]=await Promise.all([json('../brisk-dex-data.json'),json('./content.json'),json('./native-catalog.json'),json('./script-data.json'),json('./field-data.json')]);catalog=new Catalog(data,native);catalog.scriptData=scriptData;catalog.fieldData=fieldData;pack=content;
   try{const saved=await store.load();if(saved)campaign=migrateCampaign(saved,pack,catalog);}catch(e){notice(`Could not load the saved journey: ${e.message}. Use Restore backup or Import save.`);}
   if(campaign){notice('Welcome back to your Brisk journey.');update();}else startSelection();
   // Exposes only a read-only snapshot/disabled bridge for developer integration tests.

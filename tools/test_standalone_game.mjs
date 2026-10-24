@@ -9,5 +9,5 @@ assert.equal(scripts.length,2,'Game needs separate resource bridge and bundled a
 for(const script of scripts)new vm.Script(script[1]);
 const requests=[],context={parent:{fetch:url=>requests.push(url),BriskStandalone:{assetUrl:url=>url}},MutationObserver:class{observe(){}},document:{documentElement:{}}};context.window=context;vm.runInNewContext(scripts[0][1],context);
 context.fetch('./content.json');context.fetch('../brisk-dex-data.json');assert.deepEqual(requests,['game/content.json','brisk-dex-data.json']);assert.equal(context.BriskGameAssets.assetUrl('assets/map_littleroot_town-ground.png'),'game/assets/map_littleroot_town-ground.png');
-for(const key of ['game/content.json','game/native-catalog.json','game/gba-layout.json','game/script-data.json','game/assets/map_littleroot_town-ground.png'])assert.ok(html.includes(JSON.stringify(key)+':'),key);
+for(const key of ['game/content.json','game/native-catalog.json','game/gba-layout.json','game/script-data.json','game/field-data.json','game/assets/map_littleroot_town-ground.png'])assert.ok(html.includes(JSON.stringify(key)+':'),key);
 console.log('Embedded parent/child scripts parse; game resources resolve inside the single-file archive.');

@@ -6,4 +6,5 @@ export const pack=JSON.parse(fs.readFileSync(new URL('../../game/content.json',i
 export const native=JSON.parse(fs.readFileSync(new URL('../../game/native-catalog.json',import.meta.url)));
 pack.start={map:'field',x:12,y:10};
 export const catalog=new Catalog(data,native);
+catalog.fieldData=JSON.parse(fs.readFileSync(new URL('../../game/field-data.json',import.meta.url)));
 export const fresh=(seed=42)=>Campaign.start(catalog,structuredClone(pack),'TREECKO',seed);

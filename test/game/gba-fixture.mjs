@@ -7,9 +7,9 @@ function mon(species=252,{party=false,seed=31,egg=false,ppUps=3}={}){
  let sum=0;for(let i=0;i<48;i+=2)sum=(sum+d.getUint16(i,true))&65535;v.setUint16(28,sum,true);for(let i=0;i<48;i+=4)v.setUint32(32+i,(d.getUint32(i,true)^key)>>>0,true);
  if(party){v.setUint8(84,12);v.setUint16(86,19,true);v.setUint16(88,38,true);}return raw;
 }
-export function makeGbaSave({modern=true,egg=false,corruptMon=false,corruptBank=false}={}){
+export function makeGbaSave({modern=true,egg=false,corruptMon=false,corruptBank=false,location={group:0,number:0,x:12,y:10}}={}){
  const out=new Uint8Array(0x20000),parts=Array.from({length:14},()=>new Uint8Array(3968)),s0=new DataView(parts[0].buffer),s1=new DataView(parts[1].buffer),security=0xfedcba98;
- parts[0].fill(255,0,7);parts[0][0]=0xcd;s0.setUint32(10,12345,true);s0.setUint32(0xac,security,true);s1.setUint32(0x234,1,true);const party=mon(252,{party:true,egg});if(corruptMon)party[35]^=2;parts[1].set(party,0x238);s1.setUint32(0x490,(123456^security)>>>0,true);s1.setInt16(0,12,true);s1.setInt16(2,10,true);s1.setUint16(0x560,28,true);s1.setUint16(0x562,7^(security&65535),true);
+ parts[0].fill(255,0,7);parts[0][0]=0xcd;s0.setUint32(10,12345,true);s0.setUint32(0xac,security,true);s1.setUint32(0x234,1,true);const party=mon(252,{party:true,egg});if(corruptMon)party[35]^=2;parts[1].set(party,0x238);s1.setUint32(0x490,(123456^security)>>>0,true);s1.setInt16(0,location.x,true);s1.setInt16(2,location.y,true);s1.setUint8(4,location.group);s1.setUint8(5,location.number);s1.setUint16(0x560,28,true);s1.setUint16(0x562,7^(security&65535),true);
  const pc=new Uint8Array(modern?48604:34144);pc.set(mon(255,{seed:99}),4+((modern?19:13)*30+29)*80);for(let i=0;i<9;i++)parts[i+5].set(pc.subarray(i*3968,(i+1)*3968));
  function sector(physical,id,data,size,counter){const off=physical*4096;out.set(data.subarray(0,size),off);const v=new DataView(out.buffer,off,4096);v.setUint16(0xff4,id,true);v.setUint16(0xff6,sectionChecksum(out.subarray(off,off+4096),size),true);v.setUint32(0xff8,0x08012025,true);v.setUint32(0xffc,counter,true);}
  for(let bank=0;bank<2;bank++)for(let id=0;id<14;id++)sector(bank*14+(id+3)%14,id,parts[id],id===0?3884:id===4?3848:id===13&&!modern?2400:3968,bank?4:5);

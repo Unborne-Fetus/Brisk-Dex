@@ -1,3 +1,4 @@
+import {behaviorAt,sourceWater,fieldMoveUser,diveConnection} from './traversal.mjs';
 import {tileAt} from './field-specials.mjs';
 import {assert, integer, clone, Random, SAVE_FORMAT, SAVE_VERSION} from './model.mjs';
 export const WEATHER_ABILITIES = {Drizzle:'rain','Primordial Sea':'rain',Drought:'sun','Desolate Land':'sun','Orichalcum Pulse':'sun','Sand Stream':'sand','Sand Spit':'sand','Snow Warning':'snow','Delta Stream':'wind'};
@@ -28,15 +29,33 @@ export function validatePack(pack) {
 }
 function startingFlags(pack){return {...clone(pack.initialFlags||{}),FLAG_SYS_POKEMON_GET:true,FLAG_RESCUED_BIRCH:true,FLAG_HIDE_ROUTE_101_BIRCH_ZIGZAGOON_BATTLE:true,FLAG_HIDE_ROUTE_101_BIRCH_STARTERS_BAG:true,FLAG_HIDE_ROUTE_101_ZIGZAGOON:true,FLAG_HIDE_LITTLEROOT_TOWN_BIRCHS_LAB_BIRCH:false};}
 export class Campaign {
-  tile(x,y,map=this.map){return tileAt(this.state,map,x,y);}
+  get mapInfo(){return this.catalog.fieldData?.maps?.[this.map.id]||{};}
+  get mode(){return this.state.field?.mode||(this.mapInfo.mapType==='MAP_TYPE_UNDERWATER'?'underwater':'land');}
+  behavior(x,y,map=this.map){return behaviorAt(this.catalog,this.state,map,x,y);}
+  tile(x,y,map=this.map){
+    if(x<0||y<0||x>=map.width||y>=map.height)return '#';const change=this.state.metatiles?.[map.id]?.[`${x},${y}`];
+    if(sourceWater(this.catalog,this.state,map,x,y)){if(change?.blocked||!change&&this.catalog.fieldData?.maps?.[map.id]?.blockedWater?.includes(`${x},${y}`))return '#';return '~';}
+    return tileAt(this.state,map,x,y);
+  }
+  canOccupy(x,y,map=this.map,mode=this.mode,waterfall=false){const tile=this.tile(x,y,map);return tile!==undefined&&!('#h'.includes(tile))&&(tile!=='~'||mode==='surf'||mode==='underwater')&&(waterfall||this.behavior(x,y,map)!=='MB_WATERFALL')&&!this.visibleEvents(map).some(e=>e.x===x&&e.y===y&&e.kind!=='warp'&&e.solid!==false);}
+  forcedDirection(){return this.mode==='surf'?{MB_EASTWARD_CURRENT:[1,0],MB_WESTWARD_CURRENT:[-1,0],MB_NORTHWARD_CURRENT:[0,-1],MB_SOUTHWARD_CURRENT:[0,1]}[this.behavior(this.state.position.x,this.state.position.y)]||null:null;}
+  fishable(x,y){return this.tile(x,y)==='~'&&!!this.catalog.fieldData?.fishableBehaviors?.includes(this.behavior(x,y));}
+  fieldScript(dx,dy,button='interact'){
+    const p=this.state.position;
+    if(button==='dive')return fieldMoveUser(this.catalog,this.state,'FIELD_MOVE_DIVE')>=0&&diveConnection(this)?this.mode==='underwater'?'EventScript_UseDiveUnderwater':'EventScript_UseDive':null;
+    if(this.mode==='surf'&&dy===-1&&this.behavior(p.x,p.y-1)==='MB_WATERFALL')return 'EventScript_UseWaterfall';
+    if(this.mode==='land'&&this.fishable(p.x+dx,p.y+dy)&&fieldMoveUser(this.catalog,this.state,'FIELD_MOVE_SURF')>=0)return 'EventScript_UseSurf';
+    return null;
+  }
   enterMap(position){
-    this.state.position=position;for(const key of Object.keys(this.state.flags))if(/^FLAG_TEMP_/.test(key))delete this.state.flags[key];for(const key of Object.keys(this.state.vars||{}))if(/^VAR_TEMP_/.test(key))delete this.state.vars[key];
+    this.state.position=position;if(this.catalog.fieldData?.maps?.[position.map]?.mapType==='MAP_TYPE_UNDERWATER')this.state.field={mode:'underwater'};else if(this.mode!=='land'&&this.tile(position.x,position.y)!=='~')this.state.field={mode:'land'};for(const key of Object.keys(this.state.flags))if(/^FLAG_TEMP_/.test(key))delete this.state.flags[key];for(const key of Object.keys(this.state.vars||{}))if(/^VAR_TEMP_/.test(key))delete this.state.vars[key];
     if(this.state.objects?.[position.map])for(const [key,obj]of Object.entries(this.state.objects[position.map]))if(!obj.persistent)delete this.state.objects[position.map][key];
   }
-  visibleEvents() {
-    const overrides=this.state.objects?.[this.map.id]||{};
-    return this.map.events.filter(e=>!this.state.flags[e.hideFlag]&&overrides[e.localId]?.visible!==false).map(e=>({...e,...overrides[e.localId]}));
+  visibleEvents(map=this.map) {
+    const overrides=this.state.objects?.[map.id]||{};
+    return map.events.filter(e=>!this.state.flags[e.hideFlag]&&overrides[e.localId]?.visible!==false).map(e=>({...e,...overrides[e.localId]}));
   }
+  canDisembark(x,y){return this.mode==='surf'&&this.tile(x,y)!=='~'&&(this.map.elevations?.[y]?.[x]??3)===(this.catalog.fieldData?.defaultElevation??3);}
   elevationAllows(x,y) {
     const p=this.state.position,from=this.map.elevations?.[p.y]?.[p.x]||0,to=this.map.elevations?.[y]?.[x]||0;
     return !from||!to||from===15||to===15||from===to;
@@ -50,7 +69,7 @@ export class Campaign {
   validate() {
     const s=this.state; assert(s?.format===SAVE_FORMAT&&s.schema===SAVE_VERSION,'Unsupported save version'); assert(s.contentVersion===this.pack.version,'Save needs its matching content pack');
     assert(typeof s.trainer?.name==='string'&&s.trainer.name.length>0&&s.trainer.name.length<=24,'Invalid trainer name');
-    assert(this.map,'Saved map is unavailable'); integer(s.position.x,0,this.map.width-1,'saved x'); integer(s.position.y,0,this.map.height-1,'saved y'); assert(!'#~h'.includes(this.tile(s.position.x,s.position.y)),'Saved position is blocked');
+    assert(this.map,'Saved map is unavailable'); integer(s.position.x,0,this.map.width-1,'saved x'); integer(s.position.y,0,this.map.height-1,'saved y'); assert(!'#h'.includes(this.tile(s.position.x,s.position.y))&&(this.tile(s.position.x,s.position.y)!=='~'||this.mode!=='land'),'Saved position is blocked');if(s.field)assert(['land','surf','underwater'].includes(s.field.mode),'Invalid field mode');
     assert(Array.isArray(s.party)&&s.party.length>=1&&s.party.length<=6&&Array.isArray(s.boxes)&&s.boxes.length<=6000,'Invalid storage');
     const mons=[...s.party,...s.boxes]; mons.forEach(m=>this.catalog.validateMon(m)); assert(new Set(mons.map(m=>m.uid)).size===mons.length,'Duplicate Pokémon identity');
     integer(s.nextId,1,10000000,'identity counter'); assert(mons.every(m=>/^mon-[1-9]\d*$/.test(m.uid)&&Number(m.uid.slice(4))<s.nextId),'Invalid identity counter');
@@ -69,28 +88,37 @@ export class Campaign {
   }
   snapshot() { this.state.rng=this.random.state; this.validate(); return clone(this.state); }
   move(dx,dy) {
-    assert(Math.abs(dx)+Math.abs(dy)===1,'Move one tile at a time'); const p=this.state.position,x=p.x+dx,y=p.y+dy;
+    assert(Math.abs(dx)+Math.abs(dy)===1,'Move one tile at a time');const forced=this.forcedDirection();if(forced)[dx,dy]=forced; const p=this.state.position,x=p.x+dx,y=p.y+dy;
     if(x<0||y<0||x>=this.map.width||y>=this.map.height){
       const direction=y<0?'up':y>=this.map.height?'down':x<0?'left':'right';
-      const link=(this.map.connections||[]).find(c=>c.direction===direction);if(!link)return {kind:'blocked'};
-      const dest=this.pack.maps[link.map],nx=direction==='left'?dest.width-1:direction==='right'?0:x-link.offset,ny=direction==='up'?dest.height-1:direction==='down'?0:y-link.offset;
-      if(nx<0||ny<0||nx>=dest.width||ny>=dest.height||'#~h'.includes(this.tile(nx,ny,dest)))return {kind:'blocked'};
-      this.enterMap({map:link.map,x:nx,y:ny});return {kind:'warp',map:dest.name};
+      for(const link of (this.map.connections||[]).filter(c=>c.direction===direction)){
+        const dest=this.pack.maps[link.map];if(!dest)continue;const nx=direction==='left'?dest.width-1:direction==='right'?0:x-link.offset,ny=direction==='up'?dest.height-1:direction==='down'?0:y-link.offset;
+        if(!this.canOccupy(nx,ny,dest))continue;this.enterMap({map:link.map,x:nx,y:ny});return {kind:'warp',map:dest.name};
+      }return {kind:'blocked'};
     }
     const jump=this.map.jumps?.[`${x},${y}`],dir=dx===1?'east':dx===-1?'west':dy===1?'south':'north';
     if(jump===dir){const nx=x+dx,ny=y+dy;if(nx>=0&&ny>=0&&nx<this.map.width&&ny<this.map.height&&!('#~h'.includes(this.tile(nx,ny)))){p.x=nx;p.y=ny;this.state.steps++;return {kind:'step'};}}
     const warpHere=this.map.events.some(e=>e.x===x&&e.y===y&&e.kind==='warp');
-    if(('#~h'.includes(this.tile(x,y))||!this.elevationAllows(x,y))&&!warpHere)return {kind:'blocked'};
+    if((!this.canOccupy(x,y)||this.tile(x,y)!=='~'&&!this.elevationAllows(x,y)&&!this.canDisembark(x,y))&&!warpHere)return {kind:'blocked'};
     const obstacle=this.visibleEvents().find(e=>e.x===x&&e.y===y&&e.kind!=='warp'&&e.solid!==false); if(obstacle)return {kind:'blocked'};
     p.x=x;p.y=y;this.state.steps++;
     const warp=this.map.events.find(e=>e.x===x&&e.y===y&&e.kind==='warp');
     if(warp){this.enterMap({map:warp.map,x:warp.toX,y:warp.toY});return {kind:'warp',map:this.map.name};}
-    if(this.tile(x,y)==='g'&&this.state.options.encounters&&this.map.encounters?.length&&this.random.next()<Math.min(.5,(this.map.encounterRate??16)/100)) {
-      const pool=this.map.encounters,total=pool.reduce((n,e)=>n+e.weight,0); let roll=this.random.int(1,total), selected=pool[0];
-      for(const entry of pool){roll-=entry.weight;if(roll<=0){selected=entry;break;}}
-      const mon=this.createMon(selected.species,this.random.int(selected.min,selected.max)); this.mark('seen',mon.species); return {kind:'encounter',mon};
-    }
+    if(this.mode==='surf'&&this.tile(x,y)!=='~')this.state.field={mode:'land'};
+    const encountered=this.stepEncounter();if(encountered)return encountered;
     return {kind:'step'};
+  }
+  chooseEncounter(pool){
+    const total=pool.reduce((n,e)=>n+e.weight,0);if(!total)return null;let roll=this.random.int(1,total);const entry=pool.find(e=>(roll-=e.weight)<=0);if(!entry?.species)return null;
+    const mon=this.createMon(entry.species,this.random.int(entry.min,entry.max));this.mark('seen',mon.species);return {kind:'encounter',mon};
+  }
+  stepEncounter(){
+    if(!this.state.options.encounters)return null;const p=this.state.position,attrs=this.catalog.fieldData?.tileAttributes?.[this.behavior(p.x,p.y)],method=attrs?.surfable?'water_mons':'land_mons',source=this.mapInfo.encounters?.[method];
+    if(source){if(!attrs?.encounters)return null;const pool=source.slots.filter(e=>e.species);if(pool.length&&this.random.next()<Math.min(.5,source.rate/100))return this.chooseEncounter(pool);return null;}
+    if(this.tile(p.x,p.y)==='g'&&this.map.encounters?.length&&this.random.next()<Math.min(.5,(this.map.encounterRate??16)/100))return this.chooseEncounter(this.map.encounters);return null;
+  }
+  fish(rod,dx,dy){
+    assert(['old_rod','good_rod','super_rod'].includes(rod),'Invalid fishing rod');const item=Object.keys(this.catalog.data.itemDetails).find(id=>this.catalog.data.itemDetails[id].constant==='ITEM_'+rod.toUpperCase());assert(item&&(this.state.inventory[item]||0)>0,'That rod is not in the Bag');const p=this.state.position;assert(this.fishable(p.x+dx,p.y+dy),'Face fishable water');const table=this.mapInfo.encounters?.fishing_mons;assert(table?.groups?.[rod],'No fishing table here');const indices=new Set(table.groups[rod]);return this.chooseEncounter(table.slots.filter(e=>indices.has(e.sourceSlot)))||{kind:'no_bite'};
   }
   createMon(constant,level) { const mon=this.catalog.create(this.catalog.id(constant),level,this.random,`mon-${this.state.nextId++}`);const orange=/map_(?:orange_city|route14[3-6])/.test(this.map.id);const odds=orange&&this.state.options.orangeShinies!==false?50:this.state.options.shinyOdds||8192;mon.shiny=this.random.int(1,odds)===1;return mon; }
   bagAllowed(){return !['hard','extreme'].includes(this.state.options.difficulty)&&this.state.options.battleBag!==false;}

@@ -1,4 +1,5 @@
 import {assert,clone,integer} from './model.mjs';
+import {applyFieldEffect,fieldMoveUser} from './traversal.mjs';
 import {fieldSpecial,setMetatile,tileAt} from './field-specials.mjs';
 // Native script DATA only: no eval, Function constructor or JavaScript imports.
 export function compileScripts(source){
@@ -26,8 +27,18 @@ export function planScript(campaign,source,entry,decisions=null){
     return lines.map(line=>{const match=line.match(/^\.string\s+"(.*)"$/);assert(match,'Unsupported text');return match[1].replace(/\\[nl]/g,' ').replace(/\\p/g,'\n\n').replace(/\\"/g,'"').replace(/\$/g,'');}).join('').replaceAll('{PLAYER}',draft.trainer.name).replaceAll('{RIVAL}',draft.trainer.gender==='Female'?'Brendan':'May').replace(/\{(STR_VAR_[123])\}/g,(_,key)=>buffers[key]||'');
   };
   while(++steps<=4096){
-    assert(labels[label],'Unported script '+label);const line=labels[label][index++];assert(line!==undefined,'Script has no ending');const [opcode,...rest]=line.split(/\s+/),args=rest.join(' ').split(',').map(s=>s.trim());
+    assert(labels[label],'Unported script '+label);const line=labels[label][index++];assert(line!==undefined,'Script has no ending');const [opcode,...rest]=line.split(/\s+/),args=rest.join(' ').split(',').map(s=>s.trim());if(['setvar','copyvar','addvar','subvar'].includes(opcode)){if(args.length===1&&rest.length===2)args.splice(0,1,...rest);if(/^0x80[0-9a-f]{2}$/i.test(args[0]))args[0]='VAR_0x'+args[0].slice(2).toUpperCase();}
     if(opcode==='waitmovement'){if(pendingMovements.length&&decisions?.present)input({kind:'movement',startState:movementStart,actors:pendingMovements});pendingMovements=[];movementStart=null;continue;}
+    if(opcode==='checkfieldmove'){
+      const index=fieldMoveUser(campaign.catalog,draft,args[0],args[1]?!!value(args[1]):false);draft.vars??={};draft.vars.VAR_RESULT=index<0?6:index;if(index>=0)draft.vars.VAR_0x8004=draft.party[index].species;continue;
+    }
+    if(opcode==='bufferpartymonnick'){assert(/^STR_VAR_[123]$/.test(args[0]),'Invalid text buffer');const mon=draft.party[value(args[1])];assert(mon,'Invalid field-move user');buffers[args[0]]=mon.nickname;continue;}
+    if(opcode==='setfieldeffectargument')continue;
+    if(opcode==='hidefollowernpc'){draft.flags.FLAG_TEMP_HIDE_FOLLOWER=true;continue;}
+    if(opcode==='callnative'&&['FollowerNPC_WarpSetEnd','SetFollowerNPCSurfSpriteAfterDive'].includes(args[0])){draft.flags.FLAG_TEMP_HIDE_FOLLOWER=false;continue;}
+    if(opcode==='dofieldeffect'&&['FLDEFF_USE_SURF','FLDEFF_USE_DIVE','FLDEFF_USE_WATERFALL'].includes(args[0])){
+      const start=clone(draft),temporary=new campaign.constructor(campaign.catalog,campaign.pack,draft),frames=applyFieldEffect(temporary,args[0]);temporary.snapshot();if(frames.length&&decisions?.present)input({kind:'movement',startState:start,movementMode:temporary.mode,actors:[{localId:'LOCALID_PLAYER',frames}]});continue;
+    }
     if(IGNORE.has(opcode))continue;
     if(['playse','playfanfare','delay','playbgm','fadedefaultbgm','fadescreen','fadescreenspeed','savebgm','fadeoutbgm','fadeinbgm','setbattlebgm','waitstate','nop1','nop2','hidebox','showmoneybox','updatemoneybox','hidemoneybox','waitdooranim','setdooropened','setdoorclosed','setdooropen','setdoorclose','dofieldeffect','waitfieldeffect'].includes(opcode))continue;
     if(opcode==='checkplayergender'){draft.vars??={};draft.vars.VAR_RESULT=draft.trainer.gender==='Female'?1:0;continue;}
