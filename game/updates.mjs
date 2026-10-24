@@ -21,13 +21,13 @@ export class ContentUpdates {
     assert(manifest.format==='brisk-native-release'&&manifest.schema===1,'Unsupported release manifest');
     assert(typeof manifest.version==='string'&&manifest.version.length<=80,'Invalid release version');
     assert(Number.isInteger(manifest.minimumEngine)&&manifest.minimumEngine>=1&&manifest.minimumEngine<=ENGINE_VERSION,'Update requires a newer application');
-    assert(/^[a-f0-9]{64}$/.test(manifest.sha256)&&Number.isInteger(manifest.bytes)&&manifest.bytes>0&&manifest.bytes<=8000000,'Invalid content download');this.url(manifest.url,this.manifestURL);
+    assert(/^[a-f0-9]{64}$/.test(manifest.sha256)&&Number.isInteger(manifest.bytes)&&manifest.bytes>0&&manifest.bytes<=32000000,'Invalid content download');this.url(manifest.url,this.manifestURL);
     return manifest.version===currentVersion?null:manifest;
   }
   async stage(manifest) {
     // Revalidate caller-provided manifests; do not trust only check().
     assert(manifest?.format==='brisk-native-release'&&manifest.schema===1&&Number.isInteger(manifest.minimumEngine)&&manifest.minimumEngine>=1&&manifest.minimumEngine<=ENGINE_VERSION,'Unsupported update');
-    assert(Number.isInteger(manifest.bytes)&&manifest.bytes>0&&manifest.bytes<=8000000&&/^[a-f0-9]{64}$/.test(manifest.sha256),'Invalid content download');
+    assert(Number.isInteger(manifest.bytes)&&manifest.bytes>0&&manifest.bytes<=32000000&&/^[a-f0-9]{64}$/.test(manifest.sha256),'Invalid content download');
     const response=await this.fetcher(this.url(manifest.url,this.manifestURL),{redirect:'error',signal:AbortSignal.timeout(30000)});assert(response.ok,'Content download failed');
     const bytes=await readBounded(response,manifest.bytes),size=bytes.length;
     assert(size===manifest.bytes,'Incomplete content download');

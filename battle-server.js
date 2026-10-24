@@ -1832,7 +1832,7 @@ function resolveAttack(room,pi,choice){
       if(target.volatile.substitute<=0)log(room,target.name+"'s substitute faded!");
     }else{
       if(n==='falseswipe'&&hitDamage>=target.hp)hitDamage=Math.max(0,target.hp-1);
-      target.hp=Math.max(0,target.hp-hitDamage);dealt+=hitDamage;
+      hitDamage=Math.min(target.hp,hitDamage);target.hp=Math.max(0,target.hp-hitDamage);dealt+=hitDamage;
     }
     landed++;
     if(result.crit)log(room,'A critical hit!');
@@ -2038,7 +2038,7 @@ function resolveDoublesTurn(room){
   moves.sort((a,b)=>{const pa=doublesMovePriority(room,a.pi,a.pos,a.choice),pb=doublesMovePriority(room,b.pi,b.pos,b.choice);if(pa!==pb)return pb-pa;const sa=doublesSpeed(room,a.pi,a.pos),sb=doublesSpeed(room,b.pi,b.pos);return (room.trickRoom?sa-sb:sb-sa)||(Math.random()<.5?-1:1);});
   for(const e of moves){
     if(room.phase!=='battle')break;const p=room.players[e.pi],mon=activeAt(p,e.pos);if(!mon||mon.hp<=0)continue;
-    const foe=room.players[other(e.pi)],targetPos=(Number(e.choice.targetPos)===1&&activeAt(foe,1)&&activeAt(foe,1).hp>0)?1:0;
+    const foe=room.players[other(e.pi)],requested=Number(e.choice.targetPos)===1?1:0,targetPos=activeAt(foe,requested)&&activeAt(foe,requested).hp>0?requested:1-requested;
     doublesContext(room,e.pi,e.pos,targetPos,()=>resolveAttack(room,e.pi,e.choice));
     ensureDoublesReplacement(room,e.pi,0);ensureDoublesReplacement(room,e.pi,1);ensureDoublesReplacement(room,other(e.pi),0);ensureDoublesReplacement(room,other(e.pi),1);
     if(checkDoublesEnd(room))break;

@@ -983,6 +983,7 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
     <button id="tab-abilities" role="tab" aria-selected="false" aria-controls="abilities-tab-panel">Abilities</button>
     <button id="tab-items" role="tab" aria-selected="false" aria-controls="items-tab-panel">Items</button>
     <button id="tab-bag" role="tab" aria-selected="false" aria-controls="bag-tab-panel">Bag</button>
+    <button id="tab-game" role="tab" aria-selected="false" aria-controls="game-tab-panel">Play Brisk Emerald</button>
     <button id="tab-guide" role="tab" aria-selected="false" aria-controls="guide-tab-panel">Guide</button>
     <button id="tab-changes" role="tab" aria-selected="false" aria-controls="changes-tab-panel">Changes</button>
   </nav>
@@ -1275,6 +1276,9 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
     </div>
   </section>
 
+  <section id="game-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-game" style="display:none;">
+    <iframe id="brisk-game" title="Brisk Emerald recreation" style="width:100%;height:85vh;min-height:560px;border:0;border-radius:12px" allow="fullscreen" allowfullscreen></iframe>
+  </section>
   <section id="guide-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-guide" style="display:none;">
     <div class="guide-hero">
       <h2>Brisk Dex Player Guide</h2>
@@ -6349,6 +6353,13 @@ function renderCurrentReferenceTab(){
 
 function setMainTab(tabName){
   currentMainTab = tabName;
+  var game = tabName === 'game';
+  document.getElementById('game-tab-panel').style.display = game ? 'block' : 'none';
+  document.getElementById('tab-game').classList.toggle('active',game);
+  document.getElementById('tab-game').setAttribute('aria-selected',String(game));
+  var gameFrame=document.getElementById('brisk-game');
+  if(game&&!gameFrame.getAttribute('src')&&!gameFrame.hasAttribute('srcdoc')){if(window.BriskStandalone?.gameDocument)gameFrame.srcdoc=window.BriskStandalone.gameDocument;else gameFrame.src='game/index.html';}
+  if(gameFrame.contentWindow)gameFrame.contentWindow.postMessage({type:'brisk-game-visibility',visible:game},'*');
   var routes = tabName === 'routes';
   var dex = tabName === 'dex';
   var trainers = tabName === 'trainers';
@@ -6365,7 +6376,7 @@ function setMainTab(tabName){
   document.getElementById('settings-tab-panel').style.display=settings?'block':'none';
   document.getElementById('tab-settings').classList.toggle('active',settings);
   document.getElementById('tab-settings').setAttribute('aria-selected',String(settings));
-  var save = !settings && !routes && !dex && !trainers && !competitive && !online && !trading && !moves && !abilities && !items && !bag && !guide && !changes;
+  var save = !game && !settings && !routes && !dex && !trainers && !competitive && !online && !trading && !moves && !abilities && !items && !bag && !guide && !changes;
   document.getElementById('save-tab-panel').style.display = save ? 'block' : 'none';
   document.getElementById('routes-tab-panel').style.display = routes ? 'block' : 'none';
   document.getElementById('dex-tab-panel').style.display = dex ? 'block' : 'none';
@@ -6649,6 +6660,7 @@ document.getElementById('tab-moves').addEventListener('click', function(){ setMa
 document.getElementById('tab-abilities').addEventListener('click', function(){ setMainTab('abilities'); });
 document.getElementById('tab-items').addEventListener('click', function(){ setMainTab('items'); });
 document.getElementById('tab-bag').addEventListener('click', function(){ setMainTab('bag'); });
+document.getElementById('tab-game').addEventListener('click',function(){setMainTab('game');});
 document.getElementById('tab-guide').addEventListener('click', function(){ setMainTab('guide'); });
 document.getElementById('tab-changes').addEventListener('click', function(){ setMainTab('changes'); });
 document.getElementById('move-search').addEventListener('input', renderMovesDebounced);

@@ -38,7 +38,8 @@
     "game:ui": "node tools/test_native_ui.cjs",
     "game:release": "node tools/build_native_release.mjs",
     "game:battle-build": "node tools/build_native_battle.mjs",
-    "game:port": "python tools/port_native_content.py"
+    "game:port": "python tools/port_native_content.py",
+    "index:test": "npm run index:build && node tools/test_standalone_game.mjs"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.0.0",

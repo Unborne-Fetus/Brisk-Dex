@@ -1,5 +1,18 @@
 # Brisk Dex
 
+### Play Brisk Emerald inside Brisk Dex
+
+Open **Play Brisk Emerald** in the app's tabs. The native recreation now ships inside the desktop, mobile, web, and generated single-file HTML editions. It loads on first use, keeps the same session when changing tabs, and pauses movement while hidden. Campaign saves and original GBA imports retain their existing independent storage; online trading and battle services remain disconnected.
+
+This is **not yet a 1:1 recreation**. The source import now contains 550 Emerald-format maps with source graphics, 1,295 resolved warps, NPC hide flags, elevations, and shared scripts. The renderer uses the GBA's 15-by-10-tile viewport, source facing frames, and walking frames. Object visibility/position changes, flag checks, conditional calls, and switches are supported transactionally. Starter selection currently skips the introduction/rescue sequence and initializes the matching Route 101 object flags.
+
+Full story progression, native special functions, map callbacks, coordinate-triggered cutscenes, moving NPC schedules, field HMs, sound, battle presentation, and exact battle mechanics still require porting and playthrough verification. Procedural areas retain their source static layouts; their generation logic is not implemented. FRLG-format layouts are listed separately as unsupported. `game/port-report.json` lists import limitations; its unresolved-event count is a conservative extraction report, not a runtime coverage or completion percentage.
+
+Source story events now suspend for dialogue, choices, single/double battles, and parallel NPC/player movement groups, then resume the same script. Battle victories can execute the original badge, TM, gift, trainer-flag, and follow-up branches. Regression tests run the source badge scripts for all eight gym leaders; these tests simulate the victory result and separately exercise the local doubles engine. Map entry/frame/coordinate tables drive scene selection. Source metatile atlases and transactional tile overrides preserve puzzle graphics and collision, including Mauville's barrier deactivation and Petalburg's door changes. The generated script-data pack supplies numeric operands, shared text, and 863 trainer teams.
+
+Rebuild source maps with `npm run game:port -- /path/to/Pokemon-Brisk-Emerald`. Run `npm run game:test` for campaign/source tests and `npm run index:test` to rebuild and inspect the single-file game's script/resource packaging.
+
+
 Brisk Dex is a companion app for [Pokémon Brisk Emerald](https://github.com/Unborne-Fetus/Pokemon-Brisk-Emerald). Browse the game's reference data, manage Pokémon and items across saves, and battle another player using Pokémon from your collection.
 
 Species, forms, stats, moves, abilities, items, encounters, and trainer teams come from Brisk Emerald's source. Brisk changes many things from the official games, so its bundled data is the reference used by this app.

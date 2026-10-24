@@ -1,10 +1,11 @@
 import {assert,clone,integer} from './model.mjs';
+import {fieldSpecial,setMetatile,tileAt} from './field-specials.mjs';
 // Native script DATA only: no eval, Function constructor or JavaScript imports.
 export function compileScripts(source){
   const labels={};let current=null;
   for(const raw of source.split(/\r?\n/)){
-    const line=raw.trim();const label=line.match(/^(\w+)::?$/);if(label){if(current)current.push('goto '+label[1]);current=labels[label[1]]=[];continue;}
-    if(current&&line&&!line.startsWith('//'))current.push(line.replace(/\s+\/\/.*$/,''));
+    const line=raw.replace(/\s+@.*$/,'').trim();const label=line.match(/^(\w+)::?$/);if(label){if(current)current.push('goto '+label[1]);current=labels[label[1]]=[];continue;}
+    if(current&&line&&!line.startsWith('//')&&!line.startsWith('@'))current.push(line.replace(/\s+\/\/.*$/,''));
   }
   return labels;
 }
@@ -12,19 +13,44 @@ const IGNORE=new Set(['lock','lockall','release','releaseall','faceplayer','wait
 export class ScriptInputRequired extends Error {
   constructor(key,request){super('Script input required');this.key=key;this.request=request;}
 }
+export class ScriptBattleLost extends Error{constructor(state){super('Battle lost');this.state=state;}}
 export function planScript(campaign,source,entry,decisions=null){
-  const labels=compileScripts(source),draft=clone(campaign.snapshot()),messages=[],calls=[];let label=entry,index=0,steps=0,comparison=null;
+  const labels=compileScripts(source),draft=clone(campaign.snapshot()),messages=[],calls=[];let label=entry,index=0,steps=0,comparison=null,switchValue=null;const buffers={};let movementStart=null,pendingMovements=[];
+  const input=request=>{const key=`${label}:${index}:${steps}:${request.kind}`;assert(decisions,'Interactive '+request.kind+' requires a host');if(!decisions.has(key))throw new ScriptInputRequired(key,{...request,state:clone(draft)});return decisions.get(key);};
+  const constants=campaign.catalog.scriptData?.constants||{};
   const itemIds=new Map(Object.entries(campaign.catalog.data.itemDetails).map(([id,item])=>[item.constant,Number(id)]));
-  const value=token=>{token=String(token).trim();if(/^0x[0-9a-f]+$/i.test(token))return parseInt(token,16);if(/^\d+$/.test(token))return Number(token);if(token==='TRUE'||token==='YES')return 1;if(token==='FALSE'||token==='NO')return 0;if(/^VAR_/.test(token))return draft.vars?.[token]||0;throw new Error('Unresolved value '+token);};
+  const value=token=>{token=String(token).trim();if(/^0x[0-9a-f]+$/i.test(token))return parseInt(token,16);if(/^\d+$/.test(token))return Number(token);if(token==='TRUE'||token==='YES')return 1;if(token==='FALSE'||token==='NO')return 0;if(/^VAR_/.test(token))return draft.vars?.[token]||0;if(Object.hasOwn(constants,token))return constants[token];throw new Error('Unresolved value '+token);};
   const text=target=>{
-    assert(labels[target],'Missing text '+target);const lines=labels[target].filter(line=>line.startsWith('.string'));
+    assert(labels[target]||campaign.catalog.scriptData?.text?.[target],'Missing text '+target);const lines=labels[target]?labels[target].filter(line=>line.startsWith('.string')):['.string "'+campaign.catalog.scriptData.text[target]+'"'];
     assert(lines.length,'Missing text '+target);
-    return lines.map(line=>{const match=line.match(/^\.string\s+"(.*)"$/);assert(match,'Unsupported text');return match[1].replace(/\\[nl]/g,' ').replace(/\\p/g,'\n\n').replace(/\\"/g,'"').replace(/\$/g,'');}).join('').replaceAll('{PLAYER}',draft.trainer.name).replaceAll('{RIVAL}',draft.trainer.gender==='Female'?'Brendan':'May');
+    return lines.map(line=>{const match=line.match(/^\.string\s+"(.*)"$/);assert(match,'Unsupported text');return match[1].replace(/\\[nl]/g,' ').replace(/\\p/g,'\n\n').replace(/\\"/g,'"').replace(/\$/g,'');}).join('').replaceAll('{PLAYER}',draft.trainer.name).replaceAll('{RIVAL}',draft.trainer.gender==='Female'?'Brendan':'May').replace(/\{(STR_VAR_[123])\}/g,(_,key)=>buffers[key]||'');
   };
-  while(++steps<=256){
+  while(++steps<=4096){
     assert(labels[label],'Unported script '+label);const line=labels[label][index++];assert(line!==undefined,'Script has no ending');const [opcode,...rest]=line.split(/\s+/),args=rest.join(' ').split(',').map(s=>s.trim());
+    if(opcode==='waitmovement'){if(pendingMovements.length&&decisions?.present)input({kind:'movement',startState:movementStart,actors:pendingMovements});pendingMovements=[];movementStart=null;continue;}
     if(IGNORE.has(opcode))continue;
-    if(['playse','playfanfare','delay'].includes(opcode))continue;
+    if(['playse','playfanfare','delay','playbgm','fadedefaultbgm','fadescreen','fadescreenspeed','savebgm','fadeoutbgm','fadeinbgm','setbattlebgm','waitstate','nop1','nop2','hidebox','showmoneybox','updatemoneybox','hidemoneybox','waitdooranim','setdooropened','setdoorclosed','setdooropen','setdoorclose','dofieldeffect','waitfieldeffect'].includes(opcode))continue;
+    if(opcode==='checkplayergender'){draft.vars??={};draft.vars.VAR_RESULT=draft.trainer.gender==='Female'?1:0;continue;}
+    if(opcode==='settrainerflag'||opcode==='cleartrainerflag'){assert(/^TRAINER_\w+$/.test(args[0]),'Invalid trainer');draft.flags[args[0]]=opcode==='settrainerflag';continue;}
+    if(opcode==='goto_if_defeated'||opcode==='goto_if_not_defeated'){if(!!draft.flags[args[0]]===(opcode==='goto_if_defeated')){label=args[1];index=0;}continue;}
+    if(opcode==='checktrainerflag'){draft.vars??={};draft.vars.VAR_RESULT=draft.flags[args[0]]?1:0;comparison=draft.vars.VAR_RESULT;continue;}
+    if(opcode==='bufferspeciesname'||opcode==='bufferitemname'||opcode==='buffermovename'||opcode==='buffernumberstring'){
+      assert(/^STR_VAR_[123]$/.test(args[0]),'Invalid text buffer');const id=value(args[1]);buffers[args[0]]=opcode==='bufferspeciesname'?campaign.catalog.species(id).name:opcode==='bufferitemname'?campaign.catalog.data.items[id]:opcode==='buffermovename'?campaign.catalog.move(id).name:String(id);continue;
+    }
+    if(opcode==='setmetatile'){setMetatile(draft,campaign.pack.maps[draft.position.map],value(args[0]),value(args[1]),value(args[2]),value(args[3]));continue;}
+    if(opcode==='special'&&fieldSpecial(args[0],draft,campaign.pack.maps[draft.position.map],constants))continue;
+    if(opcode==='setflashlevel'||opcode==='animateflash'){draft.flashLevel=value(args[0]);continue;}
+    if(opcode==='setobjectmovementtype'||opcode==='turnobject'){
+      const map=campaign.pack.maps[draft.position.map];assert(map.events.some(e=>e.localId===args[0]),'Unknown object '+args[0]);draft.objects??={};draft.objects[map.id]??={};const obj=draft.objects[map.id][args[0]]??={};obj.movementType=opcode==='turnobject'?'MOVEMENT_TYPE_FACE_'+({1:'DOWN',2:'UP',3:'LEFT',4:'RIGHT'}[value(args[1])]):args[1];continue;
+    }
+    if(opcode==='register_matchcall'){draft.flags['REGISTERED_'+args[0]]=true;continue;}
+    if(opcode==='specialvar'){
+      draft.vars??={};assert(/^VAR_\w+$/.test(args[0]),'Invalid special result');const name=args[1];
+      if(name==='ShouldTryRematchBattle'||name==='IsTrainerReadyForRematch')draft.vars[args[0]]=0;
+      else if(name==='IsTrainerRegistered'){const id=Object.entries(constants).find(([key,id])=>key.startsWith('TRAINER_')&&id===value('VAR_0x8004'))?.[0];draft.vars[args[0]]=draft.flags['REGISTERED_'+id]?1:0;}
+      else throw new Error('Unported special '+name);continue;
+    }
+    if(opcode==='special'&&['PlayerFaceTrainerAfterBattle','DrawWholeMapView','UpdateTrainerFanClubGameClear','BufferRivalName'].includes(args[0]))continue;
     if(opcode==='end')return {state:draft,messages,steps};
     if(opcode==='return'){if(!calls.length)return {state:draft,messages,steps};[label,index]=calls.pop();continue;}
     if(opcode==='goto'||opcode==='call'){if(opcode==='call')calls.push([label,index]);label=args[0];index=0;continue;}
@@ -33,27 +59,50 @@ export function planScript(campaign,source,entry,decisions=null){
     if(['setvar','addvar','subvar','copyvar'].includes(opcode)){
       assert(/^VAR_\w+$/.test(args[0]),'Invalid variable');draft.vars??={};const v=value(args[1]),old=draft.vars[args[0]]||0;draft.vars[args[0]]=opcode==='addvar'?old+v:opcode==='subvar'?old-v:v;integer(draft.vars[args[0]],0,65535,'script variable');continue;
     }
+    if(opcode==='checkflag'){draft.vars??={};draft.vars.VAR_RESULT=draft.flags[args[0]]?1:0;comparison=draft.vars.VAR_RESULT;continue;}
+    if(opcode==='switch'){switchValue=value(args[0]);continue;}
+    if(opcode==='case'){assert(switchValue!==null,'Switch missing');if(switchValue===value(args[0])){label=args[1];index=0;}continue;}
+    if(opcode==='goto_if'){assert(comparison!==null,'Comparison missing');const yes={eq:comparison===0,ne:comparison!==0,lt:comparison<0,gt:comparison>0,le:comparison<=0,ge:comparison>=0}[args[0]];assert(yes!==undefined,'Unsupported condition');if(yes){label=args[1];index=0;}continue;}
+    if(opcode==='call_if_set'||opcode==='call_if_unset'){if(!!draft.flags[args[0]]===(opcode==='call_if_set')){calls.push([label,index]);label=args[1];index=0;}continue;}
     if(opcode==='compare'){comparison=value(args[0])-value(args[1]);continue;}
-    if(['goto_if_eq','goto_if_ne','goto_if_lt','goto_if_gt','goto_if_le','goto_if_ge'].includes(opcode)){
-      let target;if(args.length===3){comparison=value(args[0])-value(args[1]);target=args[2];}else target=args[0];assert(comparison!==null,'Comparison missing');const yes={goto_if_eq:comparison===0,goto_if_ne:comparison!==0,goto_if_lt:comparison<0,goto_if_gt:comparison>0,goto_if_le:comparison<=0,goto_if_ge:comparison>=0}[opcode];if(yes){label=target;index=0;}continue;
+    if(/^(?:goto|call)_if_(?:eq|ne|lt|gt|le|ge)$/.test(opcode)){
+      let target;if(args.length===3){comparison=value(args[0])-value(args[1]);target=args[2];}else target=args[0];assert(comparison!==null,'Comparison missing');const condition=opcode.replace(/^call_/,'goto_');const yes={goto_if_eq:comparison===0,goto_if_ne:comparison!==0,goto_if_lt:comparison<0,goto_if_gt:comparison>0,goto_if_le:comparison<=0,goto_if_ge:comparison>=0}[condition];if(yes){if(opcode.startsWith('call_'))calls.push([label,index]);label=target;index=0;}continue;
     }
     if(opcode==='msgbox'||opcode==='message'){
       const message=text(args[0]);
       if(args.includes('MSGBOX_YESNO')){const key=`${label}:${index}:${steps}`;assert(decisions,'A choice is required; this event is not ported');if(!decisions.has(key))throw new ScriptInputRequired(key,{kind:'yesno',message});const answer=decisions.get(key);assert(answer===0||answer===1,'Invalid choice');draft.vars??={};draft.vars.VAR_RESULT=answer;}
-      else messages.push(message);continue;
+      else{messages.push(message);if(decisions?.present)input({kind:'message',message});}continue;
+    }
+    if(/^trainerbattle_(?:single|double|rematch|rematch_double|no_intro)$/.test(opcode)){
+      const trainer=args[0],rematch=opcode.includes('rematch'),double=opcode.includes('double'),noIntro=opcode==='trainerbattle_no_intro';
+      if(draft.flags[trainer]&&!rematch)continue;
+      const team=campaign.catalog.scriptData?.trainers?.[trainer];assert(team?.party?.length,'Missing trainer '+trainer);
+      const result=input({kind:'battle',trainer,team,format:double?'doubles':'singles',intro:!noIntro&&args[1]?text(args[1]):'',defeat:args[noIntro?1:2]?text(args[noIntro?1:2]):''});
+      if(result?.phase==='lost')throw new ScriptBattleLost(result.state);assert(result?.phase==='won','Trainer battle was not won');const validated=new campaign.constructor(campaign.catalog,campaign.pack,clone(result.state));Object.assign(draft,validated.snapshot());draft.flags[trainer]=true;
+      const defeat=args[noIntro?1:2];if(defeat){const message=text(defeat);messages.push(message);if(decisions?.present)input({kind:'message',message});}
+      const after=args[double?4:3];if(after&&labels[after]){label=after;index=0;}continue;
     }
     if(opcode==='warp'){
       assert(args.length===3,'Unsupported warp signature');const map=args[0].toLowerCase(),x=value(args[1]),y=value(args[2]),destination=campaign.pack.maps[map];
       assert(destination,'Warp destination is not ported');integer(x,0,destination.width-1,'warp x');integer(y,0,destination.height-1,'warp y');assert(!'#~h'.includes(destination.tiles[y][x]),'Warp destination is blocked');draft.position={map,x,y};continue;
     }
+    if(['addobject','removeobject','setobjectxy','setobjectxyperm'].includes(opcode)){
+      const map=campaign.pack.maps[draft.position.map],object=args[0]==='LOCALID_PLAYER'?draft.position:map.events.find(e=>e.localId===args[0]);assert(object,'Unknown object '+args[0]);
+      if(args[0]==='LOCALID_PLAYER'){assert(opcode.startsWith('setobjectxy'),'Cannot hide player');draft.position.x=value(args[1]);draft.position.y=value(args[2]);continue;}
+      assert(args.length<4,'Remote object commands are not ported');draft.objects??={};draft.objects[map.id]??={};const target=draft.objects[map.id][args[0]]??={};
+      if(opcode==='addobject'||opcode==='removeobject'){target.visible=opcode==='addobject';if(object.hideFlag&&object.hideFlag!=='0')draft.flags[object.hideFlag]=!target.visible;}
+      else{if(opcode==='setobjectxyperm')target.persistent=true;target.x=value(args[1]);target.y=value(args[2]);integer(target.x,0,map.width-1,'object x');integer(target.y,0,map.height-1,'object y');}continue;
+    }
     if(opcode==='applymovement'){
-      assert(args[0]==='LOCALID_PLAYER','NPC movement is not ported');assert(labels[args[1]],'Movement table is not ported');
+      movementStart??=clone(draft);const frames=[];
+      const map=campaign.pack.maps[draft.position.map],player=args[0]==='LOCALID_PLAYER',object=player?draft.position:map.events.find(e=>e.localId===args[0]);assert(object,'Unknown movement object '+args[0]);assert(labels[args[1]],'Movement table is not ported');
+      draft.objects??={};draft.objects[map.id]??={};const actor=player?draft.position:(draft.objects[map.id][args[0]]??={x:object.x,y:object.y});
       let finished=false;for(const command of labels[args[1]]){if(command==='step_end'){finished=true;break;}if(command.startsWith('goto '))break;
-        if(/^(?:face_|walk_in_place_|delay_)/.test(command))continue;
+        const facing=command.match(/^(?:face_|walk_in_place_(?:fast_|faster_|slow_)?)(up|down|left|right)$/);if(facing){if(!player)actor.movementType='MOVEMENT_TYPE_FACE_'+facing[1].toUpperCase();frames.push({x:actor.x,y:actor.y,facing:facing[1]});continue;}if(/^delay_/.test(command))continue;
         const movement=command.match(/^(?:walk|walk_fast|walk_faster|walk_slow|walk_fastest)_(up|down|left|right)$/);assert(movement,'Unsupported movement '+command);
-        const [dx,dy]={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]}[movement[1]],map=campaign.pack.maps[draft.position.map],x=draft.position.x+dx,y=draft.position.y+dy;
-        assert(x>=0&&y>=0&&x<map.width&&y<map.height&&!('#~h'.includes(map.tiles[y][x])),'Scripted movement is blocked');draft.position.x=x;draft.position.y=y;
-      }assert(finished,'Movement table has no ending');continue;
+        const [dx,dy]={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]}[movement[1]],map=campaign.pack.maps[draft.position.map],x=actor.x+dx,y=actor.y+dy;
+        assert(x>=0&&y>=0&&x<map.width&&y<map.height&&!('#~h'.includes(tileAt(draft,map,x,y))),'Scripted movement is blocked');actor.x=x;actor.y=y;frames.push({x,y,facing:movement[1]});
+      }assert(finished,'Movement table has no ending');if(player&&frames.length){draft.vars??={};draft.vars.VAR_FACING={down:1,up:2,left:3,right:4}[frames.at(-1).facing];}pendingMovements.push({localId:args[0],frames});continue;
     }
     if(opcode==='checkitem'||opcode==='checkitemspace'||opcode==='removeitem'){
       const id=itemIds.get(args[0]),count=args[1]?value(args[1]):1;assert(id,'Unknown item');integer(count,1,999,'item count');const current=draft.inventory[id]||0;draft.vars??={};
@@ -64,15 +113,15 @@ export function planScript(campaign,source,entry,decisions=null){
       else if(opcode==='givemoney'){draft.money+=amount;integer(draft.money,0,999999999,'money');}else{assert(draft.money>=amount,'Not enough money');draft.money-=amount;}continue;
     }
     if(opcode==='givemon'){
-      const species=args[0].replace(/^SPECIES_/,''),level=value(args[1]);integer(level,1,100,'gift level');const temporary=new campaign.constructor(campaign.catalog,campaign.pack,draft),mon=temporary.createMon(species,level);
+      const species=campaign.catalog.data.species[constants[args[0]]]?.constant||args[0].replace(/^SPECIES_/,''),level=value(args[1]);integer(level,1,100,'gift level');const temporary=new campaign.constructor(campaign.catalog,campaign.pack,draft),mon=temporary.createMon(species,level);
       if(args[2]&&args[2]!=='ITEM_NONE'){const item=itemIds.get(args[2]);assert(item,'Unknown gift item');mon.item=item;}
-      temporary.catchMon(mon);temporary.snapshot();messages.push(`Received ${mon.nickname}!`);continue;
+      temporary.catchMon(mon);temporary.snapshot();draft.vars??={};draft.vars.VAR_RESULT=draft.party.includes(mon)?0:1;messages.push(`Received ${mon.nickname}!`);continue;
     }
     if(opcode==='special'&&args[0]==='HealPlayerParty'){
       for(const mon of draft.party)campaign.catalog.heal(mon);continue;
     }
     if(opcode==='giveitem'){
-      const id=itemIds.get(args[0]),count=args[1]?value(args[1]):1;assert(id,'Unknown reward item');integer(count,1,999,'reward quantity');const total=(draft.inventory[id]||0)+count;integer(total,0,999999,'bag capacity');draft.inventory[id]=total;messages.push(`Received ${campaign.catalog.data.items[id]} × ${count}!`);continue;
+      const id=itemIds.get(args[0]),count=args[1]?value(args[1]):1;assert(id,'Unknown reward item');integer(count,1,999,'reward quantity');const total=(draft.inventory[id]||0)+count;integer(total,0,999999,'bag capacity');draft.inventory[id]=total;draft.vars??={};draft.vars.VAR_RESULT=1;messages.push(`Received ${campaign.catalog.data.items[id]} × ${count}!`);continue;
     }
     throw new Error('Unported command '+opcode);
   }
@@ -86,8 +135,8 @@ export function runScript(campaign,source,entry){
 }
 
 export async function runInteractiveScript(campaign,source,entry,host){
-  const before=JSON.stringify(campaign.snapshot()),decisions=new Map();
-  for(let resumes=0;resumes<64;resumes++){
+  const before=JSON.stringify(campaign.snapshot()),decisions=new Map();decisions.present=host?.present===true;
+  for(let resumes=0;resumes<512;resumes++){
     let result;
     try{result=planScript(campaign,source,entry,decisions);}catch(error){
       if(!(error instanceof ScriptInputRequired))throw error;

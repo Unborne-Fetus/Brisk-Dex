@@ -1,3 +1,4 @@
+import {tileAt} from './field-specials.mjs';
 import {assert, integer, clone, Random, SAVE_FORMAT, SAVE_VERSION} from './model.mjs';
 export const WEATHER_ABILITIES = {Drizzle:'rain','Primordial Sea':'rain',Drought:'sun','Desolate Land':'sun','Orichalcum Pulse':'sun','Sand Stream':'sand','Sand Spit':'sand','Snow Warning':'snow','Delta Stream':'wind'};
 export function fieldWeather(map, lead) { return !map.outdoor||map.weatherLocked ? map.weather : WEATHER_ABILITIES[lead?.ability]||map.weather; }
@@ -7,7 +8,7 @@ export function validatePack(pack) {
   assert(pack.maps&&typeof pack.maps==='object','Missing maps');
   const maps=Object.values(pack.maps); assert(maps.length>0&&maps.length<=1000,'Invalid map count');
   for(const [id,map] of Object.entries(pack.maps)) {
-    assert(id===map.id&&/^[a-z0-9_-]+$/i.test(id),'Invalid map id'); integer(map.width,3,512,'map width'); integer(map.height,3,512,'map height');
+    assert(id===map.id&&/^[a-z0-9_-]+$/i.test(id),'Invalid map id'); integer(map.width,1,512,'map width'); integer(map.height,1,512,'map height');
     assert(typeof map.outdoor==='boolean'&&typeof map.weatherLocked==='boolean','Missing weather rules');
     assert(['clear','rain','sun','sand','snow','wind','fog'].includes(map.weather),'Invalid weather');
     assert(map.tiles?.length===map.height&&map.tiles.every(row=>typeof row==='string'&&row.length===map.width&&/^[.g#~bpfhd]+$/.test(row)),'Invalid map tiles');
@@ -25,17 +26,31 @@ export function validatePack(pack) {
   const start=pack.maps[pack.start?.map]; assert(start,'Missing starting map'); integer(pack.start.x,0,start.width-1,'start x'); integer(pack.start.y,0,start.height-1,'start y'); assert(!'#~h'.includes(start.tiles[pack.start.y][pack.start.x]),'Blocked start');
   return pack;
 }
+function startingFlags(pack){return {...clone(pack.initialFlags||{}),FLAG_SYS_POKEMON_GET:true,FLAG_RESCUED_BIRCH:true,FLAG_HIDE_ROUTE_101_BIRCH_ZIGZAGOON_BATTLE:true,FLAG_HIDE_ROUTE_101_BIRCH_STARTERS_BAG:true,FLAG_HIDE_ROUTE_101_ZIGZAGOON:true,FLAG_HIDE_LITTLEROOT_TOWN_BIRCHS_LAB_BIRCH:false};}
 export class Campaign {
+  tile(x,y,map=this.map){return tileAt(this.state,map,x,y);}
+  enterMap(position){
+    this.state.position=position;for(const key of Object.keys(this.state.flags))if(/^FLAG_TEMP_/.test(key))delete this.state.flags[key];for(const key of Object.keys(this.state.vars||{}))if(/^VAR_TEMP_/.test(key))delete this.state.vars[key];
+    if(this.state.objects?.[position.map])for(const [key,obj]of Object.entries(this.state.objects[position.map]))if(!obj.persistent)delete this.state.objects[position.map][key];
+  }
+  visibleEvents() {
+    const overrides=this.state.objects?.[this.map.id]||{};
+    return this.map.events.filter(e=>!this.state.flags[e.hideFlag]&&overrides[e.localId]?.visible!==false).map(e=>({...e,...overrides[e.localId]}));
+  }
+  elevationAllows(x,y) {
+    const p=this.state.position,from=this.map.elevations?.[p.y]?.[p.x]||0,to=this.map.elevations?.[y]?.[x]||0;
+    return !from||!to||from===15||to===15||from===to;
+  }
   constructor(catalog, pack, state) { this.catalog=catalog; this.pack=validatePack(pack); this.state=state; this.random=new Random(state.rng); this.validate(); }
   static start(catalog, pack, starter='TREECKO', seed=Date.now()) {
     const rng=new Random(seed), first=catalog.create(catalog.id(starter),5,rng,'mon-1');
-    return new Campaign(catalog,pack,{format:SAVE_FORMAT,schema:SAVE_VERSION,contentVersion:pack.version,trainer:{name:'Trainer'},position:clone(pack.start),party:[first],boxes:[],inventory:{'1':10,'28':5},money:3000,flags:{},nextId:2,rng:rng.state,steps:0,options:{encounters:true,weather:true,difficulty:'normal',expShare:true,battleBag:true,shinyOdds:8192,orangeShinies:true},seen:[first.species],caught:[first.species]});
+    return new Campaign(catalog,pack,{format:SAVE_FORMAT,schema:SAVE_VERSION,contentVersion:pack.version,vars:{VAR_STARTER_MON:{TREECKO:0,TORCHIC:1,MUDKIP:2}[starter]??0},trainer:{name:'Trainer'},position:clone(pack.start),party:[first],boxes:[],inventory:{'1':10,'28':5},money:3000,sourceObjectVersion:1,flags:startingFlags(pack),nextId:2,rng:rng.state,steps:0,options:{encounters:true,weather:true,difficulty:'normal',expShare:true,battleBag:true,shinyOdds:8192,orangeShinies:true},seen:[first.species],caught:[first.species]});
   }
   get map() { return this.pack.maps[this.state.position.map]; }
   validate() {
     const s=this.state; assert(s?.format===SAVE_FORMAT&&s.schema===SAVE_VERSION,'Unsupported save version'); assert(s.contentVersion===this.pack.version,'Save needs its matching content pack');
     assert(typeof s.trainer?.name==='string'&&s.trainer.name.length>0&&s.trainer.name.length<=24,'Invalid trainer name');
-    assert(this.map,'Saved map is unavailable'); integer(s.position.x,0,this.map.width-1,'saved x'); integer(s.position.y,0,this.map.height-1,'saved y'); assert(!'#~h'.includes(this.map.tiles[s.position.y][s.position.x]),'Saved position is blocked');
+    assert(this.map,'Saved map is unavailable'); integer(s.position.x,0,this.map.width-1,'saved x'); integer(s.position.y,0,this.map.height-1,'saved y'); assert(!'#~h'.includes(this.tile(s.position.x,s.position.y)),'Saved position is blocked');
     assert(Array.isArray(s.party)&&s.party.length>=1&&s.party.length<=6&&Array.isArray(s.boxes)&&s.boxes.length<=6000,'Invalid storage');
     const mons=[...s.party,...s.boxes]; mons.forEach(m=>this.catalog.validateMon(m)); assert(new Set(mons.map(m=>m.uid)).size===mons.length,'Duplicate Pokémon identity');
     integer(s.nextId,1,10000000,'identity counter'); assert(mons.every(m=>/^mon-[1-9]\d*$/.test(m.uid)&&Number(m.uid.slice(4))<s.nextId),'Invalid identity counter');
@@ -46,6 +61,8 @@ export class Campaign {
     assert(typeof s.options?.encounters==='boolean'&&typeof s.options.weather==='boolean','Invalid options');
     if(s.options.difficulty!==undefined)assert(['easy','normal','hard','extreme'].includes(s.options.difficulty),'Invalid difficulty');if(s.options.shinyOdds!==undefined)integer(s.options.shinyOdds,50,8192,'shiny odds');for(const key of ['expShare','battleBag','orangeShinies'])if(s.options[key]!==undefined)assert(typeof s.options[key]==='boolean','Invalid option '+key);
     for(const k of ['seen','caught']) { assert(Array.isArray(s[k])&&s[k].length<=10000,'Invalid Pokédex'); s[k].forEach(id=>this.catalog.species(id)); }
+    if(s.metatiles){for(const [mapId,changes]of Object.entries(s.metatiles)){const map=this.pack.maps[mapId];assert(map,'Invalid tile map');for(const [key,tile]of Object.entries(changes)){const [x,y]=key.split(',').map(Number);integer(x,0,map.width-1,'tile x');integer(y,0,map.height-1,'tile y');integer(tile.id,0,1023,'tile id');assert(map.metatileAtlas?.behaviors[tile.id]!==undefined&&typeof tile.blocked==='boolean','Invalid map edit');}}}
+    if(s.objects){assert(typeof s.objects==='object'&&!Array.isArray(s.objects),'Invalid objects');for(const [mapId,objects]of Object.entries(s.objects)){const map=this.pack.maps[mapId];assert(map&&objects&&typeof objects==='object','Invalid object map');for(const obj of Object.values(objects)){if(obj.visible!==undefined)assert(typeof obj.visible==='boolean','Invalid object visibility');if(obj.x!==undefined)integer(obj.x,0,map.width-1,'object x');if(obj.y!==undefined)integer(obj.y,0,map.height-1,'object y');}}}
     if(s.vars){assert(typeof s.vars==='object'&&!Array.isArray(s.vars),'Invalid script variables');for(const [key,value]of Object.entries(s.vars)){assert(/^VAR_\w+$/.test(key),'Invalid script variable');integer(value,0,65535,'script variable');}}
     if(s.respawn){const m=this.pack.maps[s.respawn.map];assert(m&&m.tiles[s.respawn.y]?.[s.respawn.x]&&!('#~h'.includes(m.tiles[s.respawn.y][s.respawn.x])),'Invalid recovery point');}
     return s;
@@ -57,18 +74,18 @@ export class Campaign {
       const direction=y<0?'up':y>=this.map.height?'down':x<0?'left':'right';
       const link=(this.map.connections||[]).find(c=>c.direction===direction);if(!link)return {kind:'blocked'};
       const dest=this.pack.maps[link.map],nx=direction==='left'?dest.width-1:direction==='right'?0:x-link.offset,ny=direction==='up'?dest.height-1:direction==='down'?0:y-link.offset;
-      if(nx<0||ny<0||nx>=dest.width||ny>=dest.height||'#~h'.includes(dest.tiles[ny][nx]))return {kind:'blocked'};
-      this.state.position={map:link.map,x:nx,y:ny};return {kind:'warp',map:dest.name};
+      if(nx<0||ny<0||nx>=dest.width||ny>=dest.height||'#~h'.includes(this.tile(nx,ny,dest)))return {kind:'blocked'};
+      this.enterMap({map:link.map,x:nx,y:ny});return {kind:'warp',map:dest.name};
     }
     const jump=this.map.jumps?.[`${x},${y}`],dir=dx===1?'east':dx===-1?'west':dy===1?'south':'north';
-    if(jump===dir){const nx=x+dx,ny=y+dy;if(nx>=0&&ny>=0&&nx<this.map.width&&ny<this.map.height&&!('#~h'.includes(this.map.tiles[ny][nx]))){p.x=nx;p.y=ny;this.state.steps++;return {kind:'step'};}}
+    if(jump===dir){const nx=x+dx,ny=y+dy;if(nx>=0&&ny>=0&&nx<this.map.width&&ny<this.map.height&&!('#~h'.includes(this.tile(nx,ny)))){p.x=nx;p.y=ny;this.state.steps++;return {kind:'step'};}}
     const warpHere=this.map.events.some(e=>e.x===x&&e.y===y&&e.kind==='warp');
-    if('#~h'.includes(this.map.tiles[y][x])&&!warpHere)return {kind:'blocked'};
-    const obstacle=this.map.events.find(e=>e.x===x&&e.y===y&&e.kind!=='warp'&&e.solid!==false); if(obstacle)return {kind:'blocked'};
+    if(('#~h'.includes(this.tile(x,y))||!this.elevationAllows(x,y))&&!warpHere)return {kind:'blocked'};
+    const obstacle=this.visibleEvents().find(e=>e.x===x&&e.y===y&&e.kind!=='warp'&&e.solid!==false); if(obstacle)return {kind:'blocked'};
     p.x=x;p.y=y;this.state.steps++;
     const warp=this.map.events.find(e=>e.x===x&&e.y===y&&e.kind==='warp');
-    if(warp){this.state.position={map:warp.map,x:warp.toX,y:warp.toY};return {kind:'warp',map:this.map.name};}
-    if(this.map.tiles[y][x]==='g'&&this.state.options.encounters&&this.map.encounters?.length&&this.random.next()<Math.min(.5,(this.map.encounterRate??16)/100)) {
+    if(warp){this.enterMap({map:warp.map,x:warp.toX,y:warp.toY});return {kind:'warp',map:this.map.name};}
+    if(this.tile(x,y)==='g'&&this.state.options.encounters&&this.map.encounters?.length&&this.random.next()<Math.min(.5,(this.map.encounterRate??16)/100)) {
       const pool=this.map.encounters,total=pool.reduce((n,e)=>n+e.weight,0); let roll=this.random.int(1,total), selected=pool[0];
       for(const entry of pool){roll-=entry.weight;if(roll<=0){selected=entry;break;}}
       const mon=this.createMon(selected.species,this.random.int(selected.min,selected.max)); this.mark('seen',mon.species); return {kind:'encounter',mon};
@@ -80,7 +97,7 @@ export class Campaign {
   travel(map,x,y){const dest=this.pack.maps[map];assert(dest&&dest.tiles[y]?.[x]&&!('#~h'.includes(dest.tiles[y][x])),'Blocked destination');this.state.position={map,x,y};}
   trainerTeam(entries){
     const normalized=s=>String(s).toLowerCase().replace(/[^a-z0-9]/g,''),byName=new Map(),moveNames=new Map(Object.entries(this.catalog.data.moves).map(([id,name])=>[normalized(name),Number(id)])),itemNames=new Map(Object.entries(this.catalog.data.items).map(([id,name])=>[normalized(name),Number(id)]));
-    for(const [id,s]of Object.entries(this.catalog.data.species)){if(!byName.has(normalized(s.name)))byName.set(normalized(s.name),Number(id));byName.set(normalized(s.constant),Number(id));if(s.formLabel)byName.set(normalized(s.name+s.formLabel),Number(id));}
+    for(const [id,s]of Object.entries(this.catalog.data.species)){if(!byName.has(normalized(s.name)))byName.set(normalized(s.name),Number(id));byName.set(normalized(s.constant),Number(id));if(s.formLabel){byName.set(normalized(s.name+s.formLabel),Number(id));if(/ Standard$/.test(s.formLabel))byName.set(normalized(s.name+s.formLabel.replace(/ Standard$/,'')),Number(id));}}
     return entries.map(entry=>{
       const id=byName.get(normalized(entry.species.replace(/\s*\([MF]\)$/i,'')));assert(id,'Unknown trainer species '+entry.species);const fields=entry.fields||{},s=this.catalog.species(id),mon=this.createMon(s.constant,Number(fields.Level)||5);mon.nickname=entry.nickname||s.name;
       const stats={HP:0,Atk:1,Def:2,Spe:3,SpA:4,SpD:5};
@@ -92,10 +109,10 @@ export class Campaign {
     });
   }
   mark(key,id) { if(!this.state[key].includes(id))this.state[key].push(id); }
-  interact(dx,dy) { const p=this.state.position;const distance=(this.map.counters||[]).includes(`${p.x+dx},${p.y+dy}`)?2:1;return this.map.events.find(e=>e.x===p.x+dx*distance&&e.y===p.y+dy*distance)||null; }
+  interact(dx,dy) { const p=this.state.position;const distance=(this.map.counters||[]).includes(`${p.x+dx},${p.y+dy}`)?2:1;return this.visibleEvents().find(e=>e.x===p.x+dx*distance&&e.y===p.y+dy*distance)||null; }
   heal() { this.state.party.forEach(m=>this.catalog.heal(m)); }
   buy(item,quantity,event) {
-    assert(this.map.events.includes(event)&&event.kind==='shop','No shop here'); const p=this.state.position; assert(Math.abs(p.x-event.x)+Math.abs(p.y-event.y)<=2&&this.interact(Math.sign(event.x-p.x),Math.sign(event.y-p.y))===event,'Approach the shopkeeper first');
+    assert(this.visibleEvents().some(e=>e.kind==='shop'&&e.x===event.x&&e.y===event.y)&&event.kind==='shop','No shop here'); const p=this.state.position; assert(Math.abs(p.x-event.x)+Math.abs(p.y-event.y)<=2&&this.interact(Math.sign(event.x-p.x),Math.sign(event.y-p.y))?.sourceScript===event.sourceScript,'Approach the shopkeeper first');
     const stock=event.stock.find(e=>e.item===item); assert(stock,'Item not sold here'); integer(quantity,1,99,'quantity');
     const count=this.state.inventory[item]||0; assert(count+quantity<=999999,'Bag is full'); const price=stock.price*({easy:1,normal:2,hard:4,extreme:10}[this.state.options.difficulty]||1);assert(this.state.money>=price*quantity,'Not enough money');
     this.state.money-=price*quantity; this.state.inventory[item]=count+quantity;
@@ -121,4 +138,4 @@ export class Campaign {
   }
 }
 
-export function migrateCampaign(state,pack,catalog){const copy=clone(state);if(copy.contentVersion===pack.version)return new Campaign(catalog,pack,copy);assert(copy.contentVersion==='prototype-1'&&pack.version==='prototype-2','Unsupported campaign migration');copy.contentVersion=pack.version;copy.options={difficulty:'normal',expShare:true,battleBag:true,shinyOdds:8192,orangeShinies:true,...copy.options};return new Campaign(catalog,pack,copy);}
+export function migrateCampaign(state,pack,catalog){const copy=clone(state);if(!copy.sourceObjectVersion){copy.flags={...startingFlags(pack),...copy.flags};copy.sourceObjectVersion=1;}if(copy.contentVersion===pack.version)return new Campaign(catalog,pack,copy);assert(copy.contentVersion==='prototype-1'&&pack.version==='prototype-2','Unsupported campaign migration');copy.contentVersion=pack.version;copy.options={difficulty:'normal',expShare:true,battleBag:true,shinyOdds:8192,orangeShinies:true,...copy.options};return new Campaign(catalog,pack,copy);}

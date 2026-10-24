@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+const html=fs.readFileSync(new URL('../standalone/index.html',import.meta.url),'utf8');
+for(const script of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(script[1]);
+const document=JSON.parse(html.match(/gameDocument:([^\n]+),\n  assetCount/)[1]);
+const scripts=[...document.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)];
+assert.equal(scripts.length,2,'Game needs separate resource bridge and bundled application scripts');
+for(const script of scripts)new vm.Script(script[1]);
+const requests=[],context={parent:{fetch:url=>requests.push(url),BriskStandalone:{assetUrl:url=>url}},MutationObserver:class{observe(){}},document:{documentElement:{}}};context.window=context;vm.runInNewContext(scripts[0][1],context);
+context.fetch('./content.json');context.fetch('../brisk-dex-data.json');assert.deepEqual(requests,['game/content.json','brisk-dex-data.json']);assert.equal(context.BriskGameAssets.assetUrl('assets/map_littleroot_town-ground.png'),'game/assets/map_littleroot_town-ground.png');
+for(const key of ['game/content.json','game/native-catalog.json','game/gba-layout.json','game/script-data.json','game/assets/map_littleroot_town-ground.png'])assert.ok(html.includes(JSON.stringify(key)+':'),key);
+console.log('Embedded parent/child scripts parse; game resources resolve inside the single-file archive.');

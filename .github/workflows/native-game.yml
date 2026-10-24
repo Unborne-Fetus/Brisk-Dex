@@ -1,10 +1,10 @@
-name: Standalone game foundation
+name: Native Emerald recreation
 on:
   push:
     branches: [main]
-    paths: ['battle-server.js', 'tools/build_native_battle.mjs', 'game/**', 'test/game/**', 'tools/import_native_maps.mjs', 'tools/serve_native_game.mjs', '.github/workflows/native-game.yml']
+    paths: ['index.html', 'tools/port_native_content.py', 'tools/source_script_data.py', 'tools/build_standalone.mjs', 'tools/test_standalone_game.mjs', 'battle-server.js', 'tools/build_native_battle.mjs', 'game/**', 'test/game/**', 'tools/import_native_maps.mjs', 'tools/serve_native_game.mjs', '.github/workflows/native-game.yml']
   pull_request:
-    paths: ['battle-server.js', 'tools/build_native_battle.mjs', 'game/**', 'test/game/**', 'tools/import_native_maps.mjs', '.github/workflows/native-game.yml']
+    paths: ['index.html', 'tools/port_native_content.py', 'tools/source_script_data.py', 'tools/build_standalone.mjs', 'tools/test_standalone_game.mjs', 'battle-server.js', 'tools/build_native_battle.mjs', 'game/**', 'test/game/**', 'tools/import_native_maps.mjs', '.github/workflows/native-game.yml']
   workflow_dispatch:
 jobs:
   test:
@@ -17,3 +17,14 @@ jobs:
       - run: npm run game:test
       - run: npm run battle:coverage
       - run: npm run battle:smoke
+
+  package-game:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run index:test

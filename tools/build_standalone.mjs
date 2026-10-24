@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import {build} from 'esbuild';
 import path from 'node:path';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
@@ -7,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const output = path.join(root, 'standalone', 'index.html');
 const assetDirs = [
-  'brisk-dex-icons', 'brisk-dex-sprites', 'brisk-dex-items',
+  'game', 'brisk-dex-icons', 'brisk-dex-sprites', 'brisk-dex-items',
   'brisk-dex-trainers', 'brisk-dex-trainer-pics', 'brisk-dex-cries',
   'brisk-dex-asset-patches'
 ];
@@ -80,6 +81,22 @@ if(!html.includes(cryFunction) || !html.includes(cryAudio)) throw new Error('Dex
 html = html.replace(cryFunction, 'async function playDexCry(url){');
 html = html.replace(cryAudio, 'dexCryAudio=new Audio(await window.BriskStandalone.assetUrl(url));');
 
+// Bundle the native game into the same distributable HTML. The child keeps its
+// own document/UI while resolving every resource through the parent's archive.
+const gameBundle=await build({entryPoints:[path.join(root,'game/app.mjs')],bundle:true,write:false,format:'iife',platform:'browser',target:'es2022'});
+const gameBridge=String.raw`<script>
+(function(){
+const normalize=url=>String(url).startsWith('../')?String(url).slice(3):'game/'+String(url).replace(/^\.\//,'');
+window.BriskGameAssets={assetUrl:url=>parent.BriskStandalone.assetUrl(normalize(url))};
+window.fetch=(url,options)=>parent.fetch(normalize(url),options);
+const pending=new WeakMap();
+function patch(img){const original=img.getAttribute('src');if(!original||/^(data:|blob:)/.test(original)||pending.get(img)===original)return;pending.set(img,original);BriskGameAssets.assetUrl(original).then(url=>{if(img.getAttribute('src')===original)img.src=url;});}
+new MutationObserver(records=>{for(const r of records){if(r.type==='attributes')patch(r.target);else for(const n of r.addedNodes){if(n.nodeType!==1)continue;if(n.tagName==='IMG')patch(n);n.querySelectorAll('img').forEach(patch);}}}).observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['src']});
+})();
+</script>`;
+let gameDocument=await fs.readFile(path.join(root,'game/index.html'),'utf8');
+gameDocument=gameDocument.replace('<link rel="stylesheet" href="./style.css">','<style>'+await fs.readFile(path.join(root,'game/style.css'),'utf8')+'</style>');
+gameDocument=gameDocument.replace('<script type="module" src="./app.mjs"></script>',gameBridge+'<script>'+gameBundle.outputFiles[0].text.replace(/<\/script/gi,'<\\/script')+'<\/script>');
 const bootstrap = `
 <style>
 #tab-online,#tab-trading,#online-tab-panel,#trading-tab-panel { display:none !important; }
@@ -149,6 +166,7 @@ const observer = new MutationObserver(records=>{
 observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['src']});
 document.addEventListener('DOMContentLoaded', ()=>scan(document.body));
 window.BriskStandalone = {
+  gameDocument:__GAME_DOCUMENT__,
   assetCount:Object.keys(packed).length,
   assetUrl:async function(url) {
     const key=keyFor(url);
@@ -160,7 +178,7 @@ window.BriskStandalone = {
 };
 })();
 </script>`;
-html = html.replace('</head>', bootstrap.replace('__PACKED__', JSON.stringify(packed)) + '\n</head>');
+html = html.replace('</head>', bootstrap.replace('__PACKED__', ()=>JSON.stringify(packed)).replace('__GAME_DOCUMENT__',()=>JSON.stringify(gameDocument).replace(/<\/script/gi,'<\\/script')) + '\n</head>');
 await fs.mkdir(path.dirname(output), {recursive:true});
 await fs.writeFile(output, html);
 const size = (await fs.stat(output)).size;

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a bounded playable map/data port from a LOCAL Brisk source checkout.
+"""Build an Emerald-format source map/data port from a LOCAL Brisk source checkout.
 Native cutscenes remain explicitly unresolved; no source scripts are evaluated.
 """
 import argparse,json,re,struct,subprocess,sys
@@ -7,14 +7,12 @@ from pathlib import Path
 from PIL import Image
 from extract_data import extract_blocks,find_source,read_jasc_palette,parse_enums,add_invoked_species_macros,extract_macro_definitions
 
-MAPS=['SlateportCity','SlateportCity_Mart','LittlerootTown','LittlerootTown_ProfessorBirchsLab','LittlerootTown_BrendansHouse_1F','LittlerootTown_BrendansHouse_2F','LittlerootTown_MaysHouse_1F','LittlerootTown_MaysHouse_2F','Route101','OldaleTown','OldaleTown_Mart','OldaleTown_PokemonCenter_1F','OldaleTown_House1','OldaleTown_House2','Route102','Route103','PetalburgCity','PetalburgCity_Mart','PetalburgCity_PokemonCenter_1F','Route104','PetalburgWoods','RustboroCity','RustboroCity_Mart','RustboroCity_PokemonCenter_1F','RustboroCity_Gym','OrangeCity','OrangeCity_Mart','OrangeCity_PokemonCenter_1F','OrangeCity_House1','OrangeCity_House2','Route143','Route144','Route145','Route146']
-
-MAPS += [f'Route{i}' for i in range(105,135)] + ['DewfordTown','DewfordTown_PokemonCenter_1F','GraniteCave_1F','GraniteCave_B1F','GraniteCave_B2F','GraniteCave_StevensRoom','MauvilleCity','MauvilleCity_Mart','MauvilleCity_PokemonCenter_1F','VerdanturfTown','VerdanturfTown_PokemonCenter_1F','RusturfTunnel','LavaridgeTown','LavaridgeTown_PokemonCenter_1F','FallarborTown','FallarborTown_PokemonCenter_1F','FortreeCity','FortreeCity_PokemonCenter_1F','LilycoveCity','LilycoveCity_PokemonCenter_1F','MossdeepCity','MossdeepCity_PokemonCenter_1F','SootopolisCity','SootopolisCity_PokemonCenter_1F','PacifidlogTown','PacifidlogTown_PokemonCenter_1F']
-
 def build(repo,out):
     repo=Path(repo).resolve();out=Path(out).resolve();assets=out/'assets';assets.mkdir(exist_ok=True)
     root=out.parent;catalog=json.loads((root/'brisk-dex-data.json').read_text());species={s['constant']:int(i) for i,s in catalog['species'].items()};moves={m['constant']:int(i) for i,m in catalog['moveDetails'].items()};items={m['constant']:int(i) for i,m in catalog['itemDetails'].items()}
     items.update({'ITEM_'+name:id for name,id in parse_enums((repo/'include/constants/items.h').read_text(),'ITEM_').items() if name not in ['FIELD_ARROW','LIST_END']})
+    from source_script_data import script_data
+    script_export=script_data(repo,catalog,json.loads((root/'brisk-dex-trainer-teams.json').read_text())['trainers']);(out/'script-data.json').write_text(json.dumps(script_export,separators=(',',':'))+'\n')
     sha=subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip();report={'source':sha,'maps':[],'unresolvedEvents':[],'externalWarps':[],'missingLearnsets':[]}
     species_text=find_source(repo,'src/data/pokemon/species_info.h','src/data/pokemon/species_info');blocks=extract_blocks(species_text,'SPECIES_')
     macros=extract_macro_definitions(species_text)
@@ -74,7 +72,22 @@ def build(repo,out):
         if entry&1024:canvas=canvas.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
         if entry&2048:canvas=canvas.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
         tilecache[key]=canvas;return canvas
-    layouts={l['id']:l for l in json.loads((repo/'data/layouts/layouts.json').read_text())['layouts']};raw={n:json.loads((repo/'data/maps'/n/'map.json').read_text()) for n in MAPS};byid={m['id']:name for name,m in raw.items()}
+    atlas_cache={}
+    def atlas(primary,secondary,slug):
+        key=(str(primary['dir']),str(secondary['dir']))
+        if key in atlas_cache:return atlas_cache[key]
+        ground=Image.new('RGBA',(512,512));top=Image.new('RGBA',(512,512));info={}
+        for index in range(1024):
+            bank=primary if index<512 else secondary;local=index if index<512 else index-512
+            entries=bank['metatiles'][local*12:local*12+12]
+            if len(entries)!=12 or local>=len(bank['attrs']):continue
+            info[index]=behaviors.get(bank['attrs'][local]&255,'MB_NORMAL')
+            for layer in range(3):
+                for q in range(4):
+                    (top if layer==2 else ground).alpha_composite(tile(entries[layer*4+q],primary,secondary),((index%32)*16+(q%2)*8,(index//32)*16+(q//2)*8))
+        paths={'ground':f'assets/{slug}-atlas-ground.png','foreground':f'assets/{slug}-atlas-top.png','behaviors':info}
+        ground.save(out/paths['ground']);top.save(out/paths['foreground']);atlas_cache[key]=paths;return paths
+    layouts={l['id']:l for l in json.loads((repo/'data/layouts/layouts.json').read_text())['layouts']};map_names=sorted(p.parent.name for p in (repo/'data/maps').glob('*/map.json'));raw={n:json.loads((repo/'data/maps'/n/'map.json').read_text()) for n in map_names};byid={m['id']:name for name,m in raw.items()}
     behavior_text=(repo/'include/constants/metatile_behaviors.h').read_text();behaviors={};index=0
     for name,value in re.findall(r'^\s*(MB_\w+)(?:\s*=\s*(0x[0-9a-fA-F]+|\d+))?\s*,',behavior_text,re.M):
         if value:index=int(value,0)
@@ -100,9 +113,13 @@ def build(repo,out):
         values=re.findall(r'\.string\s+"(.*)"',match[1]);text=''.join(values).replace('\\n',' ').replace('\\l',' ').replace('\\p','\n\n').replace('$','').replace('{PLAYER}','Trainer').replace('{RIVAL}','your rival')
         return text
     for name,map_ in raw.items():
-        layout=layouts[map_['layout']];w,h=layout['width'],layout['height'];primary,secondary=tileset(layout['primary_tileset']),tileset(layout['secondary_tileset']);buf=(repo/layout['blockdata_filepath']).read_bytes();cells=struct.unpack('<'+'H'*(len(buf)//2),buf);ground=Image.new('RGBA',(w*16,h*16),(*primary['pals'][0][0],255));foreground=Image.new('RGBA',ground.size);rows=[];jumps={};counters=[]
+        if map_['layout'] not in layouts:
+            report.setdefault('unresolvedMaps',[]).append({'map':name,'reason':'dynamic layout'});continue
+        if layouts[map_['layout']].get('layout_version','emerald')!='emerald':
+            report.setdefault('unresolvedMaps',[]).append({'map':name,'reason':'FRLG layout format'});continue
+        layout=layouts[map_['layout']];w,h=layout['width'],layout['height'];primary,secondary=tileset(layout['primary_tileset']),tileset(layout['secondary_tileset']);buf=(repo/layout['blockdata_filepath']).read_bytes();cells=struct.unpack('<'+'H'*(len(buf)//2),buf);ground=Image.new('RGBA',(w*16,h*16),(*primary['pals'][0][0],255));foreground=Image.new('RGBA',ground.size);rows=[];jumps={};counters=[];elevations=[];behavior_rows=[]
         for y in range(h):
-            row=''
+            row='';elevation_row=[];behavior_row=[]
             for x in range(w):
                 value=cells[y*w+x];idx=value&1023;bank=primary if idx<512 else secondary;local=idx if idx<512 else idx-512;behavior=behaviors.get(bank['attrs'][local]&255,'MB_NORMAL');entries=bank['metatiles'][local*12:local*12+12]
                 for layer in range(3):
@@ -112,15 +129,14 @@ def build(repo,out):
                 char='~' if surf else '#' if value&0xc00 else 'g' if behavior in ['MB_TALL_GRASS','MB_LONG_GRASS','MB_LONG_GRASS_SOUTH_EDGE'] else '.'
                 if behavior=='MB_COUNTER':counters.append(f'{x},{y}')
                 if behavior.startswith('MB_JUMP_'):jumps[f'{x},{y}']=behavior.replace('MB_JUMP_','').lower()
-                row+=char
-            rows.append(row)
-        slug=map_['id'].lower();ground.save(assets/f'{slug}-ground.png');foreground.save(assets/f'{slug}-top.png');script=(repo/'data/maps'/name/'scripts.inc').read_text();events=[];outdoor=map_['map_type'] in ['MAP_TYPE_TOWN','MAP_TYPE_CITY','MAP_TYPE_ROUTE','MAP_TYPE_OCEAN_ROUTE']
-        for obj in map_.get('object_events',[])+map_.get('bg_events',[]):
+                elevation_row.append(value>>12);behavior_row.append(behavior);row+=char
+            rows.append(row);elevations.append(elevation_row);behavior_rows.append(behavior_row)
+        slug=map_['id'].lower();ground.save(assets/f'{slug}-ground.png');foreground.save(assets/f'{slug}-top.png');script_file=repo/'data/maps'/name/'scripts.inc';script=script_file.read_text() if script_file.exists() else ''; events=[];outdoor=map_['map_type'] in ['MAP_TYPE_TOWN','MAP_TYPE_CITY','MAP_TYPE_ROUTE','MAP_TYPE_OCEAN_ROUTE']
+        for object_index,obj in enumerate(map_.get('object_events',[])+map_.get('bg_events',[]),1):
             x,y=obj.get('x',0),obj.get('y',0)
             if not(0<=x<w and 0<=y<h):continue
-            if obj.get('flag','0') not in ['0','FLAG_HIDE_OLDALE_TOWN_POTION_GIFT_MAN']:continue
             label=obj.get('script','');match=re.search(r'^'+re.escape(label)+r'::?\s*\n(.*?)(?=^\w+::?|\Z)',script,re.S|re.M);body=match[1] if match else ''
-            event={'kind':'dialogue','x':x,'y':y,'sourceScript':label,'solid':'graphics_id' in obj};visual=objsprite(obj.get('graphics_id',''))
+            event={'kind':'dialogue','x':x,'y':y,'sourceScript':label,'solid':'graphics_id' in obj,'hideFlag':obj.get('flag','0'),'localId':obj.get('local_id',str(object_index)) if 'graphics_id' in obj else None,'elevation':obj.get('elevation',0),'movementType':obj.get('movement_type')};visual=objsprite(obj.get('graphics_id',''))
             if visual:event['sprite']=visual
             if 'NURSE' in obj.get('graphics_id','') or 'PokemonCenter' in name and 'Nurse' in label or 'Bench' in label:event.update(kind='heal',text='Your Pokémon are fully healed. HP, PP and status have been restored.')
             else:
@@ -142,8 +158,8 @@ def build(repo,out):
             events.append(event)
         for warp in map_.get('warp_events',[]):
             x,y=warp['x'],warp['y'];destination=byid.get(warp['dest_map']);target=raw[destination]['warp_events'][int(warp['dest_warp_id'])] if destination and str(warp['dest_warp_id']).isdigit() and int(warp['dest_warp_id'])<len(raw[destination].get('warp_events',[])) else None
-            if target:
-                events=[e for e in events if (e['x'],e['y'])!=(x,y)];events.append({'kind':'warp','x':x,'y':y,'map':warp['dest_map'].lower(),'toX':target['x'],'toY':target['y']});rows[y]=rows[y][:x]+'d'+rows[y][x+1:]
+            if target and 0<=x<w and 0<=y<h and 0<=target['x']<layouts[raw[destination]['layout']]['width'] and 0<=target['y']<layouts[raw[destination]['layout']]['height']:
+                events.append({'kind':'warp','x':x,'y':y,'map':warp['dest_map'].lower(),'toX':target['x'],'toY':target['y']});rows[y]=rows[y][:x]+'d'+rows[y][x+1:]
             else:report['externalWarps'].append({'map':map_['id'],'destination':warp['dest_map']})
         encounters=[];rate=0
         for method in route_tables.get(map_['id'],{}).get('methods',[]):
@@ -153,16 +169,21 @@ def build(repo,out):
                     s=catalog['species'].get(str(slot['species']))
                     if s:encounters.append({'species':s['constant'],'min':slot['minLevel'],'max':slot['maxLevel'],'weight':max(1,round(slot.get('chance',1)*100))})
         weather=map_.get('weather','WEATHER_SUNNY');natural={'WEATHER_RAIN':'rain','WEATHER_DOWNPOUR':'rain','WEATHER_SANDSTORM':'sand','WEATHER_DROUGHT':'sun','WEATHER_SNOW':'snow','WEATHER_FOG_HORIZONTAL':'fog','WEATHER_FOG_DIAGONAL':'fog'}
-        world[slug]={'id':slug,'name':re.sub(r'(?<=[a-z])(?=[A-Z])',' ',name).replace('_',' '),'width':w,'height':h,'outdoor':outdoor,'weather':natural.get(weather,'clear'),'weatherLocked':weather in ['WEATHER_DOWNPOUR','WEATHER_SANDSTORM','WEATHER_DROUGHT','WEATHER_ABNORMAL','WEATHER_VOLCANIC_ASH','WEATHER_FOG_HORIZONTAL','WEATHER_FOG_DIAGONAL'],'tiles':rows,'events':events,'encounters':encounters,'encounterRate':rate,'ground':f'assets/{slug}-ground.png','foreground':f'assets/{slug}-top.png','connections':[{**c,'map':c['map'].lower()} for c in (map_.get('connections') or []) if c['map'] in byid],'jumps':jumps,'counters':counters,'sourceMap':map_['id'],'scriptText':script}
+        world[slug]={'id':slug,'name':re.sub(r'(?<=[a-z])(?=[A-Z])',' ',name).replace('_',' '),'width':w,'height':h,'outdoor':outdoor,'weather':natural.get(weather,'clear'),'weatherLocked':weather in ['WEATHER_DOWNPOUR','WEATHER_SANDSTORM','WEATHER_DROUGHT','WEATHER_ABNORMAL','WEATHER_VOLCANIC_ASH','WEATHER_FOG_HORIZONTAL','WEATHER_FOG_DIAGONAL'],'tiles':rows,'events':events,'encounters':encounters,'encounterRate':rate,'ground':f'assets/{slug}-ground.png','foreground':f'assets/{slug}-top.png','connections':[{**c,'map':c['map'].lower()} for c in (map_.get('connections') or []) if c['map'] in byid],'jumps':jumps,'counters':counters,'elevations':elevations,'behaviors':behavior_rows,'coordEvents':map_.get('coord_events',[]),'sourceMap':map_['id'],'scriptText':script}
+        world[slug]['metatileIds']=[[cells[y*w+x]&1023 for x in range(w)] for y in range(h)]
+        if 'setmetatile' in script or 'Gym' in name:world[slug]['metatileAtlas']=atlas(primary,secondary,slug)
         report['maps'].append(name)
+    for m in world.values():
+        m['events']=[e for e in m['events'] if e['kind']!='warp' or e['map'] in world]
+        m['connections']=[c for c in m['connections'] if c['map'] in world]
     # Imported warp targets can be doors marked blocked by the native collision bits.
     for m in world.values():
         for e in m['events']:
             if e['kind']=='warp':
                 dest=world[e['map']];x,y=e['toX'],e['toY'];dest['tiles'][y]=dest['tiles'][y][:x]+'d'+dest['tiles'][y][x+1:]
-    old=json.loads((out/'content.json').read_text());old['maps']={k:v for k,v in old['maps'].items() if not v.get('sourceMap')};old['maps'].update(world);old['version']='prototype-2';old['source']=sha;old['start']={'map':'map_littleroot_town','x':15,'y':14};old['playerSprites']={'Male':hero,'Female':female};old['travel']=[{'map':key,'x':next((x for y,row in enumerate(m['tiles']) for x,c in enumerate(row) if c=='.' and 3<x<m['width']-3 and 3<y<m['height']-3),1),'y':0} for key,m in world.items() if m['outdoor']]
+    old=json.loads((out/'content.json').read_text());old['maps']={k:v for k,v in old['maps'].items() if not v.get('sourceMap')};old['maps'].update(world);old['version']='prototype-2';old['source']=sha;old['sharedScripts']=(repo/'data/event_scripts.s').read_text()+'\n'+'\n'.join(p.read_text() for p in sorted((repo/'data/scripts').glob('*.inc'))+sorted((repo/'data/text').glob('*.inc')));old['initialFlags']={flag:True for flag in re.findall(r'^\s*setflag\s+(FLAG_HIDE_\w+)',(repo/'data/scripts/new_game.inc').read_text(),re.M)};old['start']={'map':'map_littleroot_town','x':15,'y':14};old['playerSprites']={'Male':hero,'Female':female};old['travel']=[{'map':key,'x':next((x for y,row in enumerate(m['tiles']) for x,c in enumerate(row) if c=='.' and 3<x<m['width']-3 and 3<y<m['height']-3),1),'y':0} for key,m in world.items() if m['outdoor'] and any('.' in row for row in m['tiles'])]
     for t in old['travel']:
-        m=world[t['map']];spots=[(x,y) for y,row in enumerate(m['tiles']) for x,c in enumerate(row) if c=='.' and 3<x<m['width']-3 and 3<y<m['height']-3 and not any(e['x']==x and e['y']==y for e in m['events'])];x,y=min(spots,key=lambda pos:(pos[0]-m['width']//2)**2+(pos[1]-m['height']//2)**2);t.update(x=x,y=y)
+        m=world[t['map']];spots=[(x,y) for y,row in enumerate(m['tiles']) for x,c in enumerate(row) if c=='.' and 3<x<m['width']-3 and 3<y<m['height']-3 and not any(e['x']==x and e['y']==y for e in m['events'])];x,y=min(spots or [(x,y) for y,row in enumerate(m['tiles']) for x,c in enumerate(row) if c=='.'],key=lambda pos:(pos[0]-m['width']//2)**2+(pos[1]-m['height']//2)**2);t.update(x=x,y=y)
     (out/'content.json').write_text(json.dumps(old,separators=(',',':'))+'\n');(out/'port-report.json').write_text(json.dumps(report,indent=2)+'\n');print(f'Ported {len(world)} maps and {len(native["species"])} species records; {len(report["unresolvedEvents"])} events await script porting.')
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('source');parser.add_argument('--output',default=str(Path(__file__).resolve().parents[1]/'game'));args=parser.parse_args();build(args.source,args.output)

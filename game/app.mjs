@@ -4,10 +4,14 @@ import {LocalBattle,supportedMove} from './battle.mjs';
 import {SaveStore,encodeSave,decodeSave} from './storage.mjs';
 import {loadSprite} from './media.mjs';
 import {importGbaSave,originalGbaBytes} from './gba-import.mjs';
+import {mapEntryScripts,coordinateScript,frameScript} from './scenes.mjs';
 import {runInteractiveScript} from './scripts.mjs';
 import {drawNative} from './renderer.mjs';
 import {IntegrationBridge} from './integrations.mjs';
 const $=id=>document.getElementById(id),ctx=$('world').getContext('2d'),store=new SaveStore();
+let appVisible=true;
+window.addEventListener('message',e=>{if(e.source!==window.parent||e.data?.type!=='brisk-game-visibility')return;appVisible=e.data.visible===true;keys.clear();});
+let sceneBattleResolve=null;
 let campaign,battle,battleEvent,pack,catalog,facing=[0,1],lastMove=0,busy=false,dirty=false,savedAt=0,saving=null,storyActive=false,choiceCancel=null;
 const keys=new Set(),bridge=new IntegrationBridge();
 const notice=text=>$('notice').textContent=text;
@@ -46,7 +50,7 @@ function partyDetails(mon){
   for(const [id,count] of Object.entries(campaign.state.inventory))if(count>0&&catalog.evolution(mon,catalog.data.itemDetails[id]?.constant))nodes.push(button(`Use ${catalog.data.items[id]}`,()=>{campaign.evolve(mon.uid,Number(id));dirty=true;close();update();}));
   modal('Partner details',nodes);
 }
-function beginBattle(mon,trainer=null,eventId=null){battleEvent=eventId;battle=new LocalBattle(campaign,mon,{trainer});dirty=true;update();}
+function beginBattle(mon,trainer=null,eventId=null,format='singles'){battleEvent=eventId;battle=new LocalBattle(campaign,mon,{trainer,format});dirty=true;update();}
 function renderBattle(){
   for(const [id,mon,back] of [['enemy-card',battle.enemy,false],['player-card',battle.playerView||battle.player,true]]){
     const card=$(id),img=document.createElement('img');loadSprite(img,sprite(mon,back));img.alt=mon.nickname;
@@ -55,17 +59,19 @@ function renderBattle(){
   $('battle-log').replaceChildren(...battle.log.slice(-5).map(line=>{const p=document.createElement('div');p.textContent=line;return p;}));$('battle-log').scrollTop=10000;
   const actions=[];
   if(battle.phase!=='battle')actions.push(button('Return to the field',async()=>{
+    if(sceneBattleResolve){const resolve=sceneBattleResolve;sceneBattleResolve=null;const result={phase:battle.phase,state:campaign.snapshot()};battle=null;update();resolve(result);return;}
     if(battle.phase==='lost'){campaign.heal();campaign.state.position=structuredClone(campaign.state.respawn||pack.start);notice('Returned to the field station and healed your party.');}
     if(battle.phase==='won'&&battle.trainer&&battleEvent)campaign.state.flags[battleEvent]=true;
     battle=null;update();await save();growthPrompts();
   }));
   else{
+    if(battle.doubles){const heading=document.createElement('strong');heading.textContent='Choose for '+battle.player.nickname;actions.push(heading);const foe=battle.room.players[1];for(const [pos,index]of [[0,foe.active],[1,foe.active2]])if(foe.team[index]?.hp>0){const target=button('Target: '+foe.team[index].name,()=>{battle.targetPos=pos;renderBattle();});target.setAttribute('aria-pressed',String((battle.targetPos||0)===pos));actions.push(target);}}
     battle.player.moves.forEach((m,i)=>{const move=catalog.move(m.id),b=button(`${move.name} · ${m.pp}/${catalog.maxPP(m)}`,()=>act({type:'move',index:i}));b.disabled=!m.pp||!supportedMove(move);actions.push(b);});
     if(!battle.available(battle.player).length)actions.push(button('Struggle',()=>act({type:'move',index:-1})));
     for(const form of battle.gimmicks())actions.push(button(`${form.kind}: ${form.name}`,()=>{const choices=battle.available(battle.player);if(!choices.length)throw new Error('No PP remains');modal('Choose a move',choices.map(index=>button(catalog.move(battle.player.moves[index].id).name,()=>{close();act({type:'move',index,gimmick:form.kind,formIndex:form.index});})));}));
     actions.push(button(`Potion (${campaign.state.inventory[28]||0})`,()=>act({type:'potion'})));
     if(!battle.trainer){actions.push(button(`Poké Ball (${campaign.state.inventory[1]||0})`,()=>act({type:'catch'})),button('Run',()=>act({type:'run'})));}
-    campaign.state.party.forEach((mon,i)=>{if(i!==battle.active&&mon.hp>0)actions.push(button(`Switch: ${mon.nickname}`,()=>act({type:'switch',index:i})));});
+    campaign.state.party.forEach((mon,i)=>{if(i!==battle.room.players[0].active&&i!==battle.room.players[0].active2&&mon.hp>0)actions.push(button(`Switch: ${mon.nickname}`,()=>act({type:'switch',index:i})));});
   }
   $('battle-actions').replaceChildren(...actions);
 }
@@ -85,22 +91,55 @@ async function save(){
 }
 async function interact(){
   if(!campaign||battle||busy||storyActive||$('modal').open)return;
+  campaign.state.vars??={};campaign.state.vars.VAR_FACING=facing[0]===1?4:facing[0]===-1?3:facing[1]===-1?2:1;
   const e=campaign.interact(...facing);if(!e){notice('Nothing to interact with here. Use a party member’s Info button for details.');return;}
   if(e.kind==='heal'){campaign.heal();if(campaign.map.sourceMap?.includes('POKEMON_CENTER'))campaign.state.respawn=structuredClone(campaign.state.position);dirty=true;notice(e.text);update();await save();}
-  else if(e.kind==='dialogue'){
-    if(campaign.map.scriptText&&e.sourceScript){try{storyActive=true;const lines=await runInteractiveScript(campaign,campaign.map.scriptText,e.sourceScript,{choose:request=>new Promise(resolve=>{choiceCancel=resolve;modal('Choose',[Object.assign(document.createElement('p'),{textContent:request.message}),...['Yes','No'].map((label,i)=>button(label,()=>{choiceCancel=null;close();resolve(i===0?1:0);}))]);})});storyActive=false;dirty=true;modal('Conversation',lines.join('\n\n')||'There is nothing more to say.');update();}catch(error){storyActive=false;modal('Event awaiting port',e.text+'\n\n'+error.message+'. No story effects were applied.');}}
-    else modal('Field notes',e.text);
-  }
+  else if((e.kind==='dialogue'||e.kind==='trainer')&&campaign.map.scriptText&&e.sourceScript){await playScene(e.sourceScript,e.text);}
+  else if(e.kind==='dialogue')modal('Conversation',e.text);
   else if(e.kind==='trainer'){
-    if(campaign.state.flags[e.id]){modal('Rival','Nice battle! Keep exploring while we prepare the rest of Hoenn.');return;}
-    modal('A friendly battle',[Object.assign(document.createElement('p'),{textContent:e.text}),button('Battle',()=>{close();beginBattle(e.team?campaign.trainerTeam(e.team):campaign.createMon(e.species,e.level),e.trainerName||'Rival',e.id);})]);
+    if(campaign.state.flags[e.id]){modal('Trainer','Thanks for the battle!');return;}
+    modal('Trainer battle',[Object.assign(document.createElement('p'),{textContent:e.text}),button('Battle',()=>{close();beginBattle(e.team?campaign.trainerTeam(e.team):campaign.createMon(e.species,e.level),e.trainerName||'Trainer',e.id);})]);
   }else if(e.kind==='shop')modal('Field supplies',e.stock.map(stock=>button(`${catalog.data.items[stock.item]} · ₽${stock.price*({easy:1,normal:2,hard:4,extreme:10}[campaign.state.options.difficulty]||1)}`,()=>{campaign.buy(stock.item,1,e);dirty=true;update();notice(`Bought ${catalog.data.items[stock.item]}.`);})));
 }
-function move(dx,dy){
-  if(!campaign||battle||storyActive||$('modal').open||busy)return;facing=[dx,dy];const result=campaign.move(dx,dy);
+function sceneChoice(message,labels=['Continue']){
+  return new Promise(resolve=>{choiceCancel=resolve;modal('Brisk Emerald',[Object.assign(document.createElement('p'),{textContent:message}),...labels.map((label,index)=>button(label,()=>{choiceCancel=null;close();resolve(index);} ))]);});
+}
+async function playScene(entry,fallback='',present=true){
+  if(storyActive)return false;const original=campaign,source=(pack.sharedScripts||'')+'\n'+campaign.map.scriptText;storyActive=true;
+  try{
+    await runInteractiveScript(original,source,entry,{present,choose:async request=>{
+      if(request.kind==='message')return sceneChoice(request.message);
+      if(request.kind==='yesno'){const answer=await sceneChoice(request.message,['Yes','No']);return answer===null?null:answer===0?1:0;}
+      if(request.kind==='movement'){
+        const previous=campaign;campaign=new Campaign(catalog,pack,request.startState);
+        try{for(let frame=0;frame<Math.max(...request.actors.map(actor=>actor.frames.length));frame++){
+          for(const actor of request.actors){const point=actor.frames[frame];if(!point)continue;
+            if(actor.localId==='LOCALID_PLAYER'){Object.assign(campaign.state.position,{x:point.x,y:point.y});facing={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]}[point.facing];}
+            else{campaign.state.objects??={};campaign.state.objects[campaign.map.id]??={};campaign.state.objects[campaign.map.id][actor.localId]={...campaign.state.objects[campaign.map.id][actor.localId],x:point.x,y:point.y,movementType:'MOVEMENT_TYPE_FACE_'+point.facing.toUpperCase()};}
+          }update();await new Promise(resolve=>setTimeout(resolve,150));
+        }return 1;}finally{campaign=previous;update();}
+      }
+      if(request.kind==='battle'){
+        if(request.intro){const answer=await sceneChoice(request.intro,['Battle']);if(answer===null)return null;}
+        campaign=new Campaign(catalog,pack,request.state);
+        try{beginBattle(campaign.trainerTeam(request.team.party),request.team.name,null,request.format);return await new Promise(resolve=>{sceneBattleResolve=resolve;});}
+        finally{battle=null;campaign=original;update();}
+      }
+      throw new Error('Unknown scene request '+request.kind);
+    }});dirty=true;update();return true;
+  }catch(error){
+    if(error.state){original.state=error.state;original.random.state=error.state.rng;original.heal();original.state.position=structuredClone(original.state.respawn||pack.start);dirty=true;notice('Your party was brought back to safety.');}
+    else notice((fallback?fallback+' · ':'')+error.message);
+    return false;
+  }finally{campaign=original;storyActive=false;update();}
+}
+async function enterMap(){for(const entry of mapEntryScripts(campaign.map))await playScene(entry,'',false);const frame=frameScript(campaign);if(frame)await playScene(frame);}
+async function stepScene(){const entry=coordinateScript(campaign);if(entry)await playScene(entry);const frame=frameScript(campaign);if(frame)await playScene(frame);}
+async function move(dx,dy){
+  if(!appVisible||!campaign||battle||storyActive||$('modal').open||busy)return;facing=[dx,dy];const result=campaign.move(dx,dy);
   if(result.kind==='encounter'){
     if(campaign.state.party.some(m=>m.hp>0))beginBattle(result.mon);else notice('Your party needs healing. Visit a bench or the lab.');
-  }else if(result.kind==='warp')notice(`Entered ${result.map}.`);
+  }else if(result.kind==='warp'){notice(`Entered ${result.map}.`);await enterMap();}else if(result.kind==='step')await stepScene();
   if(result.kind!=='blocked')dirty=true;update();
 }
 function startSelection(){
@@ -128,10 +167,10 @@ for(const b of document.querySelectorAll('[data-dir]')){const key={up:'ArrowUp',
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
 function rect(x,y,w,h,color){ctx.fillStyle=color;ctx.fillRect(x,y,w,h);}
 function draw(time){
-  requestAnimationFrame(draw);if(!campaign)return;
+  requestAnimationFrame(draw);if(!appVisible||!campaign)return;
   if(time-lastMove>150&&keys.size){const key=[...keys].find(k=>directions[k]);if(key){guard(()=>move(...directions[key]));lastMove=time;}}
   if(!battle&&!storyActive&&dirty&&time-savedAt>30000&&!$('modal').open&&!busy){savedAt=time;busy=true;save().catch(e=>notice(`Autosave failed: ${e.message}. Export your save.`)).finally(()=>busy=false);}
-  const m=campaign.map,tile=24;ctx.imageSmoothingEnabled=false;
+  const m=campaign.map,tile=24,width=m.ground?480:624,height=m.ground?320:432;if(ctx.canvas.width!==width||ctx.canvas.height!==height){ctx.canvas.width=width;ctx.canvas.height=height;}ctx.imageSmoothingEnabled=false;
   if(m.ground){drawNative(ctx,campaign,pack,facing,time);}else{
   for(let y=0;y<m.height;y++)for(let x=0;x<m.width;x++){
     const t=m.tiles[y][x],px=x*tile,py=y*tile,n=(x*37+y*17)%6;
@@ -155,7 +194,7 @@ function draw(time){
 function person(x,y,color,player){rect(x+5,y+19,14,3,'#193e3444');rect(x+8,y+16,3,5,'#293f3b');rect(x+14,y+16,3,5,'#293f3b');rect(x+6,y+9,13,9,color);rect(x+8,y+3,9,8,'#e2ba86');rect(x+6,y+1,13,5,player?'#a94f3c':'#6b6443');if(player)rect(x+(facing[0]<0?6:15),y+6,2,2,'#2c3631');}
 async function boot(){
   const json=async url=>{const r=await fetch(url);if(!r.ok)throw new Error('Could not load '+url);return r.json();};
-  const [data,content,native]=await Promise.all([json('../brisk-dex-data.json'),json('./content.json'),json('./native-catalog.json')]);catalog=new Catalog(data,native);pack=content;
+  const [data,content,native,scriptData]=await Promise.all([json('../brisk-dex-data.json'),json('./content.json'),json('./native-catalog.json'),json('./script-data.json')]);catalog=new Catalog(data,native);catalog.scriptData=scriptData;pack=content;
   try{const saved=await store.load();if(saved)campaign=migrateCampaign(saved,pack,catalog);}catch(e){notice(`Could not load the saved journey: ${e.message}. Use Restore backup or Import save.`);}
   if(campaign){notice('Welcome back to your Brisk journey.');update();}else startSelection();
   // Exposes only a read-only snapshot/disabled bridge for developer integration tests.
