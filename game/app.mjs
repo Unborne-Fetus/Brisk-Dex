@@ -3,6 +3,7 @@ import {Campaign,fieldWeather,migrateCampaign} from './world.mjs';
 import {LocalBattle,supportedMove} from './battle.mjs';
 import {SaveStore,encodeSave,decodeSave} from './storage.mjs';
 import {loadSprite} from './media.mjs';
+import {importGbaSave,originalGbaBytes} from './gba-import.mjs';
 import {runInteractiveScript} from './scripts.mjs';
 import {drawNative} from './renderer.mjs';
 import {IntegrationBridge} from './integrations.mjs';
@@ -59,7 +60,7 @@ function renderBattle(){
     battle=null;update();await save();growthPrompts();
   }));
   else{
-    battle.player.moves.forEach((m,i)=>{const move=catalog.move(m.id),b=button(`${move.name} · ${m.pp}/${move.pp}`,()=>act({type:'move',index:i}));b.disabled=!m.pp||!supportedMove(move);actions.push(b);});
+    battle.player.moves.forEach((m,i)=>{const move=catalog.move(m.id),b=button(`${move.name} · ${m.pp}/${catalog.maxPP(m)}`,()=>act({type:'move',index:i}));b.disabled=!m.pp||!supportedMove(move);actions.push(b);});
     if(!battle.available(battle.player).length)actions.push(button('Struggle',()=>act({type:'move',index:-1})));
     for(const form of battle.gimmicks())actions.push(button(`${form.kind}: ${form.name}`,()=>{const choices=battle.available(battle.player);if(!choices.length)throw new Error('No PP remains');modal('Choose a move',choices.map(index=>button(catalog.move(battle.player.moves[index].id).name,()=>{close();act({type:'move',index,gimmick:form.kind,formIndex:form.index});})));}));
     actions.push(button(`Potion (${campaign.state.inventory[28]||0})`,()=>act({type:'potion'})));
@@ -165,3 +166,13 @@ boot().catch(e=>notice(`Unable to start: ${e.message}`));
 
 $('travel').onclick=()=>{if(!campaign||battle||busy||storyActive)return;modal('Development travel', [...(pack.travel||[]).map(t=>button(pack.maps[t.map].name,()=>{campaign.travel(t.map,t.x,t.y);dirty=true;close();update();})),button('Original field station',()=>{campaign.travel('field',12,10);dirty=true;close();update();})]);};
 $('settings').onclick=()=>{if(!campaign||battle||busy||storyActive)return;const nodes=[];for(const [key,label,values] of [['difficulty','Difficulty',['easy','normal','hard','extreme']],['expShare','Modern EXP Share',[true,false]],['battleBag','Battle Bag',[true,false]],['orangeShinies','Orange Islands 1/50',[true,false]],['shinyOdds','Shiny odds',[50,100,512,1024,4096,8192]]]){const row=document.createElement('label');row.textContent=label+' ';const select=document.createElement('select');for(const value of values){const option=document.createElement('option');option.value=String(value);option.textContent=typeof value==='boolean'?(value?'On':'Off'):String(value);option.selected=campaign.state.options[key]===value;select.append(option);}select.onchange=()=>{const value=values.find(v=>String(v)===select.value);campaign.state.options[key]=value;dirty=true;};row.append(select);nodes.push(row);}nodes.push(button('Rename trainer',()=>{const name=prompt('Trainer name',campaign.state.trainer.name);if(name?.trim()){campaign.state.trainer.name=name.trim().slice(0,24);dirty=true;}}));modal('Journey options',nodes);};
+
+$('gba-import').onchange=event=>guard(async()=>{
+  const file=event.target.files[0];event.target.value='';if(!file)return;if(battle||storyActive||busy)throw new Error('Finish the active interaction first');
+  const response=await fetch('./gba-layout.json');if(!response.ok)throw new Error('GBA layout metadata is unavailable');
+  notice('Checking GBA save and Pokémon checksums…');const {campaign:candidate,report}=await importGbaSave(new Uint8Array(await file.arrayBuffer()),catalog,pack,await response.json());
+  const summary=`Import ${report.party} party Pokémon, ${report.stored} stored Pokémon and the supported bag?\n\n${report.archived.length} entries require archive-only preservation. ${report.adjustments.length} adjustments.\n\n${report.warnings.join('\n\n')}\n\nThe original .sav is retained byte-for-byte. This creates a separate native save. Any current native save becomes its backup.`;
+  if(!confirm(summary)){notice('GBA import cancelled. No save was changed.');return;}
+  await store.commit(candidate.snapshot());campaign=candidate;dirty=false;update();if($('modal').open)close();modal('GBA import report',summary+(report.archived.length?'\n\nArchive-only entries:\n'+report.archived.map(entry=>JSON.stringify(entry)).join('\n'):''));notice('GBA save imported. Keep your original file.');
+});
+$('gba-original').onclick=()=>guard(async()=>{if(!campaign)throw new Error('No campaign is loaded');const bytes=await originalGbaBytes(campaign.state),url=URL.createObjectURL(new Blob([bytes],{type:'application/octet-stream'})),a=document.createElement('a');a.href=url;a.download='brisk-original-gba.sav';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});

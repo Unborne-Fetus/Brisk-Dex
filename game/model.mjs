@@ -62,18 +62,19 @@ export class Catalog {
     assert(typeof mon.nickname==='string'&&mon.nickname.length<=40,'Invalid nickname');
     assert((s.abilities||[]).includes(mon.ability),'Illegal ability');
     assert(mon.item===0||!!this.data.items[mon.item],'Unknown item');
-    assert(typeof mon.shiny==='boolean'&&mon.origin==='native-prototype','Invalid Pokémon origin');
+    assert(typeof mon.shiny==='boolean'&&['native-prototype','gba-import'].includes(mon.origin),'Invalid Pokémon origin');
     integer(mon.exp,experience(mon.level,s.growthRate),experience(100,s.growthRate),'experience');
     assert(mon.level===100||mon.exp<experience(mon.level+1,s.growthRate),'Experience/level mismatch');
     assert([null,'poison','toxic','burn','paralysis','sleep','freeze'].includes(mon.status),'Unsupported status');
     integer(mon.hp,0,this.stats(mon)[0],'HP');
     assert(Array.isArray(mon.moves)&&mon.moves.length>=1&&mon.moves.length<=4,'Invalid moves');
     assert(new Set(mon.moves.map(m=>m.id)).size===mon.moves.length,'Duplicate moves');
-    for(const m of mon.moves) { assert(s.learnableMoves.includes(m.id)||this.native.species?.[mon.species]?.learnset?.some(e=>e.move===m.id),'Illegal move'); integer(m.pp,0,this.move(m.id).pp,'PP'); }
+    for(const m of mon.moves) { assert(s.learnableMoves.includes(m.id)||this.native.species?.[mon.species]?.learnset?.some(e=>e.move===m.id),'Illegal move'); integer(m.ppUps??0,0,3,'PP Ups');integer(m.pp,0,this.maxPP(m),'PP'); }
     assert(!mon.pendingMoves||Array.isArray(mon.pendingMoves)&&mon.pendingMoves.length<=100,'Invalid pending moves');for(const id of mon.pendingMoves||[])this.move(id);
     return mon;
   }
-  heal(mon) { mon.hp=this.stats(mon)[0]; mon.status=null; for(const m of mon.moves)m.pp=this.move(m.id).pp; }
+  maxPP(slot){return Math.floor(this.move(slot.id).pp*(5+(slot.ppUps||0))/5);}
+  heal(mon) { mon.hp=this.stats(mon)[0]; mon.status=null; for(const m of mon.moves)m.pp=this.maxPP(m); }
   gainExperience(mon, amount) {
     integer(amount,0,10000000,'experience gain'); const s=this.species(mon.species), before=mon.level, hp=mon.hp;
     mon.exp=Math.min(experience(100,s.growthRate),mon.exp+amount);

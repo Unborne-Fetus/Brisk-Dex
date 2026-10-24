@@ -80,3 +80,15 @@ The existing companion catalog lacks Mothim's record. Trainer events requiring i
 ## Progression interpreter extension
 
 Interactive NPC conversations now support yes/no choices and resume the selected branch, with cancellation and stale-state protection. Native-style item checks/removal, money transactions, Pokémon gifts (including storage overflow), HealPlayerParty, sequential label fallthrough, player-only movement tables and direct valid-map warps are supported. Whole-event validation and rollback still apply. Supported scripted movement updates position immediately; it does not yet reproduce native cutscene animation. NPC movement, shared specials and full story triggers remain unfinished. See [complete-game acceptance gates](COMPLETE_GAME_GATES.md).
+
+## GBA save transfer
+
+Use **Import GBA save** inside the development game. The read-only importer accepts raw Brisk Emerald `.sav`/`.srm` battery saves (112/128 KiB), checks a complete consistent save bank, and validates current 20-box extension sectors. Legacy 14-box saves are supported. Corrupt/mismatched PC extension sectors cause rejection rather than clearing boxes. Arbitrary other hacks, emulator save states, ROMs and unknown future save layouts are not supported.
+
+The preview reports playable party/storage counts, adjustments and archive-only records before replacing a native save. Current native progress becomes its backup. The GBA file is never written. The original bytes and SHA-256 are embedded in the native save; **Export original GBA** recovers that exact file, even after playing the remake. This is one-way transfer, not GBA/native synchronization.
+
+Pokémon preserve source EXP, recalculated level, IVs/EVs, ability slot, held item, shininess, nickname, minted nature and PP Ups. Party HP is scaled when native stats differ; original values remain archived. Box positions and original per-Pokémon records are retained as metadata. Eggs, bad/corrupt records, unknown species and other unrepresentable entries are explicitly reported and remain recoverable in the original archive. If no playable party member can transfer, the first playable boxed Pokémon is promoted and reported; if none can transfer, import is rejected. Supported bag items, money and trainer identity transfer. Original box names, coordinates and all untouched binary data remain archived.
+
+**Full story-resume compatibility is not implemented.** Quest flags, script variables, badges and other progression bytes remain in the original archive; they are not guessed into the incomplete native story engine. A valid mapped location can transfer, otherwise the starting location is used with a warning. The import must not be advertised as a complete replacement for the GBA campaign yet. Native imports never gain trusted online provenance.
+
+`tools/build_gba_reader.mjs` extracts the existing Dex's byte decoder into an isolated module; the importer adds strict bank/extension validation. `game/gba-layout.json` pins source map-index metadata. Regenerate/review these against the actual ROM source when its save layout changes.

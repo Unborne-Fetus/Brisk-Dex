@@ -1,0 +1,10 @@
+import fs from 'node:fs/promises';
+import {parse} from 'acorn';
+const root=new URL('../',import.meta.url),html=await fs.readFile(new URL('index.html',root),'utf8'),script=html.slice(html.indexOf('(function(){\n"use strict";'),html.lastIndexOf('</script>'));
+const ast=parse(script,{ecmaVersion:'latest'}),body=ast.body[0].expression.callee.body.body;
+const names=['decodeGen3String','decodePokemon','parseTrainer','speciesGrowthRate','estimateLevelFromExp','u16','u32','u8'];
+const functions=names.map(name=>{const node=body.find(n=>n.type==='FunctionDeclaration'&&n.id.name===name);if(!node)throw Error('Missing reader '+name);return script.slice(node.start,node.end);});
+const chars=script.slice(script.indexOf('var CHARMAP = {}'),script.indexOf('function decodeGen3String'));
+const orders=script.slice(script.indexOf('var SUB_ORDERS = ['),script.indexOf('];',script.indexOf('var SUB_ORDERS = ['))+2);
+const natures=script.slice(script.indexOf('var NATURES = ['),script.indexOf('];',script.indexOf('var NATURES = ['))+2);
+await fs.writeFile(new URL('game/gba-reader.mjs',root),`// Generated from the existing Dex reader. Never writes GBA data.\nimport {experience as experienceForLevel} from './model.mjs';\nexport function createGbaReader(data){const NAME_DATA=data,GAME_SHINY_ODDS=data.shinyOdds||8;\n${chars}\n${orders}\n${natures}\n${functions.join('\n')}\nreturn {decodePokemon,parseTrainer,decodeString:decodeGen3String};}\n`);

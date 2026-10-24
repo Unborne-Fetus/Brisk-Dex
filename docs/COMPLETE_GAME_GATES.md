@@ -14,7 +14,7 @@ Before removing the development label, every gate below needs repeatable evidenc
 | Brisk systems | Unported or partial | Dynamax Adventures, contests, DexNav, followers, capsules/send-out text, overworld catching, trainer rematches and all remaining ROM options |
 | Progression and economy | Partial | Caps, difficulty exceptions, money, EXP, trainer flags, quests and rewards match the ROM and survive saving |
 | Postgame | Blocked | Postgame story, Orange Islands access/progression, custom encounters, legendaries and optional bosses complete normally |
-| Save migration | Partial | Versioned native migrations, backups and recovery across releases; GBA conversion needs its own validated importer |
+| Save migration | Partial | Versioned native migrations, backups and recovery across releases; a validated one-way GBA importer now transfers representable data and archives the original; full story migration remains blocked |
 | Platforms and updates | Partial | Desktop/mobile builds, long sessions, supported input/storage, signed releases, asset updates and rollback |
 | Existing Dex integration | Intentionally disconnected | Explicitly approved, tested native ownership/provenance protocol before enabling online/trade/save-backed operations |
 

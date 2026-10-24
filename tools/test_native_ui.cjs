@@ -30,7 +30,7 @@ const relay=require('node:child_process').spawn(process.execPath,[require('node:
  await page.getByRole('button',{name:'Save',exact:true}).click();await page.waitForFunction(()=>document.getElementById('notice').textContent.includes('Journey saved'));
  const mobile=await context.newPage();await mobile.setViewportSize({width:390,height:844});await mobile.goto('http://127.0.0.1:8790/game/index.html');await mobile.waitForFunction(()=>window.BriskNative?.snapshot());if(process.env.BRISK_SCREENSHOTS)await mobile.screenshot({path:require('node:path').join(process.env.BRISK_SCREENSHOTS,'brisk-prototype-mobile.png'),fullPage:true});
  if(await mobile.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Mobile page overflows');
- const enabled=await mobile.evaluate(()=>Object.values(window.BriskNative.capabilities).some(Boolean));if(enabled)throw Error('An integration is enabled');
+ const enabled=await mobile.evaluate(()=>Object.entries(window.BriskNative.capabilities).some(([key,value])=>key!=='gbaImport'&&value));if(enabled)throw Error('An integration is enabled');
  const atomic=await mobile.evaluate(async()=>{
    const {ContentRecords}=await import('./storage.mjs'),records=new ContentRecords();await records.writeMany([['test-a',1],['test-b',2]]);
    try{await records.writeMany([['test-a',3],['test-b',()=>{}]]);}catch{}
@@ -48,5 +48,14 @@ const relay=require('node:child_process').spawn(process.execPath,[require('node:
  await storyPage.getByRole('button',{name:'Close',exact:true}).click();await storyPage.keyboard.press('e');await storyPage.getByRole('button',{name:'Close',exact:true}).click();
  if(!(await storyPage.locator('#bag').textContent()).includes('Potion × 7'))throw Error('Cancelled story granted an item');
  await storyPage.close();
+ const gbaPage=await context.newPage();await gbaPage.goto('http://127.0.0.1:8790/game/index.html');await gbaPage.waitForFunction(()=>window.BriskNative?.snapshot());
+ const {makeGbaSave}=await import(require('node:url').pathToFileURL(require('node:path').join(__dirname,'../test/game/gba-fixture.mjs')).href);
+ gbaPage.on('dialog',dialog=>dialog.accept());
+ await gbaPage.locator('#gba-import').setInputFiles({name:'brisk-transfer.sav',mimeType:'application/octet-stream',buffer:Buffer.from(makeGbaSave())});
+ await gbaPage.getByRole('heading',{name:'GBA import report',exact:true}).waitFor();
+ if(!(await gbaPage.locator('#bag').textContent()).includes('Potion × 7'))throw Error('GBA inventory did not transfer');
+ const originalDownload=gbaPage.waitForEvent('download');await gbaPage.getByRole('button',{name:'Close',exact:true}).click();await gbaPage.getByRole('button',{name:'Export original GBA',exact:true}).click();
+ const download=await originalDownload,stream=await download.createReadStream(),chunks=[];for await(const chunk of stream)chunks.push(chunk);if(!Buffer.concat(chunks).equals(Buffer.from(makeGbaSave())))throw Error('Original GBA export changed bytes');
+ await gbaPage.close();
  if(errors.length)throw Error(errors.join('\n'));console.log('Browser checks passed: starter, movement, healing, lab warp, Linking Cord purchase, persistence, trainer battle, mobile layout, disabled integrations, atomic content transaction rollback.');await browser.close();relay.kill();
 })().catch(e=>{console.error(e);relay.kill();process.exit(1);});

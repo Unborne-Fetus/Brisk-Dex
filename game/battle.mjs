@@ -31,7 +31,7 @@ export class LocalBattle {
   available(mon){return mon.moves.map((m,i)=>m.pp>0?i:-1).filter(i=>i>=0);}
   gimmicks(){const p=this.room.players[0],m=p.team[p.active];return m.transformed?[]:m.transformations.map((form,index)=>({...form,index})).filter(f=>f.kind==='Mega'?!p.usedMega:!p.usedGmax);}
   sync(){
-    this.room.players[0].team.forEach((b,i)=>{const m=this.campaign.state.party[i],max=this.catalog.stats(m)[0];m.hp=b.hp<=0?0:Math.min(max,Math.ceil(b.hp*max/b.maxHP));m.status=b.status||null;m.moves.forEach((slot,k)=>{slot.pp=Math.max(0,Math.min(this.catalog.move(slot.id).pp,b.moves[k]?.pp??slot.pp));});});
+    this.room.players[0].team.forEach((b,i)=>{const m=this.campaign.state.party[i],max=this.catalog.stats(m)[0];m.hp=b.hp<=0?0:Math.min(max,Math.ceil(b.hp*max/b.maxHP));m.status=b.status||null;m.moves.forEach((slot,k)=>{slot.pp=Math.max(0,Math.min(this.catalog.maxPP(slot),b.moves[k]?.pp??slot.pp));});});
     this.room.players[1].team.forEach((b,i)=>{if(b.hp>0||this.awarded.has(i))return;this.awarded.add(i);const source=this.opponents[i],yieldValue=this.catalog.native?.species?.[source.species]?.expYield||60;
       const amount=Math.max(1,Math.floor(yieldValue*source.level/7*(this.trainer?1.5:1))),active=this.player;
       for(const m of this.campaign.state.party){if(!m.hp)continue;const share=m===active?1:this.campaign.state.options.expShare===false?0:({easy:2,normal:1,hard:.5,extreme:0}[this.campaign.state.options.difficulty]??1);if(!share)continue;const gain=this.catalog.gainExperience(m,Math.floor(amount*share));this.say(`${m.nickname} gained ${Math.floor(amount*share)} EXP.${gain.after>gain.before?' Grew to level '+m.level+'!':''}`);}
