@@ -7,4 +7,4 @@ export const native=JSON.parse(fs.readFileSync(new URL('../../game/native-catalo
 pack.start={map:'field',x:12,y:10};
 export const catalog=new Catalog(data,native);
 catalog.fieldData=JSON.parse(fs.readFileSync(new URL('../../game/field-data.json',import.meta.url)));
-export const fresh=(seed=42)=>Campaign.start(catalog,structuredClone(pack),'TREECKO',seed);
+export const fresh=(seed=42)=>{const c=Campaign.start(catalog,structuredClone(pack),'TREECKO',seed);c.state.options.overworldEncounters=false;return c;};

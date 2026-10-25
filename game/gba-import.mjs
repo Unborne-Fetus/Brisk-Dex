@@ -18,8 +18,52 @@ function bank(bytes,start,modern){
   }
   return {sections,counter,legacy};
 }
+// Detect a battery-save payload by sector signatures AND complete bank checksums.
+// Preserve the entire supplied file separately, including emulator padding/header.
+function binaryBytes(input){
+  if(ArrayBuffer.isView(input))return new Uint8Array(input.buffer,input.byteOffset,input.byteLength).slice();
+  if(Object.prototype.toString.call(input)==='[object ArrayBuffer]')return new Uint8Array(input).slice();
+  if(Array.isArray(input)||input?.type==='Buffer'&&Array.isArray(input.data))return Uint8Array.from(input.data||input);
+  throw new Error('Save data was not binary; reload the battery save in Brisk Dex');
+}
+export async function unpackGbaSave(input){
+  const bytes=binaryBytes(input);assert(bytes.length<=16*1024*1024,'Save file exceeds the 16 MiB import limit');
+  if(bytes[0]!==0x1f||bytes[1]!==0x8b)return bytes;
+  assert(typeof DecompressionStream==='function','Gzip is unavailable here; decompress the .gz file first');
+  const reader=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')).getReader(),parts=[];let size=0;
+  try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;assert(size<=16*1024*1024,'Decompressed save exceeds the 16 MiB import limit');parts.push(value);}}catch(error){await reader.cancel().catch(()=>{});throw new Error('Could not unpack gzip battery save: '+error.message);}
+  return concat(parts);
+}
+export function normalizeGbaSave(input){
+  const original=binaryBytes(input);
+  assert(original.length!==0xe000,'This is a single-bank backup. Export the complete 112/128 KiB battery save so expanded PC storage cannot be lost');
+  assert(original.length>=0x1c000&&original.length<=16*1024*1024,`Unrecognized raw battery save size: ${original.length.toLocaleString()} bytes. Export a battery save (.sav/.srm) from your emulator`);
+  if([0x1c000,0x20000].includes(original.length))return {bytes:original,original,container:{offset:0,payloadBytes:original.length,fileBytes:original.length}};
+  const offsets=new Set(),limit=Math.min(4096,original.length-0xe000);
+  // Header length can be arbitrary, rather than sector/word aligned.
+  for(let offset=0;offset<=limit;offset++){
+    const sig=offset+0xff8;
+    if(original[sig]===0x25&&original[sig+1]===0x20&&original[sig+2]===1&&original[sig+3]===8)offsets.add(offset);
+  }
+  const matches=[];
+  for(const offset of offsets){
+    const available=original.length-offset;
+    const length=available>=0x20000?0x20000:available>=0x1c000?0x1c000:0;
+    if(!length)continue;
+    let bytes=original.slice(offset,offset+length);
+    const modern=length===0x20000&&Array.from({length:4},(_,i)=>new DataView(bytes.buffer,(28+i)*SECTOR,SECTOR).getUint16(0xff4,true)).some(id=>id>=0x100&&id<=0x103);
+    if(!bank(bytes,0,modern)&&!bank(bytes,0xe000,modern))continue;
+    const tail=original.subarray(offset+length);
+    // Larger flash dumps may repeat the battery image or pad it with 00/FF.
+    const padding=tail.every(b=>b===0||b===255),mirror=tail.every((b,i)=>b===bytes[i%length]);
+    if(tail.length&&!padding&&!mirror&&tail.length>4096)continue;
+    matches.push({bytes,original,container:{offset,payloadBytes:length,fileBytes:original.length}});
+  }
+  assert(matches.length===1, matches.length?'Multiple battery save payloads were found; export the intended battery save separately':`No complete checksum-valid Brisk battery save was found in ${original.length.toLocaleString()} bytes. Use your emulator’s Export battery save command, rather than a ROM or save state`);
+  return matches[0];
+}
 export function readGbaSave(input,catalog){
-  const bytes=new Uint8Array(input instanceof Uint8Array?input:new Uint8Array(input));assert([0x1c000,0x20000].includes(bytes.length),'Use a raw 112 KiB or 128 KiB Brisk .sav/.srm file, not a ROM or emulator save state');
+  const {bytes,original,container}=normalizeGbaSave(input);
   const modern=bytes.length===0x20000&&Array.from({length:4},(_,i)=>new DataView(bytes.buffer,bytes.byteOffset+(28+i)*SECTOR,SECTOR).getUint16(0xff4,true)).some(id=>id>=0x100&&id<=0x103);
   const a=bank(bytes,0,modern),b=bank(bytes,0xe000,modern);assert(a||b,'No complete checksum-valid Brisk save bank was found');
   const selected=a&&b?(((a.counter-b.counter)>>>0)<0x80000000?a:b):a||b;
@@ -40,7 +84,7 @@ export function readGbaSave(input,catalog){
   const bag={};for(const [offset,count]of [[0x560,30],[0x5d8,30],[0x650,16],[0x690,64],[0x790,46]])for(let i=0;i<count;i++){const at=offset+i*4,id=v1.getUint16(at,true),quantity=v1.getUint16(at+2,true)^(key&65535);if(id&&quantity)bag[id]=(bag[id]||0)+quantity;}
   const block1=concat([1,2,3,4].map(id=>sections.get(id))),trainer=reader.parseTrainer(v0,sections.get(0));
   const money=(v1.getUint32(0x490,true)^key)>>>0;assert(money<=999999999,'Invalid money: unsupported save layout');
-  return {bytes,records,bag,trainer,money,counter:selected.counter,boxCount,boxNames:Array.from({length:boxCount},(_,i)=>decodeName(reader,pc.subarray(4+boxCount*30*80+i*9,4+boxCount*30*80+(i+1)*9))),location:{group:v1.getUint8(4),number:v1.getUint8(5),x:v1.getInt16(0,true),y:v1.getInt16(2,true)},block1,fallbackBank:!(a&&b)};
+  return {bytes:original,container,records,bag,trainer,money,counter:selected.counter,boxCount,boxNames:Array.from({length:boxCount},(_,i)=>decodeName(reader,pc.subarray(4+boxCount*30*80+i*9,4+boxCount*30*80+(i+1)*9))),location:{group:v1.getUint8(4),number:v1.getUint8(5),x:v1.getInt16(0,true),y:v1.getInt16(2,true)},block1,fallbackBank:!(a&&b)};
 }
 function decodeName(reader,bytes){return reader.decodeString?reader.decodeString(bytes):toBase64(bytes);}
 function status(bits){if(bits&7)return 'sleep';if(bits&128)return 'toxic';if(bits&8)return 'poison';if(bits&16)return 'burn';if(bits&32)return 'freeze';if(bits&64)return 'paralysis';return null;}
@@ -57,9 +101,12 @@ export function restoreGbaStory(save,state,catalog){
  return {applied:true,flags:Object.keys(flags).length,variables:Object.keys(vars).length};
 }
 export async function importGbaSave(input,catalog,pack,layout){
-  const save=readGbaSave(input,catalog),campaign=Campaign.start(catalog,pack,'TREECKO',save.counter||1),s=campaign.state;
+  const original=binaryBytes(input),payload=await unpackGbaSave(original),save=readGbaSave(payload,catalog);save.bytes=original;if(payload.length!==original.length||original[0]===0x1f&&original[1]===0x8b)save.container={...save.container,compression:'gzip',fileBytes:original.length};
+  const campaign=Campaign.start(catalog,pack,'TREECKO',save.counter||1),s=campaign.state;
   s.party=[];s.boxes=[];s.inventory={};s.trainer={...save.trainer};s.money=save.money;s.nextId=1;s.seen=[];s.caught=[];
-  const report={format:'brisk-gba-import-report',saveCounter:save.counter,boxCount:save.boxCount,party:0,stored:0,archived:[],adjustments:[],warnings:['This import is one-way. Native progress cannot currently be written back to the GBA save.','Eggs, fusion storage, ribbons, markings and other unimplemented metadata remain in the original-save archive; unsupported Pokémon are listed separately.']};
+  const report={container:save.container,format:'brisk-gba-import-report',saveCounter:save.counter,boxCount:save.boxCount,party:0,stored:0,archived:[],adjustments:[],warnings:['This import is one-way. Native progress cannot currently be written back to the GBA save.','Eggs, fusion storage, ribbons, markings and other unimplemented metadata remain in the original-save archive; unsupported Pokémon are listed separately.']};
+  if(save.container.fileBytes!==save.container.payloadBytes||save.container.compression)report.warnings.push(`${save.container.compression==='gzip'?'Decoded gzip; detected':'Detected'} a ${save.container.payloadBytes/1024} KiB battery payload at byte ${save.container.offset} in the ${save.container.fileBytes.toLocaleString()}-byte file. Original wrapper/padding is archived unchanged.`);
+  if(save.fallbackBank)report.warnings.push('Only one complete bank passed validation; recovered from that bank.');
   for(const entry of save.records){const raw=entry.raw,m=entry.decoded;
     try{
       assert(m&&!m.empty&&m.checksumValid,'Invalid Pokémon checksum or record');assert(!m.isEgg&&!(raw[19]&5),'Eggs/bad eggs are not playable in this runtime');const species=catalog.species(m.species),level=(()=>{let n=1;while(n<100&&m.experience>=experience(n+1,species.growthRate))n++;return n;})();

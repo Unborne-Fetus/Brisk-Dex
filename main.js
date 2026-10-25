@@ -251,7 +251,7 @@ function campaignPath(){return path.join(app.getPath('userData'),'brisk-emerald-
 async function campaignRecords(){try{return JSON.parse(await fs.readFile(campaignPath(),'utf8'));}catch(e){if(e.code==='ENOENT')return {};throw e;}}
 ipcMain.handle('load-native-campaign',(_,key)=>{if(!['current','backup'].includes(key))throw Error('Invalid save slot');return campaignQueue.then(async()=> (await campaignRecords())[key]||null);});
 ipcMain.handle('save-native-campaign',(_,envelope)=>{
- if(envelope?.format!=='brisk-native-backup'||envelope.version!==1||typeof envelope.payload!=='string'||envelope.payload.length>16000000)throw Error('Invalid campaign save');
+ if(envelope?.format!=='brisk-native-backup'||envelope.version!==1||typeof envelope.payload!=='string'||envelope.payload.length>33554432)throw Error('Invalid campaign save');
  const digest=require('node:crypto').createHash('sha256').update(envelope.payload).digest('hex');if(digest!==envelope.sha256)throw Error('Save checksum mismatch');
  const operation=campaignQueue.then(async()=>{const records=await campaignRecords();await writeFileAtomically(campaignPath(),JSON.stringify({current:envelope,backup:records.current||records.backup||null}));});campaignQueue=operation.catch(()=>{});return operation;
 });

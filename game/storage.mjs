@@ -7,7 +7,7 @@ export async function encodeSave(state) {
 }
 export async function decodeSave(envelope) {
   assert(envelope?.format==='brisk-native-backup'&&envelope.version===1,'This is not a native Brisk save. Use Import GBA save for .sav files.');
-  assert(typeof envelope.payload==='string'&&envelope.payload.length<=16000000,'Invalid save size');
+  assert(typeof envelope.payload==='string'&&envelope.payload.length<=33554432,'Invalid save size');
   assert(await sha256(new TextEncoder().encode(envelope.payload))===envelope.sha256,'Save checksum mismatch');return JSON.parse(envelope.payload);
 }
 // One transaction writes the backup and current state together. Separate DB from Dex.

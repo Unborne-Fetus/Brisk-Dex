@@ -1,5 +1,5 @@
 import {sha256} from './storage.mjs';
-import {importGbaSave,readGbaSave,restoreGbaStory} from './gba-import.mjs';
+import {importGbaSave,readGbaSave,restoreGbaStory,unpackGbaSave} from './gba-import.mjs';
 import {Campaign} from './world.mjs';
 export async function resumeAppSave(bytes,current,catalog,pack,layout){
  const fingerprint=await sha256(bytes);
@@ -8,7 +8,7 @@ export async function resumeAppSave(bytes,current,catalog,pack,layout){
   // Older imports used starter-era story defaults. Backfill source progress,
   // retaining native rewards, party, position and changes earned since import.
   const state=structuredClone(current.snapshot()),baseline=Campaign.start(catalog,pack).state;
-  const story=restoreGbaStory(readGbaSave(bytes,catalog),state,catalog);
+  const story=restoreGbaStory(readGbaSave(await unpackGbaSave(bytes),catalog),state,catalog);
   for(const [key,value]of Object.entries(current.state.flags))if(value!==baseline.flags[key])state.flags[key]=value;
   for(const [key,value]of Object.entries(current.state.vars||{}))if(key!=='VAR_STARTER_MON')state.vars[key]=value;
   for(const [key,value]of Object.entries(current.state.options))if(value!==baseline.options[key])state.options[key]=value;
