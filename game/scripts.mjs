@@ -24,11 +24,12 @@ export function planScript(campaign,source,entry,decisions=null){
   const constants={...campaign.catalog.scriptData?.constants,...campaign.catalog.storyData?.maps?.[draft.position.map]?.localIds};
   const localId=token=>{if(token==='LOCALID_PLAYER'||token==='OBJ_EVENT_ID_PLAYER')return 'LOCALID_PLAYER';if(/^VAR_|^(?:0x[0-9a-f]+|[0-9]+)$/i.test(token)){const id=value(token);if(id===255)return 'LOCALID_PLAYER';return Object.entries(campaign.catalog.storyData?.maps?.[draft.position.map]?.localIds||{}).find(([,n])=>n===id)?.[0]||String(id);}return token;};
   const itemIds=new Map(Object.entries(campaign.catalog.data.itemDetails).map(([id,item])=>[item.constant,Number(id)]));
+  const itemId=token=>itemIds.get(token)??value(token);
   const value=token=>{token=String(token).trim();if(/^0x[0-9a-f]+$/i.test(token))return parseInt(token,16);if(/^\d+$/.test(token))return Number(token);if(token==='TRUE'||token==='YES')return 1;if(token==='FALSE'||token==='NO')return 0;if(/^0x80[0-9a-f]{2}$/i.test(token))return draft.vars?.['VAR_0x'+token.slice(2).toUpperCase()]||0;if(/^VAR_/.test(token))return draft.vars?.[token]||0;if(Object.hasOwn(constants,token))return constants[token];throw new Error('Unresolved value '+token);};
   const text=target=>{
     assert(labels[target]||campaign.catalog.scriptData?.text?.[target],'Missing text '+target);const lines=labels[target]?labels[target].filter(line=>line.startsWith('.string')):['.string "'+campaign.catalog.scriptData.text[target]+'"'];
     assert(lines.length,'Missing text '+target);
-    return lines.map(line=>{const match=line.match(/^\.string\s+"(.*)"$/);assert(match,'Unsupported text');return match[1].replace(/\\[nl]/g,' ').replace(/\\p/g,'\n\n').replace(/\\"/g,'"').replace(/\$/g,'');}).join('').replaceAll('{PLAYER}',draft.trainer.name).replaceAll('{RIVAL}',draft.trainer.gender==='Female'?'Brendan':'May').replace(/\{(STR_VAR_[123])\}/g,(_,key)=>buffers[key]||'');
+    return lines.map(line=>{const match=line.match(/^\.string\s+"(.*)"$/);assert(match,'Unsupported text');return match[1].replace(/\\[nl]/g,'\n').replace(/\\p/g,'\f').replace(/\\"/g,'"').replace(/\$/g,'');}).join('').replaceAll('{PLAYER}',draft.trainer.name).replaceAll('{RIVAL}',draft.trainer.gender==='Female'?'Brendan':'May').replace(/\{(STR_VAR_[123])\}/g,(_,key)=>buffers[key]||'');
   };
   // Brisk resized Route 101; its original rescue trigger/movement still targets
   // the old width. Align the player with the surviving rescue corridor.
@@ -53,7 +54,7 @@ export function planScript(campaign,source,entry,decisions=null){
       const temporary=new campaign.constructor(campaign.catalog,campaign.pack,draft);let mon;
       if(opcode==='dowildbattle'){assert(wildSpec,'Wild battle not configured');mon=temporary.createMon(wildSpec.species,wildSpec.level);}
       else{const table=temporary.mapInfo.encounters?.rock_smash_mons;draft.vars??={};draft.vars.VAR_RESULT=0;if(!table||temporary.random.next()>=table.rate/100){draft.rng=temporary.random.state;continue;}mon=temporary.chooseEncounter(table.slots.filter(e=>e.species))?.mon;if(!mon)continue;draft.vars.VAR_RESULT=1;}
-      draft.rng=temporary.random.state;const result=input({kind:'wild-battle',mon});if(result?.phase==='lost')throw new ScriptBattleLost(result.state);assert(['won','caught','fled'].includes(result?.phase),'Wild battle unfinished');Object.assign(draft,new campaign.constructor(campaign.catalog,campaign.pack,clone(result.state)).snapshot());continue;
+      draft.rng=temporary.random.state;const result=input({kind:'wild-battle',mon});if(result?.phase==='lost')throw new ScriptBattleLost(result.state);assert(['won','caught','fled','escaped'].includes(result?.phase),'Wild battle unfinished');Object.assign(draft,new campaign.constructor(campaign.catalog,campaign.pack,clone(result.state)).snapshot());continue;
     }
     if(opcode==='special'&&args[0]==='GetRivalSonDaughterString'){buffers.STR_VAR_1=draft.trainer.gender==='Female'?'son':'daughter';continue;}
     if(opcode==='special'&&['StartWallClock','Special_ViewWallClock'].includes(args[0])){
@@ -65,20 +66,24 @@ export function planScript(campaign,source,entry,decisions=null){
     if(opcode==='special'&&['EnableNationalPokedex','SetUnlockedPokedexFlags'].includes(args[0])){draft.flags.FLAG_SYS_NATIONAL_DEX=true;continue;}
     if(opcode==='special'&&args[0]==='ChangePokemonNickname'){const mon=draft.party[draft.vars?.VAR_0x8004||0];assert(mon,'No Pokémon to nickname');const name=input({kind:'nickname',name:mon.nickname});assert(typeof name==='string'&&name.trim().length&&name.length<=24,'Invalid nickname');mon.nickname=name.trim();continue;}
     if(opcode==='special'&&['TurnOffTVScreen','SetPlayerBedroomDecoration','SetSecretBase2F','InitSecretBaseDecorationSprites'].includes(args[0]))continue;
-    if(['setstepcallback','opendoor','closedoor','hideplayer','showplayer','incrementgamestat','setescapewarp'].includes(opcode))continue;
+    if(['setstepcallback','opendoor','closedoor','hideplayer','showplayer','incrementgamestat','setescapewarp','textcolor','waitmoncry','setobjectsubpriority','fadescreenswapbuffers'].includes(opcode))continue;
     if(opcode==='waitmovement'){if(pendingMovements.length&&decisions?.present)input({kind:'movement',startState:movementStart,actors:pendingMovements});pendingMovements=[];movementStart=null;continue;}
+    if(['multichoice','multichoicedefault','multichoicegrid'].includes(opcode)){const options=campaign.catalog.storyData?.menus?.[args[2]];assert(options?.length,'Missing menu '+args[2]);const selected=input({kind:'menu',options});assert(Number.isInteger(selected)&&selected>=0&&selected<options.length,'Invalid menu choice');draft.vars??={};draft.vars.VAR_RESULT=selected;continue;}
+    if(opcode==='fadescreen'||opcode==='fadescreenspeed'){if(decisions?.present)input({kind:'fade',out:/TO_(?:BLACK|WHITE)/.test(args[0]),white:args[0].includes('WHITE')});continue;}
+    if(opcode==='delay'){if(decisions?.present)input({kind:'delay',duration:value(args[0])*1000/60});continue;}
     if(opcode==='checkfieldmove'){
       const index=fieldMoveUser(campaign.catalog,draft,args[0],args[1]?!!value(args[1]):false);draft.vars??={};draft.vars.VAR_RESULT=index<0?6:index;if(index>=0)draft.vars.VAR_0x8004=draft.party[index].species;continue;
     }
     if(opcode==='bufferpartymonnick'){assert(/^STR_VAR_[123]$/.test(args[0]),'Invalid text buffer');const mon=draft.party[value(args[1])];assert(mon,'Invalid field-move user');buffers[args[0]]=mon.nickname;continue;}
     if(opcode==='setfieldeffectargument')continue;
     if(opcode==='hidefollowernpc'){draft.flags.FLAG_TEMP_HIDE_FOLLOWER=true;continue;}
-    if(opcode==='callnative'&&['FollowerNPC_WarpSetEnd','SetFollowerNPCSurfSpriteAfterDive'].includes(args[0])){draft.flags.FLAG_TEMP_HIDE_FOLLOWER=false;continue;}
+    if(opcode==='callnative'&&['FollowerNPC_WarpSetEnd','SetFollowerNPCSurfSpriteAfterDive','UpdateFollowingPokemon','FollowerNPC_SetObjectEventToPlayerPosition'].includes(args[0])){draft.flags.FLAG_TEMP_HIDE_FOLLOWER=false;continue;}
     if(opcode==='dofieldeffect'&&['FLDEFF_USE_SURF','FLDEFF_USE_DIVE','FLDEFF_USE_WATERFALL','FLDEFF_USE_CUT_ON_TREE','FLDEFF_USE_ROCK_SMASH','FLDEFF_USE_STRENGTH'].includes(args[0])){
       const start=clone(draft),temporary=new campaign.constructor(campaign.catalog,campaign.pack,draft),frames=applyFieldEffect(temporary,args[0]);temporary.snapshot();const user=fieldMoveUser(campaign.catalog,draft,{FLDEFF_USE_CUT_ON_TREE:'FIELD_MOVE_CUT',FLDEFF_USE_ROCK_SMASH:'FIELD_MOVE_ROCK_SMASH',FLDEFF_USE_STRENGTH:'FIELD_MOVE_STRENGTH'}[args[0]]);if(user>=0)buffers.STR_VAR_1=draft.party[user].nickname;if(frames.length&&decisions?.present)input({kind:'movement',startState:start,movementMode:temporary.mode,actors:[{localId:'LOCALID_PLAYER',frames}]});continue;
     }
     if(IGNORE.has(opcode))continue;
     if(['playse','playfanfare','delay','playbgm','fadedefaultbgm','fadescreen','fadescreenspeed','savebgm','fadeoutbgm','fadeinbgm','setbattlebgm','waitstate','nop1','nop2','hidebox','showmoneybox','updatemoneybox','hidemoneybox','waitdooranim','setdooropened','setdoorclosed','setdooropen','setdoorclose','dofieldeffect','waitfieldeffect'].includes(opcode))continue;
+    if(opcode==='playmoncry'){if(decisions?.present)input({kind:'cry',species:value(args[0])});continue;}
     if(opcode==='checkplayergender'){draft.vars??={};draft.vars.VAR_RESULT=draft.trainer.gender==='Female'?1:0;continue;}
     if(opcode==='settrainerflag'||opcode==='cleartrainerflag'){assert(/^TRAINER_\w+$/.test(args[0]),'Invalid trainer');draft.flags[args[0]]=opcode==='settrainerflag';continue;}
     if(opcode==='goto_if_defeated'||opcode==='goto_if_not_defeated'){if(!!draft.flags[args[0]]===(opcode==='goto_if_defeated')){label=args[1];index=0;}continue;}
@@ -119,7 +124,7 @@ export function planScript(campaign,source,entry,decisions=null){
     if(/^(?:goto|call)_if_(?:eq|ne|lt|gt|le|ge)$/.test(opcode)){
       let target;if(args.length===3){comparison=value(args[0])-value(args[1]);target=args[2];}else target=args[0];assert(comparison!==null,'Comparison missing');const condition=opcode.replace(/^call_/,'goto_');const yes={goto_if_eq:comparison===0,goto_if_ne:comparison!==0,goto_if_lt:comparison<0,goto_if_gt:comparison>0,goto_if_le:comparison<=0,goto_if_ge:comparison>=0}[condition];if(yes){if(opcode.startsWith('call_'))calls.push([label,index]);label=target;index=0;}continue;
     }
-    if(opcode==='msgbox'||opcode==='message'){
+    if(opcode==='msgbox'||opcode==='message'||opcode==='pokenavcall'){
       const message=text(args[0]);
       if(args.includes('MSGBOX_YESNO')){const key=`${label}:${index}:${steps}`;assert(decisions,'A choice is required; this event is not ported');if(!decisions.has(key))throw new ScriptInputRequired(key,{kind:'yesno',message});const answer=decisions.get(key);assert(answer===0||answer===1,'Invalid choice');draft.vars??={};draft.vars.VAR_RESULT=answer;}
       else{messages.push(message);if(decisions?.present)input({kind:'message',message});}continue;
@@ -149,14 +154,16 @@ export function planScript(campaign,source,entry,decisions=null){
       const map=campaign.pack.maps[draft.position.map],player=args[0]==='LOCALID_PLAYER',object=player?draft.position:map.events.find(e=>e.localId===args[0]);assert(object,'Unknown movement object '+args[0]);assert(labels[args[1]],'Movement table is not ported');
       draft.objects??={};draft.objects[map.id]??={};const actor=player?draft.position:(draft.objects[map.id][args[0]]={x:object.x,y:object.y,...draft.objects[map.id][args[0]]});
       let finished=false;for(const command of labels[args[1]]){if(command==='step_end'){finished=true;break;}if(command.startsWith('goto '))break;
+        if(/^delay_\d+$/.test(command)){frames.push({x:actor.x,y:actor.y,facing:frames.at(-1)?.facing||(player?{1:'down',2:'up',3:'left',4:'right'}[draft.vars?.VAR_FACING]:/UP/.test(object.movementType)?'up':/LEFT/.test(object.movementType)?'left':/RIGHT/.test(object.movementType)?'right':'down')||'down',duration:Number(command.slice(6))*1000/60,walking:false});continue;}
+        if(command.startsWith('emote_')){const direction=frames.at(-1)?.facing||(/UP/.test(object.movementType)?'up':/LEFT/.test(object.movementType)?'left':/RIGHT/.test(object.movementType)?'right':'down');frames.push({x:actor.x,y:actor.y,facing:direction,emote:command.slice(6)});continue;}
         const facing=command.match(/^(?:face_|walk_in_place_(?:fast_|faster_|slow_)?)(up|down|left|right)$/);if(facing){if(!player)actor.movementType='MOVEMENT_TYPE_FACE_'+facing[1].toUpperCase();frames.push({x:actor.x,y:actor.y,facing:facing[1]});continue;}if(/^(?:delay_|emote_|disable_ground_effects|enable_ground_effects|set_invisible|set_visible|face_original_direction|hide|show|cut_tree|rock_smash_break|pause|lock_facing_direction|unlock_facing_direction)/.test(command))continue;if(command==='face_player'){frames.push({x:actor.x,y:actor.y,facing:actor.x<draft.position.x?'right':actor.x>draft.position.x?'left':actor.y<draft.position.y?'down':'up'});continue;}
         const movement=command.match(/^(?:walk|walk_fast|walk_faster|walk_slow|walk_fastest|jump|jump_2|jump_in_place)_(up|down|left|right)$/);assert(movement,'Unsupported movement '+command);
         const [dx,dy]=command.startsWith('jump_in_place')?[0,0]:{up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]}[movement[1]],map=campaign.pack.maps[draft.position.map],x=actor.x+dx,y=actor.y+dy;
-        assert((connectedPosition(campaign.pack,map,x,y))&&(map.sourceMap||!('#~h'.includes(tileAt(draft,map,x,y)))),'Scripted movement is blocked: '+args[0]+' '+x+','+y+' in '+map.id);actor.x=x;actor.y=y;if(player&&(x<0||y<0||x>=map.width||y>=map.height))draft.sceneMap=map.id;frames.push({x,y,facing:movement[1]});
+        assert((connectedPosition(campaign.pack,map,x,y))&&(map.sourceMap||!('#~h'.includes(tileAt(draft,map,x,y)))),'Scripted movement is blocked: '+args[0]+' '+x+','+y+' in '+map.id);actor.x=x;actor.y=y;if(!player)actor.movementType='MOVEMENT_TYPE_FACE_'+movement[1].toUpperCase();if(player&&(x<0||y<0||x>=map.width||y>=map.height))draft.sceneMap=map.id;frames.push({x,y,facing:movement[1],walking:!command.startsWith('jump_in_place'),duration:command.startsWith('walk_faster')?75:command.startsWith('walk_fast')?100:command.startsWith('walk_slow')?250:150});
       }assert(finished,'Movement table has no ending');if(player&&frames.length){draft.vars??={};draft.vars.VAR_FACING={down:1,up:2,left:3,right:4}[frames.at(-1).facing];}pendingMovements.push({localId:args[0],frames});continue;
     }
     if(opcode==='checkitem'||opcode==='checkitemspace'||opcode==='removeitem'){
-      const id=itemIds.get(args[0]),count=args[1]?value(args[1]):1;assert(id,'Unknown item');integer(count,1,999,'item count');const current=draft.inventory[id]||0;draft.vars??={};
+      const id=itemId(args[0]),count=args[1]?value(args[1]):1;assert(id,'Unknown item');integer(count,1,999,'item count');const current=draft.inventory[id]||0;draft.vars??={};
       if(opcode==='removeitem'){assert(current>=count,'Not enough items');draft.inventory[id]=current-count;}else draft.vars.VAR_RESULT=opcode==='checkitem'?(current>=count?1:0):(current+count<=999999?1:0);continue;
     }
     if(['checkmoney','givemoney','takemoney'].includes(opcode)){
@@ -172,7 +179,7 @@ export function planScript(campaign,source,entry,decisions=null){
       for(const mon of draft.party)campaign.catalog.heal(mon);continue;
     }
     if(opcode==='giveitem'){
-      const id=itemIds.get(args[0]),count=args[1]?value(args[1]):1;assert(id,'Unknown reward item');integer(count,1,999,'reward quantity');const total=(draft.inventory[id]||0)+count;integer(total,0,999999,'bag capacity');draft.inventory[id]=total;draft.vars??={};draft.vars.VAR_RESULT=1;messages.push(`Received ${campaign.catalog.data.items[id]} × ${count}!`);continue;
+      const id=itemId(args[0]),count=args[1]?value(args[1]):1;assert(id,'Unknown reward item');integer(count,1,999,'reward quantity');const total=(draft.inventory[id]||0)+count;integer(total,0,999999,'bag capacity');draft.inventory[id]=total;draft.vars??={};draft.vars.VAR_RESULT=1;messages.push(`Received ${campaign.catalog.data.items[id]} × ${count}!`);continue;
     }
     throw new Error('Unported command '+opcode);
   }

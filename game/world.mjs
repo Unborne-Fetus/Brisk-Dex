@@ -57,7 +57,7 @@ export class Campaign {
   }
   visibleEvents(map=this.map) {
     const overrides=this.state.objects?.[map.id]||{};
-    return map.events.filter(e=>!this.state.flags[e.hideFlag]&&overrides[e.localId]?.visible!==false).map(e=>({...e,...overrides[e.localId]}));
+    return map.events.filter(e=>!this.state.flags[e.hideFlag]&&overrides[e.localId]?.visible!==false).map(e=>{const graphics=this.catalog.storyData?.maps?.[map.id]?.objectGraphics?.[e.localId],slot=graphics?.match(/^OBJ_EVENT_GFX_VAR_([0-9A-F]+)$/),sprite=slot?this.catalog.storyData.objectSprites?.[this.state.vars?.['VAR_OBJ_GFX_ID_'+slot[1]]]:null;return {...e,...(sprite?{sprite}:{}),...overrides[e.localId]};});
   }
   canDisembark(x,y){return this.mode==='surf'&&this.tile(x,y)!=='~'&&(this.map.elevations?.[y]?.[x]??3)===(this.catalog.fieldData?.defaultElevation??3);}
   elevationAllows(x,y) {
@@ -85,6 +85,7 @@ export class Campaign {
     for(const [id,count] of Object.entries(s.inventory)) { assert(this.catalog.data.items[id],'Unknown bag item'); integer(count,0,999999,'item count'); }
     assert(s.flags&&typeof s.flags==='object'&&!Array.isArray(s.flags),'Invalid flags'); assert(Object.keys(s.flags).length<=10000&&Object.values(s.flags).every(v=>typeof v==='boolean'),'Invalid flags');
     assert(typeof s.options?.encounters==='boolean'&&typeof s.options.weather==='boolean','Invalid options');
+    if(s.options.expShareMode!==undefined)integer(s.options.expShareMode,0,2,'EXP Share mode');
     if(s.options.difficulty!==undefined)assert(['easy','normal','hard','extreme'].includes(s.options.difficulty),'Invalid difficulty');if(s.options.shinyOdds!==undefined)integer(s.options.shinyOdds,50,8192,'shiny odds');for(const key of ['expShare','battleBag','orangeShinies','overworldEncounters'])if(s.options[key]!==undefined)assert(typeof s.options[key]==='boolean','Invalid option '+key);
     for(const k of ['seen','caught']) { assert(Array.isArray(s[k])&&s[k].length<=10000,'Invalid Pokédex'); s[k].forEach(id=>this.catalog.species(id)); }
     if(s.metatiles){for(const [mapId,changes]of Object.entries(s.metatiles)){const map=this.pack.maps[mapId];assert(map,'Invalid tile map');for(const [key,tile]of Object.entries(changes)){const [x,y]=key.split(',').map(Number);integer(x,0,map.width-1,'tile x');integer(y,0,map.height-1,'tile y');integer(tile.id,0,1023,'tile id');assert(map.metatileAtlas?.behaviors[tile.id]!==undefined&&typeof tile.blocked==='boolean','Invalid map edit');}}}

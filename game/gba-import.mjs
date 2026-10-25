@@ -44,10 +44,22 @@ export function readGbaSave(input,catalog){
 }
 function decodeName(reader,bytes){return reader.decodeString?reader.decodeString(bytes):toBase64(bytes);}
 function status(bits){if(bits&7)return 'sleep';if(bits&128)return 'toxic';if(bits&8)return 'poison';if(bits&16)return 'burn';if(bits&32)return 'freeze';if(bits&64)return 'paralysis';return null;}
+export function restoreGbaStory(save,state,catalog){
+ const layout=catalog.storyData?.saveLayouts?.[save.boxCount]||catalog.storyData?.saveLayout;if(!layout)return {applied:false};
+ assert(layout.flagsOffset+layout.flagBytes<=save.block1.length&&layout.varsOffset+layout.varsCount*2<=save.block1.length,'Story layout exceeds save block');
+ const view=new DataView(save.block1.buffer,save.block1.byteOffset,save.block1.byteLength),flags={},vars={};
+ for(const [key,id]of Object.entries(layout.flags)){if(key.startsWith('FLAG_TEMP_'))continue;flags[key]=!!(save.block1[layout.flagsOffset+(id>>3)]&(1<<(id&7)));}
+ for(const [key,id]of Object.entries(layout.trainers)){const bit=layout.trainerFlagsStart+id;flags[key]=!!(save.block1[layout.flagsOffset+(bit>>3)]&(1<<(bit&7)));}
+ for(const [key,id]of Object.entries(layout.vars)){if(key.startsWith('VAR_TEMP_'))continue;vars[key]=view.getUint16(layout.varsOffset+(id-layout.varsStart)*2,true);}
+ state.flags=flags;state.vars=vars;state.flashLevel=save.block1[0x30];state.options.overworldEncounters=true;
+ state.options.difficulty=['normal','easy','hard','extreme'][vars.VAR_BRISK_DIFFICULTY]||'normal';state.options.battleBag=!vars.VAR_BRISK_BATTLE_BAG_DISABLED;state.options.orangeShinies=!vars.VAR_BRISK_ISLAND_SHINIES_DISABLED;
+ const shiny=[8192,4096,2048,1024,512,256,128,100,50];state.options.shinyOdds=shiny[vars.VAR_BRISK_SHINY_ODDS-1]||512;state.options.expShareMode=Math.min(2,vars.VAR_BRISK_EXP_SHARE||0);state.options.expShare=vars.VAR_BRISK_EXP_SHARE===1&&Object.entries(catalog.data.itemDetails).some(([id,item])=>item.constant==='ITEM_MODERN_EXP_SHARE'&&(state.inventory[id]||0)>0);
+ return {applied:true,flags:Object.keys(flags).length,variables:Object.keys(vars).length};
+}
 export async function importGbaSave(input,catalog,pack,layout){
   const save=readGbaSave(input,catalog),campaign=Campaign.start(catalog,pack,'TREECKO',save.counter||1),s=campaign.state;
   s.party=[];s.boxes=[];s.inventory={};s.trainer={...save.trainer};s.money=save.money;s.nextId=1;s.seen=[];s.caught=[];
-  const report={format:'brisk-gba-import-report',saveCounter:save.counter,boxCount:save.boxCount,party:0,stored:0,archived:[],adjustments:[],warnings:['Story flags, quests and native script variables are preserved in the original-save archive but are not applied to the unfinished remake. This is not full story-resume compatibility.','This import is one-way. Native progress cannot currently be written back to the GBA save.','Eggs, fusion storage, ribbons, markings and other unimplemented metadata remain in the original-save archive; unsupported Pokémon are listed separately.']};
+  const report={format:'brisk-gba-import-report',saveCounter:save.counter,boxCount:save.boxCount,party:0,stored:0,archived:[],adjustments:[],warnings:['This import is one-way. Native progress cannot currently be written back to the GBA save.','Eggs, fusion storage, ribbons, markings and other unimplemented metadata remain in the original-save archive; unsupported Pokémon are listed separately.']};
   for(const entry of save.records){const raw=entry.raw,m=entry.decoded;
     try{
       assert(m&&!m.empty&&m.checksumValid,'Invalid Pokémon checksum or record');assert(!m.isEgg&&!(raw[19]&5),'Eggs/bad eggs are not playable in this runtime');const species=catalog.species(m.species),level=(()=>{let n=1;while(n<100&&m.experience>=experience(n+1,species.growthRate))n++;return n;})();
@@ -65,6 +77,7 @@ export async function importGbaSave(input,catalog,pack,layout){
   const target=layout?.maps?.[`${save.location.group}:${save.location.number}`],map=pack.maps[target?.nativeMap||catalog.fieldData?.mapNames?.[target?.sourceName]];
   const mode=catalog.fieldData?.maps?.[map?.id]?.mapType==='MAP_TYPE_UNDERWATER'?'underwater':map&&campaign.tile(save.location.x,save.location.y,map)==='~'?'surf':'land';
   if(map&&campaign.canOccupy(save.location.x,save.location.y,map,mode)){s.position={map:map.id,x:save.location.x,y:save.location.y};s.field={mode};}else report.warnings.push('Saved location is unavailable/blocked; placed at the standalone starting location. Original coordinates are archived.');
+  report.story=restoreGbaStory(save,s,catalog);if(!report.story.applied)report.warnings.push('Source story metadata is unavailable. Story flags were not restored.');
   report.party=s.party.length;report.stored=s.boxes.length;
   s.gbaSource={format:'brisk-gba-original',sha256:await sha256(save.bytes),bytes:toBase64(save.bytes),location:save.location,boxNames:save.boxNames,report};
   campaign.snapshot();return {campaign,report};

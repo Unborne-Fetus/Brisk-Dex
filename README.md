@@ -323,6 +323,13 @@ Install the latest **Brisk-Dex-Windows** artifact from the **Build Brisk Dex - W
 
 Visible encounters use map-specific source species/levels and the source overworld sheets where available, with shiny palettes, roaming, contact/interaction battles and persistent identity across saves. Toggle **Visible overworld encounters** in Options to return to random encounters. Interact with trees, rocks and boulders for Cut, Rock Smash and Strength. **Field moves** provides Flash, Dig, Teleport and Fly to visited towns when allowed; Surf, Dive and Waterfall retain their contextual source prompts and badge requirements.
 
-Windows campaign saves and their previous backup are written atomically under the app’s user data folder, outside the installation. Existing file-origin campaigns are migrated on startup. Export/import remains available for portable backups. Original GBA imports remain one-way conversions and archive the input bytes; they do not yet restore every GBA story flag.
+Windows campaign saves and their previous backup are written atomically under the app’s user data folder, outside the installation. Existing file-origin campaigns are migrated on startup. Export/import remains available for portable backups. GBA imports restore named story flags, defeated trainers, saved script variables and supported options using source-derived 14-box and 20-box layouts. Original bytes remain archived; native progress is still one-way and cannot be written back into the GBA file.
 
 Developer verification: `npm run game:test`, `npm run desktop:test`, and `npm run desktop:ui`. The Windows installer workflow runs the game tests and an actual Electron opening/save/reload test before packaging.
+
+
+### Default game tab and app-save resume (1.2)
+
+**Play Brisk Emerald** is the first tab and opens automatically. If Dex has a remembered GBA save, the game imports it automatically on the first launch, including supported party/PC records, bag, money, location, badges and source story state. Later launches keep newer native progress associated with that source file. Opening a different GBA save selects that file’s journey after any active battle or scene finishes; the previous native journey becomes the backup. A failed source import displays an error and preserves the existing save.
+
+The source dialogue font, window frame and battle environments are bundled locally. Story dialogue retains source line/page breaks in a two-line text box. Scene fades, movement speeds, pauses, cries, emotion markers, variable rival graphics and source choice menus are supported. Double battles display both allies and both opponents. Further quest checks cover Petalburg Woods, the Peeko rescue, Devon president, Steven’s letter and the museum confrontation. These additions extend the source port; a full end-to-end parity playthrough remains outstanding.

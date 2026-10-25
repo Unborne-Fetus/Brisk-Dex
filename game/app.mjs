@@ -1,3 +1,5 @@
+import {dialoguePages,battleEnvironment} from './dialogue.mjs';
+import {resumeAppSave,activeAppSave} from './app-save.mjs';
 import {refreshWildlife,meetWildlife} from './overworld.mjs';
 import {fieldMoveUser} from './traversal.mjs';
 import {Catalog} from './model.mjs';
@@ -13,14 +15,14 @@ import {IntegrationBridge} from './integrations.mjs';
 const $=id=>document.getElementById(id),ctx=$('world').getContext('2d'),store=new SaveStore();
 let appVisible=true;
 window.addEventListener('message',e=>{if(e.source!==window.parent||e.data?.type!=='brisk-game-visibility')return;appVisible=e.data.visible===true;keys.clear();});
-let sceneBattleResolve=null,storySource='';
+let sceneBattleResolve=null,storySource='',appSavePending=false,gbaLayout,fontMetrics={};
 let campaign,battle,battleEvent,pack,catalog,facing=[0,1],lastMove=0,busy=false,dirty=false,savedAt=0,saving=null,storyActive=false,choiceCancel=null;
 const keys=new Set(),bridge=new IntegrationBridge();
 const notice=text=>$('notice').textContent=text;
 const button=(text,fn)=>{const b=document.createElement('button');b.textContent=text;b.onclick=()=>guard(fn);return b;};
 async function guard(fn){try{await fn();}catch(e){notice(e.message);}}
 function sprite(mon,back=false){const s=catalog.species(mon.species);return '../'+(mon.shiny?(back?s.backShinySprite:s.frontShinySprite):(back?s.backSprite:s.frontSprite));}
-function modal(title,content){$('modal-title').textContent=title;$('modal-content').replaceChildren();if(typeof content==='string'){const p=document.createElement('p');p.textContent=content;$('modal-content').append(p);}else $('modal-content').append(...content);$('modal').showModal();}
+function modal(title,content,scene=false){if($('modal').open)$('modal').close();$('modal').classList.toggle('scene',scene);$('modal-title').textContent=title;$('modal-content').replaceChildren();if(typeof content==='string'){const p=document.createElement('p');p.textContent=content;$('modal-content').append(p);}else $('modal-content').append(...content);if(scene)$('modal').show();else $('modal').showModal();}
 function close(){ $('modal').close();$('world').focus(); }
 $('modal-close').onclick=()=>{if(choiceCancel){const cancel=choiceCancel;choiceCancel=null;close();cancel(null);}else close();};
 $('modal').addEventListener('cancel',()=>{if(choiceCancel){const cancel=choiceCancel;choiceCancel=null;cancel(null);}});
@@ -56,8 +58,12 @@ function partyDetails(mon){
 }
 function beginBattle(mon,trainer=null,eventId=null,format='singles'){battleEvent=eventId;battle=new LocalBattle(campaign,mon,{trainer,format});dirty=true;update();}
 function renderBattle(){
-  for(const [id,mon,back] of [['enemy-card',battle.enemy,false],['player-card',battle.playerView||battle.player,true]]){
-    const card=$(id),img=document.createElement('img');loadSprite(img,sprite(mon,back));img.alt=mon.nickname;
+  const environment='assets/battle-'+battleEnvironment(campaign)+'.png',field=document.querySelector('.battlefield');field.dataset.environment=environment;if(globalThis.BriskGameAssets)BriskGameAssets.assetUrl(environment).then(url=>{if(field.dataset.environment===environment)field.style.backgroundImage=`url(${url})`;});else field.style.backgroundImage=`url(${environment})`;
+  field.classList.toggle('doubles',battle.doubles);
+  const view=(side,slot)=>{const p=battle.room.players[side],index=slot?p.active2:p.active,runtime=p.team[index],mon=side?battle.opponents[index]:campaign.state.party[index];return runtime&&mon?{...mon,species:runtime.species,nickname:runtime.name,hp:runtime.hp,battleMaxHP:runtime.maxHP}:null;};
+  const cards=battle.doubles?[['enemy-card',view(1,0),false],['player-card',view(0,0),true],['enemy-card-2',view(1,1),false],['player-card-2',view(0,1),true]]:[['enemy-card',battle.enemy,false],['player-card',battle.playerView||battle.player,true],['enemy-card-2',null,false],['player-card-2',null,true]];
+  for(const [id,mon,back] of cards){
+    const card=$(id);card.hidden=!mon;if(!mon)continue;const img=document.createElement('img');loadSprite(img,sprite(mon,back));img.alt=mon.nickname;
     const d=document.createElement('div'),name=document.createElement('strong');name.textContent=`${mon.nickname} · Lv. ${mon.level}`;const hp=document.createElement('progress');hp.max=mon.battleMaxHP||catalog.stats(mon)[0];hp.value=mon.hp;const text=document.createElement('small');text.textContent=`${mon.hp} / ${hp.max} HP`;d.append(name,hp,text);card.replaceChildren(d,img);
   }
   $('battle-log').replaceChildren(...battle.log.slice(-5).map(line=>{const p=document.createElement('div');p.textContent=line;return p;}));$('battle-log').scrollTop=10000;
@@ -79,7 +85,7 @@ function renderBattle(){
   }
   $('battle-actions').replaceChildren(...actions);
 }
-function act(action){battle.act(action);dirty=true;update();}
+function act(action){const before={enemy:battle.enemy.hp,player:battle.playerView.hp};battle.act(action);dirty=true;update();if(!matchMedia('(prefers-reduced-motion: reduce)').matches)for(const [id,hp,prior]of [['enemy-card',battle.enemy.hp,before.enemy],['player-card',battle.playerView.hp,before.player]])if(hp<prior)$(id).animate([{opacity:1,transform:'translateX(0)'},{opacity:.1,transform:'translateX(5px)'},{opacity:1,transform:'translateX(-5px)'},{opacity:1,transform:'translateX(0)'}],{duration:350});}
 function chooseMove(mon,id){
   close();if(mon.moves.length<4){catalog.teach(mon,id,mon.moves.length);dirty=true;update();return growthPrompts();}
   modal(`${mon.nickname} wants to learn ${catalog.move(id).name}`, [...mon.moves.map((m,index)=>button(`Replace ${catalog.move(m.id).name}`,()=>{catalog.teach(mon,id,index);dirty=true;close();update();growthPrompts();})),button('Keep current moves',()=>{mon.pendingMoves=(mon.pendingMoves||[]).filter(move=>move!==id);dirty=true;close();growthPrompts();})]);
@@ -106,28 +112,36 @@ async function interact(){
     modal('Trainer battle',[Object.assign(document.createElement('p'),{textContent:e.text}),button('Battle',()=>{close();beginBattle(e.team?campaign.trainerTeam(e.team):campaign.createMon(e.species,e.level),e.trainerName||'Trainer',e.id);})]);
   }else if(e.kind==='shop')modal('Field supplies',e.stock.map(stock=>button(`${catalog.data.items[stock.item]} · ₽${stock.price*({easy:1,normal:2,hard:4,extreme:10}[campaign.state.options.difficulty]||1)}`,()=>{campaign.buy(stock.item,1,e);dirty=true;update();notice(`Bought ${catalog.data.items[stock.item]}.`);})));
 }
-function sceneChoice(message,labels=['Continue']){
-  return new Promise(resolve=>{choiceCancel=resolve;modal('Brisk Emerald',[Object.assign(document.createElement('p'),{textContent:message}),...labels.map((label,index)=>button(label,()=>{choiceCancel=null;close();resolve(index);} ))]);});
+async function sceneChoice(message,labels=['Continue']){
+ const pages=storyActive?dialoguePages(message,fontMetrics):[message];let answer=0;
+ for(let i=0;i<pages.length;i++){
+  const choices=i===pages.length-1?labels:['Continue'];answer=await new Promise(resolve=>{choiceCancel=resolve;modal('Brisk Emerald',[Object.assign(document.createElement('p'),{textContent:pages[i]}),...choices.map((label,index)=>button(label,()=>{choiceCancel=null;close();resolve(index);} ))],storyActive);$('modal-content').querySelector('button')?.focus();});
+  if(answer===null)return null;
+ }return answer;
 }
 function textInput(title,value='',type='text'){
  return new Promise(resolve=>{choiceCancel=resolve;const input=document.createElement('input');input.type=type;input.value=value;input.maxLength=24;input.setAttribute('aria-label',title);modal(title,[input,button('Continue',()=>{choiceCancel=null;close();resolve(input.value);})]);input.focus();});
 }
 async function playScene(entry,fallback='',present=true){
-  if(storyActive)return false;const original=campaign,source=storySource||((pack.sharedScripts||'')+'\n'+campaign.map.scriptText);storyActive=true;
+  if(storyActive)return false;const original=campaign,source=storySource||((pack.sharedScripts||'')+'\n'+campaign.map.scriptText);storyActive=true;update();
   try{
     await runInteractiveScript(original,source,entry,{present,choose:async request=>{
       if(request.kind==='starter')return new Promise(resolve=>{choiceCancel=resolve;modal('Choose your first partner',request.starters.map(constant=>{const species=catalog.species(catalog.id(constant)),b=button(species.name,()=>{choiceCancel=null;close();resolve(constant);});const img=document.createElement('img');loadSprite(img,'../'+species.frontSprite);img.alt='';b.prepend(img);b.className='starter';return b;}));});
       if(request.kind==='clock')return new Promise(resolve=>{choiceCancel=resolve;const field=document.createElement('input');field.type='time';field.value=request.clock||new Date().toTimeString().slice(0,5);modal(request.view?'Your room clock':'Set your room clock',[field,button('Set clock',()=>{choiceCancel=null;close();resolve(field.value);})]);});
       if(request.kind==='nickname'){const name=await textInput('Nickname',request.name);return name===null?request.name:name.trim().slice(0,24)||request.name;}
+      if(request.kind==='delay'){await new Promise(resolve=>setTimeout(resolve,request.duration));return 1;}
+      if(request.kind==='menu')return sceneChoice('Choose an option',request.options);
+      if(request.kind==='fade'){const veil=$('scene-fade');veil.style.background=request.white?'white':'black';await veil.animate([{opacity:request.out?0:1},{opacity:request.out?1:0}],{duration:240,fill:'forwards'}).finished;return 1;}
+      if(request.kind==='cry'){const path=catalog.species(request.species).cry;if(path){const audio=new Audio(globalThis.BriskGameAssets?await BriskGameAssets.assetUrl('../'+path):'../'+path);audio.volume=.4;audio.play().catch(()=>{});}return 1;}
       if(request.kind==='message')return sceneChoice(request.message);
       if(request.kind==='yesno'){const answer=await sceneChoice(request.message,['Yes','No']);return answer===null?null:answer===0?1:0;}
       if(request.kind==='movement'){
         const previous=campaign;campaign=new Campaign(catalog,pack,request.startState);if(request.movementMode)campaign.state.field={mode:request.movementMode};
         try{for(let frame=0;frame<Math.max(...request.actors.map(actor=>actor.frames.length));frame++){
           for(const actor of request.actors){const point=actor.frames[frame];if(!point)continue;
-            if(actor.localId==='LOCALID_PLAYER'){Object.assign(campaign.state.position,{x:point.x,y:point.y});facing={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]}[point.facing];}
-            else{campaign.state.objects??={};campaign.state.objects[campaign.map.id]??={};campaign.state.objects[campaign.map.id][actor.localId]={...campaign.state.objects[campaign.map.id][actor.localId],x:point.x,y:point.y,movementType:'MOVEMENT_TYPE_FACE_'+point.facing.toUpperCase()};}
-          }update();await new Promise(resolve=>setTimeout(resolve,150));
+            if(actor.localId==='LOCALID_PLAYER'){Object.assign(campaign.state.position,{x:point.x,y:point.y});facing={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]}[point.facing];campaign.state.playerEmote=point.emote||null;}
+            else{campaign.state.objects??={};campaign.state.objects[campaign.map.id]??={};campaign.state.objects[campaign.map.id][actor.localId]={...campaign.state.objects[campaign.map.id][actor.localId],x:point.x,y:point.y,movementType:'MOVEMENT_TYPE_FACE_'+point.facing.toUpperCase(),emote:point.emote||null,walking:point.walking===true};}
+          }update();await new Promise(resolve=>setTimeout(resolve,Math.max(50,...request.actors.map(actor=>actor.frames[frame]?.duration||150))));
         }return 1;}finally{campaign=previous;update();}
       }
       if(request.kind==='tutorial'){await sceneChoice('WALLY sent out ZIGZAGOON! A wild RALTS appeared.');await sceneChoice('ZIGZAGOON used TACKLE! WALLY threw a POKé BALL.');await sceneChoice('Gotcha! RALTS was caught!');return 1;}
@@ -143,7 +157,7 @@ async function playScene(entry,fallback='',present=true){
     if(error.state){original.state=error.state;original.random.state=error.state.rng;original.heal();original.state.position=structuredClone(original.state.respawn||pack.start);dirty=true;notice('Your party was brought back to safety.');}
     else notice((fallback?fallback+' · ':'')+error.message);
     return false;
-  }finally{campaign=original;storyActive=false;update();}
+  }finally{$('scene-fade').getAnimations().forEach(a=>a.cancel());campaign=original;storyActive=false;update();}
 }
 async function fieldScene(entry){const before=campaign.map.id;campaign.state.vars??={};campaign.state.vars.VAR_FACING=facing[0]===1?4:facing[0]===-1?3:facing[1]===-1?2:1;await playScene(entry);if(campaign.map.id!==before)await enterMap();}
 async function enterMap(){for(let hop=0;hop<12;hop++){const map=campaign.map.id;for(const entry of mapEntryScripts(campaign.map))await playScene(entry,'',false);for(const entry of warpScripts(campaign))await playScene(entry,'',false);const frame=frameScript(campaign);if(frame)await playScene(frame);if(map===campaign.map.id){const coord=coordinateScript(campaign);if(coord)await playScene(coord);if(map!==campaign.map.id)continue;refreshWildlife(campaign);return;}}throw Error('Too many map transitions');}
@@ -183,13 +197,13 @@ $('import').onchange=e=>guard(async()=>{
 $('restore').onclick=()=>guard(async()=>{if(battle||storyActive)throw new Error('Finish the active interaction first');const previous=await store.load('backup');if(!previous)throw new Error('No backup is available yet');const candidate=migrateCampaign(previous,pack,catalog);if(!confirm('Restore the previous saved journey?'))return;await store.commit(candidate.snapshot());campaign=candidate;dirty=false;update();notice('Previous save restored.');});
 $('new-game').onclick=()=>{if(battle||storyActive){notice('Finish the active interaction first.');return;}if(!campaign||confirm('Start a new journey? Your current saved journey will become the backup.'))startSelection();};
 const directions={ArrowUp:[0,-1],w:[0,-1],ArrowDown:[0,1],s:[0,1],ArrowLeft:[-1,0],a:[-1,0],ArrowRight:[1,0],d:[1,0]};
-window.addEventListener('keydown',e=>{if($('modal').open||['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName))return;if(directions[e.key]){e.preventDefault();if(!e.repeat){guard(()=>move(...directions[e.key]));lastMove=performance.now();}keys.add(e.key);}if(['e','Enter',' '].includes(e.key)&&e.target.tagName!=='BUTTON'){e.preventDefault();guard(interact);}});
+window.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('modal').open&&$('modal').classList.contains('scene')){e.preventDefault();$('modal-close').click();return;}if($('modal').open||['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName))return;if(directions[e.key]){e.preventDefault();if(!e.repeat){guard(()=>move(...directions[e.key]));lastMove=performance.now();}keys.add(e.key);}if(['e','Enter',' '].includes(e.key)&&e.target.tagName!=='BUTTON'){e.preventDefault();guard(interact);}});
 window.addEventListener('keyup',e=>keys.delete(e.key));window.addEventListener('blur',()=>keys.clear());
 for(const b of document.querySelectorAll('[data-dir]')){const key={up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight'}[b.dataset.dir];b.onpointerdown=e=>{e.preventDefault();b.setPointerCapture(e.pointerId);guard(()=>move(...directions[key]));lastMove=performance.now();keys.add(key);};b.onpointerup=b.onpointercancel=b.onlostpointercapture=()=>keys.delete(key);}
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
 function rect(x,y,w,h,color){ctx.fillStyle=color;ctx.fillRect(x,y,w,h);}
 function draw(time){
-  requestAnimationFrame(draw);if(!appVisible||!campaign)return;
+  requestAnimationFrame(draw);if(appSavePending&&catalog&&!battle&&!storyActive&&!busy){appSavePending=false;busy=true;syncAppSave().finally(()=>{busy=false;update();});}if(!appVisible||!campaign)return;
   if(time-lastMove>150&&campaign.forcedDirection()&&!battle&&!storyActive&&!$('modal').open&&!busy){guard(()=>move(...campaign.forcedDirection()));lastMove=time;}
   if(time-lastMove>150&&keys.size){const key=[...keys].find(k=>directions[k]);if(key){guard(()=>move(...directions[key]));lastMove=time;}}
   if(!battle&&!storyActive&&dirty&&time-savedAt>30000&&!$('modal').open&&!busy){savedAt=time;busy=true;save().catch(e=>notice(`Autosave failed: ${e.message}. Export your save.`)).finally(()=>busy=false);}
@@ -215,11 +229,23 @@ function draw(time){
   }
 }
 function person(x,y,color,player){rect(x+5,y+19,14,3,'#193e3444');rect(x+8,y+16,3,5,'#293f3b');rect(x+14,y+16,3,5,'#293f3b');rect(x+6,y+9,13,9,color);rect(x+8,y+3,9,8,'#e2ba86');rect(x+6,y+1,13,5,player?'#a94f3c':'#6b6443');if(player)rect(x+(facing[0]<0?6:15),y+6,2,2,'#2c3631');}
+async function syncAppSave(){
+ const source=await activeAppSave();if(!source)return false;
+ if(source.error){notice('Could not reopen your loaded save: '+source.error);return true;}
+ try{
+  notice('Resuming your loaded Brisk Emerald save…');gbaLayout??=await (await fetch('./gba-layout.json')).json();
+  const result=await resumeAppSave(source.bytes,campaign,catalog,pack,gbaLayout);
+  if(result.imported){await store.commit(result.campaign.snapshot());campaign=result.campaign;dirty=false;}
+  if($('modal').open)close();update();notice(`Resumed ${campaign.state.trainer.name}’s journey from the app save.`);return true;
+ }catch(error){notice('Your loaded save could not be resumed: '+error.message+'. The original save is unchanged.');return true;}
+}
+window.addEventListener('message',event=>{if(event.source===window.parent&&event.data?.type==='brisk-app-save-changed')appSavePending=true;});
 async function boot(){
   const json=async url=>{const r=await fetch(url);if(!r.ok)throw new Error('Could not load '+url);return r.json();};
-  const [data,content,native,scriptData,fieldData,storyData,wildSprites]=await Promise.all([json('../brisk-dex-data.json'),json('./content.json'),json('./native-catalog.json'),json('./script-data.json'),json('./field-data.json'),json('./story-data.json'),json('./wild-sprites.json')]);catalog=new Catalog(data,native);catalog.scriptData=scriptData;catalog.fieldData=fieldData;catalog.storyData=storyData;catalog.wildSprites=wildSprites;pack=content;storySource=(pack.sharedScripts||'')+'\n'+Object.values(pack.maps).map(m=>m.scriptText||'').join('\n');
+  const [data,content,native,scriptData,fieldData,storyData,wildSprites,metrics]=await Promise.all([json('../brisk-dex-data.json'),json('./content.json'),json('./native-catalog.json'),json('./script-data.json'),json('./field-data.json'),json('./story-data.json'),json('./wild-sprites.json'),json('./font-metrics.json')]);catalog=new Catalog(data,native);catalog.scriptData=scriptData;catalog.fieldData=fieldData;catalog.storyData=storyData;catalog.wildSprites=wildSprites;fontMetrics=metrics;pack=content;storySource=(pack.sharedScripts||'')+'\n'+Object.values(pack.maps).map(m=>m.scriptText||'').join('\n');
   try{const saved=await store.load();if(saved)campaign=migrateCampaign(saved,pack,catalog);}catch(e){notice(`Could not load the saved journey: ${e.message}. Use Restore backup or Import save.`);}
-  if(campaign){refreshWildlife(campaign);notice('Welcome back to your Brisk journey.');update();}else startSelection();
+  const resumed=await syncAppSave();
+  if(campaign){refreshWildlife(campaign);if(!resumed)notice('Welcome back to your Brisk journey.');update();}else if(!resumed)startSelection();
   // Exposes only a read-only snapshot/disabled bridge for developer integration tests.
   window.BriskNative=Object.freeze({capabilities:bridge.capabilities,snapshot:()=>campaign?bridge.prepareBattle(campaign):null});
   requestAnimationFrame(draw);
@@ -227,7 +253,7 @@ async function boot(){
 boot().catch(e=>notice(`Unable to start: ${e.message}`));
 
 $('travel').onclick=()=>{if(!campaign||battle||busy||storyActive)return;modal('Development travel', [...(pack.travel||[]).map(t=>button(pack.maps[t.map].name,()=>{campaign.travel(t.map,t.x,t.y);dirty=true;close();update();})),button('Original field station',()=>{campaign.travel('field',12,10);dirty=true;close();update();})]);};
-$('settings').onclick=()=>{if(!campaign||battle||busy||storyActive)return;const nodes=[];for(const [key,label,values] of [['overworldEncounters','Visible overworld encounters',[true,false]],['difficulty','Difficulty',['easy','normal','hard','extreme']],['expShare','Modern EXP Share',[true,false]],['battleBag','Battle Bag',[true,false]],['orangeShinies','Orange Islands 1/50',[true,false]],['shinyOdds','Shiny odds',[50,100,512,1024,4096,8192]]]){const row=document.createElement('label');row.textContent=label+' ';const select=document.createElement('select');for(const value of values){const option=document.createElement('option');option.value=String(value);option.textContent=typeof value==='boolean'?(value?'On':'Off'):String(value);option.selected=campaign.state.options[key]===value;select.append(option);}select.onchange=()=>{const value=values.find(v=>String(v)===select.value);campaign.state.options[key]=value;dirty=true;};row.append(select);nodes.push(row);}nodes.push(button('Rename trainer',async()=>{const name=await textInput('Trainer name',campaign.state.trainer.name);if(name?.trim()){campaign.state.trainer.name=name.trim().slice(0,24);dirty=true;}}));modal('Journey options',nodes);};
+$('settings').onclick=()=>{if(!campaign||battle||busy||storyActive)return;const nodes=[];for(const [key,label,values] of [['overworldEncounters','Visible overworld encounters',[true,false]],['difficulty','Difficulty',['easy','normal','hard','extreme']],['expShare','Modern EXP Share',[true,false]],['battleBag','Battle Bag',[true,false]],['orangeShinies','Orange Islands 1/50',[true,false]],['shinyOdds','Shiny odds',[50,100,128,256,512,1024,2048,4096,8192]]]){const row=document.createElement('label');row.textContent=label+' ';const select=document.createElement('select');for(const value of values){const option=document.createElement('option');option.value=String(value);option.textContent=typeof value==='boolean'?(value?'On':'Off'):String(value);option.selected=campaign.state.options[key]===value;select.append(option);}select.onchange=()=>{const value=values.find(v=>String(v)===select.value);campaign.state.options[key]=value;dirty=true;};row.append(select);nodes.push(row);}nodes.push(button('Rename trainer',async()=>{const name=await textInput('Trainer name',campaign.state.trainer.name);if(name?.trim()){campaign.state.trainer.name=name.trim().slice(0,24);dirty=true;}}));modal('Journey options',nodes);};
 
 $('gba-import').onchange=event=>guard(async()=>{
   const file=event.target.files[0];event.target.value='';if(!file)return;if(battle||storyActive||busy)throw new Error('Finish the active interaction first');

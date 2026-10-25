@@ -40,6 +40,9 @@ def script_data(repo,catalog,trainers):
                 except (ValueError,KeyError,SyntaxError,ZeroDivisionError,OverflowError):break
                 if key not in values:values[key]=current;changed=True
         if not changed:break
+    from source_save_constants import save_constants
+    resolved=save_constants(repo)
+    values.update({k:v for k,v in resolved.items() if k.startswith(('FLAG_','VAR_','TRAINER_')) or k in ['FLAGS_COUNT','VARS_COUNT','VARS_START','VARS_END','TRAINER_FLAGS_START','TRAINER_FLAGS_END','MAX_TRAINERS_COUNT']})
     for field,prefix in [('species','SPECIES_'),('moveDetails',''),('itemDetails','')]:
         for id,record in catalog[field].items():values[prefix+record['constant']]=int(id)
     text_source=(repo/'src/strings.c').read_text();text={name:''.join(re.findall(r'"((?:[^"\\]|\\.)*)"',body)) for name,body in re.findall(r'const u8 (\w+)\[\]\s*=\s*_\((.*?)\);',text_source,re.S)}

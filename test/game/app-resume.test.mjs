@@ -1,0 +1,20 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import {catalog,pack} from './helpers.mjs';import {makeGbaSave} from './gba-fixture.mjs';import {resumeAppSave} from '../../game/app-save.mjs';import {originalGbaBytes} from '../../game/gba-import.mjs';
+catalog.storyData=JSON.parse(fs.readFileSync(new URL('../../game/story-data.json',import.meta.url)));catalog.scriptData=JSON.parse(fs.readFileSync(new URL('../../game/script-data.json',import.meta.url)));
+const layout={maps:{'0:0':{nativeMap:'field'}}},flags=['FLAG_SYS_POKEMON_GET','FLAG_SYS_POKEDEX_GET','FLAG_RESCUED_BIRCH','FLAG_BADGE01_GET','FLAG_HIDE_ROUTE_101_BIRCH_STARTERS_BAG','TRAINER_ROXANNE_1'],vars={VAR_STARTER_MON:2,VAR_LITTLEROOT_INTRO_STATE:7,VAR_BIRCH_LAB_STATE:5,VAR_BRISK_DIFFICULTY:2,VAR_BRISK_SHINY_ODDS:8};
+test('app save restores trainer, party, location, badges, defeated trainers and story variables',async()=>{
+ const bytes=makeGbaSave({flags,vars,trainer:'Unborne'}),result=await resumeAppSave(bytes,null,catalog,pack,layout),s=result.campaign.state;
+ assert.equal(result.imported,true);assert.equal(s.trainer.name,'Unborne');assert.equal(s.party[0].level,12);assert.equal(s.boxes.length,1);assert.deepEqual(s.position,{map:'field',x:12,y:10});
+ for(const key of flags)assert.equal(s.flags[key],true,key);assert.equal(s.flags.FLAG_BADGE02_GET,false);for(const [key,value]of Object.entries(vars))assert.equal(s.vars[key],value,key);
+ assert.equal(s.options.difficulty,'hard');assert.equal(s.options.shinyOdds,100);assert.equal(result.report.story.applied,true);assert.deepEqual(await originalGbaBytes(s),bytes);
+});
+test('reopening the same app save preserves newer native progress without reimporting',async()=>{
+ const bytes=makeGbaSave({flags,vars}),first=await resumeAppSave(bytes,null,catalog,pack,layout);first.campaign.state.money=77;first.campaign.state.flags.FLAG_BADGE02_GET=true;first.campaign.state.position.x=11;
+ const next=await resumeAppSave(bytes,first.campaign,catalog,pack,layout);assert.equal(next.imported,false);assert.equal(next.campaign,first.campaign);assert.equal(next.campaign.state.money,77);assert.equal(next.campaign.state.position.x,11);assert.equal(next.campaign.state.flags.FLAG_BADGE02_GET,true);
+});
+test('a different app save selects its progress without mutating the previous journey',async()=>{
+ const old=await resumeAppSave(makeGbaSave({flags,vars}),null,catalog,pack,layout);old.campaign.state.money=77;const next=await resumeAppSave(makeGbaSave({flags,vars:{...vars,VAR_STARTER_MON:1},trainer:'May'}),old.campaign,catalog,pack,layout);assert.equal(next.imported,true);assert.equal(next.campaign.state.trainer.name,'May');assert.equal(old.campaign.state.money,77);assert.equal(next.campaign.state.vars.VAR_STARTER_MON,1);
+});
+test('Emerald preprocessing resolves trainer-count-dependent badge IDs exactly',()=>{assert.equal(catalog.storyData.saveLayout.flags.FLAG_BADGE01_GET,0x868);assert.equal(catalog.scriptData.constants.FLAG_BADGE01_GET,0x868);assert.equal(catalog.storyData.saveLayout.varsOffset,0x139e);});
+
+test('legacy 14-box story resumes with its original badge bits and variable offsets',async()=>{const bytes=makeGbaSave({modern:false,flags,vars,trainer:'Unborne'}),{campaign:c}=await resumeAppSave(bytes,null,catalog,pack,layout);assert.equal(c.state.flags.FLAG_BADGE01_GET,true);assert.equal(c.state.flags.FLAG_BADGE02_GET,false);assert.equal(c.state.vars.VAR_LITTLEROOT_INTRO_STATE,7);assert.equal(catalog.storyData.saveLayouts['14'].varsOffset,0x139c);assert.equal(catalog.storyData.saveLayouts['14'].flags.FLAG_BADGE01_GET,0x867);});

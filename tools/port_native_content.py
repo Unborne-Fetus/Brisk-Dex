@@ -189,5 +189,6 @@ def build(repo,out):
     build_field_data(repo,out)
     subprocess.run([sys.executable,str(root/'tools/export_story_data.py'),str(repo)],check=True)
     subprocess.run([sys.executable,str(root/'tools/export_wild_sprites.py'),str(repo)],check=True)
+    subprocess.run([sys.executable,str(root/'tools/export_game_ui.py'),str(repo)],check=True)
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('source');parser.add_argument('--output',default=str(Path(__file__).resolve().parents[1]/'game'));args=parser.parse_args();build(args.source,args.output)

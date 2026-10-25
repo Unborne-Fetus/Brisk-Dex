@@ -21,10 +21,12 @@ export function drawNative(ctx,campaign,pack,facing,time){
     const sheet=image(actor.sprite?.path);if(!sheet)continue;
     const s=actor.sprite;let frame=/FACE_UP/.test(actor.movementType)?1:/FACE_(?:LEFT|RIGHT)/.test(actor.movementType)?2:0,flip=/FACE_RIGHT/.test(actor.movementType);
     if(actor.isPlayer){if(facing[1]<0)frame=1;else if(facing[0]){frame=2;flip=facing[0]>0;}if(s.frameMap)frame=s.frameMap[frame]??0;else if(moving&&s.frames>=9){const base=frame;frame=[base===0?3:base===1?5:7,base,base===0?4:base===1?6:8,base][Math.floor(time/100)%4];}}
+    if(!actor.isPlayer&&actor.walking&&s.frames>=9)frame=[frame===0?3:frame===1?5:7,frame,frame===0?4:frame===1?6:8,frame][Math.floor(time/100)%4];
     const phase=Math.floor(time*60/1000)%32,bob=actor.isPlayer&&campaign.mode!=='land'?(phase<16?-Math.floor(phase/4):-4+Math.floor((phase-16)/4))*2:0;
     const dx=(actor.x-cx)*t+16-s.width,dy=(actor.y-cy+1)*t-s.height*2+bob;
     if(actor.isPlayer&&campaign.mode==='surf'){const blob=campaign.catalog.fieldData?.surfBlob?.[campaign.state.trainer.gender||'Male'],pic=image(blob?.path),blobFrame=facing[1]<0?1:facing[0]?2:0;if(pic){ctx.save();if(flip){ctx.translate(dx+64,dy+16);ctx.scale(-1,1);ctx.drawImage(pic,blobFrame*32,0,32,32,0,0,64,64);}else ctx.drawImage(pic,blobFrame*32,0,32,32,dx,dy+16,64,64);ctx.restore();}}
 
+    const emote=actor.isPlayer?campaign.state.playerEmote:actor.emote;if(emote){const text=emote.includes('question')?'?':emote.includes('heart')?'♥':emote.includes('double')?'‼':'!';ctx.fillStyle='#fff';ctx.fillRect(dx+s.width-8,dy-26,16,22);ctx.fillStyle='#303030';ctx.font='20px Emerald,monospace';ctx.textAlign='center';ctx.fillText(text,dx+s.width,dy-8);ctx.textAlign='start';}
     ctx.save();if(flip){ctx.translate(dx+s.width*2,dy);ctx.scale(-1,1);ctx.drawImage(sheet,frame*s.width,0,s.width,s.height,0,0,s.width*2,s.height*2);}else ctx.drawImage(sheet,frame*s.width,0,s.width,s.height,dx,dy,s.width*2,s.height*2);ctx.restore();
   }
   for(const {dest,x,y}of neighbors){const pic=image(dest.foreground);if(pic)ctx.drawImage(pic,(x-cx)*t,(y-cy)*t,dest.width*t,dest.height*t);}

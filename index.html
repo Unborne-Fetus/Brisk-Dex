@@ -971,8 +971,9 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
   </header>
 
   <nav class="main-tabs" role="tablist" aria-label="Brisk Dex sections">
+    <button class="active" id="tab-game" role="tab" aria-selected="true" aria-controls="game-tab-panel">Play Brisk Emerald</button>
     <button id="tab-settings" role="tab" aria-selected="false" aria-controls="settings-tab-panel">⚙ Settings</button>
-    <button class="active" id="tab-save" role="tab" aria-selected="true" aria-controls="save-tab-panel">Pok&eacute;mon &amp; Storage</button>
+    <button id="tab-save" role="tab" aria-selected="false" aria-controls="save-tab-panel">Pok&eacute;mon &amp; Storage</button>
     <button id="tab-routes" role="tab" aria-selected="false" aria-controls="routes-tab-panel">Route Encounters</button>
     <button id="tab-dex" role="tab" aria-selected="false" aria-controls="dex-tab-panel">Pok&eacute;dex</button>
     <button id="tab-trainers" role="tab" aria-selected="false" aria-controls="trainers-tab-panel">Trainer Teams</button>
@@ -983,12 +984,11 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
     <button id="tab-abilities" role="tab" aria-selected="false" aria-controls="abilities-tab-panel">Abilities</button>
     <button id="tab-items" role="tab" aria-selected="false" aria-controls="items-tab-panel">Items</button>
     <button id="tab-bag" role="tab" aria-selected="false" aria-controls="bag-tab-panel">Bag</button>
-    <button id="tab-game" role="tab" aria-selected="false" aria-controls="game-tab-panel">Play Brisk Emerald</button>
     <button id="tab-guide" role="tab" aria-selected="false" aria-controls="guide-tab-panel">Guide</button>
     <button id="tab-changes" role="tab" aria-selected="false" aria-controls="changes-tab-panel">Changes</button>
   </nav>
 
-  <div id="save-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-save">
+  <div id="save-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-save" style="display:none;">
 
   <div hidden id="dirty-bar" class="loader-panel" style="display:none; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; border-color:var(--accent-soft);">
     <span>Transfers are staged in Brisk Dex. The save file on disk still has the original until you save changes.</span>
@@ -1276,7 +1276,7 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
     </div>
   </section>
 
-  <section id="game-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-game" style="display:none;">
+  <section id="game-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-game">
     <iframe id="brisk-game" title="Brisk Emerald recreation" style="width:100%;height:85vh;min-height:560px;border:0;border-radius:12px" allow="fullscreen" allowfullscreen></iframe>
   </section>
   <section id="guide-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-guide" style="display:none;">
@@ -2386,7 +2386,7 @@ var BAG_ITEMS = {};
 var BAG_ORDER = [];
 var ITEM_STORAGE = {};
 var BAG_CATEGORY = 'all';
-var currentMainTab = 'save';
+var currentMainTab = 'game';
 var ONLINE_STATE = {
   relayUrl: localStorage.getItem('briskdex_battle_relay') || 'http://localhost:8787',
   roomCode: sessionStorage.getItem('briskdex_room_code') || '',
@@ -2929,7 +2929,7 @@ async function restoreLastSave(){
   var raw=new Uint8Array(bytes),save=parseSav(raw.buffer);save.filePath=saved.filePath||null;save.uri=saved.uri||null;save.fileExtension=saved.fileExtension||(/\.srm$/i.test(saved.filePath||'')?'srm':'sav');
   currentSave=save;loadDexStatusOverrides(save);saveSessionId=genId();dirty=false;
   document.getElementById('empty-state').style.display='none';document.getElementById('app-content').style.display='block';renderAll();
- }catch(err){showError('Could not reopen your last save: '+err.message);}
+ }catch(err){lastSaveRestoreError=err.message;showError('Could not reopen your last save: '+err.message);}
 }
 async function exportSaveChangesToFile(){
  if(!currentSave)return false;
@@ -2941,7 +2941,10 @@ async function exportSaveChangesToFile(){
 /* ============================================================
    UI rendering
    ============================================================ */
-var currentSave = null;
+var currentSave = null,saveRestoreReady=null,lastSaveRestoreError=null;
+window.BriskAppGame=Object.freeze({activeSave:async function(){await saveRestoreReady;return currentSave?{bytes:new Uint8Array(currentSave._internal.rawBytes),fileName:currentSave.filePath||'Brisk save'}:lastSaveRestoreError?{error:lastSaveRestoreError}:null;}});
+function notifyGameSave(){var frame=document.getElementById('brisk-game');if(frame&&frame.contentWindow)frame.contentWindow.postMessage({type:'brisk-app-save-changed'},'*');}
+
 var activeBoxIndex = 0;
 var activePokemonDrag = null;
 var lastPokemonDropAt = 0;
@@ -6430,7 +6433,7 @@ function handleSavFile(file){
       var save = parseSav(e.target.result);
       var extMatch = String(file && file.name || '').match(/\.(sav|srm)$/i);
       save.fileExtension = extMatch ? extMatch[1].toLowerCase() : 'sav';
-      currentSave = save;
+      currentSave = save;lastSaveRestoreError=null;notifyGameSave();
       storeSnapshot(save).catch(function(e){showError('Could not remember this save: '+e.message);});
       loadDexStatusOverrides(save);
       saveSessionId = genId();
@@ -6457,7 +6460,7 @@ async function handleSavFromAndroid(){
     var extMatch = String(result.name || '').match(/\.(sav|srm)$/i);
     save.fileExtension = extMatch ? extMatch[1].toLowerCase() : 'sav';
     save.uri=result.uri||null;
-    currentSave = save;
+    currentSave = save;lastSaveRestoreError=null;notifyGameSave();
     await storeSnapshot(save);
     loadDexStatusOverrides(save);
     saveSessionId = genId();
@@ -6482,7 +6485,7 @@ async function handleSavFromElectron(){
     save.filePath = result.filePath;
     var extMatch = String(result.filePath || '').match(/\.(sav|srm)$/i);
     save.fileExtension = extMatch ? extMatch[1].toLowerCase() : 'sav';
-    currentSave = save;
+    currentSave = save;lastSaveRestoreError=null;notifyGameSave();
     await storeSnapshot(save);
     loadDexStatusOverrides(save);
     saveSessionId = genId();
@@ -6835,7 +6838,8 @@ if(ONLINE_STATE.roomCode&&ONLINE_STATE.playerId){
 updateDataStatus();
 var gameDataReady = loadBundledGameData();
 storageReady = loadExternalStorage();
-restoreLastSave();
+saveRestoreReady=restoreLastSave();
+setMainTab('game');
 
 window.__briskDexDebug = function(){
   var party = currentSave ? currentSave.party.map(function(m){ return m.species; }) : [];

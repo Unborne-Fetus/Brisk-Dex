@@ -45,11 +45,11 @@ export class LocalBattle {
     this.room.players[0].team.forEach((b,i)=>{const m=this.campaign.state.party[i],max=this.catalog.stats(m)[0];m.hp=b.hp<=0?0:Math.min(max,Math.ceil(b.hp*max/b.maxHP));m.status=b.status||null;m.moves.forEach((slot,k)=>{slot.pp=Math.max(0,Math.min(this.catalog.maxPP(slot),b.moves[k]?.pp??slot.pp));});});
     this.room.players[1].team.forEach((b,i)=>{if(b.hp>0||this.awarded.has(i))return;this.awarded.add(i);const source=this.opponents[i],yieldValue=this.catalog.native?.species?.[source.species]?.expYield||60;
       const amount=Math.max(1,Math.floor(yieldValue*source.level/7*(this.trainer?1.5:1))),active=this.player;
-      for(const m of this.campaign.state.party){if(!m.hp)continue;const share=m===active?1:this.campaign.state.options.expShare===false?0:({easy:2,normal:1,hard:.5,extreme:0}[this.campaign.state.options.difficulty]??1);if(!share)continue;const gain=this.catalog.gainExperience(m,Math.floor(amount*share));this.say(`${m.nickname} gained ${Math.floor(amount*share)} EXP.${gain.after>gain.before?' Grew to level '+m.level+'!':''}`);}
+      for(const m of this.campaign.state.party){if(!m.hp)continue;const share=m===active?1:((this.campaign.state.options.expShareMode===0?this.catalog.data.itemDetails[m.item]?.constant==='ITEM_EXP_SHARE':this.campaign.state.options.expShare!==false)?({easy:2,normal:1,hard:.5,extreme:0}[this.campaign.state.options.difficulty]??1):0);if(!share)continue;const gain=this.catalog.gainExperience(m,Math.floor(amount*share));this.say(`${m.nickname} gained ${Math.floor(amount*share)} EXP.${gain.after>gain.before?' Grew to level '+m.level+'!':''}`);}
     });
     // Level changes and consumable items must survive subsequent turns and saving.
     const items=new Map(Object.entries(this.catalog.data.items).map(([id,name])=>[name,Number(id)]));
-    this.room.players[0].team.forEach((b,i)=>{const m=this.campaign.state.party[i],stats=this.catalog.stats(m);m.item=items.get(b.item)||0;
+    this.room.players[0].team.forEach((b,i)=>{const m=this.campaign.state.party[i],stats=this.catalog.stats(m);if(this.catalog.data.items[m.item]!==b.item)m.item=items.get(b.item)||0;
       if(!b.transformed){b.level=m.level;b.maxHP=stats[0];b.atk=stats[1];b.def=stats[2];b.speed=stats[3];b.spAtk=stats[4];b.spDef=stats[5];b.hp=m.hp;
         while(b.moves.length<m.moves.length){const slot=m.moves[b.moves.length];b.moves.push({...this.engine.catalogMove(slot.id),pp:slot.pp});}
       }
@@ -75,7 +75,7 @@ export class LocalBattle {
     }else if(action.type==='potion'){
       assert(this.campaign.bagAllowed(),'Battle items are disabled by your difficulty/options');assert(mon.hp<mon.maxHP,'HP is already full');this.campaign.consume(28);mon.hp=Math.min(mon.maxHP,mon.hp+20);this.say('Used a Potion.');this.enemyTurn();
     }else if(action.type==='catch'){
-      assert(!this.trainer,"You cannot catch a trainer's Pokémon");assert(this.campaign.bagAllowed(),'Battle items are disabled');
+      assert(!this.trainer,"You cannot catch a trainer's Pokémon");assert(this.campaign.state.options.battleBag!==false,'Battle items are disabled');
       const item=action.item||1;assert([1,2,3,4].includes(item),'Unsupported ball');this.campaign.consume(item);const rate=this.catalog.native?.species?.[this.opponents[this.room.players[1].active].species]?.catchRate||45;
       const status=['sleep','freeze'].includes(this.enemy.status)?2.5:this.enemy.status?1.5:1,multiplier=item===2?1.5:item===3?2:1;
       const odds=Math.min(1,((3*this.enemy.battleMaxHP-2*this.enemy.hp)*rate*multiplier*status)/(3*this.enemy.battleMaxHP*255));

@@ -11,7 +11,7 @@ const mime = {
   '.json':'application/json; charset=utf-8', '.png':'image/png',
   '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.gif':'image/gif',
   '.webp':'image/webp', '.svg':'image/svg+xml', '.ogg':'audio/ogg',
-  '.mp3':'audio/mpeg', '.wav':'audio/wav', '.woff2':'font/woff2',
+  '.mp3':'audio/mpeg', '.wav':'audio/wav', '.woff':'font/woff', '.woff2':'font/woff2',
   '.ico':'image/x-icon', '.wasm':'application/wasm'
 };
 const server = http.createServer((req,res)=>{
@@ -28,7 +28,7 @@ const server = http.createServer((req,res)=>{
   }
   // Only expose the files used by the browser app, never repository metadata or save files.
   if (relative.split(/[\\/]/).some(part => part.startsWith('.')) ||
-      !['.html','.js','.mjs','.css','.json','.png','.jpg','.jpeg','.gif','.webp','.svg','.ogg','.mp3','.wav','.woff2','.ico','.wasm'].includes(path.extname(file).toLowerCase())) {
+      !['.html','.js','.mjs','.css','.json','.png','.jpg','.jpeg','.gif','.webp','.svg','.ogg','.mp3','.wav','.woff','.woff2','.ico','.wasm'].includes(path.extname(file).toLowerCase())) {
     res.writeHead(403); res.end(); return;
   }
   fs.stat(file,(error,stat)=>{
