@@ -74,10 +74,10 @@ export async function importGbaSave(input,catalog,pack,layout){
   if(!s.party.length&&s.boxes.length){s.party.push(s.boxes.shift());report.adjustments.push({reason:'Promoted the first playable boxed Pokémon because no playable party member could be imported'});}
   assert(s.party.length,'No playable Pokémon could be imported. Original save remains unchanged.');
   for(const [id,count]of Object.entries(save.bag)){if(catalog.data.items[id]&&count<=999999)s.inventory[id]=count;else report.archived.push({item:Number(id),count,reason:'Unsupported inventory entry preserved in original save'});}
+  report.story=restoreGbaStory(save,s,catalog);if(!report.story.applied)report.warnings.push('Source story metadata is unavailable. Story flags were not restored.');
   const target=layout?.maps?.[`${save.location.group}:${save.location.number}`],map=pack.maps[target?.nativeMap||catalog.fieldData?.mapNames?.[target?.sourceName]];
   const mode=catalog.fieldData?.maps?.[map?.id]?.mapType==='MAP_TYPE_UNDERWATER'?'underwater':map&&campaign.tile(save.location.x,save.location.y,map)==='~'?'surf':'land';
   if(map&&campaign.canOccupy(save.location.x,save.location.y,map,mode)){s.position={map:map.id,x:save.location.x,y:save.location.y};s.field={mode};}else report.warnings.push('Saved location is unavailable/blocked; placed at the standalone starting location. Original coordinates are archived.');
-  report.story=restoreGbaStory(save,s,catalog);if(!report.story.applied)report.warnings.push('Source story metadata is unavailable. Story flags were not restored.');
   report.party=s.party.length;report.stored=s.boxes.length;
   s.gbaSource={format:'brisk-gba-original',sha256:await sha256(save.bytes),bytes:toBase64(save.bytes),location:save.location,boxNames:save.boxNames,report};
   campaign.snapshot();return {campaign,report};
