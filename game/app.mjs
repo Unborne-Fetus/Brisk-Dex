@@ -1,3 +1,4 @@
+import {FieldInput} from './field-motion.mjs';
 import {dialoguePages,battleEnvironment} from './dialogue.mjs';
 import {resumeAppSave,activeAppSave} from './app-save.mjs';
 import {refreshWildlife,meetWildlife} from './overworld.mjs';
@@ -14,22 +15,23 @@ import {drawNative} from './renderer.mjs';
 import {IntegrationBridge} from './integrations.mjs';
 const $=id=>document.getElementById(id),ctx=$('world').getContext('2d'),store=new SaveStore();
 let appVisible=true;
-window.addEventListener('message',e=>{if(e.source!==window.parent||e.data?.type!=='brisk-game-visibility')return;appVisible=e.data.visible===true;keys.clear();});
+window.addEventListener('message',e=>{if(e.source!==window.parent||e.data?.type!=='brisk-game-visibility')return;appVisible=e.data.visible===true;keys.clear();movement.clear();});
 let sceneBattleResolve=null,storySource='',appSavePending=false,gbaLayout,fontMetrics={};
-let campaign,battle,battleEvent,pack,catalog,facing=[0,1],lastMove=0,busy=false,dirty=false,savedAt=0,saving=null,storyActive=false,choiceCancel=null;
+let campaign,battle,battleEvent,pack,catalog,facing=[0,1],busy=false,dirty=false,savedAt=0,saving=null,storyActive=false,choiceCancel=null;
 const keys=new Set(),bridge=new IntegrationBridge();
 const notice=text=>$('notice').textContent=text;
 const button=(text,fn)=>{const b=document.createElement('button');b.textContent=text;b.onclick=()=>guard(fn);return b;};
 async function guard(fn){try{await fn();}catch(e){notice(e.message);}}
 function sprite(mon,back=false){const s=catalog.species(mon.species);return '../'+(mon.shiny?(back?s.backShinySprite:s.frontShinySprite):(back?s.backSprite:s.frontSprite));}
-function modal(title,content,scene=false){if($('modal').open)$('modal').close();$('modal').classList.toggle('scene',scene);$('modal-title').textContent=title;$('modal-content').replaceChildren();if(typeof content==='string'){const p=document.createElement('p');p.textContent=content;$('modal-content').append(p);}else $('modal-content').append(...content);if(scene)$('modal').show();else $('modal').showModal();}
+function modal(title,content,scene=false){movement.clear();if($('modal').open)$('modal').close();$('modal').classList.toggle('scene',scene);$('modal-title').textContent=title;$('modal-content').replaceChildren();if(typeof content==='string'){const p=document.createElement('p');p.textContent=content;$('modal-content').append(p);}else $('modal-content').append(...content);if(scene)$('modal').show();else $('modal').showModal();}
 function close(){ $('modal').close();$('world').focus(); }
 $('modal-close').onclick=()=>{if(choiceCancel){const cancel=choiceCancel;choiceCancel=null;close();cancel(null);}else close();};
 $('modal').addEventListener('cancel',()=>{if(choiceCancel){const cancel=choiceCancel;choiceCancel=null;cancel(null);}});
-function update(){
+function update(fieldOnly=false){
   if(!campaign)return;
   const s=campaign.state;$('map-name').textContent=campaign.map.name;$('money').textContent=`₽ ${s.money.toLocaleString()}`;
   $('weather').textContent=fieldWeather(campaign.map,s.party[0]).toUpperCase()+(campaign.map.weatherLocked?' · PROTECTED':'');
+  if(fieldOnly){$('dive').disabled=busy||!campaign.fieldScript(...facing,'dive');$('fish').disabled=busy||!campaign.fishable(s.position.x+facing[0],s.position.y+facing[1]);return;}
   $('encounters').checked=s.options.encounters;$('weather-effects').checked=s.options.weather;
   $('party').replaceChildren(...s.party.map((mon,index)=>{
     const row=document.createElement('div');row.className='party-mon';const img=document.createElement('img');loadSprite(img,sprite(mon));img.alt='';
@@ -38,6 +40,7 @@ function update(){
     row.ondblclick=()=>{if(!battle&&!storyActive)partyDetails(mon);};return row;
   }));
   $('bag').replaceChildren(...Object.entries(s.inventory).filter(([,n])=>n>0).map(([id,n])=>{const p=document.createElement('div');const usable=[28,29,30,31,32,33,34].includes(Number(id))||/^ITEM_EXP_CANDY_/.test(catalog.data.itemDetails[id]?.constant||'');if(usable){p.append(button(`${catalog.data.items[id]} × ${n}`,()=>{if(battle||storyActive)throw new Error('Finish the active interaction first');modal('Use on which Pokémon?',s.party.map(mon=>button(mon.nickname,async()=>{const candy=/^ITEM_EXP_CANDY_/.test(catalog.data.itemDetails[id]?.constant||'');let amount=1;if(candy){const input=await textInput(`How many? (1–${Math.min(n,99)})`,'1','number');if(input===null)return;amount=Number(input);}campaign.useFieldItem(Number(id),mon.uid,amount);dirty=true;close();update();growthPrompts();})));}));}else p.textContent=`${catalog.data.items[id]} × ${n}`;return p;}));
+  document.querySelector('.play').classList.toggle('in-battle',!!battle);
   $('world').hidden=!!battle;$('battle').hidden=!battle;
   $('save').disabled=!!battle||storyActive||busy;
   $('dive').disabled=!!battle||storyActive||busy||!campaign.fieldScript(...facing,'dive');$('fish').disabled=!!battle||storyActive||busy||!campaign.fishable(s.position.x+facing[0],s.position.y+facing[1]);
@@ -58,34 +61,48 @@ function partyDetails(mon){
 }
 function beginBattle(mon,trainer=null,eventId=null,format='singles'){battleEvent=eventId;battle=new LocalBattle(campaign,mon,{trainer,format});dirty=true;update();}
 function renderBattle(){
-  const environment='assets/battle-'+battleEnvironment(campaign)+'.png',field=document.querySelector('.battlefield');field.dataset.environment=environment;if(globalThis.BriskGameAssets)BriskGameAssets.assetUrl(environment).then(url=>{if(field.dataset.environment===environment)field.style.backgroundImage=`url(${url})`;});else field.style.backgroundImage=`url(${environment})`;
-  field.classList.toggle('doubles',battle.doubles);
-  const view=(side,slot)=>{const p=battle.room.players[side],index=slot?p.active2:p.active,runtime=p.team[index],mon=side?battle.opponents[index]:campaign.state.party[index];return runtime&&mon?{...mon,species:runtime.species,nickname:runtime.name,hp:runtime.hp,battleMaxHP:runtime.maxHP}:null;};
+  const environment='assets/battle-'+battleEnvironment(campaign)+'.png',field=document.querySelector('.battlefield');
+  if(field.dataset.environment!==environment){field.dataset.environment=environment;if(globalThis.BriskGameAssets)BriskGameAssets.assetUrl(environment).then(url=>{if(field.dataset.environment===environment)field.style.backgroundImage=`url(${url})`;});else field.style.backgroundImage=`url(${environment})`;}
+  field.classList.toggle('doubles',battle.doubles);document.querySelector('.play').classList.add('in-battle');
+  const view=(side,slot)=>{const p=battle.room.players[side],index=slot?p.active2:p.active,runtime=p.team[index],mon=side?battle.opponents[index]:campaign.state.party[index];return runtime&&mon?{...mon,species:runtime.species,nickname:runtime.name,hp:runtime.hp,status:runtime.status,battleMaxHP:runtime.maxHP}:null;};
   const cards=battle.doubles?[['enemy-card',view(1,0),false],['player-card',view(0,0),true],['enemy-card-2',view(1,1),false],['player-card-2',view(0,1),true]]:[['enemy-card',battle.enemy,false],['player-card',battle.playerView||battle.player,true],['enemy-card-2',null,false],['player-card-2',null,true]];
   for(const [id,mon,back] of cards){
-    const card=$(id);card.hidden=!mon;if(!mon)continue;const img=document.createElement('img');loadSprite(img,sprite(mon,back));img.alt=mon.nickname;
-    const d=document.createElement('div'),name=document.createElement('strong');name.textContent=`${mon.nickname} · Lv. ${mon.level}`;const hp=document.createElement('progress');hp.max=mon.battleMaxHP||catalog.stats(mon)[0];hp.value=mon.hp;const text=document.createElement('small');text.textContent=`${mon.hp} / ${hp.max} HP`;d.append(name,hp,text);card.replaceChildren(d,img);
+    const card=$(id);card.hidden=!mon;if(!mon)continue;
+    if(!card.querySelector('section')){card.replaceChildren();const stats=document.createElement('section');stats.className='battle-stats';const name=document.createElement('strong'),level=document.createElement('span'),condition=document.createElement('span'),track=document.createElement('span'),fill=document.createElement('span'),hpText=document.createElement('small');name.className='battle-name';level.className='battle-level';condition.className='battle-status';track.className='hp-track';fill.className='hp-fill';hpText.className='hp-text';track.setAttribute('role','progressbar');track.append(fill);stats.append(name,level,condition,track,hpText);const img=document.createElement('img');card.append(stats,img);}
+    const img=card.querySelector('img'),path=sprite(mon,back);if(img.dataset.sprite!==path){img.dataset.sprite=path;loadSprite(img,path);}img.alt=mon.nickname;
+    const max=mon.battleMaxHP||catalog.stats(mon)[0],ratio=Math.max(0,Math.min(1,mon.hp/max));card.querySelector('.battle-name').textContent=mon.nickname;card.querySelector('.battle-level').textContent='Lv. '+mon.level;card.querySelector('.battle-status').textContent=mon.status?mon.status.toUpperCase():'';card.querySelector('.hp-text').textContent=`${mon.hp} / ${max} HP`;
+    const track=card.querySelector('.hp-track');track.setAttribute('aria-label',mon.nickname+' HP');track.setAttribute('aria-valuemin','0');track.setAttribute('aria-valuemax',max);track.setAttribute('aria-valuenow',mon.hp);const fill=card.querySelector('.hp-fill');fill.style.width=100*ratio+'%';fill.dataset.health=ratio>.5?'healthy':ratio>.2?'low':'critical';card.classList.toggle('fainted',mon.hp<=0);card.classList.toggle('choosing',back&&mon.uid===battle.player.uid&&battle.phase==='battle');
   }
-  $('battle-log').replaceChildren(...battle.log.slice(-5).map(line=>{const p=document.createElement('div');p.textContent=line;return p;}));$('battle-log').scrollTop=10000;
-  const actions=[];
+  $('battle-context').textContent=`${battle.trainer||'Wild encounter'} · Turn ${battle.turn||1}${battle.weather?' · '+(typeof battle.weather==='string'?battle.weather:battle.weather.type||'Weather'):''}`;
+  $('battle-log').replaceChildren(...battle.log.slice(-3).map(line=>{const p=document.createElement('div');p.textContent=line;return p;}));$('battle-log').scrollTop=10000;
+  const actions=[],nav=$('battle-nav');nav.replaceChildren();
   if(battle.phase!=='battle')actions.push(button('Return to the field',async()=>{
     if(sceneBattleResolve){const resolve=sceneBattleResolve;sceneBattleResolve=null;const result={phase:battle.phase,state:campaign.snapshot()};battle=null;update();resolve(result);return;}
-    if(battle.phase==='lost'){campaign.heal();campaign.state.position=structuredClone(campaign.state.respawn||pack.start);notice('Returned to the field station and healed your party.');}
+    if(battle.phase==='lost'){campaign.heal();campaign.state.position=structuredClone(campaign.state.respawn||pack.start);notice('Your party was brought back to safety.');}
     if(battle.phase==='won'&&battle.trainer&&battleEvent)campaign.state.flags[battleEvent]=true;
     battle=null;update();await save();growthPrompts();
   }));
   else{
-    if(battle.doubles){const heading=document.createElement('strong');heading.textContent='Choose for '+battle.player.nickname;actions.push(heading);const foe=battle.room.players[1];for(const [pos,index]of [[0,foe.active],[1,foe.active2]])if(foe.team[index]?.hp>0){const target=button('Target: '+foe.team[index].name,()=>{battle.targetPos=pos;renderBattle();});target.setAttribute('aria-pressed',String((battle.targetPos||0)===pos));actions.push(target);}}
-    battle.player.moves.forEach((m,i)=>{const move=catalog.move(m.id),b=button(`${move.name} · ${m.pp}/${catalog.maxPP(m)}`,()=>act({type:'move',index:i}));b.disabled=!m.pp||!supportedMove(move);actions.push(b);});
-    if(!battle.available(battle.player).length)actions.push(button('Struggle',()=>act({type:'move',index:-1})));
-    for(const form of battle.gimmicks())actions.push(button(`${form.kind}: ${form.name}`,()=>{const choices=battle.available(battle.player);if(!choices.length)throw new Error('No PP remains');modal('Choose a move',choices.map(index=>button(catalog.move(battle.player.moves[index].id).name,()=>{close();act({type:'move',index,gimmick:form.kind,formIndex:form.index});})));}));
-    actions.push(button(`Potion (${campaign.state.inventory[28]||0})`,()=>act({type:'potion'})));
-    if(!battle.trainer){actions.push(button(`Poké Ball (${campaign.state.inventory[1]||0})`,()=>act({type:'catch'})),button('Run',()=>act({type:'run'})));}
-    campaign.state.party.forEach((mon,i)=>{if(i!==battle.room.players[0].active&&i!==battle.room.players[0].active2&&mon.hp>0)actions.push(button(`Switch: ${mon.nickname}`,()=>act({type:'switch',index:i})));});
+    battle.menu??='fight';
+    for(const [key,label]of [['fight','Fight'],['bag','Bag'],['party','Pokémon']]){const tab=button(label,()=>{battle.menu=key;renderBattle();});tab.setAttribute('aria-pressed',String(battle.menu===key));tab.disabled=key==='bag'&&!(campaign.bagAllowed()||!battle.trainer&&campaign.state.options.battleBag!==false);nav.append(tab);}
+    if(!battle.trainer)nav.append(button('Run',()=>act({type:'run'})));
+    const heading=document.createElement('p');heading.className='battle-prompt';heading.textContent=`What will ${battle.player.nickname} do?`;actions.push(heading);
+    if(battle.menu==='fight'){
+      if(battle.doubles){const foe=battle.room.players[1];for(const [pos,index]of [[0,foe.active],[1,foe.active2]])if(foe.team[index]?.hp>0){const target=button('Target: '+foe.team[index].name,()=>{battle.targetPos=pos;renderBattle();});target.className='target-choice';target.setAttribute('aria-pressed',String((battle.targetPos||0)===pos));actions.push(target);}}
+      battle.player.moves.forEach((m,i)=>{const move=catalog.move(m.id),b=button('',()=>act({type:'move',index:i,...(battle.selectedForm?{gimmick:battle.selectedForm.kind,formIndex:battle.selectedForm.index}:{})}));b.className='move-choice';b.dataset.type=move.type;const name=document.createElement('strong'),meta=document.createElement('small');name.textContent=move.name;meta.textContent=`${move.type} · ${move.category} · ${m.pp}/${catalog.maxPP(m)} PP`;const shortcut=document.createElement('kbd');shortcut.textContent=String(i+1);b.append(name,meta,shortcut);b.title=`${move.description||''}\nPower: ${move.power||'—'} · Accuracy: ${move.accuracy||'—'}`;b.disabled=!m.pp||!supportedMove(move);actions.push(b);});
+      if(!battle.available(battle.player).length)actions.push(button('Struggle',()=>act({type:'move',index:-1})));
+      for(const form of battle.gimmicks()){const b=button(`${form.kind}: ${form.name}`,()=>{battle.selectedForm=battle.selectedForm?.index===form.index?null:form;renderBattle();});b.className='gimmick-choice';b.setAttribute('aria-pressed',String(battle.selectedForm?.index===form.index));actions.push(b);}
+    }else if(battle.menu==='bag'){
+      const potion=button(`Potion (${campaign.state.inventory[28]||0})`,()=>act({type:'potion'}));potion.disabled=!campaign.bagAllowed()||!(campaign.state.inventory[28]>0)||battle.playerView.hp>=battle.playerView.battleMaxHP;actions.push(potion);
+      if(!battle.trainer)for(const item of [1,2,3,4]){const ball=button(`${catalog.data.items[item]} (${campaign.state.inventory[item]||0})`,()=>act({type:'catch',item}));ball.disabled=!(campaign.state.inventory[item]>0);actions.push(ball);}
+    }else campaign.state.party.forEach((mon,i)=>{const active=i===battle.room.players[0].active||i===battle.room.players[0].active2,b=button(`Switch: ${mon.nickname}`,()=>act({type:'switch',index:i}));b.disabled=active||mon.hp<=0;const info=document.createElement('small');info.textContent=`Lv. ${mon.level} · ${mon.hp}/${catalog.stats(mon)[0]} HP${active?' · Active':''}`;b.append(info);actions.push(b);});
   }
   $('battle-actions').replaceChildren(...actions);
 }
-function act(action){const before={enemy:battle.enemy.hp,player:battle.playerView.hp};battle.act(action);dirty=true;update();if(!matchMedia('(prefers-reduced-motion: reduce)').matches)for(const [id,hp,prior]of [['enemy-card',battle.enemy.hp,before.enemy],['player-card',battle.playerView.hp,before.player]])if(hp<prior)$(id).animate([{opacity:1,transform:'translateX(0)'},{opacity:.1,transform:'translateX(5px)'},{opacity:1,transform:'translateX(-5px)'},{opacity:1,transform:'translateX(0)'}],{duration:350});}
+function act(action){
+ const before=new Map([battle.enemy,battle.playerView].map(m=>[m.uid,m.hp]));battle.act(action);battle.selectedForm=null;battle.menu='fight';dirty=true;update();
+ if(!matchMedia('(prefers-reduced-motion: reduce)').matches)for(const [id,mon]of [['enemy-card',battle.enemy],['player-card',battle.playerView]])if(before.has(mon.uid)&&mon.hp<before.get(mon.uid))$(id).animate([{opacity:1},{opacity:.2},{opacity:1}],{duration:300});
+}
 function chooseMove(mon,id){
   close();if(mon.moves.length<4){catalog.teach(mon,id,mon.moves.length);dirty=true;update();return growthPrompts();}
   modal(`${mon.nickname} wants to learn ${catalog.move(id).name}`, [...mon.moves.map((m,index)=>button(`Replace ${catalog.move(m.id).name}`,()=>{catalog.teach(mon,id,index);dirty=true;close();update();growthPrompts();})),button('Keep current moves',()=>{mon.pendingMoves=(mon.pendingMoves||[]).filter(move=>move!==id);dirty=true;close();growthPrompts();})]);
@@ -101,6 +118,7 @@ async function save(){
 }
 async function interact(){
   if(!campaign||battle||busy||storyActive||$('modal').open)return;
+  await movement.idle();if(battle||storyActive||$('modal').open)return;
   campaign.state.vars??={};campaign.state.vars.VAR_FACING=facing[0]===1?4:facing[0]===-1?3:facing[1]===-1?2:1;
   const wild=meetWildlife(campaign,campaign.state.position.x+facing[0],campaign.state.position.y+facing[1]);if(wild){beginBattle(wild.mon);return;}
   const e=campaign.interact(...facing);if(e?.localId){campaign.state.vars.VAR_LAST_TALKED=catalog.storyData?.maps?.[campaign.map.id]?.localIds?.[e.localId]||Number(e.localId)||0;}if(!e){const entry=campaign.fieldScript(...facing);if(entry)await fieldScene(entry);else notice('Nothing to interact with here.');return;}
@@ -167,7 +185,7 @@ async function move(dx,dy){
   if(result.kind==='encounter'){
     if(campaign.state.party.some(m=>m.hp>0))beginBattle(result.mon);else notice('Your party needs healing. Visit a bench or the lab.');
   }else if(result.kind==='warp'){notice(`Entered ${result.map}.`);await enterMap();}else if(result.kind==='step')await stepScene();
-  if(result.kind!=='blocked')dirty=true;update();
+  if(result.kind!=='blocked')dirty=true;update(!battle);
 }
 function startSelection(){
   modal('Start your Brisk journey',[button('New game',async()=>{
@@ -189,7 +207,7 @@ $('export').onclick=()=>guard(async()=>{
   if(!campaign||battle||storyActive)throw new Error('Finish the active interaction before exporting');const envelope=await encodeSave(campaign.snapshot()),url=URL.createObjectURL(new Blob([JSON.stringify(envelope)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='brisk-standalone-save.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 });
 $('import').onchange=e=>guard(async()=>{
-  const file=e.target.files[0];e.target.value='';if(!file)return;if(battle||storyActive)throw new Error('Finish the active interaction before importing');if(file.size>17000000)throw new Error('Save file is too large');
+  const file=e.target.files[0];e.target.value='';if(!file)return;if(battle||storyActive)throw new Error('Finish the active interaction before importing');movement.clear();if(file.size>34000000)throw new Error('Save file is too large');
   const candidate=migrateCampaign(await decodeSave(JSON.parse(await file.text())),pack,catalog);
   if(campaign&&!confirm('Replace this journey with the imported save? Your existing saved journey will become the backup.'))return;
   await store.commit(candidate.snapshot());campaign=candidate;dirty=false;update();close();notice('Imported standalone campaign.');
@@ -197,15 +215,23 @@ $('import').onchange=e=>guard(async()=>{
 $('restore').onclick=()=>guard(async()=>{if(battle||storyActive)throw new Error('Finish the active interaction first');const previous=await store.load('backup');if(!previous)throw new Error('No backup is available yet');const candidate=migrateCampaign(previous,pack,catalog);if(!confirm('Restore the previous saved journey?'))return;await store.commit(candidate.snapshot());campaign=candidate;dirty=false;update();notice('Previous save restored.');});
 $('new-game').onclick=()=>{if(battle||storyActive){notice('Finish the active interaction first.');return;}if(!campaign||confirm('Start a new journey? Your current saved journey will become the backup.'))startSelection();};
 const directions={ArrowUp:[0,-1],w:[0,-1],ArrowDown:[0,1],s:[0,1],ArrowLeft:[-1,0],a:[-1,0],ArrowRight:[1,0],d:[1,0]};
-window.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('modal').open&&$('modal').classList.contains('scene')){e.preventDefault();$('modal-close').click();return;}if($('modal').open||['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName))return;if(directions[e.key]){e.preventDefault();if(!e.repeat){guard(()=>move(...directions[e.key]));lastMove=performance.now();}keys.add(e.key);}if(['e','Enter',' '].includes(e.key)&&e.target.tagName!=='BUTTON'){e.preventDefault();guard(interact);}});
-window.addEventListener('keyup',e=>keys.delete(e.key));window.addEventListener('blur',()=>keys.clear());
-for(const b of document.querySelectorAll('[data-dir]')){const key={up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight'}[b.dataset.dir];b.onpointerdown=e=>{e.preventDefault();b.setPointerCapture(e.pointerId);guard(()=>move(...directions[key]));lastMove=performance.now();keys.add(key);};b.onpointerup=b.onpointercancel=b.onlostpointercapture=()=>keys.delete(key);}
+const movement=new FieldInput({step:move,canMove:()=>appVisible&&campaign&&!battle&&!storyActive&&!$('modal').open&&!busy,interval:()=>keys.has('Shift')?100:150,onError:e=>notice(e.message)});
+const keyName=e=>e.key.length===1?e.key.toLowerCase():e.key;
+window.addEventListener('keydown',e=>{
+ if(e.key==='Escape'&&$('modal').open&&$('modal').classList.contains('scene')){e.preventDefault();$('modal-close').click();return;}
+ if($('modal').open||['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName))return;
+ const key=keyName(e);if(battle){if(['1','2','3','4'].includes(key)&&battle.menu==='fight'){e.preventDefault();$('battle-actions').querySelectorAll('.move-choice')[Number(key)-1]?.click();}else if(['f','b','p'].includes(key)){e.preventDefault();const menu={f:'fight',b:'bag',p:'party'}[key];if(menu!=='bag'||campaign.bagAllowed()||!battle.trainer&&campaign.state.options.battleBag!==false){battle.menu=menu;renderBattle();}}else if(directions[key])e.preventDefault();return;}if(key==='Shift')keys.add(key);
+ if(directions[key]){e.preventDefault();movement.press(key,directions[key]);guard(()=>movement.tick(performance.now()));}
+ if(['e','Enter',' '].includes(key)&&e.target.tagName!=='BUTTON'){e.preventDefault();guard(interact);}
+});
+window.addEventListener('keyup',e=>{const key=keyName(e);movement.release(key);keys.delete(key);});
+window.addEventListener('blur',()=>{keys.clear();movement.clear();});document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();movement.clear();}});
+for(const b of document.querySelectorAll('[data-dir]')){const key={up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight'}[b.dataset.dir];b.onpointerdown=e=>{e.preventDefault();b.setPointerCapture(e.pointerId);movement.press(key,directions[key]);guard(()=>movement.tick(performance.now()));};b.onpointerup=b.onpointercancel=b.onlostpointercapture=()=>movement.release(key);}
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
 function rect(x,y,w,h,color){ctx.fillStyle=color;ctx.fillRect(x,y,w,h);}
 function draw(time){
   requestAnimationFrame(draw);if(appSavePending&&catalog&&!battle&&!storyActive&&!busy){appSavePending=false;busy=true;syncAppSave().finally(()=>{busy=false;update();});}if(!appVisible||!campaign)return;
-  if(time-lastMove>150&&campaign.forcedDirection()&&!battle&&!storyActive&&!$('modal').open&&!busy){guard(()=>move(...campaign.forcedDirection()));lastMove=time;}
-  if(time-lastMove>150&&keys.size){const key=[...keys].find(k=>directions[k]);if(key){guard(()=>move(...directions[key]));lastMove=time;}}
+  campaign.presentationStepMs=matchMedia('(prefers-reduced-motion: reduce)').matches?0:keys.has('Shift')?100:150;movement.tick(time,campaign.forcedDirection());
   if(!battle&&!storyActive&&dirty&&time-savedAt>30000&&!$('modal').open&&!busy){savedAt=time;busy=true;save().catch(e=>notice(`Autosave failed: ${e.message}. Export your save.`)).finally(()=>busy=false);}
   const m=campaign.map,tile=24,width=m.ground?480:624,height=m.ground?320:432;if(ctx.canvas.width!==width||ctx.canvas.height!==height){ctx.canvas.width=width;ctx.canvas.height=height;}ctx.imageSmoothingEnabled=false;
   if(m.ground){drawNative(ctx,campaign,pack,facing,time);}else{

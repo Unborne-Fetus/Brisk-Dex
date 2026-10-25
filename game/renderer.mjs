@@ -1,14 +1,18 @@
+import {FieldMotion,visibleMaps} from './field-motion.mjs';
 import {resolveSprite} from './media.mjs';
 const cache=new Map(),motion=new WeakMap();
 function image(url){if(!url)return null;if(!cache.has(url)){const img=new Image();if(globalThis.BriskGameAssets)globalThis.BriskGameAssets.assetUrl(url).then(src=>img.src=src);else {img.src=url;if(url.startsWith('../brisk-dex-sprites/'))resolveSprite(url).then(src=>img.src=src).catch(()=>{});}cache.set(url,img);}const img=cache.get(url);return img.complete&&img.naturalWidth?img:null;}
 export function drawNative(ctx,campaign,pack,facing,time){
   const m=campaign.map,current=campaign.state.position;let animation=motion.get(campaign);
-  if(!animation||animation.map!==current.map){animation={...current,fromX:current.x,fromY:current.y,at:time};motion.set(campaign,animation);}
-  else if(animation.x!==current.x||animation.y!==current.y){const near=Math.abs(animation.x-current.x)+Math.abs(animation.y-current.y)===1;animation={...current,fromX:near?animation.x:current.x,fromY:near?animation.y:current.y,at:time};motion.set(campaign,animation);}
-  const progress=Math.min(1,Math.max(0,(time-animation.at)/150)),moving=progress<1&&(animation.fromX!==animation.x||animation.fromY!==animation.y),p={...current,x:animation.fromX+(current.x-animation.fromX)*progress,y:animation.fromY+(current.y-animation.fromY)*progress},t=32,cx=m.width<15?-(15-m.width)/2:campaign.state.sceneMap===m.id?p.x-7:Math.max(0,Math.min(m.width-15,p.x-7)),cy=m.height<10?-(10-m.height)/2:campaign.state.sceneMap===m.id?p.y-5:Math.max(0,Math.min(m.height-10,p.y-5));
+  if(!animation){animation=new FieldMotion();motion.set(campaign,animation);}
+  const p=animation.update(current,pack,time,campaign.presentationStepMs??150),moving=p.moving,t=32;
+  const connected=m.outdoor&&(m.connections||[]).some(l=>['up','down','left','right'].includes(l.direction)),cx=connected?p.x-7:m.width<15?-(15-m.width)/2:campaign.state.sceneMap===m.id?p.x-7:Math.max(0,Math.min(m.width-15,p.x-7)),cy=connected?p.y-5:m.height<10?-(10-m.height)/2:campaign.state.sceneMap===m.id?p.y-5:Math.max(0,Math.min(m.height-10,p.y-5));
   ctx.fillStyle='#172d29';ctx.fillRect(0,0,480,320);const base=image(m.ground),top=image(m.foreground);const changes=campaign.state.metatiles?.[m.id];
   function layer(source,atlasPath){if(!source)return;if(!changes){ctx.drawImage(source,-cx*t,-cy*t,m.width*t,m.height*t);return;}const atlas=image(atlasPath);for(let y=Math.max(0,Math.floor(cy));y<Math.min(m.height,Math.ceil(cy+10));y++)for(let x=Math.max(0,Math.floor(cx));x<Math.min(m.width,Math.ceil(cx+15));x++){const change=changes[`${x},${y}`];if(change&&atlas)ctx.drawImage(atlas,(change.id%32)*16,Math.floor(change.id/32)*16,16,16,(x-cx)*t,(y-cy)*t,t,t);else ctx.drawImage(source,x*16,y*16,16,16,(x-cx)*t,(y-cy)*t,t,t);}}
-  const neighbors=[];for(const link of m.connections||[]){const dest=pack.maps[link.map];if(!dest||!['up','down','left','right'].includes(link.direction))continue;const x=link.direction==='left'?-dest.width:link.direction==='right'?m.width:link.offset,y=link.direction==='up'?-dest.height:link.direction==='down'?m.height:link.offset;neighbors.push({dest,x,y});const pic=image(dest.ground);if(pic)ctx.drawImage(pic,(x-cx)*t,(y-cy)*t,dest.width*t,dest.height*t);}
+  // Extend border tiles under the connected scene instead of exposing black gaps.
+  if(base)for(let y=Math.floor(cy);y<Math.ceil(cy+10);y++)for(let x=Math.floor(cx);x<Math.ceil(cx+15);x++)if(x<0||y<0||x>=m.width||y>=m.height)ctx.drawImage(base,Math.max(0,Math.min(m.width-1,x))*16,Math.max(0,Math.min(m.height-1,y))*16,16,16,(x-cx)*t,(y-cy)*t,t,t);
+  const neighbors=visibleMaps(pack,m,{x:cx,y:cy}).filter(e=>e.map.id!==m.id).map(e=>({dest:e.map,x:e.x,y:e.y}));
+  for(const {dest,x,y}of neighbors){const pic=image(dest.ground);if(pic)ctx.drawImage(pic,(x-cx)*t,(y-cy)*t,dest.width*t,dest.height*t);image(dest.foreground);for(const e of campaign.visibleEvents(dest))if(e.sprite)image(e.sprite.path);}
   layer(base,m.metatileAtlas?.ground);
   function drawWild(actor){
     const wild=campaign.catalog.wildSprites,source=wild?.species[actor.mon.species],species=campaign.catalog.species(actor.mon.species),pic=image(source?(actor.mon.shiny?wild.shiny:wild.normal):'../'+(actor.mon.shiny?species.frontShinySprite:species.frontSprite));if(!pic)return;
@@ -16,7 +20,7 @@ export function drawNative(ctx,campaign,pack,facing,time){
     if(source){const frame=({down:0,up:2,left:4,right:4}[actor.facing]||0)+Math.floor(time/400)%2;ctx.save();if(actor.facing==='right'){ctx.translate(x+48,y-32);ctx.scale(-1,1);ctx.drawImage(pic,source.x+frame*32,source.y,32,32,0,0,64,64);}else ctx.drawImage(pic,source.x+frame*32,source.y,32,32,x-16,y-32,64,64);ctx.restore();}else ctx.drawImage(pic,x-4,y-12,40,40);
     if(actor.mon.shiny){ctx.fillStyle='#ffe482';ctx.fillRect(x+29,y,3,3);}
   }
-  const actors=campaign.visibleEvents().filter(e=>e.sprite&&e.kind!=='warp').map(e=>({...e,isPlayer:false}));actors.push({...p,sprite:campaign.catalog.fieldData?.playerSprites?.[campaign.mode]?.[campaign.state.trainer.gender||'Male']||pack.playerSprites?.[campaign.state.trainer.gender||'Male'],isPlayer:true});if(campaign.state.options.encounters&&campaign.state.options.overworldEncounters&&campaign.state.wildlife?.map===m.id)actors.push(...campaign.state.wildlife.actors.map(a=>({...a,isWild:true})));actors.sort((a,b)=>a.y-b.y);
+  const actors=[...campaign.visibleEvents(),...neighbors.flatMap(({dest,x,y})=>campaign.visibleEvents(dest).map(e=>({...e,x:e.x+x,y:e.y+y})))].filter(e=>e.sprite&&e.kind!=='warp').map(e=>({...e,isPlayer:false}));actors.push({...p,sprite:campaign.catalog.fieldData?.playerSprites?.[campaign.mode]?.[campaign.state.trainer.gender||'Male']||pack.playerSprites?.[campaign.state.trainer.gender||'Male'],isPlayer:true});if(campaign.state.options.encounters&&campaign.state.options.overworldEncounters&&campaign.state.wildlife?.map===m.id)actors.push(...campaign.state.wildlife.actors.map(a=>({...a,isWild:true})));actors.sort((a,b)=>a.y-b.y);
   for(const actor of actors){
     if(actor.isWild){drawWild(actor);continue;}
     const sheet=image(actor.sprite?.path);if(!sheet)continue;

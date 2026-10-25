@@ -103,7 +103,7 @@ export class Campaign {
       const direction=y<0?'up':y>=this.map.height?'down':x<0?'left':'right';
       for(const link of (this.map.connections||[]).filter(c=>c.direction===direction)){
         const dest=this.pack.maps[link.map];if(!dest)continue;const nx=direction==='left'?dest.width-1:direction==='right'?0:x-link.offset,ny=direction==='up'?dest.height-1:direction==='down'?0:y-link.offset;
-        if(!this.canOccupy(nx,ny,dest))continue;this.enterMap({map:link.map,x:nx,y:ny});return {kind:'warp',map:dest.name};
+        if(!this.canOccupy(nx,ny,dest))continue;this.state.steps++;this.enterMap({map:link.map,x:nx,y:ny});return {kind:'warp',map:dest.name};
       }return {kind:'blocked'};
     }
     const jump=this.map.jumps?.[`${x},${y}`],dir=dx===1?'east':dx===-1?'west':dy===1?'south':'north';

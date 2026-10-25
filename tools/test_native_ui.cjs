@@ -9,7 +9,7 @@ const relay=require('node:child_process').spawn(process.execPath,[require('node:
  await page.waitForFunction(()=>document.getElementById('notice').textContent.includes('Journey saved'));
  if(process.env.BRISK_SCREENSHOTS)await page.screenshot({path:require('node:path').join(process.env.BRISK_SCREENSHOTS,'brisk-prototype-desktop.png'),fullPage:true});
  await page.getByRole('button',{name:'Travel · dev',exact:true}).click();await page.getByRole('button',{name:'Original field station',exact:true}).click();
- const press=async(key,n=1)=>{for(let i=0;i<n;i++)await page.keyboard.press(key);};
+ const press=async(key,n=1)=>{for(let i=0;i<n;i++){await page.keyboard.press(key);await page.waitForTimeout(165);}};
  await press('ArrowUp',2);await press('ArrowLeft');await press('e');await page.waitForFunction(()=>document.getElementById('notice').textContent.includes('Journey saved'));
  await press('ArrowDown');await press('ArrowLeft',6);await press('ArrowUp',3);
  await page.waitForFunction(()=>document.getElementById('map-name').textContent==='Research Lab');
@@ -21,6 +21,7 @@ const relay=require('node:child_process').spawn(process.execPath,[require('node:
  // Meet rival at 9,10, approaching from east.
  await press('ArrowDown',2);await press('ArrowRight',4);await press('ArrowDown');await press('ArrowLeft');await press('e');
  await page.getByRole('button',{name:'Battle',exact:true}).click();await page.waitForFunction(()=>!document.getElementById('battle').hidden);
+ if(process.env.BRISK_SCREENSHOTS)await page.locator('.game-screen').screenshot({path:require('node:path').join(process.env.BRISK_SCREENSHOTS,'single-battle.png')});
  if(await page.getByRole('button',{name:/Poké Ball \(/}).count())throw Error('Trainer battle shows catching');
  for(let i=0;i<60;i++){
    const done=page.getByRole('button',{name:'Return to the field',exact:true});if(await done.count()){await done.click();break;}
