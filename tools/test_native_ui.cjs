@@ -46,6 +46,7 @@ const relay=require('node:child_process').spawn(process.execPath,[require('node:
  for(const key of ['ArrowUp','ArrowUp','ArrowRight','e'])await storyPage.keyboard.press(key);
  await storyPage.getByRole('button',{name:'Yes',exact:true}).click();await storyPage.waitForFunction(()=>!document.getElementById('modal').open&&document.getElementById('bag').textContent.includes('Potion × 7'));
  if(!(await storyPage.locator('#bag').textContent()).includes('Potion × 7'))throw Error('Story choice did not grant exactly two Potions');
+ await storyPage.keyboard.press('e');await storyPage.getByRole('button',{name:'Yes',exact:true}).waitFor();await storyPage.keyboard.press('Tab');await storyPage.keyboard.press('Enter');await storyPage.waitForFunction(()=>!document.getElementById('modal').open);if(!(await storyPage.locator('#bag').textContent()).includes('Potion × 7'))throw Error('Keyboard No chose Yes');
  await storyPage.keyboard.press('e');await storyPage.getByRole('button',{name:'Yes',exact:true}).waitFor();await storyPage.keyboard.press('Escape');
  if(!(await storyPage.locator('#bag').textContent()).includes('Potion × 7'))throw Error('Cancelled story granted an item');
  await storyPage.close();

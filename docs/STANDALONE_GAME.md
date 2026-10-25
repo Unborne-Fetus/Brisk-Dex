@@ -116,3 +116,15 @@ Trainer sight collects all matching undefeated sight lines before starting a bat
 Both map layers and changed metatiles share a camera origin snapped to the 2× source-pixel grid, preventing fractional tile edges from exposing seams. Wildlife atlas generation supports 32/64 pixel frames, eight-frame asymmetric sprites and vertical strips. The atlas resolves 1,677 species/form entries through source art and documented regular-form/evolution-family/closest-species aliases; Egg and Alcremie G-Max have no atlas entry. Custom substitutes include Centiskorch for Pythonova, Exeggutor for Baoby and Alolan Exeggutor for Baobaraffe. These are explicit substitutes, not newly drawn original sprites. Exporting palettes/sheets remains reproducible with `tools/export_wild_sprites.py <ROM-checkout>`.
 
 `npm run game:ui:features` checks fullscreen, saved options, running animation, text layout and a real two-trainer victory. Graphics tests validate atlas rectangles and snapped tile edges.
+
+## Detailed game interface
+
+Party summaries now have Overview/Stats/Moves tabs, HP and EXP bars, source ability descriptions, nature, held-item controls, and IV/EV tables. Relearning/evolution actions use the existing campaign rules. Held-item give/take operations validate inventory capacity and item eligibility before changing either side.
+
+The Bag browser searches names/descriptions with accent-insensitive matching, filters pockets, sorts quantities and shows existing item icons and descriptions. Supported field medicine and EXP candy can be used on party members; eligible evolution items and held items have explicit actions. Unsupported field effects are not advertised as usable. The field kit remains a compact eight-item preview, prioritizing medicine/candy, with the full bag one click away.
+
+Storage browses the whole native collection with paging, search, level/name sorting and a shiny filter. Filtered rows retain their original indexes so selecting a search result swaps the intended Pokémon, including slots past 100. Returning from a stored summary restores its previous search/page.
+
+A read-only area map shows the current position and source map connections. Battle details (button or **I**) shows full current move descriptions/PP and the complete local battle log on desktop or touch. HP-change feedback accounts for all four active doubles slots, ignores switched-in identities, and respects reduced-motion settings. Menu tabs support arrow/Home/End navigation. Source dialogue retains focus on its choices and makes background field controls inert; keyboard confirmation follows the focused choice. The field has a visible saved/unsaved indicator and a touch Talk action.
+
+Run `npm run game:ui:interface` for end-to-end checks covering summaries, held-item transfers, medicine, a filtered swap at slot 125, area maps and narrow-phone layout. These changes remain local; online/trade integration is disconnected.

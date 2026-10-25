@@ -1,3 +1,5 @@
+import {battleCards,healthChanges,fieldUsable} from './ui-data.mjs';
+import {createInterface} from './interface.mjs';
 import {FieldInput} from './field-motion.mjs';
 import {dialoguePages,battleEnvironment} from './dialogue.mjs';
 import {resumeAppSave,activeAppSave} from './app-save.mjs';
@@ -20,12 +22,13 @@ let runLatch=false;
 let sceneBattleResolve=null,storySource='',appSavePending=false,gbaLayout,fontMetrics={};
 let campaign,battle,battleEvent,pack,catalog,facing=[0,1],busy=false,dirty=false,savedAt=0,saving=null,storyActive=false,choiceCancel=null;
 const keys=new Set(),bridge=new IntegrationBridge();
-const notice=text=>$('notice').textContent=text;
+const notice=text=>{$('notice').textContent=text;};
 const button=(text,fn)=>{const b=document.createElement('button');b.textContent=text;b.onclick=()=>guard(fn);return b;};
-async function guard(fn){try{await fn();}catch(e){notice(e.message);}}
+async function guard(fn){try{await fn();}catch(e){notice(e.message);if($('modal').open&&!$('modal').classList.contains('scene')){let alert=$('modal-error');if(!alert){alert=document.createElement('p');alert.id='modal-error';alert.setAttribute('role','alert');$('modal-content').prepend(alert);}alert.textContent=e.message;}}}
 function sprite(mon,back=false){const s=catalog.species(mon.species);return '../'+(mon.shiny?(back?s.backShinySprite:s.frontShinySprite):(back?s.backSprite:s.frontSprite));}
-function modal(title,content,scene=false){movement.clear();if($('modal').open)$('modal').close();$('modal').classList.remove('pause');$('modal').classList.toggle('scene',scene);$('modal-title').textContent=title;$('modal-content').replaceChildren();if(typeof content==='string'){const p=document.createElement('p');p.textContent=content;$('modal-content').append(p);}else $('modal-content').append(...content);if(scene)$('modal').show();else $('modal').showModal();}
-function close(){ $('modal').close();$('modal').classList.remove('pause');$('world').focus(); }
+function lockSceneControls(locked){for(const selector of ['aside','.bottom','.touch','#pause-menu','#map-open','#battle-details'])document.querySelector(selector).inert=locked;}
+function modal(title,content,scene=false){movement.clear();if($('modal').open)$('modal').close();$('modal').classList.remove('pause','wide');$('modal').classList.toggle('scene',scene);$('modal-title').textContent=title;$('modal-content').replaceChildren();if(typeof content==='string'){const p=document.createElement('p');p.textContent=content;$('modal-content').append(p);}else $('modal-content').append(...content);lockSceneControls(scene);if(scene)$('modal').show();else $('modal').showModal();}
+function close(){lockSceneControls(false); $('modal').close();$('modal').classList.remove('pause');$('world').focus(); }
 $('modal-close').onclick=()=>{if(choiceCancel){const cancel=choiceCancel;choiceCancel=null;close();cancel(null);}else close();};
 $('modal').addEventListener('cancel',()=>{if(choiceCancel){const cancel=choiceCancel;choiceCancel=null;cancel(null);}});
 function update(fieldOnly=false){
@@ -40,40 +43,31 @@ function update(fieldOnly=false){
     const action=button('Lead',()=>{if(battle||storyActive)throw new Error('Finish the active interaction first');campaign.setLead(index);dirty=true;update();});action.disabled=index===0||!!battle;const controls=document.createElement('div');controls.className='party-controls';controls.append(action,button('Info',()=>{if(!battle&&!storyActive)partyDetails(mon);}));row.append(img,info,controls);
     row.ondblclick=()=>{if(!battle&&!storyActive)partyDetails(mon);};return row;
   }));
-  $('bag').replaceChildren(...Object.entries(s.inventory).filter(([,n])=>n>0).map(([id,n])=>{const p=document.createElement('div');const usable=[28,29,30,31,32,33,34].includes(Number(id))||/^ITEM_EXP_CANDY_/.test(catalog.data.itemDetails[id]?.constant||'');if(usable){p.append(button(`${catalog.data.items[id]} × ${n}`,()=>{if(battle||storyActive)throw new Error('Finish the active interaction first');modal('Use on which Pokémon?',s.party.map(mon=>button(mon.nickname,async()=>{const candy=/^ITEM_EXP_CANDY_/.test(catalog.data.itemDetails[id]?.constant||'');let amount=1;if(candy){const input=await textInput(`How many? (1–${Math.min(n,99)})`,'1','number');if(input===null)return;amount=Number(input);}campaign.useFieldItem(Number(id),mon.uid,amount);dirty=true;close();update();growthPrompts();})));}));}else p.textContent=`${catalog.data.items[id]} × ${n}`;return p;}));
+  $('bag').replaceChildren(...Object.entries(s.inventory).filter(([,n])=>n>0).sort((a,b)=>Number(fieldUsable(catalog,b[0]))-Number(fieldUsable(catalog,a[0]))||Number(a[0])-Number(b[0])).slice(0,8).map(([id,n])=>{const p=document.createElement('div');const usable=fieldUsable(catalog,id);if(usable){p.append(button(`${catalog.data.items[id]} × ${n}`,()=>{if(battle||storyActive)throw new Error('Finish the active interaction first');modal('Use on which Pokémon?',s.party.map(mon=>button(mon.nickname,async()=>{const candy=/^ITEM_EXP_CANDY_/.test(catalog.data.itemDetails[id]?.constant||'');let amount=1;if(candy){const input=await textInput(`How many? (1–${Math.min(n,99)})`,'1','number');if(input===null)return;amount=Number(input);}campaign.useFieldItem(Number(id),mon.uid,amount);dirty=true;close();update();growthPrompts();})));}));}else p.textContent=`${catalog.data.items[id]} × ${n}`;return p;}));
+  $('battle-details').hidden=!battle;for(const id of ['pause-menu','map-open','party-open','storage-open','bag-open'])$(id).disabled=!!battle||storyActive||busy;
+  $('team-count').textContent=s.party.length+'/6';$('bag-count').textContent=Object.values(s.inventory).filter(n=>n>0).length+' items';
   document.querySelector('.play').classList.toggle('in-battle',!!battle);
   $('world').hidden=!!battle;$('battle').hidden=!battle;
   $('save').disabled=!!battle||storyActive||busy;
   $('dive').disabled=!!battle||storyActive||busy||!campaign.fieldScript(...facing,'dive');$('fish').disabled=!!battle||storyActive||busy||!campaign.fishable(s.position.x+facing[0],s.position.y+facing[1]);
   if(battle)renderBattle();
 }
-function partyDetails(mon){
-  const stats=catalog.stats(mon),p=document.createElement('p');p.textContent=`${mon.nickname} · HP ${mon.hp}/${stats[0]} · Attack ${stats[1]} · Defense ${stats[2]} · Speed ${stats[3]} · Sp. Atk ${stats[4]} · Sp. Def ${stats[5]}`;
-  const nodes=[p];
-  nodes.push(button('Relearn level-up move',()=>{close();const learned=(catalog.native.species?.[mon.species]?.learnset||[]).filter(e=>e.level<=mon.level&&!mon.moves.some(m=>m.id===e.move));modal('Level-up moves', [...new Set(learned.map(e=>e.move))].map(id=>button(catalog.move(id).name,()=>chooseMove(mon,id))));}));
-  nodes.push(button('Held item',()=>{close();const stock=Object.entries(campaign.state.inventory).filter(([id,n])=>n>0);modal('Choose a held item',stock.map(([id])=>button(catalog.data.items[id],()=>{campaign.consume(Number(id));if(mon.item)campaign.state.inventory[mon.item]=(campaign.state.inventory[mon.item]||0)+1;mon.item=Number(id);dirty=true;close();update();})));}));
-
-  if(campaign.state.boxes.length)nodes.push(button('Swap with storage',()=>{
-    close();modal('Caught Pokémon in storage',campaign.state.boxes.slice(0,100).map((stored,index)=>button(`${stored.nickname} · Lv. ${stored.level}`,()=>{campaign.swapStorage(campaign.state.party.indexOf(mon),index);dirty=true;close();update();})));
-  }));
-  const evo=catalog.evolution(mon);if(evo)nodes.push(button('Evolve',()=>{campaign.evolve(mon.uid);dirty=true;close();update();notice(`${mon.nickname} evolved!`);}));
-  for(const [id,count] of Object.entries(campaign.state.inventory))if(count>0&&catalog.evolution(mon,catalog.data.itemDetails[id]?.constant))nodes.push(button(`Use ${catalog.data.items[id]}`,()=>{campaign.evolve(mon.uid,Number(id));dirty=true;close();update();}));
-  modal('Partner details',nodes);
-}
-function beginBattle(mon,trainer=null,eventId=null,format='singles'){battleEvent=eventId;battle=new LocalBattle(campaign,mon,{trainer,format});dirty=true;update();}
+const ui=createInterface({getCampaign:()=>campaign,getBattle:()=>battle,modal,button,close,sprite,notice,textInput,chooseMove,growth:growthPrompts,changed:()=>{dirty=true;update();}});
+function partyDetails(mon){if($('modal').open&&$('modal').classList.contains('scene'))return;ui.summary(mon);}
+function beginBattle(mon,trainer=null,eventId=null,format='singles'){movement.clear();battleEvent=eventId;battle=new LocalBattle(campaign,mon,{trainer,format});dirty=true;update();}
 function renderBattle(){
   const environment='assets/battle-'+battleEnvironment(campaign)+'.png',field=document.querySelector('.battlefield');
   if(field.dataset.environment!==environment){field.dataset.environment=environment;if(globalThis.BriskGameAssets)BriskGameAssets.assetUrl(environment).then(url=>{if(field.dataset.environment===environment)field.style.backgroundImage=`url(${url})`;});else field.style.backgroundImage=`url(${environment})`;}
   field.classList.toggle('doubles',battle.doubles);document.querySelector('.play').classList.add('in-battle');
-  const view=(side,slot)=>{const p=battle.room.players[side],index=slot?p.active2:p.active,runtime=p.team[index],mon=side?battle.opponents[index]:campaign.state.party[index];return runtime&&mon?{...mon,species:runtime.species,nickname:runtime.name,hp:runtime.hp,status:runtime.status,battleMaxHP:runtime.maxHP}:null;};
-  const cards=battle.doubles?[['enemy-card',view(1,0),false],['player-card',view(0,0),true],['enemy-card-2',view(1,1),false],['player-card-2',view(0,1),true]]:[['enemy-card',battle.enemy,false],['player-card',battle.playerView||battle.player,true],['enemy-card-2',null,false],['player-card-2',null,true]];
-  for(const [id,mon,back] of cards){
+  const cards=battleCards(battle,campaign);
+  for(const {id,mon,back}of cards){
     const card=$(id);card.hidden=!mon;if(!mon)continue;
     if(!card.querySelector('section')){card.replaceChildren();const stats=document.createElement('section');stats.className='battle-stats';const name=document.createElement('strong'),level=document.createElement('span'),condition=document.createElement('span'),track=document.createElement('span'),fill=document.createElement('span'),hpText=document.createElement('small');name.className='battle-name';level.className='battle-level';condition.className='battle-status';track.className='hp-track';fill.className='hp-fill';hpText.className='hp-text';track.setAttribute('role','progressbar');track.append(fill);stats.append(name,level,condition,track,hpText);const img=document.createElement('img');card.append(stats,img);}
     const img=card.querySelector('img'),path=sprite(mon,back);if(img.dataset.sprite!==path){img.dataset.sprite=path;loadSprite(img,path);}img.alt=mon.nickname;
     const max=mon.battleMaxHP||catalog.stats(mon)[0],ratio=Math.max(0,Math.min(1,mon.hp/max));card.querySelector('.battle-name').textContent=mon.nickname;card.querySelector('.battle-level').textContent='Lv. '+mon.level;card.querySelector('.battle-status').textContent=mon.status?mon.status.toUpperCase():'';card.querySelector('.hp-text').textContent=`${mon.hp} / ${max} HP`;
     const track=card.querySelector('.hp-track');track.setAttribute('aria-label',mon.nickname+' HP');track.setAttribute('aria-valuemin','0');track.setAttribute('aria-valuemax',max);track.setAttribute('aria-valuenow',mon.hp);const fill=card.querySelector('.hp-fill');fill.style.width=100*ratio+'%';fill.dataset.health=ratio>.5?'healthy':ratio>.2?'low':'critical';card.classList.toggle('fainted',mon.hp<=0);card.classList.toggle('choosing',back&&mon.uid===battle.player.uid&&battle.phase==='battle');
   }
+  $('battle-details').hidden=false;$('map-name').textContent=battle.trainer||'Wild encounter';$('weather').textContent='TURN '+(battle.turn||1);
   $('battle-context').textContent=`${battle.trainer||'Wild encounter'} · Turn ${battle.turn||1}${battle.weather?' · '+(typeof battle.weather==='string'?battle.weather:battle.weather.type||'Weather'):''}`;
   $('battle-log').replaceChildren(...battle.log.slice(-3).map(line=>{const p=document.createElement('div');p.textContent=line;return p;}));$('battle-log').scrollTop=10000;
   const actions=[],nav=$('battle-nav');nav.replaceChildren();$('battle-targets').replaceChildren();
@@ -101,8 +95,9 @@ function renderBattle(){
   $('battle-actions').replaceChildren(...actions);$('battle').dataset.menu=battle.phase==='battle'?battle.menu:'finished';
 }
 function act(action){
- const before=new Map([battle.enemy,battle.playerView].map(m=>[m.uid,m.hp]));battle.act(action);battle.selectedForm=null;battle.menu='fight';dirty=true;update();
- if(!matchMedia('(prefers-reduced-motion: reduce)').matches)for(const [id,mon]of [['enemy-card',battle.enemy],['player-card',battle.playerView]])if(before.has(mon.uid)&&mon.hp<before.get(mon.uid))$(id).animate([{opacity:1},{opacity:.2},{opacity:1}],{duration:300});
+ const before=battleCards(battle,campaign);battle.act(action);battle.selectedForm=null;battle.menu='fight';dirty=true;update();
+ const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+ for(const {id,delta}of healthChanges(before,battleCards(battle,campaign))){const card=$(id),stats=card.querySelector('.battle-stats');stats.querySelector('.hp-change')?.remove();const label=document.createElement('span');label.className='hp-change '+(delta>0?'healing':'damage');label.textContent=(delta>0?'+':'')+delta;label.setAttribute('aria-hidden','true');stats.append(label);setTimeout(()=>label.remove(),1100);if(!reduced)card.querySelector('img').animate(delta<0?[{opacity:1},{opacity:.2,transform:'translateX(3px)'},{opacity:1}]:[{filter:'brightness(1)'},{filter:'brightness(1.5)'},{filter:'brightness(1)'}],{duration:300});}
 }
 function chooseMove(mon,id){
   close();if(mon.moves.length<4){catalog.teach(mon,id,mon.moves.length);dirty=true;update();return growthPrompts();}
@@ -233,9 +228,11 @@ const keyName=e=>e.key.length===1?e.key.toLowerCase():e.key;
 window.addEventListener('keydown',e=>{
  if(e.key==='Escape'&&(document.fullscreenElement||document.querySelector('.play').classList.contains('expanded'))){if(!document.fullscreenElement)toggleFullscreen();return;}
  if(e.key==='Escape'&&$('modal').open&&$('modal').classList.contains('scene')){e.preventDefault();$('modal-close').click();return;}
- if($('modal').open&&$('modal').classList.contains('scene')&&['e','Enter',' '].includes(e.key)){e.preventDefault();$('modal-content').querySelector('button')?.click();return;}
+ if($('modal').open&&$('modal').classList.contains('scene')&&e.key==='Tab'){e.preventDefault();const buttons=[...$('modal-content').querySelectorAll('button:not(:disabled)')],i=buttons.indexOf(document.activeElement);buttons[(i+(e.shiftKey?-1:1)+buttons.length)%buttons.length]?.focus();return;}
+ if($('modal').open&&$('modal').classList.contains('scene')&&['e','Enter',' '].includes(e.key)){e.preventDefault();const target=document.activeElement?.matches('#modal-content button')?document.activeElement:$('modal-content').querySelector('button');target?.click();return;}
  if(e.key==='Escape'&&!$('modal').open&&!battle){e.preventDefault();openGameMenu();return;}
  if($('modal').open||['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName))return;
+ if(e.key.toLowerCase()==='i'&&battle){e.preventDefault();ui.battleInfo();return;}
  const key=keyName(e);if(battle){if(['1','2','3','4'].includes(key)&&battle.menu==='fight'){e.preventDefault();$('battle-actions').querySelectorAll('.move-choice')[Number(key)-1]?.click();}else if(['f','b','p'].includes(key)){e.preventDefault();const menu={f:'fight',b:'bag',p:'party'}[key];if(menu!=='bag'||campaign.bagAllowed()||!battle.trainer&&campaign.state.options.battleBag!==false){battle.menu=menu;renderBattle();}}else if(directions[key])e.preventDefault();return;}if(key==='Shift'||key==='b'){if(campaign?.state.options.runMode==='toggle'){if(!e.repeat)runLatch=!runLatch;}else keys.add(key);e.preventDefault();}
  if(directions[key]){e.preventDefault();movement.press(key,directions[key]);guard(()=>movement.tick(performance.now()));}
  if(['e','Enter',' '].includes(key)&&e.target.tagName!=='BUTTON'){e.preventDefault();guard(interact);}
@@ -246,7 +243,7 @@ for(const b of document.querySelectorAll('[data-dir]')){const key={up:'ArrowUp',
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
 function rect(x,y,w,h,color){ctx.fillStyle=color;ctx.fillRect(x,y,w,h);}
 function draw(time){
-  requestAnimationFrame(draw);if(appSavePending&&catalog&&!battle&&!storyActive&&!busy){appSavePending=false;busy=true;syncAppSave().finally(()=>{busy=false;update();});}if(!appVisible||!campaign)return;
+  requestAnimationFrame(draw);const saveLabel=saving?'Saving…':dirty?'Unsaved changes':campaign?'Saved':'Ready';if($('save-status').textContent!==saveLabel){$('save-status').textContent=saveLabel;$('save-status').dataset.state=saving?'saving':dirty?'dirty':'saved';}if(appSavePending&&catalog&&!battle&&!storyActive&&!busy){appSavePending=false;busy=true;syncAppSave().finally(()=>{busy=false;update();});}if(!appVisible||!campaign)return;
   campaign.presentationRunning=isRunning();campaign.presentationStepMs=matchMedia('(prefers-reduced-motion: reduce)').matches?0:isRunning()?100:150;movement.tick(time,campaign.forcedDirection());
   if(!battle&&!storyActive&&dirty&&time-savedAt>30000&&!$('modal').open&&!busy){savedAt=time;busy=true;save().catch(e=>notice(`Autosave failed: ${e.message}. Export your save.`)).finally(()=>busy=false);}
   const m=campaign.map,tile=24,width=m.ground?480:624,height=m.ground?320:432;if(ctx.canvas.width!==width||ctx.canvas.height!==height){ctx.canvas.width=width;ctx.canvas.height=height;}ctx.imageSmoothingEnabled=false;
@@ -296,7 +293,7 @@ boot().catch(e=>notice(`Unable to start: ${e.message}`));
 
 $('travel').onclick=()=>{if(!campaign||battle||busy||storyActive)return;modal('Development travel', [...(pack.travel||[]).map(t=>button(pack.maps[t.map].name,()=>{campaign.travel(t.map,t.x,t.y);dirty=true;close();update();})),button('Original field station',()=>{campaign.travel('field',12,10);dirty=true;close();update();})]);};
 function openOptions(){
- if(!campaign||battle||busy||storyActive)return;const nodes=[];
+ if(!campaign||battle||busy||storyActive||$('modal').open&&$('modal').classList.contains('scene'))return;const nodes=[];
  for(const [key,label,values] of [['textSpeed','Text speed',['instant','fast','normal']],['runMode','Running controls',['hold','toggle','always']],['theme','Menu theme',['dark','light']],['trainersTalkOnly','Trainers battle on talk only',[false,true]],['encounters','Wild encounters',[true,false]],['weather','Weather effects',[true,false]],['overworldEncounters','Visible overworld encounters',[true,false]],['wildlifeDensity','Visible Pokémon density',[3,6,9]],['shinyHunt','Fast shiny hunting despawns',[true,false]],['difficulty','Difficulty',['easy','normal','hard','extreme']],['expShare','Modern EXP Share',[true,false]],['battleBag','Battle Bag',[true,false]],['orangeShinies','Orange Islands 1/50',[true,false]],['shinyOdds','Shiny odds',[50,100,128,256,512,1024,2048,4096,8192]]]){
   const row=document.createElement('label');row.textContent=label+' ';const select=document.createElement('select');select.setAttribute('aria-label',label);
   const defaults={textSpeed:'instant',runMode:'hold',theme:'dark',trainersTalkOnly:false,wildlifeDensity:6,shinyHunt:false};for(const value of values){const option=document.createElement('option');option.value=String(value);option.textContent=typeof value==='boolean'?(value?'On':'Off'):String(value);option.selected=(campaign.state.options[key]??defaults[key])===value;select.append(option);}
@@ -304,7 +301,7 @@ function openOptions(){
  }
  nodes.push(button('Rename trainer',async()=>{const name=await textInput('Trainer name',campaign.state.trainer.name);if(name?.trim()){campaign.state.trainer.name=name.trim().slice(0,24);dirty=true;update();openOptions();}}));nodes.push(button('Save options',async()=>{close();await save();}));modal('Options',nodes);
 }
-function openGameMenu(){if(!campaign||battle||storyActive||busy)return;modal('BRISK EMERALD',[button('Pokémon',()=>modal('Pokémon',campaign.state.party.map(mon=>button(mon.nickname,()=>partyDetails(mon))))),button('Bag',()=>modal('Bag',Object.entries(campaign.state.inventory).filter(([,n])=>n>0).map(([id,n])=>Object.assign(document.createElement('p'),{textContent:`${catalog.data.items[id]} × ${n}`})))),button('Save',async()=>{close();await save();}),button('Options',openOptions),button('Fullscreen',toggleFullscreen),button('Close menu',close)]);$('modal').classList.add('pause');}
+function openGameMenu(){if(!campaign||battle||storyActive||busy||$('modal').open)return;modal('BRISK EMERALD',[button('Pokémon',ui.party),button('Bag',()=>ui.bag()),button('Stored Pokémon',()=>ui.storage()),button('Area map',ui.localMap),button('Save',async()=>{close();await save();}),button('Options',openOptions),button('Controls & help',ui.help),button('Fullscreen',toggleFullscreen),button('Close menu',close)]);$('modal').classList.add('pause');}
 async function toggleFullscreen(){
  const surface=document.querySelector('.play');if($('modal').open&&$('modal').classList.contains('pause'))close();if(surface.classList.contains('expanded')){surface.classList.remove('expanded');$('fullscreen').textContent='Fullscreen';return;}if(document.fullscreenElement){await document.exitFullscreen();return;}
  if(surface.requestFullscreen){try{await surface.requestFullscreen();return;}catch{}}
@@ -335,3 +332,5 @@ $('field-moves').onclick=()=>guard(()=>{
  if(available('FLY')&&campaign.map.outdoor){const destinations=Object.values(pack.maps).filter(m=>/^map_(?:littleroot_town|oldale_town|petalburg_city|rustboro_city|dewford_town|slateport_city|mauville_city|verdanturf_town|fallarbor_town|lavaridge_town|fortree_city|lilycove_city|mossdeep_city|sootopolis_city|pacifidlog_town|ever_grande_city)$/.test(m.id)&&state.flags['FLAG_VISITED_'+m.id.replace('map_','').toUpperCase()]);nodes.push(button('Fly',()=>{close();modal('Fly to a visited town',destinations.map(m=>button(m.name,async()=>{const sourceLanding=Object.values(catalog.storyData.healLocations||{}).find(t=>t.map===m.id),landing=sourceLanding&&campaign.tile(sourceLanding.x,sourceLanding.y,m)!=='~'&&campaign.canOccupy(sourceLanding.x,sourceLanding.y,m,'land')?sourceLanding:pack.travel.find(t=>t.map===m.id);if(!landing)throw Error('No landing here');campaign.enterMap({map:landing.map,x:landing.x,y:landing.y});dirty=true;close();await enterMap();update();})));}));}
  if(!nodes.length){notice('No field moves can be used here yet. Face a tree, rock or boulder and use Interact.');return;}modal('Field moves',nodes);
 });
+
+$('party-open').onclick=()=>{if(campaign&&!battle&&!storyActive&&!busy&&!$('modal').open)ui.party();};$('bag-open').onclick=()=>{if(campaign&&!battle&&!storyActive&&!busy&&!$('modal').open)ui.bag();};$('storage-open').onclick=()=>{if(campaign&&!battle&&!storyActive&&!busy&&!$('modal').open)ui.storage();};$('map-open').onclick=()=>{if(campaign&&!battle&&!storyActive&&!busy&&!$('modal').open)ui.localMap();};$('battle-details').onclick=()=>{if(battle&&!$('modal').open)ui.battleInfo();};$('touch-interact').onclick=()=>guard(interact);

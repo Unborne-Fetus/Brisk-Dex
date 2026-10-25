@@ -8,7 +8,7 @@ const server=http.createServer(async(req,res)=>{
   try{
     if(!['GET','HEAD'].includes(req.method)){res.writeHead(405);res.end();return;}
     const url=new URL(req.url,'http://localhost'),relative=decodeURIComponent(url.pathname).replace(/^\/+/, '')||'game/index.html',file=path.resolve(root,relative);
-    if(!file.startsWith(root+path.sep)||relative.split(/[\\/]/).some(p=>p.startsWith('.'))||!(relative.startsWith('game/')||relative.startsWith('brisk-dex-sprites/')||relative.startsWith('brisk-dex-cries/')||relative.startsWith('brisk-dex-asset-patches/')||relative==='brisk-dex-data.json')){res.writeHead(403);res.end();return;}
+    if(!file.startsWith(root+path.sep)||relative.split(/[\\/]/).some(p=>p.startsWith('.'))||!(relative.startsWith('game/')||relative.startsWith('brisk-dex-items/')||relative.startsWith('brisk-dex-sprites/')||relative.startsWith('brisk-dex-cries/')||relative.startsWith('brisk-dex-asset-patches/')||relative==='brisk-dex-data.json')){res.writeHead(403);res.end();return;}
     const type=types[path.extname(file)];if(!type){res.writeHead(403);res.end();return;}
     const data=await fs.readFile(file);res.writeHead(200,{'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(req.method==='HEAD'?undefined:data);
   }catch(e){res.writeHead(404);res.end('Not found');}

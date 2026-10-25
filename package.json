@@ -48,7 +48,8 @@
     "game:wild-sprites": "python tools/export_wild_sprites.py",
     "game:ui:battle": "node tools/test_battle_presentation.cjs",
     "game:ui:field": "node tools/test_field_presentation.cjs",
-    "game:ui:features": "node tools/test_native_features.cjs"
+    "game:ui:features": "node tools/test_native_features.cjs",
+    "game:ui:interface": "node tools/test_game_interface.cjs"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.0.0",

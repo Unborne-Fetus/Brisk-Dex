@@ -157,6 +157,11 @@ export class Campaign {
     const count=this.state.inventory[item]||0; assert(count+quantity<=999999,'Bag is full'); const price=stock.price*({easy:1,normal:2,hard:4,extreme:10}[this.state.options.difficulty]||1);assert(this.state.money>=price*quantity,'Not enough money');
     this.state.money-=price*quantity; this.state.inventory[item]=count+quantity;
   }
+  giveHeldItem(uid,item){
+    const mon=this.state.party.find(m=>m.uid===uid),detail=this.catalog.data.itemDetails[item];assert(mon,'Choose a party Pokémon');assert(this.catalog.data.items[item]&&!['KEY_ITEMS','TM_HM'].includes(detail?.pocket),'This item cannot be held');assert(mon.item!==item,'Already holding this item');assert((this.state.inventory[item]||0)>0,'Not enough items');if(mon.item)assert((this.state.inventory[mon.item]||0)<999999,'The Bag cannot hold another copy');
+    this.state.inventory[item]--;if(mon.item)this.state.inventory[mon.item]=(this.state.inventory[mon.item]||0)+1;mon.item=Number(item);
+  }
+  takeHeldItem(uid){const mon=this.state.party.find(m=>m.uid===uid);assert(mon?.item,'This Pokémon is not holding an item');assert((this.state.inventory[mon.item]||0)<999999,'The Bag cannot hold another copy');this.state.inventory[mon.item]=(this.state.inventory[mon.item]||0)+1;mon.item=0;}
   useFieldItem(item,uid,quantity=1){
     const mon=this.state.party.find(m=>m.uid===uid);assert(mon,'Choose a party Pokémon');integer(quantity,1,99,'quantity');assert((this.state.inventory[item]||0)>=quantity,'Not enough items');const constant=this.catalog.data.itemDetails[item]?.constant,exp={ITEM_EXP_CANDY_XS:100,ITEM_EXP_CANDY_S:800,ITEM_EXP_CANDY_M:3000,ITEM_EXP_CANDY_L:10000,ITEM_EXP_CANDY_XL:30000};
     if(exp[constant]){assert(mon.level<100,'Already at level 100');this.state.inventory[item]-=quantity;this.catalog.gainExperience(mon,exp[constant]*quantity);return;}
