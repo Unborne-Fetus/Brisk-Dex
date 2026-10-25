@@ -13,10 +13,12 @@ const replacements={
   id:'function id(){return "offline-"+(++sequence);}',
   finishBattle:`function finishBattle(room,winnerIndex,message){if(room.phase==='finished')return;room.phase='finished';room.winner=winnerIndex;room.reward=null;room.players.forEach(p=>p.choice=null);if(message)log(room,message);}`
 };
+// Offline two-trainer encounters retain both complete six-member teams.
+replacements.cleanTeam=defs.get('cleanTeam').source.replace('team.slice(0,6)','team.slice(0,12)');
 const roots=['cleanTeam','beginBattle','resolveTurn','resolveDoublesTurn','botChoice','publicMon','doSwitch','onSwitchIn','verifiedTransformations','catalogMove','effectiveness','switchBlocked'];
 const used=new Set();
 function walk(node,fn){if(!node||typeof node!=='object')return;if(node.type==='Identifier')fn(node.name);for(const [k,v] of Object.entries(node)){if(['start','end'].includes(k))continue;if(Array.isArray(v))v.forEach(n=>walk(n,fn));else if(v&&typeof v==='object')walk(v,fn);}}
-function visit(name){if(used.has(name)||!defs.has(name))return;used.add(name);if(replacements[name])return;walk(defs.get(name).node,visit);}
+function visit(name){if(used.has(name)||!defs.has(name))return;used.add(name);if(replacements[name]&&name!=='cleanTeam')return;walk(defs.get(name).node,visit);}
 roots.forEach(visit);
 const generated=[...used].map(name=>replacements[name]||defs.get(name).source).join('\n\n');
 // Fail the build if dependency selection accidentally reaches host/account operations.
@@ -26,7 +28,7 @@ const suffix=`
 function start(teams,{format='singles',difficulty='normal',names=['Trainer','Opponent']}={}){
   const players=teams.map((input,i)=>({id:'offline-'+i,name:names[i],team:cleanTeam(input),active:0,active2:null,choice:null,isBot:i===1,botDifficulty:difficulty,leadSelected:Math.max(0,input.findIndex(m=>m.hp>0))}));
   if(players.some(p=>!p.team.length))throw new Error('Both sides need a real Pokémon');
-  const room={code:'OFFLINE',phase:'lobby',rules:{format,teamSize:6,noPrize:true,offline:true},players,log:[],animations:[],animationSeq:0,winner:null};
+  const room={code:'OFFLINE',phase:'lobby',rules:{format,teamSize:Math.max(...players.map(p=>p.team.length)),noPrize:true,offline:true},players,log:[],animations:[],animationSeq:0,winner:null};
   beginBattle(room);
   players.forEach((p,i)=>p.team.forEach((mon,j)=>{const original=teams[i][j];mon.hp=clamp(original.hp??mon.maxHP,0,mon.maxHP);mon.status=original.status||null;mon.moves.forEach((m,k)=>{m.pp=original.moves[k].pp;m.maxPP=original.moves[k].maxPP||catalogMove(m.id).maxPP;});}));
   return room;

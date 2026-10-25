@@ -5,7 +5,7 @@ export function createBattleEngine(BRISK_DATA,random=Math.random){
 const Math=Object.create(globalThis.Math);Math.random=random;let sequence=0;
 function cleanTeam(team){
   if(!Array.isArray(team)) return [];
-  return team.slice(0,6).map((mon,index)=>({
+  return team.slice(0,12).map((mon,index)=>({
     slot:index,
     rewardRaw80:cleanRewardRaw80(mon.rewardRaw80),
     species:Number(mon.species)||0,
@@ -1598,7 +1598,7 @@ function transformationFormIds(speciesId){
 function start(teams,{format='singles',difficulty='normal',names=['Trainer','Opponent']}={}){
   const players=teams.map((input,i)=>({id:'offline-'+i,name:names[i],team:cleanTeam(input),active:0,active2:null,choice:null,isBot:i===1,botDifficulty:difficulty,leadSelected:Math.max(0,input.findIndex(m=>m.hp>0))}));
   if(players.some(p=>!p.team.length))throw new Error('Both sides need a real Pokémon');
-  const room={code:'OFFLINE',phase:'lobby',rules:{format,teamSize:6,noPrize:true,offline:true},players,log:[],animations:[],animationSeq:0,winner:null};
+  const room={code:'OFFLINE',phase:'lobby',rules:{format,teamSize:Math.max(...players.map(p=>p.team.length)),noPrize:true,offline:true},players,log:[],animations:[],animationSeq:0,winner:null};
   beginBattle(room);
   players.forEach((p,i)=>p.team.forEach((mon,j)=>{const original=teams[i][j];mon.hp=clamp(original.hp??mon.maxHP,0,mon.maxHP);mon.status=original.status||null;mon.moves.forEach((m,k)=>{m.pp=original.moves[k].pp;m.maxPP=original.moves[k].maxPP||catalogMove(m.id).maxPP;});}));
   return room;

@@ -43,3 +43,6 @@ export class FieldInput {
   try{await this.step(...direction);}catch(error){this.onError(error);}finally{this.running=false;this.notify();}
  }
 }
+// Both background layers and individual changed metatiles use this same pixel
+// origin. Two-pixel steps preserve the 2× source raster without sampling seams.
+export function pixelCamera(x,y,tile=32){return {x:Math.round(x*tile/2)*2/tile,y:Math.round(y*tile/2)*2/tile};}
