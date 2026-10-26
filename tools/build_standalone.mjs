@@ -95,6 +95,7 @@ new MutationObserver(records=>{for(const r of records){if(r.type==='attributes')
 })();
 </script>`;
 let gameDocument=await fs.readFile(path.join(root,'game/index.html'),'utf8');
+gameDocument=gameDocument.replace('<link rel="stylesheet" href="./battle-ui.css">','<style>'+await fs.readFile(path.join(root,'game/battle-ui.css'),'utf8')+'</style>');
 let gameCSS=await fs.readFile(path.join(root,'game/style.css'),'utf8');
 const shellCSS=await fs.readFile(path.join(root,'game/shell.css'),'utf8');
 gameDocument=gameDocument.replace('<link rel="stylesheet" href="./shell.css">','<style>'+shellCSS+'</style>');
