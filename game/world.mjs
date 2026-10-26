@@ -176,6 +176,20 @@ export class Campaign {
     integer(partyIndex,0,this.state.party.length-1,'party slot'); integer(boxIndex,0,this.state.boxes.length-1,'storage slot');
     [this.state.party[partyIndex],this.state.boxes[boxIndex]]=[this.state.boxes[boxIndex],this.state.party[partyIndex]];
   }
+  renamePartner(uid,name) {
+    const mon=this.state.party.find(m=>m.uid===uid);assert(mon,'Choose a party Pokémon');
+    assert(typeof name==='string','Enter a nickname');const clean=name.trim();
+    assert(clean.length>0&&clean.length<=24&&!/[\x00-\x1f\x7f]/.test(clean),'Use 1–24 printable characters');mon.nickname=clean;
+  }
+  swapParty(first,second) {
+    integer(first,0,this.state.party.length-1,'party slot');integer(second,0,this.state.party.length-1,'party slot');
+    [this.state.party[first],this.state.party[second]]=[this.state.party[second],this.state.party[first]];
+  }
+  reorderMove(uid,first,second) {
+    const mon=this.state.party.find(m=>m.uid===uid);assert(mon,'Choose a party Pokémon');
+    integer(first,0,mon.moves.length-1,'move slot');integer(second,0,mon.moves.length-1,'move slot');
+    [mon.moves[first],mon.moves[second]]=[mon.moves[second],mon.moves[first]];
+  }
   setLead(index) { integer(index,0,this.state.party.length-1,'party slot'); const p=this.state.party;[p[0],p[index]]=[p[index],p[0]]; }
   evolve(uid,itemId) {
     const mon=this.state.party.find(m=>m.uid===uid);assert(mon,'Choose a party Pokémon'); const item=itemId?this.catalog.data.itemDetails[itemId]?.constant:null,e=this.catalog.evolution(mon,item);

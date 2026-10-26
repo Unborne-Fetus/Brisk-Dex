@@ -52,7 +52,7 @@ function update(fieldOnly=false){
   $('dive').disabled=!!battle||storyActive||busy||!campaign.fieldScript(...facing,'dive');$('fish').disabled=!!battle||storyActive||busy||!campaign.fishable(s.position.x+facing[0],s.position.y+facing[1]);
   if(battle)renderBattle();
 }
-const ui=createInterface({getCampaign:()=>campaign,getBattle:()=>battle,modal,button,close,sprite,notice,textInput,chooseMove,growth:growthPrompts,changed:()=>{dirty=true;update();}});
+const ui=createInterface({getCampaign:()=>campaign,getBattle:()=>battle,modal,button,close,sprite,notice,textInput,chooseMove,save:async()=>{close();await save();},options:openOptions,fullscreen:toggleFullscreen,growth:growthPrompts,changed:()=>{dirty=true;update();}});
 function partyDetails(mon){if($('modal').open&&$('modal').classList.contains('scene'))return;ui.summary(mon);}
 function beginBattle(mon,trainer=null,eventId=null,format='singles'){movement.clear();battleEvent=eventId;battle=new LocalBattle(campaign,mon,{trainer,format});dirty=true;update();}
 function renderBattle(){
@@ -141,7 +141,7 @@ async function sceneChoice(message,labels=['Continue']){
  }return answer;
 }
 function textInput(title,value='',type='text'){
- return new Promise(resolve=>{choiceCancel=resolve;const input=document.createElement('input');input.type=type;input.value=value;input.maxLength=24;input.setAttribute('aria-label',title);modal(title,[input,button('Continue',()=>{choiceCancel=null;close();resolve(input.value);})]);input.focus();});
+ return new Promise(resolve=>{choiceCancel=resolve;const input=document.createElement('input');input.type=type;input.value=value;input.maxLength=24;input.setAttribute('aria-label',title);const submit=button('Continue',()=>{if(!input.reportValidity())return;choiceCancel=null;close();resolve(input.value);});input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();submit.click();}});modal(title,[input,submit]);input.focus();});
 }
 async function playScene(entry,fallback='',present=true){
   if(storyActive)return false;const original=campaign,source=storySource||((pack.sharedScripts||'')+'\n'+campaign.map.scriptText);storyActive=true;update();
@@ -301,7 +301,7 @@ function openOptions(){
  }
  nodes.push(button('Rename trainer',async()=>{const name=await textInput('Trainer name',campaign.state.trainer.name);if(name?.trim()){campaign.state.trainer.name=name.trim().slice(0,24);dirty=true;update();openOptions();}}));nodes.push(button('Save options',async()=>{close();await save();}));modal('Options',nodes);
 }
-function openGameMenu(){if(!campaign||battle||storyActive||busy||$('modal').open)return;modal('BRISK EMERALD',[button('Pokémon',ui.party),button('Bag',()=>ui.bag()),button('Stored Pokémon',()=>ui.storage()),button('Area map',ui.localMap),button('Save',async()=>{close();await save();}),button('Options',openOptions),button('Controls & help',ui.help),button('Fullscreen',toggleFullscreen),button('Close menu',close)]);$('modal').classList.add('pause');}
+function openGameMenu(){if(!campaign||battle||storyActive||busy||$('modal').open)return;ui.dashboard();}
 async function toggleFullscreen(){
  const surface=document.querySelector('.play');if($('modal').open&&$('modal').classList.contains('pause'))close();if(surface.classList.contains('expanded')){surface.classList.remove('expanded');$('fullscreen').textContent='Fullscreen';return;}if(document.fullscreenElement){await document.exitFullscreen();return;}
  if(surface.requestFullscreen){try{await surface.requestFullscreen();return;}catch{}}
