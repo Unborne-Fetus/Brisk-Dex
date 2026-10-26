@@ -27,7 +27,7 @@ const button=(text,fn)=>{const b=document.createElement('button');b.textContent=
 async function guard(fn){try{await fn();}catch(e){notice(e.message);if($('modal').open&&!$('modal').classList.contains('scene')){let alert=$('modal-error');if(!alert){alert=document.createElement('p');alert.id='modal-error';alert.setAttribute('role','alert');$('modal-content').prepend(alert);}alert.textContent=e.message;}}}
 function sprite(mon,back=false){const s=catalog.species(mon.species);return '../'+(mon.shiny?(back?s.backShinySprite:s.frontShinySprite):(back?s.backSprite:s.frontSprite));}
 function lockSceneControls(locked){for(const selector of ['aside','.bottom','.touch','#pause-menu','#map-open','#battle-details'])document.querySelector(selector).inert=locked;}
-function modal(title,content,scene=false){movement.clear();if($('modal').open)$('modal').close();$('modal').classList.remove('pause','wide');$('modal').classList.toggle('scene',scene);$('modal-title').textContent=title;$('modal-content').replaceChildren();if(typeof content==='string'){const p=document.createElement('p');p.textContent=content;$('modal-content').append(p);}else $('modal-content').append(...content);lockSceneControls(scene);if(scene)$('modal').show();else $('modal').showModal();}
+function modal(title,content,scene=false){movement.clear();if($('modal').open)$('modal').close();$('modal').classList.remove('pause','wide','options-dialog');$('modal').classList.toggle('scene',scene);$('modal-title').textContent=title;$('modal-content').replaceChildren();if(typeof content==='string'){const p=document.createElement('p');p.textContent=content;$('modal-content').append(p);}else $('modal-content').append(...content);lockSceneControls(scene);if(scene)$('modal').show();else $('modal').showModal();}
 function close(){lockSceneControls(false); $('modal').close();$('modal').classList.remove('pause');$('world').focus(); }
 $('modal-close').onclick=()=>{if(choiceCancel){const cancel=choiceCancel;choiceCancel=null;close();cancel(null);}else close();};
 $('modal').addEventListener('cancel',()=>{if(choiceCancel){const cancel=choiceCancel;choiceCancel=null;cancel(null);}});
@@ -293,13 +293,13 @@ boot().catch(e=>notice(`Unable to start: ${e.message}`));
 
 $('travel').onclick=()=>{if(!campaign||battle||busy||storyActive)return;modal('Development travel', [...(pack.travel||[]).map(t=>button(pack.maps[t.map].name,()=>{campaign.travel(t.map,t.x,t.y);dirty=true;close();update();})),button('Original field station',()=>{campaign.travel('field',12,10);dirty=true;close();update();})]);};
 function openOptions(){
- if(!campaign||battle||busy||storyActive||$('modal').open&&$('modal').classList.contains('scene'))return;const nodes=[];
+ if(!campaign||battle||busy||storyActive||$('modal').open&&$('modal').classList.contains('scene'))return;const nodes=[],groups=new Map();
  for(const [key,label,values] of [['textSpeed','Text speed',['instant','fast','normal']],['runMode','Running controls',['hold','toggle','always']],['theme','Menu theme',['dark','light']],['trainersTalkOnly','Trainers battle on talk only',[false,true]],['encounters','Wild encounters',[true,false]],['weather','Weather effects',[true,false]],['overworldEncounters','Visible overworld encounters',[true,false]],['wildlifeDensity','Visible Pokémon density',[3,6,9]],['shinyHunt','Fast shiny hunting despawns',[true,false]],['difficulty','Difficulty',['easy','normal','hard','extreme']],['expShare','Modern EXP Share',[true,false]],['battleBag','Battle Bag',[true,false]],['orangeShinies','Orange Islands 1/50',[true,false]],['shinyOdds','Shiny odds',[50,100,128,256,512,1024,2048,4096,8192]]]){
   const row=document.createElement('label');row.textContent=label+' ';const select=document.createElement('select');select.setAttribute('aria-label',label);
   const defaults={textSpeed:'instant',runMode:'hold',theme:'dark',trainersTalkOnly:false,wildlifeDensity:6,shinyHunt:false};for(const value of values){const option=document.createElement('option');option.value=String(value);option.textContent=typeof value==='boolean'?(value?'On':'Off'):String(value);option.selected=(campaign.state.options[key]??defaults[key])===value;select.append(option);}
-  select.onchange=()=>{campaign.state.options[key]=values.find(v=>String(v)===select.value);runLatch=false;dirty=true;update();};row.append(select);nodes.push(row);
+  select.onchange=()=>{campaign.state.options[key]=values.find(v=>String(v)===select.value);runLatch=false;dirty=true;update();};row.append(select);const group=['textSpeed','theme','weather'].includes(key)?'Display':['runMode','trainersTalkOnly'].includes(key)?'Controls':['encounters','overworldEncounters','wildlifeDensity','shinyHunt','orangeShinies','shinyOdds'].includes(key)?'Encounters':'Battle rules';if(!groups.has(group)){const section=document.createElement('section');section.className='option-group';const heading=document.createElement('h3');heading.textContent=group;section.append(heading);groups.set(group,section);nodes.push(section);}groups.get(group).append(row);
  }
- nodes.push(button('Rename trainer',async()=>{const name=await textInput('Trainer name',campaign.state.trainer.name);if(name?.trim()){campaign.state.trainer.name=name.trim().slice(0,24);dirty=true;update();openOptions();}}));nodes.push(button('Save options',async()=>{close();await save();}));modal('Options',nodes);
+ nodes.push(button('Rename trainer',async()=>{const name=await textInput('Trainer name',campaign.state.trainer.name);if(name?.trim()){campaign.state.trainer.name=name.trim().slice(0,24);dirty=true;update();openOptions();}}));nodes.push(button('Save options',async()=>{close();await save();}));modal('Options',nodes);$('modal').classList.add('wide','options-dialog');
 }
 function openGameMenu(){if(!campaign||battle||storyActive||busy||$('modal').open)return;ui.dashboard();}
 async function toggleFullscreen(){
@@ -334,3 +334,9 @@ $('field-moves').onclick=()=>guard(()=>{
 });
 
 $('party-open').onclick=()=>{if(campaign&&!battle&&!storyActive&&!busy&&!$('modal').open)ui.party();};$('bag-open').onclick=()=>{if(campaign&&!battle&&!storyActive&&!busy&&!$('modal').open)ui.bag();};$('storage-open').onclick=()=>{if(campaign&&!battle&&!storyActive&&!busy&&!$('modal').open)ui.storage();};$('map-open').onclick=()=>{if(campaign&&!battle&&!storyActive&&!busy&&!$('modal').open)ui.localMap();};$('battle-details').onclick=()=>{if(battle&&!$('modal').open)ui.battleInfo();};$('touch-interact').onclick=()=>guard(interact);
+
+// Companion panels keep secondary controls out of the field viewport.
+for(const tab of document.querySelectorAll('[data-panel]'))tab.addEventListener('click',()=>{
+ for(const button of document.querySelectorAll('[data-panel]'))button.setAttribute('aria-pressed',String(button===tab));
+ for(const panel of document.querySelectorAll('[data-content]'))panel.hidden=panel.dataset.content!==tab.dataset.panel;
+});

@@ -96,6 +96,8 @@ new MutationObserver(records=>{for(const r of records){if(r.type==='attributes')
 </script>`;
 let gameDocument=await fs.readFile(path.join(root,'game/index.html'),'utf8');
 let gameCSS=await fs.readFile(path.join(root,'game/style.css'),'utf8');
+const shellCSS=await fs.readFile(path.join(root,'game/shell.css'),'utf8');
+gameDocument=gameDocument.replace('<link rel="stylesheet" href="./shell.css">','<style>'+shellCSS+'</style>');
 for(const match of [...gameCSS.matchAll(/url\(['"]?(\.\/assets\/[^)'"]+)['"]?\)/g)]){const entry=packed['game/'+match[1].slice(2)];if(!entry)throw Error('Unbundled game stylesheet asset '+match[1]);gameCSS=gameCSS.replace(match[0],'url(data:'+entry[0]+';base64,'+gunzipSync(Buffer.from(entry[1],'base64')).toString('base64')+')');}
 gameDocument=gameDocument.replace('<link rel="stylesheet" href="./style.css">','<style>'+gameCSS+'</style>');
 gameDocument=gameDocument.replace('<script type="module" src="./app.mjs"></script>',gameBridge+'<script>'+gameBundle.outputFiles[0].text.replace(/<\/script/gi,'<\\/script')+'<\/script>');
