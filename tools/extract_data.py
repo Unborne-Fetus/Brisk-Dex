@@ -360,6 +360,7 @@ def extract_feature_catalog(repo):
         ("Kanto postgame", "Kanto Gym Leader teams have level-92 aces on Easy, 96 on Normal, 99 on Hard and 100 on Kaizo. Kanto wild encounters and migrated legendaries have source-backed locations."),
         ("Custom Pokémon & Megas", "Added Fakémon and artist-created Mega forms are included with their Brisk stats, moves, artwork and evolution methods. Custom Mega Stones are sold only in Orange City. Mega Dragonite Y and Dragoninite Y are separate from the original Mega Dragonite."),
         ("Custom Pokémon & Megas", "Rhydon has a split evolution: Rhyfortress at level 60, or Rhyperior using a Protector. Mega Snorlax now has 75 Defense and 120 Special Defense."),
+        ("Signature Abilities", "Brisk-exclusive signature abilities, their in-game descriptions and the Pokémon that possess them are listed in the Abilities reference. Use the Brisk signature filter to find them."),
     ])
     brisk_map = {}
     for category, change in brisk:
@@ -1584,6 +1585,21 @@ def main():
             "pocket": pocket_constant
         }
 
+    # All Brisk-exclusive abilities are identified by the game's canonical
+    # constants, not by a frozen list of names or arbitrary ID thresholds.
+    # This keeps the Dex's signature-ability view in sync automatically.
+    custom_section = re.search(
+        r'// Brisk Emerald custom abilities([\\s\\S]*?)\\bABILITIES_COUNT\\b',
+        abilities_const_text)
+    signature_ability_ids = []
+    if custom_section:
+        signature_names = re.findall(
+            r'^\\s*ABILITY_([A-Z0-9_]+)\\b', custom_section.group(1), re.MULTILINE)
+        signature_ability_ids = list(dict.fromkeys(
+            ability_ids[name] for name in signature_names
+            if name in ability_ids and str(ability_ids[name]) in ability_details
+        ))
+
     route_encounters = extract_route_encounters(repo, species_ids)
     trainer_teams = extract_complete_trainer_teams(repo)
     change_catalog = extract_feature_catalog(repo)
@@ -1591,6 +1607,7 @@ def main():
         trainer["locations"] = trainer_locations.get(trainer["constant"], [])
     data = {"species": out_species, "moves": out_moves, "movePP": out_move_pp, "moveDetails": move_details,
             "abilities": out_abilities, "abilityDetails": ability_details, "items": out_items, "itemDetails": item_details, "routeEncounters": route_encounters,
+            "signatureAbilityIds": signature_ability_ids,
             "changes": change_catalog, "shinyOdds": shiny_odds}
     primary_effects = sorted({m.get("effect") for m in move_details.values() if m.get("effect")})
     secondary_effects = sorted({e.get("effect") for m in move_details.values() for e in m.get("moveEffects", []) if e.get("effect")})

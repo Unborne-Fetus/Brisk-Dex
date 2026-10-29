@@ -1213,6 +1213,10 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
     <p class="route-intro">Ability descriptions, behavior flags, and Pokémon users come directly from Brisk Emerald.</p>
     <div class="reference-tools">
       <input id="ability-search" type="search" placeholder="Search ability, description, constant, or Pokémon…" aria-label="Search Brisk Emerald abilities">
+      <select id="ability-scope" aria-label="Filter Brisk abilities">
+        <option value="all">All abilities</option>
+        <option value="brisk">Brisk signature abilities</option>
+      </select>
     </div>
     <div class="reference-layout">
       <aside class="reference-list" id="ability-list" aria-label="Brisk Emerald abilities"></aside>
@@ -2596,6 +2600,7 @@ async function loadBundledGameData(){
       species:data.species || {}, moves:data.moves || {},
       movePP:data.movePP || {}, moveDetails:data.moveDetails || {},
       items:data.items || {}, abilities:data.abilities || {}, abilityDetails:data.abilityDetails || {},
+      signatureAbilityIds:Array.isArray(data.signatureAbilityIds) ? data.signatureAbilityIds : [],
       itemDetails:data.itemDetails || {},
       changes:Array.isArray(data.changes) ? data.changes : []
     };
@@ -4760,7 +4765,10 @@ function renderAbilities(){
     return name && name!=='-------' && !/^ABILITY_\d+$/.test(constant) && description!=='no special ability.';
   }));
   var q=(document.getElementById('ability-search').value||'').trim().toLowerCase();
+  var scope=(document.getElementById('ability-scope')||{}).value||'all';
+  var signatures=new Set(BUNDLED_DATA.signatureAbilityIds||[]);
   var ids=Object.keys(all).filter(function(id){
+    if(scope==='brisk' && !signatures.has(Number(id))) return false;
     var ability=all[id]||{};
     if(!q) return true;
     var userNames=abilityUsers(Number(id)).slice(0,80).map(speciesName);
@@ -4776,7 +4784,7 @@ function renderAbilities(){
     var users=abilityUsers(Number(id));
     var btn=el('button',{class:'reference-entry'+(Number(id)===Number(selectedAbilityReferenceId)?' active':'')});
     btn.appendChild(el('strong',{text:ability.name||('Ability #'+id)}));
-    btn.appendChild(el('small',{text:users.length+' Pokémon'}));
+    btn.appendChild(el('small',{text:users.length+' Pokémon'+(signatures.has(Number(id))?' · Brisk signature':'')}));
     btn.addEventListener('click',function(){selectedAbilityReferenceId=Number(id);renderAbilities();});
     return btn;
   },(IS_ANDROID||IS_IOS)?100:ids.length);
@@ -4784,6 +4792,8 @@ function renderAbilities(){
   var ability=all[String(selectedAbilityReferenceId)]||{};
   var hero=el('section',{class:'reference-hero'});
   hero.appendChild(el('h2',{text:ability.name||('Ability #'+selectedAbilityReferenceId)}));
+  if(signatures.has(Number(selectedAbilityReferenceId)))
+    hero.appendChild(el('div',{class:'dex-id',text:'Brisk Emerald signature ability'}));
   hero.appendChild(el('div',{class:ability.description?'reference-description':'dex-muted',text:ability.description||'No ability description is present in the currently loaded Brisk data.'}));
   detail.appendChild(hero);
 
@@ -6682,6 +6692,7 @@ document.getElementById('move-search').addEventListener('input', renderMovesDebo
 document.getElementById('move-type').addEventListener('change', renderMoves);
 document.getElementById('move-category').addEventListener('change', renderMoves);
 document.getElementById('ability-search').addEventListener('input', renderAbilitiesDebounced);
+ document.getElementById('ability-scope').addEventListener('change', renderAbilities);
 document.getElementById('item-search').addEventListener('input', renderItemsDebounced);
 document.getElementById('item-order').addEventListener('change', renderItems);
 document.getElementById('bag-search').addEventListener('input', renderBag);

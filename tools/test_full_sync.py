@@ -5,6 +5,33 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MODES = ("Easy", "Normal", "Hard", "Kaizo")
+# Exact assignments from Brisk Emerald's Pokémon species tables.
+SIGNATURE_OWNERS = {
+    "LEDIAN": "SPEED_BOXER",
+    "DELCATTY": "NINE_LIVES",
+    "KRICKETUNE": "GRAND_MAESTRO",
+    "LUVDISC": "HEARTBREAKER",
+    "SPIDOPS": "WEB_EXCRETANT",
+    "DELIBIRD": "FLASH_FREEZE",
+    "SUNKERN": "SOLAR_FLEET",
+    "SUNFLORA": "SOLAR_FLEET",
+    "CARNIVINE": "JAW_SNAP",
+    "WATCHOG": "DURAN",
+    "WUGTRIO": "CLEARWATER",
+    "FURRET": "BUILD_ME_UP",
+    "ARIADOS": "OVERDOSE",
+    "MAGCARGO": "BURNING_CRUST",
+    "LUMINEON": "OGOOUE_BASIN",
+    "MARACTUS": "NOPALES",
+    "SWALOT": "TORSION",
+    "HEATMOR": "FLAME_TONGUE",
+    "SEAKING": "CRASHER_WAKE",
+    "THIEVUL": "MASTER_THIEF",
+    "BEHEEYEM": "PSYCHIC_GRAVITY",
+    "UNFEZANT": "RAGE_WINGS",
+    "KECLEON": "CHROMATOPHORES",
+}
+
 
 class SyncedContentTests(unittest.TestCase):
     @classmethod
@@ -57,6 +84,24 @@ class SyncedContentTests(unittest.TestCase):
                                     and any(slot["species"] == sid for slot in method["slots"])
                                     for area in locations for method in area["methods"]),
                                 name + " is a Kaizo-only Orange City trainer reward")
+
+
+    def test_all_signature_abilities_have_names_descriptions_and_owners(self):
+        details = {ability["constant"].removeprefix("ABILITY_"): (int(aid), ability)
+                   for aid, ability in self.data["abilityDetails"].items()}
+        species = {pokemon["constant"]: pokemon
+                   for pokemon in self.data["species"].values()}
+        expected = set(SIGNATURE_OWNERS.values())
+        signature_ids = set(self.data.get("signatureAbilityIds", []))
+        self.assertEqual(len(expected), 22)
+        self.assertEqual(signature_ids, {details[name][0] for name in expected})
+        for species_name, ability_name in SIGNATURE_OWNERS.items():
+            with self.subTest(species=species_name, ability=ability_name):
+                aid, ability = details[ability_name]
+                self.assertIn(aid, signature_ids)
+                self.assertTrue(ability["name"])
+                self.assertTrue(ability["description"])
+                self.assertIn(ability["name"], species[species_name]["abilities"])
 
 if __name__ == "__main__":
     unittest.main()

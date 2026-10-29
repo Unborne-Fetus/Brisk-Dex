@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/sync-brisk-data.yml'
+      - 'tools/extract_data.py'
+      - 'tools/test_full_sync.py'
   workflow_dispatch:
   schedule:
     - cron: '17 */6 * * *'
