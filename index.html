@@ -1099,9 +1099,15 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
 
   <section id="trainers-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-trainers" style="display:none;">
     <div class="section-heading"><h3>Trainer Teams</h3><span class="count" id="trainer-count"></span></div>
-    <p class="route-intro">Browse the teams defined in Brisk Emerald's <code>src/data/trainers.party</code>. This is hack data, not a vanilla Emerald trainer database.</p>
+    <p class="route-intro">Browse current Hoenn and Kanto teams across Easy, Normal, Hard and Kaizo, directly from Brisk Emerald's authored rosters.</p>
     <div class="trainer-tools">
       <input id="trainer-search" type="search" placeholder="Search trainer, class, Pok&eacute;mon, move, ability, or item…" aria-label="Search Brisk trainer teams">
+      <select id="trainer-mode" aria-label="Trainer difficulty">
+        <option value="Easy">Easy</option>
+        <option value="Normal" selected>Normal</option>
+        <option value="Hard">Hard</option>
+        <option value="Kaizo">Kaizo</option>
+      </select>
       <select id="trainer-class" aria-label="Filter trainers by class"><option value="all">All classes</option></select>
       <select id="trainer-size" aria-label="Filter trainers by party size">
         <option value="all">Any team size</option>
@@ -4400,10 +4406,14 @@ function renderTrainerClassOptions(){
   Array.from(classes).sort().forEach(function(c){select.appendChild(el('option',{value:c,text:c}));});
   select.value=Array.from(select.options).some(function(o){return o.value===prev;})?prev:'all';
 }
+function trainerSelectedMode(){var s=document.getElementById('trainer-mode');return s?s.value:'Normal';}
+function trainerParty(t){return (t.modeTeams&&t.modeTeams[trainerSelectedMode()])||t.party||[];}
+function trainerProfile(t){return (t.modeProfiles&&t.modeProfiles[trainerSelectedMode()])||t;}
 function trainerSearchText(t){
-  var parts=[t.name,t.class,t.ai,t.battleType,t.items,t.pic];
+  var meta=trainerProfile(t);
+  var parts=[t.name,t.class,t.region,meta.ai,meta.battleType,meta.items,t.pic];
   (t.locations||[]).forEach(function(loc){parts.push(loc.location,loc.method);});
-  (t.party||[]).forEach(function(m){
+  trainerParty(t).forEach(function(m){
     parts.push(m.species,m.nickname,m.item);
     Object.keys(m.fields||{}).forEach(function(k){parts.push(k,m.fields[k]);});
     (m.moves||[]).forEach(function(move){parts.push(move);});
@@ -4420,10 +4430,10 @@ function renderTrainerTeams(){
   var filtered=TRAINER_DATA.filter(function(t){
     if(t.constant==='TRAINER_NONE') return false;
     if(classFilter!=='all' && (t.class||'Pkmn Trainer')!==classFilter) return false;
-    if(sizeFilter!=='all' && String((t.party||[]).length)!==sizeFilter) return false;
+    if(sizeFilter!=='all' && String(trainerParty(t).length)!==sizeFilter) return false;
     return !q || trainerSearchText(t).includes(q);
   });
-  document.getElementById('trainer-count').textContent=filtered.length+' of '+Math.max(0,TRAINER_DATA.length-1)+' trainers';
+  document.getElementById('trainer-count').textContent=filtered.length+' of '+TRAINER_DATA.filter(function(t){return t.constant!=='TRAINER_NONE';}).length+' trainers';
   list.innerHTML=''; detail.innerHTML='';
   if(!TRAINER_DATA.length){
     list.appendChild(el('div',{class:'route-empty',text:'Trainer team data is not loaded.'}));
@@ -4444,7 +4454,7 @@ function renderTrainerTeams(){
     left.appendChild(el('strong',{text:t.name||t.constant.replace(/^TRAINER_/,'')}));
     left.appendChild(el('small',{text:t.class||'Pkmn Trainer'}));
     btn.appendChild(left);
-    btn.appendChild(el('span',{class:'trainer-entry-count',text:(t.party||[]).length+' mon'}));
+    btn.appendChild(el('span',{class:'trainer-entry-count',text:trainerParty(t).length+' mon'}));
     btn.addEventListener('click',function(){selectedTrainerConstant=t.constant;renderTrainerTeams();});
     list.appendChild(btn);
   });
@@ -4455,12 +4465,14 @@ function renderTrainerTeams(){
     var trainerHero=el('img',{src:t.portrait,alt:(t.name||'Trainer')+' battle sprite',style:'width:120px;height:120px;object-fit:contain;image-rendering:pixelated;float:right;margin-left:18px;'}); trainerHero.loading='lazy'; trainerHero.decoding='async'; head.appendChild(trainerHero);
   }
   head.appendChild(el('h2',{text:t.name||t.constant.replace(/^TRAINER_/,'')}));
-  var meta=el('div',{class:'trainer-meta'});
+  var meta=el('div',{class:'trainer-meta'}), profile=trainerProfile(t);
   [
     t.class||'Pkmn Trainer',
-    t.battleType ? ((String(t.battleType).toLowerCase()==='yes'||String(t.battleType).toLowerCase()==='doubles')?'Double Battle':(String(t.battleType).toLowerCase()==='no'?'Single Battle':t.battleType)) : null,
-    t.ai ? 'AI: '+t.ai : null,
-    t.items ? 'Trainer items: '+t.items : null
+    t.region||'Hoenn',
+    t.modeTeams ? trainerSelectedMode()+' difficulty' : 'Original team',
+    profile.battleType ? ((String(profile.battleType).toLowerCase()==='yes'||String(profile.battleType).toLowerCase()==='doubles')?'Double Battle':(String(profile.battleType).toLowerCase()==='no'?'Single Battle':profile.battleType)) : null,
+    profile.ai ? 'AI: '+profile.ai : null,
+    profile.items ? 'Trainer items: '+profile.items : null
   ].filter(Boolean).forEach(function(x){meta.appendChild(el('span',{text:x}));});
   head.appendChild(meta); detail.appendChild(head);
 
@@ -4479,7 +4491,7 @@ function renderTrainerTeams(){
   detail.appendChild(locationCard);
 
   var team=el('div',{class:'trainer-team-grid'});
-  (t.party||[]).forEach(function(m){
+  trainerParty(t).forEach(function(m){
     var sid=trainerSpeciesId(m.species), card=el('article',{class:'trainer-mon'});
     if(sid) applyTypeStyle(card,sid);
     var mh=el('div',{class:'trainer-mon-head'});
@@ -6676,6 +6688,7 @@ document.getElementById('bag-search').addEventListener('input', renderBag);
 document.getElementById('bag-order').addEventListener('change', renderBag);
 document.querySelectorAll('#bag-subtabs [data-bag-category]').forEach(function(btn){btn.addEventListener('click',function(){setBagCategory(btn.dataset.bagCategory);});});
 document.getElementById('trainer-search').addEventListener('input', renderTrainerTeamsDebounced);
+ document.getElementById('trainer-mode').addEventListener('change', renderTrainerTeams);
 document.getElementById('trainer-class').addEventListener('change', renderTrainerTeams);
 document.getElementById('trainer-size').addEventListener('change', renderTrainerTeams);
 document.getElementById('competitive-search').addEventListener('input', renderCompetitiveSetsDebounced);

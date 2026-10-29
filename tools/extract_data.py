@@ -346,7 +346,7 @@ def extract_feature_catalog(repo):
     brisk.extend([
         ("Dynamax Adventures", "Enter through the Route 146 research cave. Choose from twelve distinct level-70 rentals; the omniscient-AI rival chooses their own partner. Route bosses have five times HP, the level-100 legendary finale seven times HP, and each generated Pokémon has independent 1/100 shiny odds."),
         ("Dynamax Adventures", "Battles remain 2v1 regardless of the global format. Mega/G-Max route bosses and persistent Dynamax/G-Max final bosses face ordinary rentals that may activate their own Mega/G-Max. The Bag is disabled; post-battle recruitment remains free."),
-        ("Dynamax Adventures", "Rental HP scales by difficulty: Easy x4, Normal x2, Hard x1, Extreme x1/2. PP restores every round. Easy heals HP/status, Normal heals HP, Hard restores half max HP and Extreme one quarter; Extreme bosses also deal double damage."),
+        ("Dynamax Adventures", "Rental HP scales by difficulty: Easy x4, Normal x2, Hard x1, Kaizo x1/2. PP restores every round. Easy heals HP/status, Normal heals HP, Hard restores half max HP and Extreme one quarter; Kaizo bosses also deal double damage."),
         ("Dynamax Adventures", "Birch accompanies the expedition into rest rooms. Talk to him to switch to an earlier catch not already used by either teammate. Benched health/status/PP persist and the original party stays safe. At the end, keep one catch."),
         ("Dynamax Adventures", "Six full-size rental icons appear in a two-column grid. Route previews reveal only the primary type. The boss has one large HP bar; inflated HP animates in under a second and team boosts skip empty slots."),
         ("Contests", "Solo contest appeals announce a random target beat: 2, 3 or 4. Press A on that beat for four bonus hearts on Perfect timing or two on Good; missing leaves ordinary appeal unchanged. Higher ranks tighten timing and improve NPC accuracy; link contests keep their original rules."),
@@ -354,8 +354,10 @@ def extract_feature_catalog(repo):
         ("Options & Quality of Life", "Switch between light/dark themes, rename the player at any time, use the two-in-one bike, and select modern or legacy EXP Share. The modern EXP Share is a Key Item and is not sold in Lilycove."),
         ("Options & Quality of Life", "Multi-use candies retain gained levels and trigger evolutions. The summary-screen move relearner switches between level-up, TM and Egg moves. Ball replacement is available with Master Ball restrictions."),
         ("Ball Capsules", "Visual capsule seals include hearts, stars, lines, smoke, electricity, bubbles, fire, confetti, flowers, music notes and letters. Send-out messages are a separate feature with custom text."),
-        ("Difficulty", "Easy uses base prices, basic AI, zero trainer IVs/EVs, no level caps and 200% shared EXP. Normal uses double prices, original trainer training and normal shared EXP. Hard uses quadruple prices, smarter choices, perfect IVs, reduced caps and 50% shared EXP. Extreme uses tenfold prices, omniscient AI, optimized IVs/EVs, reduced caps, no shared EXP and an EXP stop at the cap."),
+        ("Difficulty", "Easy uses base prices, basic AI, zero trainer IVs/EVs, no level caps and 200% shared EXP. Normal uses double prices, original trainer training and normal shared EXP. Hard uses quadruple prices, smarter choices, perfect IVs, reduced caps and 50% shared EXP. Kaizo uses tenfold prices, omniscient AI, optimized IVs/EVs, reduced caps, no shared EXP and an EXP stop at the cap."),
         ("Orange Islands", "Orange City and Routes 143–146 have increased grass encounter rates (15 rather than 7). The optional Islands shiny boost is 1/50. Benches heal the party without moving the whiteout destination, and Routes 148/149 are connected by teleporter."),
+        ("Kanto postgame", "After saving Hoenn, travel from the Orange Islands through Orange Strait to Kanto. Trainers and Gym Leaders have unique teams on Easy, Normal, Hard and Kaizo."),
+        ("Kanto postgame", "Kanto Gym Leader teams have level-92 aces on Easy, 96 on Normal, 99 on Hard and 100 on Kaizo. Kanto wild encounters and migrated legendaries have source-backed locations."),
         ("Custom Pokémon & Megas", "Added Fakémon and artist-created Mega forms are included with their Brisk stats, moves, artwork and evolution methods. Custom Mega Stones are sold only in Orange City. Mega Dragonite Y and Dragoninite Y are separate from the original Mega Dragonite."),
         ("Custom Pokémon & Megas", "Rhydon has a split evolution: Rhyfortress at level 60, or Rhyperior using a Protector. Mega Snorlax now has 75 Defense and 120 Special Defense."),
     ])
@@ -668,11 +670,25 @@ def extract_reference_locations(repo):
             for item in set(re.findall(r'\.2byte\s+(ITEM_[A-Z0-9_]+)', scripts)):
                 add(item_locations, item, location, "Shop")
 
+    # FRLG event identities are remapped through this source-owned manifest.
+    kanto_path = os.path.join(repo, "data/brisk_kanto_postgame.json")
+    if os.path.isfile(kanto_path):
+        try:
+            kanto_maps = json.loads(read(kanto_path)).get("maps", {})
+        except (ValueError, TypeError):
+            kanto_maps = {}
+        for map_name, config in kanto_maps.items():
+            location = pretty(map_name.removesuffix("_Frlg"))
+            for obj in (config.get("objects") or {}).values():
+                constant = obj.get("trainer", "")
+                if constant.startswith("TRAINER_BRISK_KANTO_"):
+                    add(trainer_locations, constant, location, "Kanto trainer battle")
+
     return trainer_locations, item_locations
 
-def extract_trainer_teams(repo):
-    """Parse Brisk Emerald's trainers.party into JSON-friendly trainer/team records."""
-    path = os.path.join(repo, "src/data/trainers.party")
+def extract_trainer_teams(repo, relative_path="src/data/trainers.party"):
+    """Parse any source-native trainer party file, including authored mode teams."""
+    path = os.path.join(repo, relative_path)
     if not os.path.isfile(path):
         return []
 
@@ -755,10 +771,45 @@ def extract_trainer_teams(repo):
             "mugshot": meta.get("Mugshot", ""),
             "startingStatus": meta.get("Starting Status", ""),
             "multiParty": meta.get("Multi Party", ""),
+            "difficulty": meta.get("Difficulty", ""),
             "party": party,
         })
     return trainers
 
+
+
+def extract_complete_trainer_teams(repo):
+    """Merge four authored mode parties per identity, including Kanto."""
+    trainers = extract_trainer_teams(repo)
+    by_constant = {row["constant"]: row for row in trainers}
+    for path in ("src/data/brisk_mode_teams.party",
+                 "src/data/brisk_kanto_teams.party"):
+        for variant in extract_trainer_teams(repo, path):
+            mode = variant.get("difficulty")
+            if mode not in ("Easy", "Normal", "Hard", "Kaizo"):
+                continue
+            constant = variant["constant"]
+            trainer = by_constant.get(constant)
+            if trainer is None:
+                trainer = dict(variant)
+                trainer["party"] = []
+                trainer["modeTeams"] = {}
+                trainer["modeProfiles"] = {}
+                trainers.append(trainer)
+                by_constant[constant] = trainer
+            trainer.setdefault("modeTeams", {})[mode] = variant["party"]
+            trainer.setdefault("modeProfiles", {})[mode] = {
+                "ai": variant.get("ai", ""),
+                "items": variant.get("items", ""),
+                "battleType": variant.get("battleType", "")
+            }
+            trainer["region"] = "Kanto" if constant.startswith("TRAINER_BRISK_KANTO_") else "Hoenn"
+            if mode == "Normal":
+                trainer["party"] = variant["party"]
+                for field in ("name", "class", "pic", "gender", "battleType"):
+                    if variant.get(field):
+                        trainer[field] = variant[field]
+    return trainers
 
 def extract_route_encounters(repo, species_ids):
     encounters_path = os.path.join(repo, "src/data/wild_encounters.json")
@@ -809,7 +860,11 @@ def extract_route_encounters(repo, species_ids):
                 continue
             info = map_info.get(map_id, {})
             source_label = (raw.get("base_label") or "").upper()
-            if info.get("gameRegion") == "REGION_KANTO" or any(tag in source_label for tag in ("FIRERED", "LEAFGREEN", "FRLG")):
+            # Only Brisk's generated Kanto tables are playable; FRLG's
+            # campaign reference tables are not used by the postgame.
+            if any(tag in source_label for tag in ("FIRERED", "LEAFGREEN")):
+                continue
+            if info.get("gameRegion") == "REGION_KANTO" and not source_label.startswith("SBRISKKANTO_"):
                 continue
             methods = []
             variant_match = re.search(r'ALTERINGCAVE(\d+)', source_label)
@@ -882,7 +937,7 @@ def extract_route_encounters(repo, species_ids):
         except (ValueError, TypeError):
             continue
         map_id = info.get("id")
-        if not map_id or info.get("region") == "REGION_KANTO":
+        if not map_id or root.endswith("_Frlg"):
             continue
         script = strip_comments(read(os.path.join(root, "scripts.inc")) or "")
         for match in re.finditer(r'\b(setwildbattle|seteventmon|givemon)\s+SPECIES_([A-Z0-9_]+)\s*,\s*(\d+)\b', script):
@@ -939,7 +994,7 @@ def extract_route_encounters(repo, species_ids):
             except (OSError, ValueError, TypeError):
                 continue
             map_id = info.get("id")
-            if not map_id or info.get("region") == "REGION_KANTO":
+            if not map_id:
                 continue
             for obj in info.get("object_events", []):
                 declaration = definitions.get(obj.get("script"))
@@ -1530,7 +1585,7 @@ def main():
         }
 
     route_encounters = extract_route_encounters(repo, species_ids)
-    trainer_teams = extract_trainer_teams(repo)
+    trainer_teams = extract_complete_trainer_teams(repo)
     change_catalog = extract_feature_catalog(repo)
     for trainer in trainer_teams:
         trainer["locations"] = trainer_locations.get(trainer["constant"], [])
@@ -1551,7 +1606,7 @@ def main():
     with open("brisk-battle-effects.json", "w", encoding='utf-8') as f:
         json.dump(battle_manifest, f, ensure_ascii=False, indent=2)
     with open("brisk-dex-trainer-teams.json", "w", encoding='utf-8') as f:
-        json.dump({"source": "Pokemon-Brisk-Emerald/src/data/trainers.party", "trainers": trainer_teams},
+        json.dump({"source": "Pokemon-Brisk-Emerald/src/data/trainers.party + brisk_mode_teams.party + brisk_kanto_teams.party", "trainers": trainer_teams},
                   f, ensure_ascii=False, separators=(',', ':'))
 
     print()
@@ -1861,7 +1916,7 @@ def main():
     with open("brisk-dex-data.json", "w", encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
     with open("brisk-dex-trainer-teams.json", "w", encoding='utf-8') as f:
-        json.dump({"source": "Pokemon-Brisk-Emerald/src/data/trainers.party", "trainers": trainer_teams},
+        json.dump({"source": "Pokemon-Brisk-Emerald/src/data/trainers.party + brisk_mode_teams.party + brisk_kanto_teams.party", "trainers": trainer_teams},
                   f, ensure_ascii=False, separators=(',', ':'))
 
     # Bundle each playable outfit's normal overworld sprite. SaveBlock2.currOutfitId
