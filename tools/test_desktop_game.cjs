@@ -10,7 +10,13 @@ const fs=require('node:fs/promises'),os=require('node:os'),path=require('node:pa
   if(!page.url().startsWith('brisk://app/'))throw Error('Desktop did not use the bundled app origin');
   if(await page.locator('.main-tabs button').first().getAttribute('id')!=='tab-game'||await page.locator('#tab-game').getAttribute('aria-selected')!=='true')throw Error('Play Brisk Emerald must be first and selected at startup');const game=page.frameLocator('#brisk-game');await game.getByRole('button',{name:'New game',exact:true}).click();
   // Complete Birch's welcome, gender and name, then arrive inside the truck.
-  for(let i=0;i<3;i++)await game.getByRole('button',{name:'Continue',exact:true}).click();await game.getByRole('button',{name:'Boy',exact:true}).click();await game.getByRole('textbox',{name:'What is your name?'}).fill('Spencer');await game.getByRole('button',{name:'Continue',exact:true}).click();await game.getByRole('button',{name:'Continue',exact:true}).click();
+  // Birch's source dialogue changes as Brisk Emerald is updated. Advance
+  // all intro pages rather than assuming it always takes exactly three clicks.
+  for(let i=0;i<32;i++){
+    if(await game.getByRole('button',{name:'Boy',exact:true}).isVisible())break;
+    await game.getByRole('button',{name:'Continue',exact:true}).click();
+  }
+  await game.getByRole('button',{name:'Boy',exact:true}).click();await game.getByRole('textbox',{name:'What is your name?'}).fill('Spencer');await game.getByRole('button',{name:'Continue',exact:true}).click();await game.getByRole('button',{name:'Continue',exact:true}).click();
   await game.locator('#notice').filter({hasText:'Journey saved'}).waitFor();await game.locator('#map-name').filter({hasText:'Inside Of Truck'}).waitFor();
   const records=JSON.parse(await fs.readFile(path.join(profile,'brisk-emerald-campaign.json'),'utf8')),state=JSON.parse(records.current.payload);if(state.party.length||state.position.map!=='map_inside_of_truck')throw Error('New game skipped the original opening');
   await game.locator('#world').press('ArrowRight');await game.locator('#world').press('ArrowRight');
