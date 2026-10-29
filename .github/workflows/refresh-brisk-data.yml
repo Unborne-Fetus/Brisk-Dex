@@ -11,9 +11,11 @@ on:
 permissions:
   contents: write
 
+# Share the main-branch lock with sync-brisk-data.yml so both refresh
+# workflows cannot commit and push the same generated JSON concurrently.
 concurrency:
-  group: refresh-brisk-data-${{ github.ref }}
-  cancel-in-progress: true
+  group: sync-brisk-emerald-${{ github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
   refresh:
