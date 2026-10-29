@@ -38,5 +38,25 @@ class SyncedContentTests(unittest.TestCase):
                             area.get("gameRegion") == "REGION_KANTO"
                             for area in areas))
 
+    def test_source_placed_ultra_beasts_and_kaizo_rewards(self):
+        species = {record["constant"]: int(sid)
+                   for sid, record in self.data["species"].items()}
+        locations = self.data["routeEncounters"]
+        for name in ("XURKITREE", "CELESTEELA", "NIHILEGO"):
+            sid = species[name]
+            with self.subTest(name=name):
+                self.assertTrue(any(method.get("type") == "static"
+                                    and any(slot["species"] == sid for slot in method["slots"])
+                                    for area in locations for method in area["methods"]),
+                                name + " must have its actual source-placed encounter")
+        for name in ("GUZZLORD", "NECROZMA"):
+            sid = species[name]
+            with self.subTest(name=name):
+                self.assertTrue(any("Orange" in area["name"]
+                                    and method.get("type") == "gift"
+                                    and any(slot["species"] == sid for slot in method["slots"])
+                                    for area in locations for method in area["methods"]),
+                                name + " is a Kaizo-only Orange City trainer reward")
+
 if __name__ == "__main__":
     unittest.main()

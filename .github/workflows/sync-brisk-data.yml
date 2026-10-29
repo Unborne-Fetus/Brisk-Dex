@@ -57,7 +57,7 @@ jobs:
           # optional static encounter placements. Report missing sites as warnings
           # without publishing invented locations or stale extracted data.
           assert len(data.get('routeEncounters', [])) >= 50, 'Route extraction unexpectedly small'
-          wanted = ('XURKITREE', 'CELESTEELA', 'GUZZLORD', 'NIHILEGO')
+          wanted = ('XURKITREE', 'CELESTEELA', 'NIHILEGO')
           by_name = {value.get('constant'): int(key) for key, value in data['species'].items()}
           for pokemon in wanted:
               sid = by_name.get(pokemon)
@@ -70,6 +70,14 @@ jobs:
                   print(pokemon, sites)
               else:
                   print(f'::warning title=Missing optional static encounter::{pokemon} has no extracted static encounter; review Brisk Emerald encounter placements')
+          for pokemon in ('GUZZLORD', 'NECROZMA'):
+              sid = by_name.get(pokemon)
+              gifts = [r['name'] for r in data['routeEncounters']
+                       for method in r.get('methods', [])
+                       for slot in method.get('slots', [])
+                       if method.get('type') == 'gift' and int(slot['species']) == sid]
+              if 'Orange City' not in gifts:
+                  raise AssertionError(f'{pokemon} must be an Orange City Kaizo reward')
           print('Species:', len(data['species']), 'Trainers:', len(trainers['trainers']))
           PY
       - name: Record exact Brisk Emerald source revision

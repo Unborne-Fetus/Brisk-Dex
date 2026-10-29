@@ -983,7 +983,7 @@ def extract_route_encounters(repo, species_ids):
     if os.path.isfile(legendary_file):
         definitions = {}
         for event, constant, level in re.findall(
-            r"\\bbrisk_static_legendary\\s+([A-Za-z0-9_]+)\\s*,\\s*SPECIES_([A-Z0-9_]+)\\s*,\\s*(\\d+)\\s*,",
+            r"\bbrisk_static_legendary\s+([A-Za-z0-9_]+)\s*,\s*SPECIES_([A-Z0-9_]+)\s*,\s*(\d+)\s*,",
             strip_comments(read(legendary_file))):
             definitions[event] = (constant, int(level))
         for root, _, files in os.walk(maps_dir):
