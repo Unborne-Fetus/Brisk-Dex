@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: sync-brisk-emerald-main
@@ -84,6 +85,8 @@ jobs:
         run: git -C .brisk-game-source rev-parse HEAD > brisk-emerald-data-revision.txt
       - name: Commit refreshed assets and data
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           git config user.name "Brisk Dex data sync"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -96,4 +99,10 @@ jobs:
           else
             git commit -m "Sync Dex game data with Brisk Emerald master"
             git push origin HEAD:main
+            # GITHUB_TOKEN commits do not trigger normal push workflows, so
+            # explicitly rebuild the published app after source-data changes.
+            gh workflow run deploy-web.yml --ref main
+            gh workflow run build-all.yml --ref main
+            gh workflow run build-linux.yml --ref main
+            gh workflow run build-ios.yml --ref main
           fi
