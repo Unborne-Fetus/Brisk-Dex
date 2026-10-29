@@ -1589,12 +1589,12 @@ def main():
     # constants, not by a frozen list of names or arbitrary ID thresholds.
     # This keeps the Dex's signature-ability view in sync automatically.
     custom_section = re.search(
-        r'// Brisk Emerald custom abilities([\\s\\S]*?)\\bABILITIES_COUNT\\b',
+        r'// Brisk Emerald custom abilities([\s\S]*?)\bABILITIES_COUNT\b',
         abilities_const_text)
     signature_ability_ids = []
     if custom_section:
         signature_names = re.findall(
-            r'^\\s*ABILITY_([A-Z0-9_]+)\\b', custom_section.group(1), re.MULTILINE)
+            r'^\s*ABILITY_([A-Z0-9_]+)\b', custom_section.group(1), re.MULTILINE)
         signature_ability_ids = list(dict.fromkeys(
             ability_ids[name] for name in signature_names
             if name in ability_ids and str(ability_ids[name]) in ability_details
