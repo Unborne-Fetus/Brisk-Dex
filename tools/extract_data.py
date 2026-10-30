@@ -1338,9 +1338,8 @@ def main():
             "pokedexEntry": pokedex_entry
         }
 
-    # Calculate the lowest level at which each species can exist by following
-    # its evolution paths. Level-based evolutions use their specified threshold;
-    # item/trade/friendship evolutions can happen at the parent's current level.
+    # Compute the earliest legitimate evolution chain, including a new level
+    # gain for each level evolution and split evolutions such as Shedinja.
     evolution_edges = []
     incoming_evolutions = set()
     for constant, source_id in species_ids.items():
@@ -1350,13 +1349,21 @@ def main():
         for evo in re.finditer(r'\{\s*(EVO_[A-Z0-9_]+)\s*,\s*([^,]+),\s*SPECIES_([A-Z0-9_]+)', block):
             method, parameter, target_constant = evo.groups()
             target_id = species_ids.get(target_constant)
-            if source_id == 0 or target_id is None or str(source_id) not in out_species or str(target_id) not in out_species:
+            if (method == "EVO_NONE" or source_id == 0 or target_id is None
+                    or str(source_id) not in out_species or str(target_id) not in out_species):
                 continue
             threshold = 1
-            if method.startswith("EVO_LEVEL"):
+            if method in ("EVO_LEVEL", "EVO_LEVEL_BATTLE_ONLY"):
                 level_match = re.search(r'\b(\d+)\b', parameter)
-                threshold = int(level_match.group(1)) if level_match else 1
-            evolution_edges.append((source_id, target_id, threshold))
+                threshold = int(level_match.group(1)) if level_match else 101
+            elif method == "EVO_SPLIT_FROM_EVO":
+                # The split occurs alongside another evolution of this source.
+                partner = re.search(
+                    r'\{\s*EVO_LEVEL\s*,\s*(\d+)\s*,\s*' + re.escape(parameter.strip()) + r'\b',
+                    block,
+                )
+                threshold = int(partner.group(1)) if partner else 101
+            evolution_edges.append((source_id, target_id, threshold, method))
             out_species[str(source_id)].setdefault("evolutions", []).append({
                 "target": target_id,
                 "method": method,
@@ -1364,23 +1371,24 @@ def main():
             })
             incoming_evolutions.add(target_id)
 
-    minimum_levels = {sid: (1 if sid not in incoming_evolutions else None) for sid in species_ids.values()
+    minimum_levels = {sid: (1 if sid not in incoming_evolutions else 101)
+                      for sid in species_ids.values()
                       if sid and str(sid) in out_species}
     for _ in range(len(minimum_levels)):
         changed = False
-        for source_id, target_id, threshold in evolution_edges:
-            source_level = minimum_levels.get(source_id)
-            if source_level is None:
+        for source_id, target_id, threshold, method in evolution_edges:
+            source_level = minimum_levels.get(source_id, 101)
+            if source_level > 100:
                 continue
-            candidate = max(source_level, threshold)
-            target_level = minimum_levels.get(target_id)
-            if target_level is None or candidate < target_level:
+            is_level = method in ("EVO_LEVEL", "EVO_LEVEL_BATTLE_ONLY", "EVO_SPLIT_FROM_EVO")
+            candidate = max(source_level + int(is_level), threshold)
+            if candidate < minimum_levels[target_id]:
                 minimum_levels[target_id] = candidate
                 changed = True
         if not changed:
             break
     for sid, species in out_species.items():
-        species["minimumLevel"] = minimum_levels.get(int(sid)) or 1
+        species["minimumLevel"] = minimum_levels.get(int(sid), 101)
 
     out_moves = {}
     out_move_pp = {}
