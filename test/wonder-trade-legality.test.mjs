@@ -61,7 +61,8 @@ test('split evolutions and two successive level gains are level-legal', () => {
 test('permanent regional and stone forms remain possible; battle-only forms do not', () => {
   const pool = createPool(fixture());
   const at8 = pool.getWonderTradePool(8);
-  assert.ok(at8.includes('9')); // Item evolutions can legitimately be early.
+  assert.ok(!at8.includes('9')); // Instant evolutions are held until Lv16.
+  assert.ok(pool.getWonderTradePool(16).includes('9'));
   assert.ok(at8.includes('10')); // Regional forms are legal as ordinary Pokémon.
   for (const id of ['7', '11', '17', '16'])
     assert.ok(!at8.includes(id), 'Illegal form or unresolved evolution '+id);
