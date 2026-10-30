@@ -2232,13 +2232,13 @@ function getWonderTradeMinimumLevels(){
       var isLevel = method === 'EVO_LEVEL' || method === 'EVO_LEVEL_BATTLE_ONLY';
       var required = 1;
       if (isLevel) {
-        var levelMatch = String(evo.parameter || '').match(/^\\s*(\\d+)\\b/);
+        var levelMatch = String(evo.parameter || '').match(/^\s*(\d+)\b/);
         required = levelMatch ? Number(levelMatch[1]) : 101;
       } else if (method === 'EVO_SPLIT_FROM_EVO') {
         // Shedinja is created when Nincada evolves into Ninjask.
         var partner = (source.evolutions || []).find(function(other){
           return other.method === 'EVO_LEVEL' &&
-            String(other.parameter || '').match(/^\\s*\\d+\\s*$/) &&
+            String(other.parameter || '').match(/^\s*\d+\s*$/) &&
             speciesById[String(other.target)] &&
             speciesById[String(other.target)].constant === String(evo.parameter || '').replace(/^SPECIES_/, '');
         });
