@@ -2250,15 +2250,25 @@ function getWonderTradeMinimumLevels(){
   });
 
   var levels = Object.create(null);
-  ids.forEach(function(id){ levels[id] = incoming.has(id) ? 101 : 1; });
+  var stages = Object.create(null);
+  ids.forEach(function(id){
+    levels[id] = incoming.has(id) ? 101 : 1;
+    stages[id] = incoming.has(id) ? 101 : 0;
+  });
   for (var pass = 0; pass < ids.length; pass++) {
     var changed = false;
     edges.forEach(function(edge){
       var parent = levels[edge.from];
       if (parent > 100) return;
       var candidate = Math.max(edge.required, parent + (edge.needsLevel ? 1 : 0));
+      // Item/trade/other instant evolutions are technically possible very
+      // early, but Wonder Trade should not give fully evolved powerhouses at
+      // level 8. Keep fast natural level-up lines (e.g. Butterfree) intact.
+      if (!edge.needsLevel)
+        candidate = Math.max(candidate, stages[edge.from] === 0 ? 16 : 30);
       if (candidate < levels[edge.to]) {
         levels[edge.to] = candidate;
+        stages[edge.to] = stages[edge.from] + 1;
         changed = true;
       }
     });
