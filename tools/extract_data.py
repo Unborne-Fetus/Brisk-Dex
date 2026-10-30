@@ -1374,6 +1374,8 @@ def main():
     minimum_levels = {sid: (1 if sid not in incoming_evolutions else 101)
                       for sid in species_ids.values()
                       if sid and str(sid) in out_species}
+    minimum_stages = {sid: (0 if sid not in incoming_evolutions else 101)
+                      for sid in minimum_levels}
     for _ in range(len(minimum_levels)):
         changed = False
         for source_id, target_id, threshold, method in evolution_edges:
@@ -1382,8 +1384,11 @@ def main():
                 continue
             is_level = method in ("EVO_LEVEL", "EVO_LEVEL_BATTLE_ONLY", "EVO_SPLIT_FROM_EVO")
             candidate = max(source_level + int(is_level), threshold)
+            if not is_level:
+                candidate = max(candidate, 16 if minimum_stages[source_id] == 0 else 30)
             if candidate < minimum_levels[target_id]:
                 minimum_levels[target_id] = candidate
+                minimum_stages[target_id] = minimum_stages[source_id] + 1
                 changed = True
         if not changed:
             break
