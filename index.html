@@ -2208,14 +2208,89 @@ var WONDER_TRADE_EXCLUDED_SPECIES = new Set([
   'WALKING_WAKE','IRON_LEAVES','GOUGING_FIRE','RAGING_BOLT','IRON_BOULDER','IRON_CROWN'
 ]);
 
+// Calculate eligibility from the actual evolution graph, rather than trusting
+// an exported minimumLevel of 1 for forms whose evolution path is missing.
+var WONDER_TRADE_LEVEL_SOURCE = null;
+var WONDER_TRADE_LEVELS = null;
+var WONDER_TRADE_INCOMING = null;
+
+function getWonderTradeMinimumLevels(){
+  if (WONDER_TRADE_LEVEL_SOURCE === NAME_DATA.species && WONDER_TRADE_LEVELS)
+    return WONDER_TRADE_LEVELS;
+
+  var speciesById = NAME_DATA.species;
+  var ids = Object.keys(speciesById);
+  var incoming = new Set();
+  var edges = [];
+  ids.forEach(function(id){
+    var source = speciesById[id];
+    (Array.isArray(source.evolutions) ? source.evolutions : []).forEach(function(evo){
+      var method = String(evo.method || '');
+      var target = String(evo.target);
+      if (method === 'EVO_NONE' || !Object.prototype.hasOwnProperty.call(speciesById, target))
+        return;
+      var isLevel = method === 'EVO_LEVEL' || method === 'EVO_LEVEL_BATTLE_ONLY';
+      var required = 1;
+      if (isLevel) {
+        var levelMatch = String(evo.parameter || '').match(/^\\s*(\\d+)\\b/);
+        required = levelMatch ? Number(levelMatch[1]) : 101;
+      } else if (method === 'EVO_SPLIT_FROM_EVO') {
+        // Shedinja is created when Nincada evolves into Ninjask.
+        var partner = (source.evolutions || []).find(function(other){
+          return other.method === 'EVO_LEVEL' &&
+            String(other.parameter || '').match(/^\\s*\\d+\\s*$/) &&
+            speciesById[String(other.target)] &&
+            speciesById[String(other.target)].constant === String(evo.parameter || '').replace(/^SPECIES_/, '');
+        });
+        required = partner ? Number(partner.parameter) : 101;
+      }
+      incoming.add(target);
+      edges.push({from:String(id),to:target,required:required,needsLevel:isLevel || method === 'EVO_SPLIT_FROM_EVO'});
+    });
+  });
+
+  var levels = Object.create(null);
+  ids.forEach(function(id){ levels[id] = incoming.has(id) ? 101 : 1; });
+  for (var pass = 0; pass < ids.length; pass++) {
+    var changed = false;
+    edges.forEach(function(edge){
+      var parent = levels[edge.from];
+      if (parent > 100) return;
+      var candidate = Math.max(edge.required, parent + (edge.needsLevel ? 1 : 0));
+      if (candidate < levels[edge.to]) {
+        levels[edge.to] = candidate;
+        changed = true;
+      }
+    });
+    if (!changed) break;
+  }
+  WONDER_TRADE_LEVEL_SOURCE = speciesById;
+  WONDER_TRADE_LEVELS = levels;
+  WONDER_TRADE_INCOMING = incoming;
+  return levels;
+}
+
 function getWonderTradePool(level){
+  var minimums = getWonderTradeMinimumLevels();
   return Object.keys(NAME_DATA.species).filter(function(id){
     var species = NAME_DATA.species[id];
-    return species && species.constant && species.constant !== 'EGG' &&
-      !WONDER_TRADE_EXCLUDED_SPECIES.has(species.constant) &&
-      Array.isArray(species.baseStats) && species.baseStats.length === 6 &&
+    if (!species || !species.constant || species.constant === 'EGG' ||
+        species.isMega || species.isGmax || WONDER_TRADE_EXCLUDED_SPECIES.has(species.constant))
+      return false;
+
+    // Temporary battle-only forms are not tradeable as ordinary Pokémon.
+    if (/(?:^|_)(?:MEGA|GMAX|PRIMAL|TOTEM|TERA|ETERNAMAX|ZEN|HERO|ASH|BATTLE_BOND)(?:_|$)/.test(species.constant))
+      return false;
+
+    // Only ordinary, regional, or evolution-derived permanent forms belong
+    // in the pool. Other transformations must be obtained in-game.
+    if (species.formLabel && !WONDER_TRADE_INCOMING.has(id) &&
+        !/^(?:Alola|Alolan|Galar|Galarian|Hisui|Hisuian|Paldea|Paldean)$/i.test(species.formLabel))
+      return false;
+
+    return Array.isArray(species.baseStats) && species.baseStats.length === 6 &&
       Array.isArray(species.learnableMoves) && species.learnableMoves.length > 0 &&
-      (Number(species.minimumLevel) || 1) <= level;
+      Math.max(minimums[id] || 101, Number(species.minimumLevel) || 1) <= level;
   });
 }
 async function wonderTradeAtLocation(mon, loc){
