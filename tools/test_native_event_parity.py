@@ -65,7 +65,7 @@ def check_route101(checkout):
                 raise RuntimeError(f'Route 101 {key}: out-of-bounds event {event["x"]},{event["y"]}')
     triggers = [(e['x'], e['y']) for e in route['coord_events']
                 if e.get('var') == 'VAR_ROUTE101_STATE']
-    if triggers != [(10, 19), (11, 19), (10, 18), (11, 18)]:
+    if triggers != [(10, 19), (11, 19), (10, 19), (11, 19)]:
         raise RuntimeError('Route 101 rescue triggers are incorrectly positioned')
     script = (checkout / 'data/maps/Route101/scripts.inc').read_text()
     scene = script.split('Route101_EventScript_StartBirchRescue::\n', 1)[1].split('\n\tend', 1)[0]
@@ -84,6 +84,11 @@ def check_route101(checkout):
     zig = movement(script, 'Route101_Movement_ZigzagoonChaseInCircles', zig)
     if birch != (13, 14) or zig != (12, 14):
         raise RuntimeError('Rescue chase ends outside the intended area')
+    # The introductory movement must stop below the bag, not walk onto a cliff.
+    if movement(script, 'Route101_Movement_EnterScene', (10, 19)) != (10, 18):
+        raise RuntimeError('Player is displaced from the lower starter-bag approach')
+    if movement(script, 'Route101_Movement_EnterScene', (11, 19)) != (11, 18):
+        raise RuntimeError('Second rescue trigger displaces the player')
     if movement(script, 'Route101_Movement_BirchApproachPlayer', birch) != (9, 14):
         raise RuntimeError('Birch cannot approach the player after the starter selection')
     print('Route 101 event: trigger, actor positions and movement path valid')
