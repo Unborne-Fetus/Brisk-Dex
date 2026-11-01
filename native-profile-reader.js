@@ -31,7 +31,7 @@ function inflate(packed,expected){
         if(src+2>packed.length)throw new Error('Truncated profile match');
         const high=packed[src++],low=packed[src++],length=(high>>4)+3,dist=((high&15)<<8|low)+1;
         if(dist>at||length>expected-at)throw new Error('Invalid profile match');
-        for(let i=0;i<length;i++)out[at++]=out[at-dist];
+        for(let i=0;i<length;i++){out[at]=out[at-dist];at++;}
       }else{
         if(src>=packed.length)throw new Error('Truncated profile literal');
         out[at++]=packed[src++];
