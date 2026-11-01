@@ -16,6 +16,21 @@ press A
 wait-until task_first=Task_HandleMainMenuInput max 1000`;
 let start=fs.readFileSync(path.join(smoke,'opening_start.replay'),'utf8');
 start=start.replace('wait-until task_first=Task_HandleMainMenuInput max 600',profileGate);
+// Native Brisk reads the computer clock automatically; unlike the cartridge
+// the first setup scene no longer waits for a manual hour/minute confirmation.
+const clockBegin=start.indexOf('mash A until callback2=CB2_WallClock max 600');
+const clockEnd=start.indexOf('# ---- 6. Downstairs:',clockBegin);
+assert.ok(clockBegin>=0&&clockEnd>clockBegin,'Upstream clock replay anchors changed');
+start=start.slice(0,clockBegin)+`mash A until callback2=CB2_WallClock max 600
+wait-until callback2=CB2_Overworld max 1200
+wait-until script_running=1 max 600
+mash A until controls_locked=0 max 3000
+wait 20
+expect flag:2144=1
+# The native clock has been initialized from the computer's local time.
+dump 07_clock_set
+screenshot 07_clock_set
+`+start.slice(clockEnd);
 fs.writeFileSync(path.join(smoke,'brisk_opening_start.replay'),start);
 let replay=fs.readFileSync(path.join(smoke,'opening.replay'),'utf8');
 replay=replay.replace('include opening_start.replay','include brisk_opening_start.replay');
@@ -26,15 +41,14 @@ replay=replay.replace('# POKeMON, BAG, the player, SAVE: three down', '# DEXNAV,
 const bagStart=replay.indexOf("# Birch's bag lies");
 const battleStart=replay.indexOf('wait-until in_battle=1',bagStart);
 assert.ok(bagStart>=0 && battleStart>bagStart,'Upstream opening structure changed');
-replay=replay.slice(0,bagStart)+`# Brisk bag at (10,17); approach it from the north after the chase.
-hold DOWN
-wait-until pos=11,16 max 200
-release DOWN
+replay=replay.slice(0,bagStart)+`# Brisk bag at (10,17); approach from the southern path after the chase.
+# The safe approach ends one tile south of the relocated starter bag.
+wait-until pos=11,18 max 200
 hold LEFT
-wait-until pos=10,16 max 200
+wait-until pos=10,18 max 200
 release LEFT
 wait 20
-press DOWN
+press UP
 wait 10
 press A
 wait-until task_first=Task_BirchCaseMain max 1200
