@@ -99,6 +99,24 @@ def check_route101(checkout):
             raise RuntimeError('Map spawn differs from original Brisk: ' + local_id)
         if spawn(local_id) != expected:
             raise RuntimeError('Rescue script overrides original coordinates: ' + local_id)
+    # Keep actors facing each other after the rescue, without changing tiles.
+    for local_id, default_facing in (
+        ('LOCALID_ROUTE101_BIRCH', 'MOVEMENT_TYPE_JOG_IN_PLACE_RIGHT'),
+        ('LOCALID_ROUTE101_ZIGZAGOON', 'MOVEMENT_TYPE_JOG_IN_PLACE_LEFT'),
+    ):
+        if actors[local_id]['movement_type'] != default_facing:
+            raise RuntimeError('Route 101 default NPC facing is wrong: ' + local_id)
+    for label, facing in (
+        ('Route101_Movement_BirchFaceZigzagoon', 'walk_in_place_fast_right'),
+        ('Route101_Movement_ZigzagoonFaceBirch', 'walk_in_place_fast_left'),
+    ):
+        match = re.search(r'^' + re.escape(label) + r':\n(.*?)\tstep_end', script, re.M | re.S)
+        if not match:
+            raise RuntimeError('Missing final rescue direction: ' + label)
+        moves = [line.strip() for line in match.group(1).splitlines()
+                 if line.strip().startswith('walk_')]
+        if moves != [facing]:
+            raise RuntimeError('Route 101 NPCs must face one another: ' + label)
     birch = (8, 15)
     zigzagoon = (9, 15)
     birch = movement(script, 'Route101_Movement_BirchRunAway1', birch)
