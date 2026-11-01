@@ -28,6 +28,7 @@
     "battle:coverage": "node tools/check_battle_coverage.js",
     "battle:smoke": "node tools/test_battle_server.js",
     "compat:test": "node tools/test_emerald_compat.js && node tools/test_gba_rom_import.js",
+    "rom:index": "node tools/embed_rom_index.js",
     "release:test": "npm run battle:coverage && npm run battle:smoke && npm run compat:test && npm run release:verify",
     "release:verify": "node tools/verify_release.js"
   },
