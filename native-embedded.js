@@ -15,17 +15,17 @@ async function engineInfo(executable){
   try{
     const info=JSON.parse(await fs.readFile(path.join(path.dirname(executable),'build-info.json'),'utf8'));
     if(!['brisk','expansion'].includes(info.profile))throw new Error('Unknown game profile');
-    return {profile:info.profile,briskCommit:info.brisk_commit||null};
+    return {profile:info.profile,briskCommit:info.brisk_commit||null,protocol:info.embedded_protocol||1};
   }catch(error){
     if(error.code==='ENOENT')return {profile:'expansion'}; // existing native builds
-    return {error:'The native engine build information is invalid. Rebuild Brisk Dex.'};
+    return {error:'The native engine build information is invalid. Rebuild Pokemon Brisk Emerald.'};
   }
 }
 async function embeddedStatus({platform=process.platform,resources=process.resourcesPath}={}){
   if(!['linux','win32'].includes(platform))return {status:'unsupported',message:'Native expansion gameplay is currently Windows/Linux desktop only.'};
   const executable=bundledGamePath({platform,resources});
   const checked=await validateNativeExecutable(executable,platform);
-  if(!checked.ok)return {status:'not-installed',message:'The integrated native engine was not included in this build. Rebuild Brisk Dex with the native source integration enabled.'};
+  if(!checked.ok)return {status:'not-installed',message:'The integrated native engine was not included in this build. Rebuild Pokemon Brisk Emerald with the native source integration enabled.'};
   const info=await engineInfo(executable);
   if(info.error)return {status:'invalid-build',message:info.error};
   return {status:'ready',...info,message:info.profile==='brisk'?'Integrated Brisk Emerald is ready.':'Integrated expansion engine is ready.'};
@@ -55,7 +55,7 @@ class EmbeddedNativeGame{
   constructor({webContents,resources=process.resourcesPath,userData,platform=process.platform,spawnChild=spawn}){
     this.webContents=webContents;this.resources=resources;this.userData=userData;
     this.platform=platform;this.spawnChild=spawnChild;this.child=null;this.decoder=null;
-    this.errorTail='';
+    this.errorTail='';this.keys=0;this.options={speed:1,paused:false,mute:false};this.protocol=1;
   }
   send(event,payload){
     if(this.webContents&&!this.webContents.isDestroyed())this.webContents.send(event,payload);
@@ -70,6 +70,7 @@ class EmbeddedNativeGame{
     if(this.child)return {ok:true,alreadyRunning:true};
     const status=await embeddedStatus({platform:this.platform,resources:this.resources});
     if(status.status!=='ready')return {ok:false,error:status.message};
+    this.protocol=status.protocol||1;
     const executable=bundledGamePath({platform:this.platform,resources:this.resources});
     const dataDir=path.join(this.userData,status.profile==='brisk'?'native-brisk-emerald':'native-expansion');
     await fs.mkdir(dataDir,{recursive:true});
@@ -102,14 +103,25 @@ class EmbeddedNativeGame{
       if(this.child===child){this.child=null;this.send('native-game-state',{running:false,message:error.message});}
     });
     return await new Promise(resolve=>{
-      child.once('spawn',()=>{this.send('native-game-state',{running:true});resolve({ok:true});});
+      child.once('spawn',()=>{this.writeInput();this.send('native-game-state',{running:true});resolve({ok:true});});
       child.once('error',error=>resolve({ok:false,error:error.message}));
     });
   }
   input(value){
-    if(!this.child?.stdin?.writable)return false;
     if(!Number.isInteger(value)||value<0||value>0x3ff)return false;
-    const keys=Buffer.allocUnsafe(2);keys.writeUInt16LE(value);
+    this.keys=value;return this.writeInput();
+  }
+  configure(options){
+    if(!options||![0,1,2,3,4].includes(options.speed)||typeof options.paused!=='boolean'||typeof options.mute!=='boolean')return {ok:false,error:'Invalid game settings.'};
+    this.options={speed:options.speed,paused:options.paused,mute:options.mute};
+    this.writeInput();
+    return this.child&&this.protocol<2?{ok:false,error:'Rebuild the native engine once to enable speed, pause and audio controls.'}:{ok:true};
+  }
+  writeInput(){
+    if(!this.child?.stdin?.writable)return false;
+    const {speed,paused,mute}=this.options;
+    const word=this.keys|(this.protocol>=2?((speed<<10)|(Number(paused)<<13)|(Number(mute)<<14)):0);
+    const keys=Buffer.allocUnsafe(2);keys.writeUInt16LE(word);
     try{return this.child.stdin.write(keys);}
     catch(error){return false;}
   }

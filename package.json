@@ -1,9 +1,9 @@
 {
   "name": "brisk-dex",
-  "productName": "Brisk Dex",
-  "version": "1.2.0",
-  "description": "Companion app for Pok\u00e9mon Brisk Emerald",
-  "main": "main.js",
+  "productName": "Pokemon Brisk Emerald",
+  "version": "1.3.0",
+  "description": "Pokemon Brisk Emerald with an integrated Pokedex and save tools",
+  "main": "update-bootstrap.js",
   "author": {
     "name": "Brisk Emerald",
     "email": "noreply@briskemerald.local"
@@ -37,7 +37,8 @@
     "native:build": "bash tools/build-native-expansion.sh windows",
     "native:bridge:test": "node --test test/desktop/embedded-game.test.cjs",
     "desktop:ui": "node tools/test_embedded_ui.cjs",
-    "native:ui": "node tools/test_native_controls_ui.cjs"
+    "native:ui": "node tools/test_native_controls_ui.cjs",
+    "updates:build": "node tools/build_update_bundle.cjs"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.0.0",
@@ -49,7 +50,7 @@
   },
   "build": {
     "appId": "com.briskemerald.briskdex",
-    "productName": "Brisk Dex",
+    "productName": "Pokemon Brisk Emerald",
     "files": [
       "main.js",
       "preload.js",
@@ -74,7 +75,10 @@
       "native-launcher.js",
       "native-embedded.js",
       "native-controls.js",
-      "native-saves.js"
+      "native-saves.js",
+      "native-settings-ui.js",
+      "native-updater.js",
+      "update-bootstrap.js"
     ],
     "directories": {
       "output": "dist"

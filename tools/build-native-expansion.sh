@@ -20,7 +20,7 @@ deps_mode="${2:---check}"
 # Normalize helper input too, for existing Windows CRLF checkouts.
 sed 's/\r$//' "$root/tools/setup-native-deps.sh" | bash -s -- "$target" "$deps_mode"
 remote="https://github.com/uehlbran/pokeemerald-expansion-native.git"
-pin="bb3fd057061cdd7e6a9e79b76abb41924ee44ecc"
+pin="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["native_commit"])' "$root/tools/brisk-native-source.json")"
 if [ ! -d "$checkout/.git" ]; then mkdir -p "$(dirname "$checkout")"; git clone --depth 1 "$remote" "$checkout"; fi
 # Keep shallow source transactions serial; background auto-maintenance can
 # change .git/shallow while another pinned source is being fetched.
@@ -40,10 +40,13 @@ if ! git -C "$checkout" cat-file -e "$pin^{commit}" 2>/dev/null; then
   fetch_source origin "$pin"
 fi
 git -C "$checkout" checkout --detach "$pin"
+# These files are generated transport inputs. Restore them before reapplying
+# the current bridge so old cached protocol versions cannot be patched twice.
+git -C "$checkout" checkout "$pin" -- platform/video.c platform/input.c platform/frame.c
 if [ "$profile" = brisk ]; then
   # Pin both source trees; game assets are obtained from their original repo.
-  brisk_pin="8d2b525214a61a89563facde52c79a567ade560b"
-  base_pin="e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7"
+  brisk_pin="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["brisk_commit"])' "$root/tools/brisk-native-source.json")"
+  base_pin="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["expansion_base"])' "$root/tools/brisk-native-source.json")"
   if ! git -C "$checkout" cat-file -e "$brisk_pin^{commit}" 2>/dev/null; then
     fetch_source https://github.com/Unborne-Fetus/Pokemon-Brisk-Emerald.git "$brisk_pin"
   fi
@@ -51,6 +54,7 @@ if [ "$profile" = brisk ]; then
     fetch_source https://github.com/rh-hideout/pokeemerald-expansion.git "$base_pin"
   fi
   python3 "$root/tools/prepare_brisk_native.py" "$checkout"
+  python3 "$root/tools/test_native_graphics.py" "$checkout/src/dma3_manager.c"
 fi
 python3 "$root/tools/patch-native-compat.py" "$checkout"
 python3 "$root/tools/patch-native-stream.py" "$checkout"

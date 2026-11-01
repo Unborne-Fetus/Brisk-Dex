@@ -9,7 +9,7 @@ function crc32(bytes){
 }
 function validateSave(save,profile){
   if(save.length!==SAVE_BYTES||save.subarray(0,8).toString('ascii')!=='PENSAVE\0')
-    throw new Error('This is not a native Brisk Dex save. GBA saves require conversion.');
+    throw new Error('This is not a native Pokemon Brisk Emerald save. GBA saves require conversion.');
   if(save.readUInt32LE(8)!==1||save.readUInt32LE(12)!==64||save.readUInt32LE(16)!==(profile==='brisk'?0x42524b31:1)||save.readUInt32LE(20)!==131072)
     throw new Error('This save uses an incompatible game layout or platform.');
   if(save.readUInt32LE(24)!==crc32(save.subarray(28)))throw new Error('Save checksum failed; the backup is damaged.');

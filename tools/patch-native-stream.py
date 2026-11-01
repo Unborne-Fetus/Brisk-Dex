@@ -25,6 +25,13 @@ PRESENT_ORIGINAL = """    if (state.headless)
     if (SDL_UpdateTexture"""
 PRESENT_UPDATED = """    if (state.headless) {
         if (state.brisk_stream) {
+            /* Fast-forward advances every game frame but only presents at
+             * display rate, so IPC never becomes the speed limiter. */
+            static uint32_t last_present;
+            const uint32_t now = SDL_GetTicks();
+            if ((uint32_t)(now - last_present) < 16u)
+                return 0;
+            last_present = now;
             const unsigned char header[8] = {'B', 'E', 'X', 'P', 0, 0x2c, 0x01, 0};
             if (fwrite(header, 1, sizeof header, stdout) != sizeof header
                 || fwrite(frame, sizeof(uint16_t), VIDEO_PIXEL_COUNT, stdout) != VIDEO_PIXEL_COUNT)
@@ -63,6 +70,11 @@ THREAD_INSERT = """
 /* The app owns stdin; a dedicated thread waits for two-byte GBA key masks.
  * No gameplay state or GBA memory is touched from this thread. */
 static SDL_atomic_t brisk_keys;
+static SDL_atomic_t brisk_options;
+unsigned input_brisk_speed(void) { return (unsigned)SDL_AtomicGet(&brisk_options) & 7u; }
+bool input_brisk_paused(void) { return (SDL_AtomicGet(&brisk_options) & 8) != 0; }
+bool input_brisk_muted(void) { return (SDL_AtomicGet(&brisk_options) & 16) != 0; }
+bool input_brisk_active(void) { return getenv("BRISK_FRAME_STREAM") != NULL; }
 static bool brisk_reader_started;
 static int brisk_read_stdin(void *unused)
 {
@@ -72,8 +84,14 @@ static int brisk_read_stdin(void *unused)
         return 1;
 #endif
     unsigned char keys[2];
-    while (fread(keys, 1, 2, stdin) == 2)
-        SDL_AtomicSet(&brisk_keys, (int)(keys[0] | (keys[1] << 8)) & 0x3ff);
+    SDL_AtomicSet(&brisk_options, 1);
+    while (fread(keys, 1, 2, stdin) == 2) {
+        unsigned word = keys[0] | ((unsigned)keys[1] << 8);
+        unsigned options = word >> 10;
+        if ((options & 7u) > 4u) options = (options & ~7u) | 1u;
+        SDL_AtomicSet(&brisk_options, (int)options);
+        SDL_AtomicSet(&brisk_keys, (int)word & 0x3ff);
+    }
     SDL_AtomicSet(&brisk_keys, 0);
     return 0;
 }
@@ -101,6 +119,26 @@ def apply(source_dir: Path) -> None:
     data = swap(data, INPUT_ORIGINAL, INPUT_UPDATED, "input init")
     data = swap(data, INPUT_KEYS_ORIGINAL, INPUT_KEYS_UPDATED, "input mask")
     inp.write_text(data)
+    frame = source_dir / "platform/frame.c"
+    data = frame.read_text()
+    declarations = ('#include "input.h"\n#include <SDL.h>\n'
+                    'extern unsigned input_brisk_speed(void);\n'
+                    'extern bool input_brisk_paused(void);\n'
+                    'extern bool input_brisk_muted(void);\n'
+                    'extern bool input_brisk_active(void);')
+    data = swap(data, '#include "input.h"', declarations, "embedded timing declarations")
+    data = swap(data, 'const uint32_t speed = fastforward_multiplier();',
+                'const uint32_t speed = input_brisk_active() ? input_brisk_speed() : fastforward_multiplier();', "embedded speed")
+    data = swap(data, 'const bool muted = fastforward_muted();',
+                'const bool muted = input_brisk_active() ? (input_brisk_muted() || speed == 0) : fastforward_muted();', "embedded mute")
+    before = '    run_visible_lines();\n'
+    after = ('    while (input_brisk_active() && input_brisk_paused()) {\n'
+             '        (void)audio_set_paused(true);\n'
+             '        frame.sound_muted = true;\n'
+             '        SDL_Delay(10);\n'
+             '    }\n' + before)
+    data = swap(data, before, after, "embedded pause")
+    frame.write_text(data)
 
 def self_test():
     checks = [

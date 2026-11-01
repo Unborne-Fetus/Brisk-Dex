@@ -1,4 +1,4 @@
-name: Build Brisk Dex - Windows + Android
+name: Build Pokemon Brisk Emerald - Windows + Android
 
 run-name: "Build Windows + Android - ${{ inputs.request_id || github.sha }}"
 
@@ -40,7 +40,7 @@ jobs:
       - name: Upload Windows installer
         uses: actions/upload-artifact@v6
         with:
-          name: Brisk-Dex-Windows
+          name: Pokemon-Brisk-Emerald-Windows
           path: dist/*.exe
           if-no-files-found: error
 
@@ -74,10 +74,10 @@ jobs:
           cd android
           ./gradlew assembleDebug
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk Brisk-Dex-Android.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk Pokemon-Brisk-Emerald-Android.apk
       - name: Upload APK
         uses: actions/upload-artifact@v6
         with:
-          name: Brisk-Dex-Android
-          path: Brisk-Dex-Android.apk
+          name: Pokemon-Brisk-Emerald-Android
+          path: Pokemon-Brisk-Emerald-Android.apk
           if-no-files-found: error

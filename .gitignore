@@ -13,3 +13,5 @@ www/
 /native-game/linux/
 
 /build-integrated.log
+
+/update-dist/

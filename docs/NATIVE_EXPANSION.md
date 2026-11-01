@@ -1,4 +1,4 @@
-# Brisk Emerald native integration in Brisk Dex
+# Pokemon Brisk Emerald desktop app
 
 This embeds the native C engine with Brisk Emerald game content imported from its pinned source repository. It replaces the separate executable selector and native game window. The game is a managed, hidden helper process inside one Brisk Dex desktop installation, rendering its 240×160 BGR555 frames into a canvas inside the app.
 
@@ -68,3 +68,19 @@ The native port also corrects Route 101 rescue triggers that were outside the pi
 The native symbol map is staged beside the executable for diagnostics and state-based replay validation. CI builds both Windows and Linux Brisk engines and exercises the opening, first battle, saving, restarting and profile selection. See [capacity and remaining limits](BRISK_NATIVE_CAPACITY.md).
 
 For backend development, `BRISK_NATIVE_PROFILE=expansion bash tools/build-native-expansion.sh linux` retains the base-expansion profile. The integrated Windows installer entrypoint always selects Brisk.
+
+## Controls and speed
+
+Open **Controls, speed and updates** in the game tab to remap each keyboard key and standard controller button. Bindings, normal speed, held speed-up speed, mute and pause-on-focus-loss are saved locally. Speed choices are 1×, 2×, 3×, 4× and unlimited; holding Tab uses the chosen fast speed. Pause/Resume, fullscreen and PNG screenshots are available beside Start/Stop. Native protocol 2 carries these options alongside the ten GBA key bits; old engines retain basic controls and explain that one engine rebuild is required for the new options.
+
+The native port uploads background/window DMA requests synchronously between complete host-rendered frames. This avoids the cartridge queue's 128-request limit, its 40 KiB single-transfer stall and references to temporary graphics buffers after a callback returns. The GBA build's original DMA scheduling is preserved. The compiled regression covers 48 KiB transfers, 200 temporary glyph uploads, fills and zero-sized requests. The Linux opening replay additionally checks naming-keyboard and overworld image regions; gameplay state alone cannot pass with invisible background layers.
+
+## Downloadable updates and app rename
+
+The installed name is **Pokemon Brisk Emerald**. The Electron app ID, mobile package IDs, local-storage keys and original `Brisk Dex` user-data directory remain stable, preserving existing saves and external storage.
+
+After installing this version once, the desktop app checks for updates at startup and every six hours. Checks can be disabled, or run manually. It downloads a complete platform-specific runtime/content bundle to a versioned directory under `app-updates`, verifies the manifest, SHA-256 and every file, and stages it without modifying the running game or save directories. Save in game, stop it, then choose **Restart and apply update**. **Roll back update** restores the prior runtime; an unconfirmed failed launch also falls back on the next launch. Rejected or offline downloads leave the installed game available. The rollback keeps the current save files; in-game saves are never downgraded automatically.
+
+The `updates` prerelease in this repository is a machine-readable delivery channel. Native builds create bundles with `node tools/build_update_bundle.cjs win32|linux`. Both native targets, the Linux gameplay/visual replay, desktop tests and Windows UI checks must pass before the workflow publishes the channel manifests. Regular game, reference-data and app-code updates then need no new installer. Changes to Electron itself, native OS prerequisites, or the fixed bootstrap API can still require a new installer.
+
+The existing scheduled/source-dispatch data synchronization also updates the Brisk source pin and dispatches the native build. Unreviewed source conflicts or failed checks prevent publication. Browser/mobile editions do not download desktop native runtime packages.

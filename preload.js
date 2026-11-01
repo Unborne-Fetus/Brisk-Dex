@@ -3,6 +3,13 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('briskDexAPI', {
   backupNativeSaves:()=>ipcRenderer.invoke('native-game-backup'),
   restoreNativeSaves:()=>ipcRenderer.invoke('native-game-restore'),
+  configureNativeGame:options=>ipcRenderer.invoke('native-game-configure',options),
+  appReady:()=>ipcRenderer.invoke('app-ready'),
+  updateStatus:()=>ipcRenderer.invoke('app-update-status'),
+  checkForUpdates:()=>ipcRenderer.invoke('app-update-check'),
+  automaticUpdates:value=>ipcRenderer.invoke('app-update-configure',value),
+  applyUpdate:()=>ipcRenderer.invoke('app-update-apply'),
+  rollbackUpdate:()=>ipcRenderer.invoke('app-update-rollback'),
   getNativeGameStatus:()=>ipcRenderer.invoke('native-game-status'),
   startNativeGame:()=>ipcRenderer.invoke('native-game-start'),
   stopNativeGame:()=>ipcRenderer.invoke('native-game-stop'),

@@ -4,8 +4,13 @@ const fs = require('fs/promises');
 const fsSync = require('fs');
 const {EmbeddedNativeGame,embeddedStatus}=require('./native-embedded');
 const nativeSaves=require('./native-saves');
+const {NativeUpdater}=require('./native-updater');
+const nativeUpdater=new NativeUpdater({userData:app.getPath('userData'),bundledRoot:process.env.BRISK_BUNDLED_ROOT||__dirname});
+function nativeResources(){
+  const exe=process.platform==='win32'?'pokeemerald-native.exe':'pokeemerald-native';
+  return fsSync.existsSync(path.join(__dirname,'native-game',process.platform,exe))?__dirname:(app.isPackaged?process.resourcesPath:__dirname);
+}
 
-protocol.registerSchemesAsPrivileged([{scheme:'brisk',privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true,stream:true}}]);
 const {assetPath}=require('./desktop-content');
 const {pathToFileURL}=require('node:url');
 let mainWindow;
@@ -40,6 +45,8 @@ function createWindow(){
 app.whenReady().then(async () => {
   protocol.handle('brisk',request=>{const target=assetPath(request.url,__dirname);return target?net.fetch(pathToFileURL(target).href):new Response('Not found',{status:404});});
   createWindow();
+  const checkAutomatic=async()=>{try{if((await nativeUpdater.config()).automatic)await nativeUpdater.check();}catch(error){console.warn('Update check:',error.message);}};
+  setInterval(checkAutomatic,6*60*60*1000).unref();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -249,7 +256,7 @@ app.on('before-quit',()=>{if(localBattleRelay)localBattleRelay.server.close();})
 
 
 
-/* A single Brisk Dex installation owns this native process and its game tab.
+/* A single Pokemon Brisk Emerald installation owns this native process and its game tab.
    No executable selection, shell execution, or second SDL window. */
 let nativeGame=null;
 let nativeTransferBusy=false;
@@ -257,7 +264,7 @@ function getNativeGame(){
   if(!nativeGame){
     nativeGame=new EmbeddedNativeGame({
       webContents:mainWindow.webContents,
-      resources:app.isPackaged?process.resourcesPath:__dirname,
+      resources:nativeResources(),
       userData:app.getPath('userData')
     });
   }
@@ -266,11 +273,11 @@ function getNativeGame(){
 }
 function requireMainRenderer(event){
   if(!mainWindow||event.sender!==mainWindow.webContents||event.senderFrame!==mainWindow.webContents.mainFrame)
-    throw new Error('Native game command must originate from the Brisk Dex main page');
+    throw new Error('Native game command must originate from the Pokemon Brisk Emerald main page');
 }
 ipcMain.handle('native-game-status',async event=>{
   requireMainRenderer(event);
-  return embeddedStatus({resources:app.isPackaged?process.resourcesPath:__dirname});
+  return embeddedStatus({resources:nativeResources()});
 });
 ipcMain.handle('native-game-start',async event=>{
   requireMainRenderer(event);
@@ -292,7 +299,7 @@ for(const action of ['backup','restore'])ipcMain.handle('native-game-'+action,as
     return {ok:false,error:'Save in the game menu and stop the game before transferring saves.'};
   nativeTransferBusy=true;
   try{
-    const status=await embeddedStatus({resources:app.isPackaged?process.resourcesPath:__dirname});
+    const status=await embeddedStatus({resources:nativeResources()});
     if(status.status!=='ready')throw new Error(status.message);
     const userData=app.getPath('userData');
     const filters=[{name:'Brisk native save backup',extensions:['briskbackup']}];
@@ -317,5 +324,21 @@ for(const action of ['backup','restore'])ipcMain.handle('native-game-'+action,as
     await nativeSaves.restoreBackup(userData,status.profile,text);
     return {ok:true,message:'Both save profiles and the game clock were restored. Your previous saves were kept as a recovery copy.'};
   }catch(error){return {ok:false,error:error.code==='ENOENT'?'No native save exists yet. Save using the in-game menu first.':error.message};}
+  finally{nativeTransferBusy=false;}
+});
+
+ipcMain.handle('native-game-configure',(event,options)=>{requireMainRenderer(event);return getNativeGame().configure(options);});
+ipcMain.handle('app-ready',async event=>{requireMainRenderer(event);await nativeUpdater.confirm();nativeUpdater.config().then(config=>{if(config.automatic)nativeUpdater.check();}).catch(console.warn);return {ok:true};});
+ipcMain.handle('app-update-status',event=>{requireMainRenderer(event);return nativeUpdater.status();});
+ipcMain.handle('app-update-check',event=>{requireMainRenderer(event);return nativeUpdater.check();});
+ipcMain.handle('app-update-configure',(event,automatic)=>{requireMainRenderer(event);return nativeUpdater.configure(automatic);});
+for(const action of ['apply','rollback'])ipcMain.handle('app-update-'+action,async event=>{
+  requireMainRenderer(event);
+  if(nativeTransferBusy||nativeGame?.child||nativeGame?.starting||nativeGame?.stopping)return {ok:false,message:'Save your game and stop it before restarting for an update.'};
+  nativeTransferBusy=true;
+  try{
+    if(action==='apply')await nativeUpdater.activate();else await nativeUpdater.rollback();
+    app.relaunch();app.exit(0);return {ok:true};
+  }catch(error){return {ok:false,message:error.message};}
   finally{nativeTransferBusy=false;}
 });

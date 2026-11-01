@@ -1,12 +1,22 @@
 (function(root){
   'use strict';
   // Standard Gamepad mapping: south/east, back/start, shoulders and D-pad.
-  function gamepadMask(pad){
+  const defaults={keys:{KeyZ:0,KeyX:1,Backspace:2,Enter:3,ArrowRight:4,ArrowLeft:5,ArrowUp:6,ArrowDown:7,KeyS:8,KeyA:9},buttons:[0,1,8,9,15,14,12,13,5,4],fastKey:'Tab',speed:1,fastSpeed:4,mute:false,pauseOnBlur:true};
+  function settings(value={}){
+    if(!value||typeof value!=='object'||Array.isArray(value))value={};
+    const result={...defaults,...value,keys:{...defaults.keys},buttons:[...defaults.buttons]};
+    if(value.keys&&Object.keys(value.keys).length===10&&new Set(Object.values(value.keys)).size===10&&Object.entries(value.keys).every(([key,bit])=>/^[A-Za-z][A-Za-z0-9]{0,30}$/.test(key)&&Number.isInteger(bit)&&bit>=0&&bit<10))result.keys={...value.keys};
+    if(Array.isArray(value.buttons)&&value.buttons.length===10&&new Set(value.buttons).size===10&&value.buttons.every(n=>Number.isInteger(n)&&n>=0&&n<=31))result.buttons=[...value.buttons];
+    for(const key of ['speed','fastSpeed'])if(![0,1,2,3,4].includes(result[key]))result[key]=defaults[key];
+    for(const key of ['mute','pauseOnBlur'])result[key]=result[key]===true;
+    if(!/^[A-Za-z][A-Za-z0-9]{0,30}$/.test(result.fastKey)||Object.hasOwn(result.keys,result.fastKey))result.fastKey='Tab';
+    return result;
+  }
+  function gamepadMask(pad,buttons=defaults.buttons){
     if(!pad?.connected||pad.mapping!=='standard')return 0;
     const pressed=i=>pad.buttons[i]?.pressed===true;
     let mask=0;
-    for(const [button,bit] of [[0,0],[1,1],[8,2],[9,3],[15,4],[14,5],[12,6],[13,7],[5,8],[4,9]])
-      if(pressed(button))mask|=1<<bit;
+    buttons.forEach((button,bit)=>{if(pressed(button))mask|=1<<bit;});
     const x=pad.axes[0]||0,y=pad.axes[1]||0;
     if(x>0.35)mask|=1<<4;
     if(x< -0.35)mask|=1<<5;
@@ -23,7 +33,7 @@
     }
     clear(){this.sources.clear();this.mask=0;this.send(0);}
   }
-  const api={gamepadMask,InputState};
+  const api={defaults,settings,gamepadMask,InputState};
   if(typeof module==='object'&&module.exports)module.exports=api;
   else root.BriskNativeControls=api;
 })(globalThis);

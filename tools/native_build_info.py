@@ -19,6 +19,7 @@ def stage(destination, source, profile, native_commit):
                 'native_commit': native_commit, 'heap_bytes': 0x1C500, 'save_layout_id': 1}
     else:
         raise ValueError('Unknown native game profile')
+    info['embedded_protocol'] = 2
     destination.mkdir(parents=True, exist_ok=True)
     (destination / 'build-info.json').write_text(json.dumps(info, indent=2) + '\n')
 

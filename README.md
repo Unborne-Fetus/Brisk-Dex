@@ -1,8 +1,8 @@
-# Brisk Dex
+# Pokemon Brisk Emerald
 
 ## Embedded expansion engine (experimental)
 
-The **Brisk Emerald** desktop tab runs the native C engine with Brisk Emerald's current game source, maps, teams, custom species, abilities and features. Brisk Dex owns the internal game process, framebuffer, controls and audio. The game tab includes standard controller support, fullscreen play, and backup/restore for both native save profiles and the game clock.
+The **Brisk Emerald** desktop tab runs the native C engine with Brisk Emerald's current game source, maps, teams, custom species, abilities and features. The app owns the internal game process, framebuffer, controls and audio. The game tab includes standard controller support, fullscreen play, and backup/restore for both native save profiles and the game clock.
 
 On Windows, run `build-integrated.bat` to build one installer containing the Brisk native runtime. The build imports the pinned Brisk source into the native backend and checks the resulting engine before packaging. On Linux, run `bash tools/build-native-expansion.sh linux` before packaging. Native Brisk uses separate saves from GBA files and the earlier base-expansion native build. Public builds without a locally staged game engine still show gameplay as unavailable.
 

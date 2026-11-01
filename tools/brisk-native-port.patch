@@ -298,3 +298,43 @@ index 7bf8c444..e1c5ab12 100644
  }
  
  static void StatEditor_MainCB(void)
+diff --git a/src/dma3_manager.c b/src/dma3_manager.c
+index 8ddc36f16..7d8178272 100644
+--- a/src/dma3_manager.c
++++ b/src/dma3_manager.c
+@@ -95,6 +95,17 @@ void ProcessDma3Requests(void)
+ 
+ s16 RequestDma3Copy(const void *src, void *dest, u16 size, u32 mode)
+ {
++#if BRISK_NATIVE
++    /* Desktop game callbacks run between complete host-rendered frames.
++     * Upload now: the cartridge queue can drop bursts of 128 requests or
++     * stall forever on a transfer above its 40 KiB VBlank budget, and a
++     * temporary tile buffer may be freed before the next host VBlank. */
++    if (size != 0) {
++        if (mode == 1) { Dma3CopyLarge32_(src, dest, size); }
++        else { Dma3CopyLarge16_(src, dest, size); }
++    }
++    return 0;
++#endif
+     int cursor;
+     int i = 0;
+ 
+@@ -127,6 +138,17 @@ s16 RequestDma3Copy(const void *src, void *dest, u16 size, u32 mode)
+ 
+ s16 RequestDma3Fill(s32 value, void *dest, u16 size, u32 mode)
+ {
++#if BRISK_NATIVE
++    /* Desktop game callbacks run between complete host-rendered frames.
++     * Upload now: the cartridge queue can drop bursts of 128 requests or
++     * stall forever on a transfer above its 40 KiB VBlank budget, and a
++     * temporary tile buffer may be freed before the next host VBlank. */
++    if (size != 0) {
++        if (mode == 1) { Dma3FillLarge32_(value, dest, size); }
++        else { Dma3FillLarge16_(value, dest, size); }
++    }
++    return 0;
++#endif
+     int cursor;
+     int i = 0;
+ 

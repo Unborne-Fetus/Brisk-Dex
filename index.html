@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Brisk Dex</title>
+<title>Pokemon Brisk Emerald</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -961,8 +961,8 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
         <svg viewBox="0 0 24 24" fill="none"><path d="M12 2L3 7v6c0 5 4 8.5 9 9 5-.5 9-4 9-9V7l-9-5z" stroke="#eafbf0" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 8v6M9 11h6" stroke="#eafbf0" stroke-width="1.6" stroke-linecap="round"/></svg>
       </div>
       <div>
-        <h1>BRISK DEX</h1>
-        <p>Companion app &middot; Pok&eacute;mon Brisk Emerald</p>
+        <h1>POKEMON BRISK EMERALD</h1>
+        <p>Play &middot; Pok&eacute;dex &middot; Save tools</p>
       </div>
     </div>
     <div class="top-actions">
@@ -975,7 +975,7 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
     </div>
   </header>
 
-  <nav class="main-tabs" role="tablist" aria-label="Brisk Dex sections">
+  <nav class="main-tabs" role="tablist" aria-label="Pokemon Brisk Emerald sections">
     <button class="active" id="tab-game" role="tab" aria-selected="true" aria-controls="game-tab-panel">Brisk Emerald</button>
     <button id="tab-settings" role="tab" aria-selected="false" aria-controls="settings-tab-panel">⚙ Settings</button>
     <button id="tab-save" role="tab" aria-selected="false" aria-controls="save-tab-panel">Pok&eacute;mon &amp; Storage</button>
@@ -996,7 +996,7 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
   <div id="save-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-save" style="display:none;">
 
   <div hidden id="dirty-bar" class="loader-panel" style="display:none; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; border-color:var(--accent-soft);">
-    <span>Transfers are staged in Brisk Dex. The save file on disk still has the original until you save changes.</span>
+    <span>Transfers are staged in Pokemon Brisk Emerald. The save file on disk still has the original until you save changes.</span>
     <button class="primary" id="btn-save-changes">Save changes</button>
   </div>
 
@@ -1270,10 +1270,10 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
   </section>
   <section id="bag-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-bag" style="display:none;">
     <div class="section-heading"><h3>Bag</h3><span class="count" id="bag-count"></span></div>
-    <p class="route-intro">Stored items are organized by pocket. Drag item stacks between the Bag and External Item Storage; Brisk Dex no longer creates items or increases quantities.</p>
+    <p class="route-intro">Stored items are organized by pocket. Drag item stacks between the Bag and External Item Storage; Pokemon Brisk Emerald no longer creates items or increases quantities.</p>
     <div class="bag-tools">
       <input id="bag-search" type="search" placeholder="Search stored items by name or #ID…" aria-label="Search stored bag items">
-      <select id="bag-order" aria-label="Sort Brisk Dex bag">
+      <select id="bag-order" aria-label="Sort Pokemon Brisk Emerald bag">
         <option value="custom">Custom order</option>
         <option value="alphabetical">Alphabetical</option>
         <option value="numeric">Item #</option>
@@ -1307,19 +1307,38 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
   <section id="game-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-game">
     <div id="native-game-view" class="loader-panel" style="padding:24px;max-width:800px;margin:auto">
       <h2 id="native-game-title">Pokémon Brisk Emerald</h2>
-      <p id="native-game-description">Play Brisk Emerald directly in Brisk Dex.</p>
+      <p id="native-game-description">Play Brisk Emerald directly in Pokemon Brisk Emerald.</p>
       <p id="native-game-status" role="status">Checking integrated engine…</p>
       <div class="top-actions">
         <button id="native-game-launch" type="button" class="primary" disabled>Start game</button>
         <button id="native-game-stop" type="button" disabled>Stop game</button>
+        <button id="native-game-pause" type="button">Pause</button>
+        <button id="native-game-screenshot" type="button">Screenshot</button>
         <button id="native-game-fullscreen" type="button">Fullscreen</button>
         <button id="native-game-backup" type="button" disabled>Back up saves</button>
         <button id="native-game-restore" type="button" disabled>Restore saves</button>
       </div>
+      <details id="native-game-settings" style="margin-top:12px">
+        <summary>Controls, speed and updates</summary>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;margin:12px 0">
+          <label>Game speed <select id="native-speed"><option value="1">1×</option><option value="2">2×</option><option value="3">3×</option><option value="4">4×</option><option value="0">Unlimited</option></select></label>
+          <label>Hold speed-up <select id="native-fast-speed"><option value="2">2×</option><option value="3">3×</option><option value="4">4×</option><option value="0">Unlimited</option></select></label>
+          <label>Speed-up key <input id="native-fast-key" readonly size="12" aria-label="Click and press a new hold speed-up key"></label>
+          <label><input type="checkbox" id="native-mute">Mute audio</label>
+          <label><input type="checkbox" id="native-blur-pause">Pause when away</label>
+        </div>
+        <p>Click a keyboard binding and press a key. Escape cancels. Controller numbers use the standard Gamepad mapping (starting at 0).</p>
+        <div id="native-binding-list" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px"></div>
+        <button id="native-controls-reset" type="button">Reset controls</button>
+        <hr>
+        <label><input type="checkbox" id="native-auto-updates" checked>Automatically check and download updates</label>
+        <p id="native-update-status" role="status">Updates are available in the desktop app.</p>
+        <div class="top-actions"><button id="native-update-check" type="button">Check for updates</button><button id="native-update-apply" type="button" disabled>Restart and apply update</button><button id="native-update-rollback" type="button" disabled>Roll back update</button></div>
+      </details>
       <canvas id="native-game-screen" width="240" height="160" tabindex="0"
         aria-label="Pokémon Emerald game screen. Arrow keys move; Z confirms; X goes back; Enter starts."
         style="display:block;max-width:720px;width:100%;aspect-ratio:3/2;height:auto;margin:18px auto 8px;background:#101010;border:2px solid #363636;image-rendering:pixelated;outline-offset:3px"></canvas>
-      <p style="font-size:12px">Controls: arrows to move; Z = A, X = B, Enter = Start, Backspace = Select, A = L, S = R. Standard controllers: D-pad or left stick to move; south/east = A/B; shoulders = L/R; Start/Back = Start/Select.</p>
+      <p style="font-size:12px">Open “Controls, speed and updates” to change keyboard and controller bindings. Defaults: arrows move; Z/X = A/B; Enter/Backspace = Start/Select; A/S = L/R. Hold Tab to speed up.</p>
       <p id="native-controller-status" role="status" style="font-size:12px">Connect a controller and press a button to use it.</p>
       <div class="top-actions" id="native-touch-keys" aria-label="Game controls" style="justify-content:center">
         <button type="button" data-native-key="6">Up</button>
@@ -1338,27 +1357,27 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
   </section>
   <section id="guide-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-guide" style="display:none;">
     <div class="guide-hero">
-      <h2>Brisk Dex Player Guide</h2>
-      <p>Everything you need to use Brisk Dex with Pok&eacute;mon Brisk Emerald. Open a section below whenever you need help &mdash; no developer knowledge required.</p>
+      <h2>Pokemon Brisk Emerald Player Guide</h2>
+      <p>Everything you need to use Pokemon Brisk Emerald with Pok&eacute;mon Brisk Emerald. Open a section below whenever you need help &mdash; no developer knowledge required.</p>
     </div>
     <div class="guide-grid">
       <details class="guide-card" open>
         <summary>Getting Started</summary>
         <div class="guide-body">
           <ol>
-            <li>Open Brisk Dex and choose <strong>Load .sav / .srm file</strong>.</li>
+            <li>Open Pokemon Brisk Emerald and choose <strong>Load .sav / .srm file</strong>.</li>
             <li>Select your Pok&eacute;mon Brisk Emerald save file.</li>
-            <li>Brisk Dex reads the save locally and fills in your trainer, party, boxes, and Pok&eacute;dex information.</li>
+            <li>Pokemon Brisk Emerald reads the save locally and fills in your trainer, party, boxes, and Pok&eacute;dex information.</li>
             <li>Use the tabs across the top to browse encounters, Pok&eacute;mon, trainers, moves, abilities, items, and other features.</li>
           </ol>
-          <div class="guide-tip">Brisk Dex uses Brisk Emerald data rather than assuming the original Emerald or standard National Pok&eacute;dex data.</div>
+          <div class="guide-tip">Pokemon Brisk Emerald uses Brisk Emerald data rather than assuming the original Emerald or standard National Pok&eacute;dex data.</div>
         </div>
       </details>
 
       <details class="guide-card">
         <summary>Loading &amp; Saving</summary>
         <div class="guide-body">
-          <p>Changes save automatically. Desktop and Android update the opened file. Browser and iOS sessions keep a recovery copy inside Brisk Dex; export a copy when you need to use it in an emulator.</p>
+          <p>Changes save automatically. Desktop and Android update the opened file. Browser and iOS sessions keep a recovery copy inside Pokemon Brisk Emerald; export a copy when you need to use it in an emulator.</p>
           <ul>
             <li><strong>.sav</strong> and <strong>.srm</strong> are supported save-file extensions.</li>
             <li>The app checks the save structure before displaying editable data.</li>
@@ -1384,12 +1403,12 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
       <details class="guide-card">
         <summary>External Storage</summary>
         <div class="guide-body">
-          <p>External Storage is Brisk Dex storage that exists outside a single game save. It is useful for keeping Pok&eacute;mon available between saves.</p>
+          <p>External Storage is Pokemon Brisk Emerald storage that exists outside a single game save. It is useful for keeping Pok&eacute;mon available between saves.</p>
           <ul>
             <li>Drag a party or boxed Pok&eacute;mon into External Storage to store it.</li>
             <li>Drag a stored Pok&eacute;mon onto a compatible empty box slot to withdraw it.</li>
             <li>Use search and sorting to find stored Pok&eacute;mon quickly.</li>
-            <li>Export an archive if you want a separate copy of your Brisk Dex storage.</li>
+            <li>Export an archive if you want a separate copy of your Pokemon Brisk Emerald storage.</li>
           </ul>
         </div>
       </details>
@@ -1405,7 +1424,7 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
             <li><strong>Shiny:</strong> a shiny copy is present or the status has been marked manually.</li>
             <li>Entries include Brisk stats, abilities, evolutions/forms, movepools, locations, sprites, and cries when available.</li>
           </ul>
-          <p>You can manually change a displayed Pok&eacute;dex status in Brisk Dex after the save has been read.</p>
+          <p>You can manually change a displayed Pok&eacute;dex status in Pokemon Brisk Emerald after the save has been read.</p>
         </div>
       </details>
 
@@ -1469,7 +1488,7 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
           <ul>
             <li>Search stored items by name or displayed #ID.</li>
             <li>Use the pocket subtabs to browse Poké Balls, medicine, berries, TMs/HMs, battle items, held items, key items, and other items.</li>
-            <li>Drag a stack or select Move, then choose the quantity. Key items cannot be transferred. Brisk Dex does not create items or increase quantities.</li>
+            <li>Drag a stack or select Move, then choose the quantity. Key items cannot be transferred. Pokemon Brisk Emerald does not create items or increase quantities.</li>
           </ul>
         </div>
       </details>
@@ -1485,14 +1504,14 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
       <details class="guide-card">
         <summary>Online Battles</summary>
         <div class="guide-body">
-          <p>Online Battle lets two Brisk Dex players host or join a private room.</p>
+          <p>Online Battle lets two Pokemon Brisk Emerald players host or join a private room.</p>
           <ol>
             <li>Choose up to six Pok&eacute;mon from your party, PC boxes, or External Storage.</li>
             <li>One player selects <strong>Host Battle</strong> and shares the six-character room code.</li>
             <li>The other player enters the same relay and room code, then selects <strong>Join Battle</strong>.</li>
-            <li>Both players ready up and play the battle from Brisk Dex.</li>
+            <li>Both players ready up and play the battle from Pokemon Brisk Emerald.</li>
           </ol>
-          <p>The available battle mechanics are those currently implemented by the Brisk Dex simulator, which may not yet reproduce every Brisk Emerald mechanic exactly.</p>
+          <p>The available battle mechanics are those currently implemented by the Pokemon Brisk Emerald simulator, which may not yet reproduce every Brisk Emerald mechanic exactly.</p>
         </div>
       </details>
 
@@ -1507,11 +1526,11 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
       <details class="guide-card">
         <summary>FAQ &amp; Troubleshooting</summary>
         <div class="guide-body guide-faq">
-          <p><strong>Why does Brisk Dex disagree with a normal Pok&eacute;dex website?</strong><br>Brisk Emerald changes Pok&eacute;mon, trainers, encounters, moves, abilities, items, and other mechanics, so Brisk Dex prioritizes Brisk Emerald's own extracted data.</p>
+          <p><strong>Why does Pokemon Brisk Emerald disagree with a normal Pok&eacute;dex website?</strong><br>Brisk Emerald changes Pok&eacute;mon, trainers, encounters, moves, abilities, items, and other mechanics, so Pokemon Brisk Emerald prioritizes Brisk Emerald's own extracted data.</p>
           <p><strong>Why is my save not loading?</strong><br>Make sure you selected the actual emulator/game save file rather than a save state, ROM, ZIP, or unrelated file.</p>
-          <p><strong>Why did an edit not appear in game?</strong><br>Make sure you saved the changes from Brisk Dex and then loaded the resulting save in your emulator or game.</p>
-          <p><strong>Why is a sprite, cry, description, or location missing?</strong><br>The current Brisk data bundle may not contain that asset or field yet. Updating Brisk Dex and its Brisk Emerald reference data may resolve it.</p>
-          <p><strong>Does External Storage belong to my Emerald save?</strong><br>No. It is Brisk Dex storage kept separately from an individual game save.</p>
+          <p><strong>Why did an edit not appear in game?</strong><br>Make sure you saved the changes from Pokemon Brisk Emerald and then loaded the resulting save in your emulator or game.</p>
+          <p><strong>Why is a sprite, cry, description, or location missing?</strong><br>The current Brisk data bundle may not contain that asset or field yet. Updating Pokemon Brisk Emerald and its Brisk Emerald reference data may resolve it.</p>
+          <p><strong>Does External Storage belong to my Emerald save?</strong><br>No. It is Pokemon Brisk Emerald storage kept separately from an individual game save.</p>
           <p><strong>Can I use boxed or externally stored Pok&eacute;mon online?</strong><br>Yes. The Online Battle team picker can use eligible Pok&eacute;mon from the party, PC boxes, or External Storage.</p>
           <p><strong>Why is one of my Pok&eacute;mon missing from the competitive team picker?</strong><br>Competitive play only accepts checksum-valid Pok&eacute;mon with Brisk Emerald's trusted acquisition marker and legal species, ability, EV, IV, held-item, and move data. Debug-created, save-edited, hacked, corrupted, and older unverified Pok&eacute;mon are excluded.</p>
         </div>
@@ -1528,7 +1547,7 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
     <div class="changes-grid" id="changes-grid"></div>
   </section>
 
-  <footer class="foot">Brisk Dex &middot; reads Gen III GBA save data entirely in your browser</footer>
+  <footer class="foot">Pokemon Brisk Emerald &middot; reads Gen III GBA save data entirely in your browser</footer>
 </div>
 
 
@@ -2407,7 +2426,7 @@ async function wonderTradeAtLocation(mon, loc){
   if (IS_ELECTRON && currentSave.filePath && !saved) return;
   document.getElementById('modal-root').innerHTML = '';
   renderAll();
-  showNotice('Wonder Trade complete: received ' + speciesName(speciesId) + ' at Lv' + level + (received.isShiny ? ' (shiny)!' : '.') + (IS_ELECTRON ? '' : ' Changes are saved automatically in Brisk Dex.'));
+  showNotice('Wonder Trade complete: received ' + speciesName(speciesId) + ' at Lv' + level + (received.isShiny ? ' (shiny)!' : '.') + (IS_ELECTRON ? '' : ' Changes are saved automatically in Pokemon Brisk Emerald.'));
 }
 function setTeraTypeInRecord(rawRecord, newType){
   if (!rawRecord || rawRecord.length < 80) throw new Error('Pokémon record is incomplete.');
@@ -2782,7 +2801,7 @@ async function loadBundledGameData(){
     if (IS_ANDROID || IS_IOS) document.body.classList.add('android-lite');
     renderCurrentReferenceTab();
   }catch(err){
-    showError('Could not load Brisk Emerald data bundled with Brisk Dex: ' + err.message);
+    showError('Could not load Brisk Emerald data bundled with Pokemon Brisk Emerald: ' + err.message);
   }
 }
 
@@ -3765,7 +3784,7 @@ function importExternalStorageFile(file){
       await storageReady;
       var data = JSON.parse(e.target.result);
       var incoming = Array.isArray(data) ? data : data && data.format === 'briskdex-storage' && data.version === 1 ? data.pokemon : null;
-      if (!Array.isArray(incoming)) throw new Error('That is not a Brisk Dex storage archive.');
+      if (!Array.isArray(incoming)) throw new Error('That is not a Pokemon Brisk Emerald storage archive.');
       var valid = incoming.filter(validStorageEntry);
       if (valid.length !== incoming.length) throw new Error('The archive contains invalid Pokémon records; nothing was imported.');
       var recovering = !!storageLoadError;
@@ -6167,7 +6186,7 @@ function renderOnlineBattle(){
     var join=el('button',{text:'Join Battle'});join.disabled=!!ONLINE_STATE.matchmakingTicket;join.addEventListener('click',joinOnlineBattle);
     actions.appendChild(host);actions.appendChild(join);form.appendChild(actions);setup.appendChild(form);
     setup.appendChild(el('div',{id:'online-connection-status',class:'online-status',role:'status','aria-live':'polite',text:'Ready to connect.'}));
-    setup.appendChild(el('div',{class:'online-status',text:'On desktop, Brisk Dex detects your network address and Host Battle starts the local relay automatically. With a loaded save, your party is selected by default, so hosting is normally one click. Joiners on the same Wi-Fi/LAN use the shown relay address and room code; allow Brisk Dex through Windows Firewall on private networks.'}));
+    setup.appendChild(el('div',{class:'online-status',text:'On desktop, Pokemon Brisk Emerald detects your network address and Host Battle starts the local relay automatically. With a loaded save, your party is selected by default, so hosting is normally one click. Joiners on the same Wi-Fi/LAN use the shown relay address and room code; allow Pokemon Brisk Emerald through Windows Firewall on private networks.'}));
     shell.appendChild(setup);
     var teamCard=el('section',{class:'online-card'});teamCard.appendChild(el('h4',{text:'Choose battle team · '+snapshot.length+'/6'}));
     var candidates=ensureBattleTeamSelection();
@@ -6297,7 +6316,7 @@ function renderOnlineBattle(){
     var lanCard=el('section',{class:'online-card',id:'lan-battles-card',style:'grid-column:1 / -1;'});
     var lanHead=el('div',{style:'display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;'});
     var lanTitle=el('div');lanTitle.appendChild(el('h4',{text:'LAN Battles',style:'margin:0;'}));
-    lanTitle.appendChild(el('div',{class:'dex-muted',text:'Find Brisk Dex battles on the same Wi-Fi or local network automatically.'}));
+    lanTitle.appendChild(el('div',{class:'dex-muted',text:'Find Pokemon Brisk Emerald battles on the same Wi-Fi or local network automatically.'}));
     lanHead.appendChild(lanTitle);
     var scanBtn=el('button',{class:'primary',text:ONLINE_STATE.lanScanning?'Scanning…':'Scan LAN'});
     scanBtn.disabled=ONLINE_STATE.lanScanning;
@@ -6327,14 +6346,14 @@ function renderOnlineBattle(){
     }else if(ONLINE_STATE.lanError){
       lanCard.appendChild(el('div',{class:'route-empty',text:ONLINE_STATE.lanError+' Make sure both devices are on the same Wi-Fi and the host has started a battle.'}));
     }else{
-      lanCard.appendChild(el('div',{class:'route-empty',text:'No scan yet. Press Scan LAN to find nearby Brisk Dex battle hosts.'}));
+      lanCard.appendChild(el('div',{class:'route-empty',text:'No scan yet. Press Scan LAN to find nearby Pokemon Brisk Emerald battle hosts.'}));
     }
     shell.appendChild(lanCard);root.appendChild(shell);
     if((IS_ANDROID||IS_IOS)&&!ONLINE_STATE.lanScanDone&&!ONLINE_STATE.lanScanning)setTimeout(function(){scanLanBattles(false);},100);
     return;
   }
   if(ONLINE_STATE.playerIndex===0&&ONLINE_STATE.lanUrls&&ONLINE_STATE.lanUrls.length){
-    root.appendChild(el('div',{class:'online-card',text:'Join from Android using relay: '+ONLINE_STATE.lanUrls.join(' or ')+' · Use the room code below. Keep both devices on the same network and allow Brisk Dex through Windows Firewall on private networks.'}));
+    root.appendChild(el('div',{class:'online-card',text:'Join from Android using relay: '+ONLINE_STATE.lanUrls.join(' or ')+' · Use the room code below. Keep both devices on the same network and allow Pokemon Brisk Emerald through Windows Firewall on private networks.'}));
   }
   var room=ONLINE_STATE.room, me=room.players[ONLINE_STATE.playerIndex], foe=room.players[ONLINE_STATE.playerIndex===0?1:0];
   var top=el('section',{class:'online-card'});
@@ -6584,7 +6603,15 @@ function clearNativeInput(){nativeInput.clear();}
 function nativeTransferButtons(){
   for(const action of ['backup','restore'])document.getElementById('native-game-'+action).disabled=!nativeEngineReady||nativeRunning;
 }
-const nativeCodeBits={KeyZ:0,KeyX:1,Backspace:2,Enter:3,ArrowRight:4,ArrowLeft:5,ArrowUp:6,ArrowDown:7,KeyS:8,KeyA:9};
+let nativePreferences;
+try{nativePreferences=BriskNativeControls.settings(JSON.parse(localStorage.getItem('brisk-native-controls')||'{}'));}catch{nativePreferences=BriskNativeControls.settings();}
+let nativeCodeBits=nativePreferences.keys;
+let nativeUserPaused=false,nativeFastHeld=false,nativeBlurPaused=false,nativePanelPaused=false,nativeBinding=null;
+function applyNativeOptions(){
+  window.briskDexAPI?.configureNativeGame?.({speed:nativeFastHeld?nativePreferences.fastSpeed:nativePreferences.speed,paused:nativeUserPaused||nativeBlurPaused||nativePanelPaused,mute:nativePreferences.mute}).then(result=>{if(result&&!result.ok)document.getElementById('native-game-status').textContent=result.error;}).catch(error=>console.warn(error));
+}
+function saveNativePreferences(){localStorage.setItem('brisk-native-controls',JSON.stringify(nativePreferences));nativeCodeBits=nativePreferences.keys;clearNativeInput();applyNativeOptions();}
+
 
 function onNativeFrame(frame){
   if(!nativeRunning||currentMainTab!=='game')return;
@@ -6607,7 +6634,7 @@ window.briskDexAPI?.onNativeState?.(state=>{
   document.getElementById('native-game-stop').disabled=!nativeRunning;
   document.getElementById('native-game-launch').disabled=nativeRunning;
   document.getElementById('native-game-status').textContent=state.message||(nativeRunning?'Game running.':'Game stopped.');
-  if(!nativeRunning)clearNativeInput();
+  if(nativeRunning){nativeBlurPaused=false;applyNativeOptions();}else clearNativeInput();
   nativeTransferButtons();
 });
 async function refreshNativeGame(){
@@ -6625,7 +6652,7 @@ async function refreshNativeGame(){
     status.textContent=nativeRunning?'Game running.':result.message;
     if(result.status==='ready'){
       document.getElementById('native-game-title').textContent=result.profile==='brisk'?'Pokémon Brisk Emerald':'Pokémon Emerald — Native Expansion';
-      document.getElementById('native-game-description').textContent=result.profile==='brisk'?'Play Brisk Emerald directly in Brisk Dex.':'Play the expansion engine directly in Brisk Dex.';
+      document.getElementById('native-game-description').textContent=result.profile==='brisk'?'Play Brisk Emerald directly in Pokemon Brisk Emerald.':'Play the expansion engine directly in Pokemon Brisk Emerald.';
     }
     launch.disabled=result.status!=='ready'||nativeRunning;
   }catch(error){status.textContent='Unable to check native engine: '+error.message;launch.disabled=true;}
@@ -6641,23 +6668,38 @@ document.getElementById('native-game-stop').addEventListener('click',async()=>{
   clearNativeInput();await window.briskDexAPI?.stopNativeGame?.();await refreshNativeGame();
 });
 document.addEventListener('keydown',event=>{
+  if(nativeBinding){
+    event.preventDefault();event.stopImmediatePropagation();
+    if(event.code==='Escape'){nativeBinding=null;renderNativeBindings();return;}
+    if(!/^[A-Za-z][A-Za-z0-9]{0,30}$/.test(event.code))return;
+    const old=Object.keys(nativePreferences.keys).find(code=>nativePreferences.keys[code]===nativeBinding.bit);
+    const occupied=nativePreferences.keys[event.code];
+    if(event.code===nativePreferences.fastKey){document.getElementById('native-game-status').textContent='That key is assigned to hold speed-up.';return;}
+    delete nativePreferences.keys[old];nativePreferences.keys[event.code]=nativeBinding.bit;
+    if(occupied!==undefined)nativePreferences.keys[old]=occupied;
+    nativeBinding=null;saveNativePreferences();renderNativeBindings();return;
+  }
+  const editing=event.target.closest?.('input,select,textarea,button');
+  if(currentMainTab==='game'&&nativeRunning&&!editing&&event.code===nativePreferences.fastKey&&!event.ctrlKey&&!event.altKey&&!event.metaKey){event.preventDefault();nativeFastHeld=true;applyNativeOptions();return;}
   const bit=nativeCodeBits[event.code];
   if(currentMainTab!=='game'||!nativeRunning||bit===undefined||event.altKey||event.ctrlKey||event.metaKey)return;
-  if(event.target instanceof HTMLInputElement||event.target instanceof HTMLTextAreaElement)return;
+  if(editing)return;
   event.preventDefault();nativeInput.set('keyboard',(nativeInput.sources.get('keyboard')||0)|(1<<bit));
 },true);
 document.addEventListener('keyup',event=>{
+  if(event.code===nativePreferences.fastKey&&nativeFastHeld){event.preventDefault();nativeFastHeld=false;applyNativeOptions();}
   const bit=nativeCodeBits[event.code];
   if(bit===undefined||!(nativeKeymask&(1<<bit)))return;
   event.preventDefault();nativeInput.set('keyboard',(nativeInput.sources.get('keyboard')||0)&~(1<<bit));
 },true);
-window.addEventListener('blur',clearNativeInput);
-document.addEventListener('visibilitychange',()=>{if(document.hidden)clearNativeInput();});
+window.addEventListener('blur',()=>{clearNativeInput();nativeFastHeld=false;if(nativePreferences.pauseOnBlur){nativeBlurPaused=true;applyNativeOptions();}});
+window.addEventListener('focus',()=>{nativeBlurPaused=false;applyNativeOptions();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){clearNativeInput();nativeFastHeld=false;if(nativePreferences.pauseOnBlur)nativeBlurPaused=true;}else nativeBlurPaused=false;applyNativeOptions();});
 function pollNativeController(){
   let mask=0,connected=false;
   if(nativeRunning&&currentMainTab==='game'&&!document.hidden&&document.hasFocus()){
     for(const pad of navigator.getGamepads?.()||[]){
-      if(pad?.connected&&pad.mapping==='standard'){connected=true;mask|=BriskNativeControls.gamepadMask(pad);}
+      if(pad?.connected&&pad.mapping==='standard'){connected=true;mask|=BriskNativeControls.gamepadMask(pad,nativePreferences.buttons);}
     }
   }
   nativeInput.set('controller',mask);
@@ -6694,7 +6736,7 @@ function setMainTab(tabName){
   document.getElementById('game-tab-panel').style.display = game ? 'block' : 'none';
   document.getElementById('tab-game').classList.toggle('active',game);
   document.getElementById('tab-game').setAttribute('aria-selected',String(game));
-  if(game)refreshNativeGame();else clearNativeInput();
+  if(game){refreshNativeGame();nativeBlurPaused=false;}else{clearNativeInput();nativeBinding=null;nativeFastHeld=false;if(nativePreferences.pauseOnBlur)nativeBlurPaused=true;}applyNativeOptions();
   var routes = tabName === 'routes';
   var dex = tabName === 'dex';
   var trainers = tabName === 'trainers';
@@ -7194,6 +7236,7 @@ window.__briskDexDebug = function(){
 
 })();
 </script>
+<script src="native-settings-ui.js"></script>
 </body>
 </html>
 

@@ -21,13 +21,14 @@ const assert=require('node:assert/strict');
     const page=await browser.newPage();
     const errors=[];page.on('pageerror',error=>errors.push(error.message));
     await page.addInitScript(()=>{
-      window.testKeys=[];window.testPad=null;window.testTransfers=[];
+      window.testKeys=[];window.testPad=null;window.testTransfers=[];window.testOptions=[];
       Object.defineProperty(navigator,'getGamepads',{value:()=>[window.testPad]});
       window.briskDexAPI={
         loadGameData:async()=>(await fetch('brisk-dex-data.json')).json(),
         loadTrainerData:async()=>(await fetch('brisk-dex-trainer-teams.json')).json(),
         loadBundledIcons:async()=>(await fetch('brisk-dex-icon-manifest.json')).json(),
         loadStorage:async()=>[],saveStorage:async()=>({ok:true}),loadLastSav:async()=>null,
+        configureNativeGame:async options=>{window.testOptions.push(options);return {ok:true};},
         getNativeGameStatus:async()=>({status:'ready',profile:'brisk',message:'Integrated Brisk Emerald is ready.'}),
         onNativeFrame:()=>{},onNativeState:callback=>window.testNativeState=callback,
         startNativeGame:async()=>{window.testNativeState({running:true});return {ok:true};},
@@ -56,6 +57,25 @@ const assert=require('node:assert/strict');
     await page.waitForFunction(()=>document.fullscreenElement?.id==='native-game-view');
     await page.locator('#native-game-fullscreen').click();
     await page.waitForFunction(()=>!document.fullscreenElement);
+    await page.locator('#native-game-settings summary').click();
+    await page.getByRole('button',{name:'Remap A keyboard key',exact:true}).click();
+    await page.keyboard.press('c');
+    assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('brisk-native-controls')).keys.KeyC),0);
+    await page.locator('#native-speed').selectOption('3');
+    await page.waitForFunction(()=>window.testOptions.at(-1)?.speed===3);
+    await page.locator('#native-game-settings summary').click();
+    await page.locator('#native-game-screen').click();
+    await page.keyboard.down('c');
+    await page.waitForFunction(()=>window.testKeys.at(-1)===1);
+    await page.keyboard.up('c');
+    await page.keyboard.down('Tab');
+    await page.waitForFunction(()=>window.testOptions.at(-1)?.speed===4);
+    await page.keyboard.up('Tab');
+    await page.waitForFunction(()=>window.testOptions.at(-1)?.speed===3);
+    await page.locator('#native-game-pause').click();
+    await page.waitForFunction(()=>window.testOptions.at(-1)?.paused===true);
+    await page.locator('#native-game-pause').click();
+    await page.waitForFunction(()=>window.testOptions.at(-1)?.paused===false);
     await page.locator('#native-game-stop').click();
     await page.locator('#native-game-backup').click();
     await page.locator('#native-game-restore').click();

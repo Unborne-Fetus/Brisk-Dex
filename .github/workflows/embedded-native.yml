@@ -8,6 +8,7 @@ on:
       - 'native-*.js'
       - 'index.html'
       - 'package.json'
+      - 'update-bootstrap.js'
       - 'main.js'
       - 'preload.js'
       - '.github/workflows/embedded-native.yml'
@@ -140,6 +141,9 @@ jobs:
       - run: npm run native:ui
 
   brisk-native-build:
+    concurrency:
+      group: brisk-runtime-updates-${{ matrix.target }}-${{ github.ref }}
+      cancel-in-progress: true
     strategy:
       fail-fast: false
       matrix:
@@ -191,3 +195,74 @@ jobs:
       - name: Validate Brisk's native Windows executable layout
         if: matrix.target == 'windows'
         run: python3 tools/test_native_pe.py native-game/win32/pokeemerald-native.exe native-src/brisk-emerald-native/platform/build_glue/check_pe_layout.py
+
+      - name: Stage Windows engine for a real Windows gameplay replay
+        if: matrix.target == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: brisk-windows-replay
+          path: |
+            native-game/win32/pokeemerald-native.exe
+            native-game/win32/SDL2.dll
+            native-game/win32/pokeemerald-native.exe.symbols
+            native-src/brisk-emerald-native/tests/smoke
+          retention-days: 1
+      - name: Build a validated downloadable game update
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          platform=linux
+          if [ "${{ matrix.target }}" = windows ]; then platform=win32; fi
+          node tools/build_update_bundle.cjs "$platform" update-dist
+      - name: Stage validated update bundle
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: brisk-runtime-${{ matrix.target }}
+          path: update-dist/*
+          retention-days: 1
+
+  brisk-windows-replay:
+    needs: brisk-native-build
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: brisk-windows-replay
+          path: .
+      - name: Verify Windows graphics, opening, battle and both save profiles
+        run: node tools/test_brisk_native.cjs windows
+
+  publish-runtime-updates:
+    needs: [brisk-native-build, brisk-windows-replay, companion, desktop-windows-ui]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency:
+      group: brisk-runtime-channel-publish
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: brisk-runtime-*
+          path: update-dist
+          merge-multiple: true
+      - name: Publish update channel without requiring a new installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          current=$(gh api "repos/$GH_REPO/commits/main" --jq .sha)
+          if [ "$current" != "$GITHUB_SHA" ]; then echo 'A newer main revision superseded this build'; exit 0; fi
+          if ! gh release view updates >/dev/null 2>&1; then
+            gh release create updates --target main --title "Pokemon Brisk Emerald automatic updates" --notes "Downloadable runtime and content updates for the desktop app." --prerelease
+          fi
+          gh release upload updates update-dist/runtime-*.json.gz --clobber
+          gh release upload updates update-dist/latest-*.json --clobber

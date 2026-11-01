@@ -79,7 +79,13 @@ test('embedded process runs headless, forwards ten-bit keys, and never opens an 
  assert.equal(game.input(1024),false);
  const inputs=[];child.stdin.on('data',bytes=>inputs.push(bytes.readUInt16LE()));
  assert.equal(game.input(0x0201),true);
- assert.deepEqual(inputs,[0x201]);
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.deepEqual(inputs,[0,0x201]);
+ game.protocol=2;
+ assert.equal(game.configure({speed:4,paused:true,mute:true}).ok,true);
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(inputs.at(-1),0x201|(4<<10)|(1<<13)|(1<<14));
+ assert.equal(game.configure({speed:99,paused:false,mute:false}).ok,false);
  child.stdout.write(packet(0x7fff));
  assert.equal(events.filter(x=>x.name==='native-game-frame').length,1);
  // Stop must wait for the OS exit; save restore cannot race a live writer.

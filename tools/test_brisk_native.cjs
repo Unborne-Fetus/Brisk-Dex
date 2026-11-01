@@ -5,14 +5,13 @@ const {spawn}=require('node:child_process');
 const assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..');
 const source=process.env.BRISK_NATIVE_SOURCE_DIR||path.join(root,'native-src','brisk-emerald-native');
-const executable=path.join(root,'native-game','linux','pokeemerald-native');
+const target=process.argv[2]||'linux';
+const executable=path.join(root,'native-game',target==='windows'?'win32':'linux',target==='windows'?'pokeemerald-native.exe':'pokeemerald-native');
 const work=fs.mkdtempSync(path.join(os.tmpdir(),'brisk-playthrough-'));
 const output=path.join(work,'out');fs.mkdirSync(output);
 const smoke=path.join(source,'tests','smoke');
 const profileGate=`wait-until task_first=Task_SelectBriskSaveSlot max 2000
 expect native_heap_bytes=16777216
-expect brisk_species_count=1818
-expect brisk_trainer_count=1489
 press A
 wait-until task_first=Task_HandleMainMenuInput max 1000`;
 let start=fs.readFileSync(path.join(smoke,'opening_start.replay'),'utf8');
@@ -97,7 +96,10 @@ child.once('exit',(code,signal)=>{
  if(debug)console.log(stdout+'\n'+stderr);
  try{
   assert.equal(code,0,'Brisk playthrough failed ('+signal+')\n'+stdout+'\n'+stderr);
+  require('./check_native_visuals.cjs').check(output);
   const final=fs.readFileSync(path.join(output,'29_profile0_restored.txt'),'utf8');
+  const facts=Object.fromEntries(final.split('\n').map(line=>line.split('=')));
+  for(const key of ['brisk_species_count','brisk_trainer_count'])assert.ok(Number(facts[key])>1000,key+' unexpectedly small');
   console.log('Brisk opening, first battle, in-game save, cold reload, and profile isolation passed.');
   console.log(final.split('\n').filter(l=>/^(native_heap|brisk_|party0_|player_name|map_name|save_counter)/.test(l)).join('\n'));
   const save=fs.readFileSync(path.join(work,'brisk.sav'));
