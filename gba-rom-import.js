@@ -161,7 +161,7 @@ function normalizedManifest(manifest){
 }
 function importRom(value,options){
   var b=bytesOf(value),details=basicDetails(b),warnings=[],header=scanHeader(b),rhh=scanRhh(b);
-  var embedded=parseEmbedded(b),layout=(options&&options.layout)||(embedded&&embedded.layout)||{};
+  var embedded=(options&&options.manifest)||parseEmbedded(b),layout=(options&&options.layout)||(embedded&&embedded.layout)||{};
   var data=embedded?normalizedManifest(embedded):{},source=embedded?'embedded-manifest':'rom-tables';
   var speciesLayout=layout.speciesInfo||null,count=Number(layout.speciesCount)||(rhh&&rhh.species)||(header&&header.pokedexCount+1)||387;
   if(!data.species){
@@ -188,5 +188,29 @@ function importRom(value,options){
   var counts={species:Object.keys(data.species||{}).length,icons:Object.keys(icons).length,trainers:(data.trainerTeams||[]).length,routes:(data.routeEncounters||[]).length,moves:Object.keys(data.moves||{}).length,items:Object.keys(data.items||{}).length,abilities:Object.keys(data.abilities||{}).length};
   return {details:details,header:header,rhh:rhh,data:data,icons:icons,counts:counts,source:source,warnings:warnings,complete:!!embedded&&counts.species>0&&counts.trainers>0&&counts.routes>0};
 }
-return {importRom:importRom,readIcon:readIcon,tilesToRgba:tilesToRgba,lz77:lz77,crc32:crc32,gbaString:gbaString,scanHeader:scanHeader,scanRhh:scanRhh,parseEmbedded:parseEmbedded,MAGIC:MAGIC};
+async function importRomAsync(value,options){
+  var b=bytesOf(value),pat=[66,68,88,82,79,77,90,33],found=-1;
+  for(var i=b.length-pat.length;i>=Math.max(0,b.length-16*1024*1024);i--){
+    var yes=true;for(var j=0;j<pat.length;j++)if(b[i+j]!==pat[j]){yes=false;break;}
+    if(yes){found=i;break;}
+  }
+  if(found<0)return importRom(b,options);
+  basicDetails(b);
+  var size=u32(b,found-8),expected=u32(b,found-4),start=found-8-size;
+  if(!size||size>MAX_PACK||start<0)throw new Error('Compressed ROM index has an invalid size.');
+  if(crc32(b,start,found-8)!==expected)throw new Error('Compressed ROM index has a checksum mismatch.');
+  var packed=b.slice(start,found-8),inflated;
+  if(typeof DecompressionStream!=='undefined'){
+    var stream=new Blob([packed]).stream().pipeThrough(new DecompressionStream('deflate'));
+    inflated=new Uint8Array(await new Response(stream).arrayBuffer());
+  }else if(typeof require==='function'){
+    inflated=bytesOf(require('zlib').inflateSync(Buffer.from(packed)));
+  }else throw new Error('This device cannot decode compressed ROM indexes.');
+  if(inflated.length>MAX_PACK)throw new Error('ROM index exceeds the 12 MB data limit.');
+  var raw=typeof TextDecoder!=='undefined'?new TextDecoder('utf-8',{fatal:true}).decode(inflated):Buffer.from(inflated).toString('utf8');
+  var manifest=JSON.parse(raw);
+  if(!manifest||manifest.format!=='briskdex-rom-v1'||!manifest.data)throw new Error('Invalid compressed ROM index.');
+  return importRom(b,Object.assign({},options||{},{manifest:manifest}));
+}
+return {importRomAsync:importRomAsync,importRom:importRom,readIcon:readIcon,tilesToRgba:tilesToRgba,lz77:lz77,crc32:crc32,gbaString:gbaString,scanHeader:scanHeader,scanRhh:scanRhh,parseEmbedded:parseEmbedded,MAGIC:MAGIC};
 });
