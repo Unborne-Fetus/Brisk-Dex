@@ -30,6 +30,9 @@ const assert=require('node:assert/strict');
         loadStorage:async()=>[],saveStorage:async()=>({ok:true}),loadLastSav:async()=>null,
         configureNativeGame:async options=>{window.testOptions.push(options);return {ok:true};},
         getNativeGameStatus:async()=>({status:'ready',profile:'brisk',message:'Integrated Brisk Emerald is ready.'}),
+        getNativeGameProfiles:async()=>({available:false,reason:'No integrated save exists yet.'}),
+        setNativeFullscreen:async enabled=>{window.testFullscreen=enabled;window.testFullscreenChange?.(enabled);return {ok:true,fullscreen:enabled};},
+        onNativeFullscreenChange:callback=>window.testFullscreenChange=callback,
         onNativeFrame:()=>{},onNativeState:callback=>window.testNativeState=callback,
         startNativeGame:async()=>{window.testNativeState({running:true});return {ok:true};},
         stopNativeGame:async()=>{window.testNativeState({running:false});return {ok:true};},
@@ -55,12 +58,10 @@ const assert=require('node:assert/strict');
     await page.keyboard.up('ArrowUp');
     await page.locator('#tab-game').click();
     await page.locator('#native-game-fullscreen').click();
-    await page.waitForFunction(()=>document.fullscreenElement?.id==='native-game-stage');
-    // Only the canvas is fullscreen; page controls are intentionally hidden.
-    // Headless Chromium doesn't synthesize the browser's Escape fullscreen shortcut.
-    // Exit using the DOM API, as the application's fullscreen button does.
-    await page.evaluate(()=>document.exitFullscreen());
-    await page.waitForFunction(()=>!document.fullscreenElement);
+    await page.waitForFunction(()=>window.testFullscreen===true&&document.body.classList.contains('native-game-immersive'));
+    assert.equal(await page.locator('#native-game-stage').count(),1);
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(()=>window.testFullscreen===false&&!document.body.classList.contains('native-game-immersive'));
     await page.locator('#native-game-settings summary').click();
     await page.getByRole('button',{name:'Remap A keyboard key',exact:true}).click();
     await page.keyboard.press('c');
