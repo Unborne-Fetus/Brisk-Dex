@@ -24,6 +24,8 @@ on:
       - 'tools/patch-native-stream.py'
       - 'tools/patch-native-compat.py'
       - 'tools/native-stdio.h'
+      - 'tools/native_pe_imports.py'
+      - 'tools/test_native_pe.py'
       - 'test/desktop/**'
       - 'package.json'
       - '.github/workflows/embedded-native.yml'
@@ -42,6 +44,7 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: python3 tools/patch-native-stream.py --self-test
       - run: python3 tools/test_native_compat.py
+      - run: python3 tools/test_native_pe.py
       - run: bash -n tools/build-native-expansion.sh tools/setup-native-deps.sh
       - run: bash tools/test_wsl_line_endings.sh
       - run: node --check main.js && node --check native-embedded.js && node --check preload.js
@@ -96,6 +99,8 @@ jobs:
           x86_64-w64-mingw32-gcc -std=gnu17 -Wall -Wextra -Werror -D_WIN32_WINNT=0x0A00 -DWINVER=0x0A00 -c /tmp/brisk-winapi-probe.c -o /tmp/brisk-winapi-probe.o
       - name: Cross-compile embedded Windows engine
         run: bash tools/build-native-expansion.sh windows
+      - name: Reproduce and repair the reported import-section layout failure
+        run: python3 tools/test_native_pe.py native-game/win32/pokeemerald-native.exe native-src/pokeemerald-expansion-native/platform/build_glue/check_pe_layout.py
       - name: Confirm private bundled Windows game dependencies exist
         run: |
           test -s native-game/win32/pokeemerald-native.exe

@@ -31,6 +31,26 @@ class CompatibilityPatchTests(unittest.TestCase):
             self.assertEqual((platform / "pure.c").read_text(), untouched)
             self.assertEqual((root / "src/game.c").read_text(), source)
 
+    def test_pe_normalization_precedes_validation_and_invalidates_cached_links(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            platform = root / "platform"
+            (platform / "build_glue").mkdir(parents=True)
+            (platform / "bios_internal.c").write_text('#include <stdio.h>\n')
+            makefile = root / "Makefile.native"
+            makefile.write_text('$(NATIVE_EXE): $(NATIVE_LINKER_SCRIPTS) | check-palette-padding\n'
+                                '\t$(NATIVE_EXE_CHECK)\n')
+            compat.apply(root)
+            first = {str(p.relative_to(root)): p.read_bytes() for p in root.rglob('*') if p.is_file()}
+            compat.apply(root)
+            self.assertEqual(first, {str(p.relative_to(root)): p.read_bytes() for p in root.rglob('*') if p.is_file()})
+            recipe = makefile.read_text()
+            self.assertLess(recipe.index('$(PYTHON) -I platform/build_glue/brisk_pe_imports.py $@'),
+                            recipe.index('$(NATIVE_EXE_CHECK)'))
+            self.assertIn('platform/build_glue/brisk_pe_imports.py) |', recipe)
+            self.assertEqual((platform / 'build_glue/brisk_pe_imports.py').read_bytes(),
+                             Path(__file__).with_name('native_pe_imports.py').read_bytes())
+
     def test_unexpected_source_checkout_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaisesRegex(RuntimeError, "platform sources not found"):

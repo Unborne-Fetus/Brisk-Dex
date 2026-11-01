@@ -42,3 +42,7 @@ Some older MinGW GCC versions reject C99 `%zu`/`%zx` formats in standard stdio c
 Windows builds run the upstream COFF converter tests and real-object comparisons. macOS-only assembler tests are excluded from Windows builds so older Clang releases do not need to understand Mach-O zero-fill sections. Linux and other upstream build modes keep their original test selection.
 
 The Windows target explicitly sets `WINVER` and `_WIN32_WINNT` to Windows 10 so older MinGW headers expose the required host APIs. The build compiles the Windows platform library before converting game assets, reporting compiler failures earlier.
+
+## Import-section layout across binutils versions
+
+Some MinGW linker versions emit a read-only `.idata` section after writable game data, which the native engine's contiguous writable-image check rejects. Before validation, the Windows link recipe now makes that import section writable when it lies within the mutable tail, and updates the PE checksum. Section addresses, import tables and contents remain in place. The full upstream PE layout validator still runs afterward. CI recreates the reported read-only flag on the real built engine, verifies rejection, applies normalization, and verifies the complete image again.

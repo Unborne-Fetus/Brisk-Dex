@@ -65,7 +65,28 @@ def apply(source_dir: Path) -> None:
             if data.count(before) != 1:
                 raise RuntimeError("macho_object: pinned self-test anchor changed")
             macho.write_text(data.replace(before, after))
-    print("Applied MinGW ANSI stdio compatibility (format warnings remain enabled)")
+    makefile = source_dir / "Makefile.native"
+    if makefile.exists():
+        helper = platform / "build_glue/brisk_pe_imports.py"
+        helper_text = Path(__file__).with_name("native_pe_imports.py").read_text()
+        if not helper.exists() or helper.read_text() != helper_text:
+            helper.write_text(helper_text)
+        data = makefile.read_text()
+        command = '\t$(if $(filter windows,$(TARGET_OS)),$(PYTHON) -I platform/build_glue/brisk_pe_imports.py $@)\n'
+        if command not in data:
+            anchor = '\t$(NATIVE_EXE_CHECK)\n'
+            if data.count(anchor) != 1:
+                raise RuntimeError("Makefile.native: pinned PE validation anchor changed")
+            data = data.replace(anchor, command + anchor)
+        before = '$(NATIVE_LINKER_SCRIPTS) | check-palette-padding'
+        after = '$(NATIVE_LINKER_SCRIPTS) $(if $(filter windows,$(TARGET_OS)),platform/build_glue/brisk_pe_imports.py) | check-palette-padding'
+        if after not in data:
+            if data.count(before) != 1:
+                raise RuntimeError("Makefile.native: pinned executable dependency anchor changed")
+            data = data.replace(before, after)
+        if data != makefile.read_text():
+            makefile.write_text(data)
+    print("Applied native compiler and PE layout compatibility (validation remains enabled)")
 
 
 if __name__ == "__main__":
