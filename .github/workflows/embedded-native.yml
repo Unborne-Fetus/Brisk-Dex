@@ -1,4 +1,9 @@
 name: Embedded expansion native bridge
+# Publish only the latest validated source revision. Older builds that are
+# superseded by new commits should not keep the update channel blocked.
+concurrency:
+  group: brisk-native-latest-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 on:
   push:
     branches: [main]
@@ -143,7 +148,7 @@ jobs:
   brisk-native-build:
     concurrency:
       group: brisk-runtime-updates-${{ matrix.target }}-${{ github.ref }}
-      cancel-in-progress: false
+      cancel-in-progress: true
     strategy:
       fail-fast: false
       matrix:
