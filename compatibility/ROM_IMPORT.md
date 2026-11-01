@@ -17,7 +17,7 @@ The report gives precise counts and warns about unavailable tables. Unknown trai
 
 ## Making a single-file, fully indexed Brisk Emerald ROM
 
-When building Brisk Emerald from source, regenerate the reference data **from the exact same game revision** first:
+On Windows, **`index-brisk-rom.bat`** is the one-step entry point. Double-click it and enter the compiled `.gba` path and the matching Brisk Emerald source folder. It extracts Pokémon, Fakémon, abilities, trainer teams, encounters, **all map definitions**, icons and shinies, then writes `*-indexed.gba`. It requires Python with Pillow; it never overwrites the original ROM.\n\nWhen building Brisk Emerald from source, regenerate the reference data **from the exact same game revision** first:
 
 ```sh
 python tools/extract_data.py /path/to/Pokemon-Brisk-Emerald
