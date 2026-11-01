@@ -24,6 +24,7 @@ if ! git -C "$checkout" cat-file -e "$pin^{commit}" 2>/dev/null; then
   git -C "$checkout" fetch --depth 1 origin "$pin"
 fi
 git -C "$checkout" checkout --detach "$pin"
+python3 "$root/tools/patch-native-compat.py" "$checkout"
 python3 "$root/tools/patch-native-stream.py" "$checkout"
 (cd "$checkout" && bash tools/build-native.sh --os "$target")
 dest="$root/native-game"

@@ -11,3 +11,5 @@ www/
 # locally built native engine, not for committing/publishing
 /native-game/win32/
 /native-game/linux/
+
+/build-integrated.log

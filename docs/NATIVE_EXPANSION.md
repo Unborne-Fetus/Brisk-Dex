@@ -21,7 +21,7 @@ The embedded bridge streams video and input. SDL plays native audio directly thr
 
 ## Limitations / validation
 
-The JavaScript launcher, IPC framing, and build patch are regression-tested. **The patched expansion C source has not yet been compiled or run through a native game-play smoke test in this environment**, so this feature must be regarded as experimental. This still runs unmodified expansion gameplay; Brisk-specific content has not yet been ported. Native backend support is currently Windows and Linux only.
+The JavaScript launcher, IPC framing, and build patch are regression-tested. CI compiles the patched expansion for Windows and Linux and runs a Linux startup/frame-stream smoke test. Windows UI checks also pass. A full gameplay playthrough is still unverified. This still runs unmodified expansion gameplay; Brisk-specific content has not yet been ported. Native backend support is currently Windows and Linux only.
 
 ## Windows checkout / WSL line endings
 
@@ -32,3 +32,9 @@ If `build-integrated.bat` previously printed `set: pipefail: invalid option name
 The integrated Windows build now installs missing compiler packages automatically, including `gcc-multilib`, `libc6-dev-i386`, `gcc-mingw-w64-x86-64`, `binutils-mingw-w64-x86-64`, and `clang`. Standalone Bash builds only check dependencies; use `bash tools/setup-native-deps.sh windows --install` to install them, or pass `--install` as the second argument to `build-native-expansion.sh`. Package-manager failures stop the build before any clone or packaging.
 
 Under WSL, source and object files live in `~/.cache/brisk-dex/<checkout-key>/pokeemerald-expansion-native` (or `$XDG_CACHE_HOME`). This avoids building on Windows NTFS. Only the final executable and SDL2 DLL are copied into the app checkout for packaging. `BRISK_NATIVE_SOURCE_DIR` can override the source location. Existing `native-src` checkouts are left untouched. Fresh clones omit the upstream Git history; repeat builds reuse the pinned source and compiled objects.
+
+## Older WSL MinGW compilers
+
+Some older MinGW GCC versions reject C99 `%zu`/`%zx` formats in standard stdio calls even with ANSI stdio enabled. The build applies a platform-only adapter that explicitly selects MinGW's GNU-format stdio functions. Format checking and warnings-as-errors remain enabled. The Windows native build is checked on both Ubuntu 22.04 and 24.04. Host `libsdl2-dev` is required for the Windows build's Linux data-layout submake and is now checked for both targets.
+
+`build-integrated.bat` records console output in `build-integrated.log` beside the batch file, including failures. Rerunning the build keeps the cached source and objects; no manual source cleanup is needed.

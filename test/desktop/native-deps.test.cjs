@@ -41,3 +41,10 @@ testOnLinux('native setup stops on a package index failure',async t=>{
  const r=s.run('--install');assert.equal(r.status,42);
  assert.equal(await fs.readFile(path.join(s.dir,'apt.log'),'utf8'),'update\n');
 });
+
+ testOnLinux('Windows native preflight includes host SDL for the data-layout submake',async t=>{
+ const s=await sandbox(t);
+ await s.stub('pkg-config','if [ "$2" = sdl2 ]; then exit 1; fi\nexit 0\n');
+ const r=s.run('--check');assert.equal(r.status,1);
+ assert.match(r.stderr,/libsdl2-dev/);
+ });

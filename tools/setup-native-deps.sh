@@ -19,13 +19,16 @@ if ! command -v pkg-config >/dev/null || ! pkg-config --exists libpng; then miss
 if ! command -v gcc >/dev/null || ! printf 'int main(void){return 0;}\n' | gcc -m32 -x c -o /dev/null - 2>/dev/null; then
     missing+=(gcc-multilib libc6-dev-i386)
 fi
+# The Windows data-layout submake runs with TARGET_OS=Linux and evaluates
+# SDL flags too. Check the host SDL headers for either target.
+if ! command -v pkg-config >/dev/null || ! pkg-config --exists sdl2; then
+    missing+=(libsdl2-dev)
+fi
 if [ "$target" = windows ]; then
     need clang clang
     need x86_64-w64-mingw32-gcc gcc-mingw-w64-x86-64
     need x86_64-w64-mingw32-windres binutils-mingw-w64-x86-64
     need x86_64-w64-mingw32-as binutils-mingw-w64-x86-64
-elif ! command -v pkg-config >/dev/null || ! pkg-config --exists sdl2; then
-    missing+=(libsdl2-dev)
 fi
 if [ "${#missing[@]}" -eq 0 ]; then echo 'Native compiler prerequisites are ready.'; exit 0; fi
 printf 'Missing native build packages: %s\n' "${missing[*]}" >&2
