@@ -44,82 +44,82 @@ def movement(script, label, position):
     x, y = position
     offsets = {'walk_fast_left': (-1, 0), 'walk_fast_right': (1, 0),
                'walk_fast_up': (0, -1), 'walk_fast_down': (0, 1)}
-    for cmd in match.group(1).splitlines():
-        cmd = cmd.strip()
-        if cmd.startswith('walk_') and cmd not in offsets and not cmd.startswith('walk_in_place'):
-            raise RuntimeError('Unverified rescue step ' + cmd)
-        dx, dy = offsets.get(cmd, (0, 0))
+    for line in match.group(1).splitlines():
+        command = line.strip()
+        if command.startswith('walk_') and command not in offsets and not command.startswith('walk_in_place'):
+            raise RuntimeError('Unverified rescue movement ' + command)
+        dx, dy = offsets.get(command, (0, 0))
         x, y = x + dx, y + dy
         if label == 'Route101_Movement_EnterScene':
             safe = 10 <= x <= 11 and 18 <= y <= 19
-        elif label == 'Route101_Movement_ZigzagoonStepSouth':
-            safe = x == 12 and y in (16, 17)
+        elif label == 'Route101_Movement_BirchApproachPlayer':
+            safe = y == 16 and x in (10, 11)
         else:
-            # No actor may be moved onto the solid ledge at y=15.
-            safe = 10 <= x <= 13 and y == 16
+            # Original reference poses must not drift after the rescue trigger.
+            safe = (x, y) == position
         if not safe:
-            raise RuntimeError(f'{label} leaves the intended Route 101 corridor at {x},{y}')
+            raise RuntimeError(f'{label} drifts off its expected reference tile at {x},{y}')
     return x, y
 
 
 def check_route101(checkout):
     route = json.loads((checkout / 'data/maps/Route101/map.json').read_text())
     layouts = json.loads((checkout / 'data/layouts/layouts.json').read_text())['layouts']
-    layout = next(x for x in layouts if x['id'] == route['layout'])
-    for key in ('object_events', 'coord_events', 'warp_events', 'bg_events'):
-        for event in route.get(key, []):
+    layout = next(item for item in layouts if item['id'] == route['layout'])
+    for family in ('object_events', 'coord_events', 'warp_events', 'bg_events'):
+        for event in route.get(family, []):
             if not (0 <= event['x'] < layout['width'] and 0 <= event['y'] < layout['height']):
-                raise RuntimeError(f'Route 101 {key}: out-of-bounds event {event["x"]},{event["y"]}')
-    triggers = [(e['x'], e['y']) for e in route['coord_events']
-                if e.get('var') == 'VAR_ROUTE101_STATE']
-    if triggers != [(10, 19), (11, 19), (10, 19), (11, 19)]:
-        raise RuntimeError('Route 101 rescue triggers are incorrectly positioned')
+                raise RuntimeError(f'Route 101 {family} references outside map: {event["x"]},{event["y"]}')
+    bag = next(event for event in route['object_events']
+               if event['graphics_id'] == 'OBJ_EVENT_GFX_BIRCHS_BAG')
+    if (bag['x'], bag['y']) != (10, 17):
+        raise RuntimeError('Birch bag must remain at its existing location')
+    triggers = [(event['x'], event['y'], event['var_value'])
+                for event in route['coord_events'] if event.get('var') == 'VAR_ROUTE101_STATE']
+    if triggers != [(10, 19, '1'), (11, 19, '1'), (10, 19, '2'), (11, 19, '2')]:
+        raise RuntimeError('Route 101 player rescue/exit triggers changed')
     script = (checkout / 'data/maps/Route101/scripts.inc').read_text()
-    scene_order = ['Route101_Movement_BirchRunInCircles', 'Route101_Movement_BirchFaceZigzagoon',
-                   'Route101_Movement_ZigzagoonStepSouth', 'Route101_Text_PleaseHelp']
     rescue = script.split('Route101_EventScript_StartBirchRescue::\n', 1)[1].split('\n\tend', 1)[0]
-    positions = [rescue.find(token) for token in scene_order]
-    if -1 in positions or positions != sorted(positions):
-        raise RuntimeError('Zigzagoon must step south after the chase and before Birch asks for help')
-    bag = script.split('Route101_EventScript_BirchsBag::\n', 1)[1].split('\n\tend', 1)[0]
-    if 'Route101_Movement_BirchApproachPlayer' not in bag:
-        raise RuntimeError('Birch must approach the player from the lower grass')
-    if 'Route101_Movement_BirchStepNorth' in script or 'Route101_Movement_BirchStepSouth' in script:
-        raise RuntimeError('Birch cannot step onto the raised ledge')
-    scene = script.split('Route101_EventScript_StartBirchRescue::\n', 1)[1].split('\n\tend', 1)[0]
-    def spawn(actor):
-        matches = re.findall(r'^\s*setobjectxy ' + re.escape(actor) + r',\s*(\d+),\s*(\d+)$', scene, re.M)
+    bag_event = script.split('Route101_EventScript_BirchsBag::\n', 1)[1].split('\n\tend', 1)[0]
+    actors = {e['local_id']: e for e in route['object_events'] if 'local_id' in e}
+
+    def spawn(local_id):
+        matches = re.findall(r'^\s*setobjectxy ' + re.escape(local_id)
+                             + r',\s*(\d+),\s*(\d+)$', rescue, re.M)
         if len(matches) != 1:
-            raise RuntimeError('Missing rescue actor: ' + actor)
+            raise RuntimeError('Missing or duplicated rescue position: ' + local_id)
         return tuple(map(int, matches[0]))
-    actors = {event['local_id']: event for event in route['object_events'] if 'local_id' in event}
-    for local, expected in [('LOCALID_ROUTE101_BIRCH',(11,16)),('LOCALID_ROUTE101_ZIGZAGOON',(10,16))]:
-        actor = actors[local]
-        if (actor['x'],actor['y']) != expected or actor['elevation'] != 3:
-            raise RuntimeError('Route 101 physical NPC spawn does not match safe rescue corridor')
-    birch = spawn('LOCALID_ROUTE101_BIRCH')
-    zig = spawn('LOCALID_ROUTE101_ZIGZAGOON')
-    if birch != (11, 16) or zig != (10, 16):
-        raise RuntimeError('Birch and Zigzagoon are no longer on the accessible side of the cliff')
+
+    for local_id, expected in (
+        ('LOCALID_ROUTE101_BIRCH', (8, 15)),
+        ('LOCALID_ROUTE101_ZIGZAGOON', (9, 15)),
+    ):
+        actor = actors[local_id]
+        if (actor['x'], actor['y']) != expected or actor['elevation'] != 3:
+            raise RuntimeError('Map spawn differs from original Brisk: ' + local_id)
+        if spawn(local_id) != expected:
+            raise RuntimeError('Rescue script overrides original coordinates: ' + local_id)
+    birch = (8, 15)
+    zigzagoon = (9, 15)
     birch = movement(script, 'Route101_Movement_BirchRunAway1', birch)
-    zig = movement(script, 'Route101_Movement_ZigzagoonChase1', zig)
+    zigzagoon = movement(script, 'Route101_Movement_ZigzagoonChase1', zigzagoon)
     birch = movement(script, 'Route101_Movement_BirchRunInCircles', birch)
-    zig = movement(script, 'Route101_Movement_ZigzagoonChaseInCircles', zig)
-    if birch != (13, 16) or zig != (12, 16):
-        raise RuntimeError('Rescue chase ends outside the intended area')
-    # This row is grass. The northern row (y=15) is the solid horizontal ledge.
-    # Separate Birch and the attacker without walking Birch into a cliff.
-    zig = movement(script, 'Route101_Movement_ZigzagoonStepSouth', zig)
-    if birch != (13, 16) or zig != (12, 17):
-        raise RuntimeError('The rescue poses must occupy separate safe grass rows')
-    # The introductory movement must stop below the bag, not walk onto a cliff.
-    if movement(script, 'Route101_Movement_EnterScene', (10, 19)) != (10, 18):
-        raise RuntimeError('Player is displaced from the lower starter-bag approach')
-    if movement(script, 'Route101_Movement_EnterScene', (11, 19)) != (11, 18):
-        raise RuntimeError('Second rescue trigger displaces the player')
-    if movement(script, 'Route101_Movement_BirchApproachPlayer', birch) != (11, 16):
-        raise RuntimeError('Birch cannot approach the player after the starter selection')
-    print('Route 101 event: trigger, actor positions and movement path valid')
+    zigzagoon = movement(script, 'Route101_Movement_ZigzagoonChaseInCircles', zigzagoon)
+    if birch != (8, 15) or zigzagoon != (9, 15):
+        raise RuntimeError('Chase moves actors off their original Brisk positions')
+    if 'Route101_Movement_ZigzagoonStepSouth' in script or 'Route101_Movement_BirchStepNorth' in script:
+        raise RuntimeError('Legacy rescue movement still displaces the original NPCs')
+    if not re.search(r'^\s*setobjectxy LOCALID_ROUTE101_BIRCH, 11, 16\s*$', bag_event, re.M):
+        raise RuntimeError('Missing Birch reposition after the game fades for starter selection')
+    if bag_event.find('setobjectxy LOCALID_ROUTE101_BIRCH, 11, 16') > bag_event.find('StartNewPokeballCaseUI'):
+        raise RuntimeError('Birch must reposition while the field is faded out')
+    if movement(script, 'Route101_Movement_BirchApproachPlayer', (11, 16)) != (10, 16):
+        raise RuntimeError('Birch cannot safely approach unchanged starter bag')
+    for starting in ((10, 19), (11, 19)):
+        if movement(script, 'Route101_Movement_EnterScene', starting) != (starting[0], 18):
+            raise RuntimeError('Player leaves unchanged rescue approach')
+    print('Route 101: original Birch (8,15) and Zigzagoon (9,15), bag and player triggers unchanged')
+
 
 
 def main():
