@@ -68,6 +68,7 @@
       "index.html",
       "brisk-dex-data.json",
       "brisk-dex-trainer-teams.json",
+      "brisk-dex-trainer-flags.json",
       "brisk-dex-icons/**/*",
       "brisk-dex-trainers/**/*",
       "brisk-dex-items/**/*",

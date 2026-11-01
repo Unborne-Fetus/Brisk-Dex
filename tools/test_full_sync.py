@@ -58,6 +58,20 @@ class SyncedContentTests(unittest.TestCase):
                 self.assertEqual(len(team), 6)
                 self.assertTrue(all(int(mon["fields"]["Level"]) == level for mon in team))
 
+    def test_all_trainer_flags_have_source_identifiers(self):
+        flags = json.loads((ROOT / "brisk-dex-trainer-flags.json").read_text(encoding="utf-8"))
+        ids = flags["ids"]
+        self.assertEqual(flags["hoennFlagBase"], 0x500)
+        self.assertEqual(flags["hoennFlagsOffset"], 0x1270)
+        self.assertEqual(flags["kantoTrainerBase"], 865)
+        self.assertEqual(flags["kantoFlagsOffset"], 120)
+        self.assertGreaterEqual(len(ids), 1488)
+        for name in self.trainers:
+            with self.subTest(trainer=name):
+                self.assertIn(name, ids)
+                self.assertGreaterEqual(ids[name], 0)
+                self.assertLess(ids[name], 865 + 624)
+
     def test_postgame_wild_encounters(self):
         areas = self.data["routeEncounters"]
         self.assertTrue(any("Frlg" in area.get("id", "") or

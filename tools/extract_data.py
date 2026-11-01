@@ -1148,6 +1148,35 @@ def format_encounter_subsection(value):
         return "Room " + room.group(1)
     return value.replace('_', ' ').title()
 
+
+def extract_trainer_defeat_flags(repo):
+    """Map trainer constants to the exact flag bits used by Brisk's save format."""
+    hoenn = find_source(repo, "include/constants/opponents.h")
+    kanto = find_source(repo, "include/constants/brisk_kanto_trainers.h")
+    base = re.search(r"#define\s+BRISK_KANTO_TRAINER_BASE\s+BRISK_HOENN_TRAINERS_COUNT", hoenn)
+    count = re.search(r"#define\s+BRISK_HOENN_TRAINERS_COUNT\s+(\d+)", hoenn)
+    if not base or not count:
+        raise ValueError("Trainer defeat flag range changed: update the Dex save parser")
+    kanto_start = int(count.group(1))
+    ids = {m.group(1): int(m.group(2)) for m in
+           re.finditer(r"^\s*#define\s+(TRAINER_[A-Z0-9_]+)\s+(\d+)\b", hoenn, re.M)}
+    ids.update({m.group(1): kanto_start + int(m.group(2)) for m in
+                re.finditer(r"^\s*#define\s+(TRAINER_BRISK_KANTO_[A-Z0-9_]+)\s+\(\s*BRISK_KANTO_TRAINER_BASE\s*\+\s*(\d+)\s*\)", kanto, re.M)})
+    if len(ids) < 1000:
+        raise ValueError("Only %d trainer flag IDs extracted; expected Hoenn and Kanto" % len(ids))
+    # See GetTrainerDefeatFlag(), SaveBlock1.flags, SaveBlock3.kantoTrainerFlags.
+    # SaveBlock3 offset is guarded in Brisk Emerald's test/brisk_kanto_postgame.c.
+    return {
+        "source": "Pokemon-Brisk-Emerald constants/opponents.h + brisk_kanto_trainers.h",
+        "hoennFlagBase": 0x500,
+        "hoennFlagsOffset": 0x1270,
+        "kantoTrainerBase": kanto_start,
+        "kantoFlagsOffset": 120,
+        "saveChunkSize": 116,
+        "saveChunkStart": 3968,
+        "ids": ids
+    }
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: python3 extract_data.py /path/to/repo")
@@ -1638,6 +1667,8 @@ def main():
     with open("brisk-dex-trainer-teams.json", "w", encoding='utf-8') as f:
         json.dump({"source": "Pokemon-Brisk-Emerald/src/data/trainers.party + brisk_mode_teams.party + brisk_kanto_teams.party", "trainers": trainer_teams},
                   f, ensure_ascii=False, separators=(',', ':'))
+    with open("brisk-dex-trainer-flags.json", "w", encoding="utf-8") as f:
+        json.dump(extract_trainer_defeat_flags(repo), f, separators=(',', ':'))
 
     print()
     print("Wrote brisk-dex-data.json:")
