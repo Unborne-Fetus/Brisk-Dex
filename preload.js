@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('briskDexAPI', {
   applyUpdate:()=>ipcRenderer.invoke('app-update-apply'),
   rollbackUpdate:()=>ipcRenderer.invoke('app-update-rollback'),
   getNativeGameStatus:()=>ipcRenderer.invoke('native-game-status'),
+  exportNativeDiagnostics:()=>ipcRenderer.invoke('native-game-export-diagnostics'),
   getNativeGameProfiles:()=>ipcRenderer.invoke('native-game-profiles'),
   setNativeFullscreen:enabled=>ipcRenderer.invoke('native-game-fullscreen',enabled),
   onNativeFullscreenChange:callback=>{
