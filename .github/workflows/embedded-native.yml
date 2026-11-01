@@ -151,10 +151,28 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends build-essential git python3 pkg-config curl clang gcc-multilib libc6-dev-i386 libpng-dev libsdl2-dev gcc-mingw-w64-x86-64 binutils-mingw-w64-x86-64
+      - name: Restore validated Linux Brisk runtime for replay checks
+        if: matrix.target == 'linux'
+        id: brisk-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            native-game/linux
+            native-src/brisk-emerald-native/tests/smoke
+          key: brisk-linux-${{ runner.os }}-${{ hashFiles('tools/build-native-expansion.sh', 'tools/brisk-native-source.json', 'tools/brisk-native-port.patch', 'tools/prepare_brisk_native.py', 'tools/patch-native-stream.py', 'tools/patch-native-compat.py', 'tools/native-stdio.h', 'tools/native_build_info.py') }}
       - name: Build the complete Brisk Emerald source port
+        if: matrix.target != 'linux' || steps.brisk-cache.outputs.cache-hit != 'true'
         env:
           BRISK_NATIVE_PROFILE: brisk
         run: bash tools/build-native-expansion.sh ${{ matrix.target }}
+      - name: Cache the compiled Linux engine before gameplay checks
+        if: matrix.target == 'linux' && steps.brisk-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            native-game/linux
+            native-src/brisk-emerald-native/tests/smoke
+          key: ${{ steps.brisk-cache.outputs.cache-primary-key }}
       - name: Start the Brisk native engine and verify embedded frames
         if: matrix.target == 'linux'
         run: node tools/test_native_stream.cjs
