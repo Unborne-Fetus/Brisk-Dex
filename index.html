@@ -946,6 +946,11 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
 }
 @media(max-width:390px){.battle-move-grid,.battle-switch-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.battle-side-panel{width:42px!important}.battle-sim-field{margin:0 42px!important}.battle-preview-mon{grid-template-columns:34px minmax(0,1fr)}.battle-preview-mon button{grid-column:1/-1}}
 </style>
+<style>
+#native-game-view:fullscreen{box-sizing:border-box;max-width:none!important;width:100%;height:100%;overflow:auto;background:#101010;color:#eee;}
+#native-game-view:fullscreen #native-game-screen{max-width:min(1100px, calc((100vh - 280px) * 1.5));}
+#native-touch-keys button{touch-action:none;}
+</style>
 </head>
 <body>
 <div class="wrap">
@@ -1300,18 +1305,22 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
   </section>
 
   <section id="game-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-game">
-    <div class="loader-panel" style="padding:24px;max-width:800px;margin:auto">
+    <div id="native-game-view" class="loader-panel" style="padding:24px;max-width:800px;margin:auto">
       <h2 id="native-game-title">Pokémon Brisk Emerald</h2>
       <p id="native-game-description">Play Brisk Emerald directly in Brisk Dex.</p>
       <p id="native-game-status" role="status">Checking integrated engine…</p>
       <div class="top-actions">
         <button id="native-game-launch" type="button" class="primary" disabled>Start game</button>
         <button id="native-game-stop" type="button" disabled>Stop game</button>
+        <button id="native-game-fullscreen" type="button">Fullscreen</button>
+        <button id="native-game-backup" type="button" disabled>Back up saves</button>
+        <button id="native-game-restore" type="button" disabled>Restore saves</button>
       </div>
       <canvas id="native-game-screen" width="240" height="160" tabindex="0"
         aria-label="Pokémon Emerald game screen. Arrow keys move; Z confirms; X goes back; Enter starts."
         style="display:block;max-width:720px;width:100%;aspect-ratio:3/2;height:auto;margin:18px auto 8px;background:#101010;border:2px solid #363636;image-rendering:pixelated;outline-offset:3px"></canvas>
-      <p style="font-size:12px">Controls: arrows to move; Z = A, X = B, Enter = Start, Backspace = Select, A = L, S = R. Click the game screen to capture keyboard controls.</p>
+      <p style="font-size:12px">Controls: arrows to move; Z = A, X = B, Enter = Start, Backspace = Select, A = L, S = R. Standard controllers: D-pad or left stick to move; south/east = A/B; shoulders = L/R; Start/Back = Start/Select.</p>
+      <p id="native-controller-status" role="status" style="font-size:12px">Connect a controller and press a button to use it.</p>
       <div class="top-actions" id="native-touch-keys" aria-label="Game controls" style="justify-content:center">
         <button type="button" data-native-key="6">Up</button>
         <button type="button" data-native-key="5">Left</button>
@@ -1324,7 +1333,7 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
         <button type="button" data-native-key="9">L</button>
         <button type="button" data-native-key="8">R</button>
       </div>
-      <p style="font-size:12px">Save using the in-game menu before stopping. Your game saves are kept between app updates. Native game saves are separate from GBA save files.</p>
+      <p style="font-size:12px">Save using the in-game menu before stopping. Your game saves are kept between app updates. Stop the game to back up or restore both save profiles and the game clock. Restoring keeps a recovery copy of your previous saves. Native backups are separate from GBA save files.</p>
     </div>
   </section>
   <section id="guide-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-guide" style="display:none;">
@@ -1527,6 +1536,7 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
 
 <script src="asset-loader.js"></script>
 <script src="localization.js"></script>
+<script src="native-controls.js"></script>
 <script>
 (function(){
 "use strict";
@@ -6568,9 +6578,14 @@ function renderCurrentReferenceTab(){
 const nativeCanvas=document.getElementById('native-game-screen');
 const nativeCtx=nativeCanvas.getContext('2d',{alpha:false});
 const nativeImage=nativeCtx.createImageData(240,160);
-let nativeRunning=false,nativeKeymask=0;
+let nativeRunning=false,nativeKeymask=0,nativeEngineReady=false;
+const nativeInput=new BriskNativeControls.InputState(mask=>{nativeKeymask=mask;window.briskDexAPI?.sendNativeKeys?.(mask);});
+function clearNativeInput(){nativeInput.clear();}
+function nativeTransferButtons(){
+  for(const action of ['backup','restore'])document.getElementById('native-game-'+action).disabled=!nativeEngineReady||nativeRunning;
+}
 const nativeCodeBits={KeyZ:0,KeyX:1,Backspace:2,Enter:3,ArrowRight:4,ArrowLeft:5,ArrowUp:6,ArrowDown:7,KeyS:8,KeyA:9};
-function nativeKeys(mask){nativeKeymask=mask;window.briskDexAPI?.sendNativeKeys?.(mask);}
+
 function onNativeFrame(frame){
   if(!nativeRunning||currentMainTab!=='game')return;
   const bytes=frame instanceof Uint8Array?frame:new Uint8Array(frame);
@@ -6592,7 +6607,8 @@ window.briskDexAPI?.onNativeState?.(state=>{
   document.getElementById('native-game-stop').disabled=!nativeRunning;
   document.getElementById('native-game-launch').disabled=nativeRunning;
   document.getElementById('native-game-status').textContent=state.message||(nativeRunning?'Game running.':'Game stopped.');
-  if(!nativeRunning)nativeKeys(0);
+  if(!nativeRunning)clearNativeInput();
+  nativeTransferButtons();
 });
 async function refreshNativeGame(){
   const api=window.briskDexAPI;
@@ -6604,6 +6620,8 @@ async function refreshNativeGame(){
   }
   try{
     const result=await api.getNativeGameStatus();
+    nativeEngineReady=result.status==='ready';
+    nativeTransferButtons();
     status.textContent=nativeRunning?'Game running.':result.message;
     if(result.status==='ready'){
       document.getElementById('native-game-title').textContent=result.profile==='brisk'?'Pokémon Brisk Emerald':'Pokémon Emerald — Native Expansion';
@@ -6620,28 +6638,54 @@ document.getElementById('native-game-launch').addEventListener('click',async()=>
   }catch(error){document.getElementById('native-game-status').textContent=error.message;}
 });
 document.getElementById('native-game-stop').addEventListener('click',async()=>{
-  nativeKeys(0);await window.briskDexAPI?.stopNativeGame?.();await refreshNativeGame();
+  clearNativeInput();await window.briskDexAPI?.stopNativeGame?.();await refreshNativeGame();
 });
 document.addEventListener('keydown',event=>{
   const bit=nativeCodeBits[event.code];
   if(currentMainTab!=='game'||!nativeRunning||bit===undefined||event.altKey||event.ctrlKey||event.metaKey)return;
   if(event.target instanceof HTMLInputElement||event.target instanceof HTMLTextAreaElement)return;
-  event.preventDefault();nativeKeys(nativeKeymask|(1<<bit));
+  event.preventDefault();nativeInput.set('keyboard',(nativeInput.sources.get('keyboard')||0)|(1<<bit));
 },true);
 document.addEventListener('keyup',event=>{
   const bit=nativeCodeBits[event.code];
   if(bit===undefined||!(nativeKeymask&(1<<bit)))return;
-  event.preventDefault();nativeKeys(nativeKeymask&~(1<<bit));
+  event.preventDefault();nativeInput.set('keyboard',(nativeInput.sources.get('keyboard')||0)&~(1<<bit));
 },true);
-window.addEventListener('blur',()=>nativeKeys(0));
+window.addEventListener('blur',clearNativeInput);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)clearNativeInput();});
+function pollNativeController(){
+  let mask=0,connected=false;
+  if(nativeRunning&&currentMainTab==='game'&&!document.hidden&&document.hasFocus()){
+    for(const pad of navigator.getGamepads?.()||[]){
+      if(pad?.connected&&pad.mapping==='standard'){connected=true;mask|=BriskNativeControls.gamepadMask(pad);}
+    }
+  }
+  nativeInput.set('controller',mask);
+  document.getElementById('native-controller-status').textContent=connected?'Controller connected.':'Connect a controller and press a button to use it.';
+  requestAnimationFrame(pollNativeController);
+}
+requestAnimationFrame(pollNativeController);
+document.getElementById('native-game-fullscreen').addEventListener('click',async()=>{
+  try{
+    if(document.fullscreenElement)await document.exitFullscreen();
+    else await document.getElementById('native-game-view').requestFullscreen();
+    nativeCanvas.focus();
+  }catch(error){document.getElementById('native-game-status').textContent=error.message;}
+});
+for(const action of ['backup','restore'])document.getElementById('native-game-'+action).addEventListener('click',async()=>{
+  try{
+    const result=await window.briskDexAPI?.[action==='backup'?'backupNativeSaves':'restoreNativeSaves']?.();
+    if(result&&!result.canceled)document.getElementById('native-game-status').textContent=result.ok?result.message:result.error;
+  }catch(error){document.getElementById('native-game-status').textContent=error.message;}
+});
 document.querySelectorAll('#native-touch-keys [data-native-key]').forEach(btn=>{
   const bit=Number(btn.dataset.nativeKey);
   btn.addEventListener('pointerdown',event=>{
     event.preventDefault();
-    if(nativeRunning){btn.setPointerCapture(event.pointerId);nativeKeys(nativeKeymask|(1<<bit));}
+    if(nativeRunning){btn.setPointerCapture(event.pointerId);nativeInput.set('pointer-'+event.pointerId,1<<bit);}
   });
   for(const type of ['pointerup','pointercancel','lostpointercapture'])
-    btn.addEventListener(type,()=>nativeKeys(nativeKeymask&~(1<<bit)));
+    btn.addEventListener(type,event=>nativeInput.set('pointer-'+event.pointerId,0));
 });
 
 function setMainTab(tabName){
@@ -6650,7 +6694,7 @@ function setMainTab(tabName){
   document.getElementById('game-tab-panel').style.display = game ? 'block' : 'none';
   document.getElementById('tab-game').classList.toggle('active',game);
   document.getElementById('tab-game').setAttribute('aria-selected',String(game));
-  if(game)refreshNativeGame();else if(nativeKeymask)nativeKeys(0);
+  if(game)refreshNativeGame();else clearNativeInput();
   var routes = tabName === 'routes';
   var dex = tabName === 'dex';
   var trainers = tabName === 'trainers';

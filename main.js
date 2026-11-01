@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs/promises');
 const fsSync = require('fs');
 const {EmbeddedNativeGame,embeddedStatus}=require('./native-embedded');
+const nativeSaves=require('./native-saves');
 
 protocol.registerSchemesAsPrivileged([{scheme:'brisk',privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true,stream:true}}]);
 const {assetPath}=require('./desktop-content');
@@ -251,6 +252,7 @@ app.on('before-quit',()=>{if(localBattleRelay)localBattleRelay.server.close();})
 /* A single Brisk Dex installation owns this native process and its game tab.
    No executable selection, shell execution, or second SDL window. */
 let nativeGame=null;
+let nativeTransferBusy=false;
 function getNativeGame(){
   if(!nativeGame){
     nativeGame=new EmbeddedNativeGame({
@@ -259,6 +261,7 @@ function getNativeGame(){
       userData:app.getPath('userData')
     });
   }
+  nativeGame.webContents=mainWindow.webContents;
   return nativeGame;
 }
 function requireMainRenderer(event){
@@ -271,6 +274,7 @@ ipcMain.handle('native-game-status',async event=>{
 });
 ipcMain.handle('native-game-start',async event=>{
   requireMainRenderer(event);
+  if(nativeTransferBusy)return {ok:false,error:'Finish the save backup or restore first.'};
   return getNativeGame().start();
 });
 ipcMain.handle('native-game-stop',event=>{
@@ -281,3 +285,37 @@ ipcMain.on('native-game-input',(event,mask)=>{
   try{requireMainRenderer(event);if(nativeGame)nativeGame.input(mask);}catch(error){console.warn('native input ignored:',error.message);}
 });
 app.on('before-quit',()=>{if(nativeGame)nativeGame.stop();});
+
+for(const action of ['backup','restore'])ipcMain.handle('native-game-'+action,async event=>{
+  requireMainRenderer(event);
+  if(nativeTransferBusy||nativeGame?.child||nativeGame?.starting||nativeGame?.stopping)
+    return {ok:false,error:'Save in the game menu and stop the game before transferring saves.'};
+  nativeTransferBusy=true;
+  try{
+    const status=await embeddedStatus({resources:app.isPackaged?process.resourcesPath:__dirname});
+    if(status.status!=='ready')throw new Error(status.message);
+    const userData=app.getPath('userData');
+    const filters=[{name:'Brisk native save backup',extensions:['briskbackup']}];
+    if(action==='backup'){
+      const backup=await nativeSaves.createBackup(userData,status.profile);
+      const selected=await dialog.showSaveDialog(mainWindow,{title:'Back up both native save profiles',defaultPath:status.profile+'-'+new Date().toISOString().slice(0,10)+'.briskbackup',filters});
+      if(selected.canceled)return {canceled:true};
+      await writeFileAtomically(selected.filePath,backup);
+      return {ok:true,message:'Both save profiles and the game clock were backed up.'};
+    }
+    const selected=await dialog.showOpenDialog(mainWindow,{title:'Restore a native save backup',properties:['openFile'],filters});
+    if(selected.canceled)return {canceled:true};
+    const file=await fs.open(selected.filePaths[0],'r');
+    let text;
+    try{
+      if((await file.stat()).size>nativeSaves.MAX_BACKUP_BYTES)throw new Error('The backup is too large.');
+      const bytes=Buffer.alloc(nativeSaves.MAX_BACKUP_BYTES+1);
+      const {bytesRead}=await file.read(bytes,0,bytes.length,0);
+      if(bytesRead>nativeSaves.MAX_BACKUP_BYTES)throw new Error('The backup is too large.');
+      text=bytes.subarray(0,bytesRead).toString('utf8');
+    }finally{await file.close();}
+    await nativeSaves.restoreBackup(userData,status.profile,text);
+    return {ok:true,message:'Both save profiles and the game clock were restored. Your previous saves were kept as a recovery copy.'};
+  }catch(error){return {ok:false,error:error.code==='ENOENT'?'No native save exists yet. Save using the in-game menu first.':error.message};}
+  finally{nativeTransferBusy=false;}
+});

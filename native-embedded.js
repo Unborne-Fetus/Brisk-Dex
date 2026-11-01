@@ -61,6 +61,12 @@ class EmbeddedNativeGame{
     if(this.webContents&&!this.webContents.isDestroyed())this.webContents.send(event,payload);
   }
   async start(){
+    if(this.stopping)return {ok:false,error:'The game is still stopping. Try again in a moment.'};
+    if(this.starting)return this.starting;
+    this.starting=this.startProcess();
+    try{return await this.starting;}finally{this.starting=null;}
+  }
+  async startProcess(){
     if(this.child)return {ok:true,alreadyRunning:true};
     const status=await embeddedStatus({platform:this.platform,resources:this.resources});
     if(status.status!=='ready')return {ok:false,error:status.message};
@@ -68,7 +74,8 @@ class EmbeddedNativeGame{
     const dataDir=path.join(this.userData,status.profile==='brisk'?'native-brisk-emerald':'native-expansion');
     await fs.mkdir(dataDir,{recursive:true});
     this.errorTail='';
-    this.decoder=new PacketDecoder(frame=>this.send('native-game-frame',new Uint8Array(frame)));
+    const decoder=new PacketDecoder(frame=>this.send('native-game-frame',new Uint8Array(frame)));
+    this.decoder=decoder;
     let child;
     try{
       child=this.spawnChild(executable,['--headless','--data-dir',dataDir],{
@@ -82,7 +89,7 @@ class EmbeddedNativeGame{
     child.stdin.on('error',error=>{
       this.send('native-game-state',{running:false,message:'Native input pipe closed: '+error.message});
     });
-    child.stdout.on('data',part=>this.decoder.push(part));
+    child.stdout.on('data',part=>{if(this.child===child)decoder.push(part);});
     child.stderr.on('data',part=>{this.errorTail=(this.errorTail+part.toString('utf8')).slice(-1500);});
     child.on('exit',(code,signal)=>{
       if(this.child===child){
@@ -106,13 +113,19 @@ class EmbeddedNativeGame{
     try{return this.child.stdin.write(keys);}
     catch(error){return false;}
   }
-  stop(){
+  async stop(){
+    if(this.starting)await this.starting;
+    if(this.stopping)return this.stopping;
     if(!this.child)return {ok:true};
     this.input(0);
-    this.child.kill();
-    this.child=null;
-    this.send('native-game-state',{running:false,message:'Game stopped.'});
-    return {ok:true};
+    const child=this.child;
+    this.stopping=new Promise(resolve=>{
+      const timer=setTimeout(()=>{child.kill('SIGKILL');},5000);
+      timer.unref?.();
+      child.once('exit',()=>{clearTimeout(timer);resolve({ok:true});});
+      child.kill();
+    });
+    try{return await this.stopping;}finally{this.stopping=null;}
   }
 }
 module.exports={WIDTH,HEIGHT,PIXELS,HEADER,PacketDecoder,bundledGamePath,embeddedStatus,EmbeddedNativeGame};

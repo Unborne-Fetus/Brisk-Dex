@@ -17,11 +17,17 @@ By default public GitHub builds do **not** contain Nintendo game assets or a pre
 
 The native game's headless video backend writes packets `BEXP` + little-endian length 76800 + 76800 bytes of raw BGR555 pixels on stdout. Brisk Dex decodes these with framing, renders using nearest-neighbor canvas scaling, and ignores malformed frames. The game's stdin takes little-endian 16-bit key masks (low ten bits, active-high), read by a dedicated SDL thread. Electron's IPC never permits the web page to pass an executable path or command line. Native Brisk saves live in Electron user-data `native-brisk-emerald/`. The earlier base-expansion native directory, `native-expansion/`, is preserved. GBA saves require conversion and are not loaded directly by the native engine.
 
-The embedded bridge streams video and input. SDL plays native audio directly through the Windows/Linux audio device without opening a game window. Keyboard and onscreen controls cover all ten GBA buttons. Controller forwarding and save interchange are future work.
+The embedded bridge streams video and input. SDL plays native audio directly through the Windows/Linux audio device without opening a game window. Keyboard and onscreen controls cover all ten GBA buttons. Standard controllers are supported through the Gamepad API: D-pad/left stick, south/east face buttons, shoulders and Start/Back. Keyboard, controller and touch inputs can be used together; releasing one source does not release another held input. Inputs clear on focus loss, tab changes or controller disconnection. Fullscreen stays inside Brisk Dex.
+
+## Native save backups
+
+Stop the game after saving from its in-game menu, then choose **Back up saves** in the game tab. The `.briskbackup` file contains the entire native flash image (both profiles) and RTC offset. **Restore saves** validates the format, layout, 64-bit ABI and image CRC before writing anything. It restores the profiles and clock together, preserving the existing directory in `native-brisk-emerald.before-restore-<unique ID>` beside the active directory. Existing settings are retained. Save transfers are blocked while the game is starting, running or stopping. The app waits for process exit before allowing a new start or transfer.
+
+A backup works between the current Windows and Linux 64-bit native builds with the same save schema. It is not a GBA `.sav` converter. Native/GBA save conversion still requires a separate schema migration; changing an extension or adding a header is insufficient. Browser/mobile editions keep native backup controls unavailable.
 
 ## Limitations / validation
 
-CI compiles the complete Brisk port for Windows and Linux. The Linux replay passes the opening, custom nine-starter case, first battle, in-game saving, cold restart/Continue, and isolation of the two save profiles. The embedded frame transport, desktop bridge, standalone Dex, and Windows UI checks pass. A complete Hoenn/Kanto playthrough remains unverified. Native backend support is currently Windows and Linux only.
+CI compiles the complete Brisk port for Windows and Linux. The Linux replay passes the opening, custom nine-starter case, first battle, in-game saving, cold restart/Continue, and isolation of the two save profiles. The embedded frame transport, desktop bridge, standalone Dex, and Windows UI checks pass. A complete Hoenn/Kanto playthrough remains unverified. Native backend support is currently Windows and Linux only. `npm run desktop:test` exercises controller input arbitration and native backup/restore, corruption rejection and recovery copies. `npm run native:ui` checks controller/keyboard handoff, disconnection, tab release, fullscreen and save-transfer controls against a mock bridge without game assets; the Windows UI CI job runs it with Chromium. Physical controller hardware and a complete Windows gameplay session still need device testing.
 
 ## Windows checkout / WSL line endings
 

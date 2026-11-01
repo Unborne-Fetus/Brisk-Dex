@@ -6,6 +6,8 @@ on:
       - 'tools/**'
       - 'test/desktop/**'
       - 'native-*.js'
+      - 'index.html'
+      - 'package.json'
       - 'main.js'
       - 'preload.js'
       - '.github/workflows/embedded-native.yml'
@@ -13,7 +15,7 @@ on:
     paths:
       - 'main.js'
       - 'preload.js'
-      - 'native-embedded.js'
+      - 'native-*.js'
       - 'native-game/**'
       - 'index.html'
       - 'tools/build-native-expansion.sh'
@@ -134,6 +136,8 @@ jobs:
       - run: npm ci
       - run: npm run desktop:test
       - run: npm run desktop:ui
+      - run: npx playwright install chromium
+      - run: npm run native:ui
 
   brisk-native-build:
     strategy:

@@ -59,7 +59,7 @@ for(const name of Object.keys(packed)) {
 add('brisk-dex-icon-manifest.json', Buffer.from(JSON.stringify({icons, shinyIcons})));
 
 let html = await fs.readFile(path.join(root, 'index.html'), 'utf8');
-for(const name of ['asset-loader.js','localization.js']) {
+for(const name of ['asset-loader.js','localization.js','native-controls.js']) {
   const tag = '<script src="' + name + '"></script>';
   if(!html.includes(tag)) throw new Error('Expected external script: ' + name);
   const source = (await fs.readFile(path.join(root, name), 'utf8'))

@@ -2,7 +2,7 @@
   "name": "brisk-dex",
   "productName": "Brisk Dex",
   "version": "1.2.0",
-  "description": "Companion app for Pokémon Brisk Emerald",
+  "description": "Companion app for Pok\u00e9mon Brisk Emerald",
   "main": "main.js",
   "author": {
     "name": "Brisk Emerald",
@@ -36,7 +36,8 @@
     "desktop:test": "node --test test/desktop/*.test.cjs",
     "native:build": "bash tools/build-native-expansion.sh windows",
     "native:bridge:test": "node --test test/desktop/embedded-game.test.cjs",
-    "desktop:ui": "node tools/test_embedded_ui.cjs"
+    "desktop:ui": "node tools/test_embedded_ui.cjs",
+    "native:ui": "node tools/test_native_controls_ui.cjs"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.0.0",
@@ -71,7 +72,9 @@
       "brisk-dex-icon-manifest.json",
       "desktop-content.js",
       "native-launcher.js",
-      "native-embedded.js"
+      "native-embedded.js",
+      "native-controls.js",
+      "native-saves.js"
     ],
     "directories": {
       "output": "dist"

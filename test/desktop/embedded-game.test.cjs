@@ -53,9 +53,10 @@ test('embedded process runs headless, forwards ten-bit keys, and never opens an 
  await fs.writeFile(path.join(path.dirname(exe),'build-info.json'),JSON.stringify({profile:'brisk'}));
  const legacy=path.join(root,'userdata','native-expansion','existing.sav');
  await fs.mkdir(path.dirname(legacy),{recursive:true});await fs.writeFile(legacy,'keep-existing-save');
- let args,opts,child;
+ let args,opts,child,spawnCount=0;
  const events=[];
  const mockSpawn=(file,a,o)=>{
+  spawnCount++;
   assert.equal(file,exe);args=a;opts=o;
   child=new EventEmitter();child.stdout=new PassThrough();child.stderr=new PassThrough();
   child.stdin=new PassThrough();child.kill=()=>{child.emit('exit',0,null);return true;};
@@ -66,7 +67,8 @@ test('embedded process runs headless, forwards ten-bit keys, and never opens an 
   webContents:{isDestroyed:()=>false,send:(name,payload)=>events.push({name,payload})},
   resources:root,userData:path.join(root,'userdata'),platform:'win32',spawnChild:mockSpawn
  });
- assert.equal((await game.start()).ok,true);
+ assert.deepEqual(await Promise.all([game.start(),game.start()]),[{ok:true},{ok:true}]);
+ assert.equal(spawnCount,1,'concurrent starts must share one engine');
  assert.equal(args[0],'--headless');
  assert.equal(args.includes('--silent'),false);
  assert.equal(opts.windowsHide,true);
@@ -80,6 +82,14 @@ test('embedded process runs headless, forwards ten-bit keys, and never opens an 
  assert.deepEqual(inputs,[0x201]);
  child.stdout.write(packet(0x7fff));
  assert.equal(events.filter(x=>x.name==='native-game-frame').length,1);
+ // Stop must wait for the OS exit; save restore cannot race a live writer.
+ child.kill=()=>true;
+ const stopping=game.stop();
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal((await game.start()).ok,false);
+ assert.equal(game.child,child);
+ child.emit('exit',0,null);
+ await stopping;
  assert.equal((await game.stop()).ok,true);
  assert.equal(game.child,null);
 });
