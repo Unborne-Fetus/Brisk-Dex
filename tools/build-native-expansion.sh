@@ -6,10 +6,14 @@ case "$target" in windows|linux);; *) echo 'Usage: bash tools/build-native-expan
 # BRISK_NATIVE_ROOT allows this script to be read from stdin after CRLF cleanup.
 root="${BRISK_NATIVE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 # WSL compilation belongs on the Linux filesystem, not /mnt/c (NTFS).
-source_default="$root/native-src/pokeemerald-expansion-native"
+profile="${BRISK_NATIVE_PROFILE:-expansion}"
+case "$profile" in expansion|brisk);; *) echo "Unknown native profile: $profile" >&2; exit 2;; esac
+source_name=pokeemerald-expansion-native
+if [ "$profile" = brisk ]; then source_name=brisk-emerald-native; fi
+source_default="$root/native-src/$source_name"
 if [ -n "${WSL_DISTRO_NAME:-}" ] || [[ "$root" == /mnt/* ]]; then
   cache_key="$(printf '%s' "$root" | sha256sum | cut -c1-12)"
-  source_default="${XDG_CACHE_HOME:-$HOME/.cache}/brisk-dex/$cache_key/pokeemerald-expansion-native"
+  source_default="${XDG_CACHE_HOME:-$HOME/.cache}/brisk-dex/$cache_key/$source_name"
 fi
 checkout="${BRISK_NATIVE_SOURCE_DIR:-$source_default}"
 deps_mode="${2:---check}"
@@ -24,6 +28,19 @@ if ! git -C "$checkout" cat-file -e "$pin^{commit}" 2>/dev/null; then
   git -C "$checkout" fetch --depth 1 origin "$pin"
 fi
 git -C "$checkout" checkout --detach "$pin"
+if [ "$profile" = brisk ]; then
+  # Pin both source trees; game assets are obtained from their original repo.
+  brisk_pin="8d2b525214a61a89563facde52c79a567ade560b"
+  base_pin="e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7"
+  if ! git -C "$checkout" cat-file -e "$brisk_pin^{commit}" 2>/dev/null; then
+    git -C "$checkout" fetch --depth 1 https://github.com/Unborne-Fetus/Pokemon-Brisk-Emerald.git "$brisk_pin"
+  fi
+  if ! git -C "$checkout" cat-file -e "$base_pin^{commit}" 2>/dev/null; then
+    git -C "$checkout" fetch --depth 1 https://github.com/rh-hideout/pokeemerald-expansion.git "$base_pin"
+  fi
+  python3 "$root/tools/prepare_brisk_native.py" "$checkout"
+  git -C "$checkout" apply "$root/tools/brisk-native-port.patch"
+fi
 python3 "$root/tools/patch-native-compat.py" "$checkout"
 python3 "$root/tools/patch-native-stream.py" "$checkout"
 if [ "$target" = windows ]; then

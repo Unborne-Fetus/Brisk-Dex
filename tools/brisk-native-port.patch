@@ -1,0 +1,98 @@
+diff --git a/include/malloc.h b/include/malloc.h
+index d1bd3302..b3fff732 100644
+--- a/include/malloc.h
++++ b/include/malloc.h
+@@ -26,7 +26,11 @@ struct MemBlock
+     u16 magic;
+ 
+     // Size of the block (not including this header struct).
++#if BRISK_NATIVE
++    u32 size;
++#else
+     u32 size:18;
++#endif
+ 
+     // Low 14 bits of location pointer.
+     u32 locationLo:14;
+@@ -41,7 +45,11 @@ struct MemBlock
+     u8 data[0];
+ };
+ 
++#if BRISK_NATIVE
++#define HEAP_SIZE (16 * 1024 * 1024)
++#else
+ #define HEAP_SIZE 0x1C500
++#endif
+ extern u8 gHeap[HEAP_SIZE];
+ 
+ #if TESTING || !defined(NDEBUG)
+diff --git a/platform/game_flags.mk b/platform/game_flags.mk
+index 16aee6d2..25cdcf74 100644
+--- a/platform/game_flags.mk
++++ b/platform/game_flags.mk
+@@ -3,6 +3,6 @@
+ # game (Makefile.native) and for platform/inspect.c, which reads the game's
+ # structures (platform/Makefile). TESTING and the game version stay with each
+ # makefile: the game varies them, inspect.c is built once for the plain game.
+-GAME_DEFINES := -DMODERN=1 -DPLATFORM_NATIVE=1
++GAME_DEFINES := -DMODERN=1 -DPLATFORM_NATIVE=1 -DBRISK_NATIVE=1
+ # Plain char is unsigned on ARM; the game was written for that.
+ GAME_CHAR_FLAGS := -funsigned-char
+diff --git a/platform/save_convert.c b/platform/save_convert.c
+index a83bb7fa..cdf262a2 100644
+--- a/platform/save_convert.c
++++ b/platform/save_convert.c
+@@ -1,3 +1,15 @@
++#if BRISK_NATIVE
++#include "save_convert.h"
++/* Brisk compact profiles serialize a different game schema. The native
++ * container rejects foreign layout IDs before this width-only hook. */
++int save_convert_image(uint8_t *image, uint32_t from_bits, uint32_t to_bits)
++{
++    (void)image;
++    (void)from_bits;
++    (void)to_bits;
++    return SAVE_CONVERT_ERR_ARGUMENT;
++}
++#else
+ /*
+  * save_convert.c: moves the game's save between the 32-bit and the 64-bit
+  * native build. Interface and what is converted: save_convert.h.
+@@ -424,3 +436,5 @@ int save_convert_image(uint8_t *image, uint32_t from_bits, uint32_t to_bits)
+     }
+     return converted;
+ }
++
++#endif /* BRISK_NATIVE */
+diff --git a/platform/save_file.h b/platform/save_file.h
+index 6d86a20a..a50fdbd8 100644
+--- a/platform/save_file.h
++++ b/platform/save_file.h
+@@ -91,7 +91,7 @@
+  * 64-bit layouts share the id; the pointer width tells them apart, and main
+  * moves a save from one to the other with save_convert.h. A build that
+  * changes the layout any other way uses a new value. */
+-#define SAVE_FILE_LAYOUT_ID 1u
++#define SAVE_FILE_LAYOUT_ID 0x42524B31u /* BRK1: Brisk 64-bit compact profiles */
+ 
+ /* The ABI an image was written with. */
+ struct save_file_layout {
+diff --git a/src/malloc.c b/src/malloc.c
+index 21012396..6d637236 100644
+--- a/src/malloc.c
++++ b/src/malloc.c
+@@ -18,8 +18,14 @@ ALIGNED(4) EWRAM_DATA u8 gHeap[HEAP_SIZE] = {0};
+ #else
+ // 8-byte blocks at 64 bits: struct MemBlock holds pointers (24-byte header), so its
+ // address and every block size must keep 8-byte alignment.
++#if BRISK_NATIVE
++/* Native working allocations use the executable's writable image, outside
++ * the emulated 256 KiB EWRAM window. transfer_bounds tracks this span. */
++ALIGNED(8) u8 gHeap[HEAP_SIZE] = {0};
++#else
+ ALIGNED(8) EWRAM_DATA u8 gHeap[HEAP_SIZE] = {0};
+ #endif
++#endif
+ #else
+ #line 10
+ ALIGNED(4) EWRAM_DATA u8 gHeap[HEAP_SIZE] = {0};
