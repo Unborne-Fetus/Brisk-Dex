@@ -40,6 +40,10 @@ function createWindow(){
       sandbox: true
     }
   });
+  // Use Electron's native window fullscreen; the renderer displays only the
+  // game framebuffer in its immersive overlay, not the surrounding Dex UI.
+  for(const [eventName,fullscreen] of [['enter-full-screen',true],['leave-full-screen',false]])
+    mainWindow.on(eventName,()=>{if(!mainWindow.isDestroyed())mainWindow.webContents.send('native-game-fullscreen-changed',fullscreen);});
   mainWindow.loadURL('brisk://app/index.html');
 }
 
@@ -289,6 +293,12 @@ function requireMainRenderer(event){
   if(!mainWindow||event.sender!==mainWindow.webContents||event.senderFrame!==mainWindow.webContents.mainFrame)
     throw new Error('Native game command must originate from the Pokemon Brisk Emerald main page');
 }
+ipcMain.handle('native-game-fullscreen',async(event,enabled)=>{
+  requireMainRenderer(event);
+  if(typeof enabled!=='boolean')return {ok:false,error:'Invalid fullscreen state.'};
+  mainWindow.setFullScreen(enabled);
+  return {ok:true,fullscreen:mainWindow.isFullScreen()};
+});
 ipcMain.handle('native-game-status',async event=>{
   requireMainRenderer(event);
   return embeddedStatus({resources:nativeResources()});
