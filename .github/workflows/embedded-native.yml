@@ -143,7 +143,7 @@ jobs:
   brisk-native-build:
     concurrency:
       group: brisk-runtime-updates-${{ matrix.target }}-${{ github.ref }}
-      cancel-in-progress: true
+      cancel-in-progress: false
     strategy:
       fail-fast: false
       matrix:

@@ -26,7 +26,7 @@ test('download, apply, confirmed restart and rollback preserve player saves',asy
  assert.equal((await updater.state()).current,null);
  await updater.activate();
  const active=await resolveActiveRoot(dir,dir);assert.notEqual(active,dir);
- assert.equal((await fs.stat(path.join(active,'native-game/linux/pokeemerald-native'))).mode&0o777,0o755);
+ if(process.platform!=='win32')assert.equal((await fs.stat(path.join(active,'native-game/linux/pokeemerald-native'))).mode&0o777,0o755);
  await updater.confirm();assert.equal(await resolveActiveRoot(dir,dir),active);
  setBundle(bundle(2));assert.equal((await updater.check()).ready,true);await updater.activate();await resolveActiveRoot(dir,dir);await updater.confirm();
  await updater.rollback();assert.equal(await resolveActiveRoot(dir,dir),active);

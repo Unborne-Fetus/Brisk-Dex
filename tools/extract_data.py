@@ -2003,8 +2003,7 @@ def main():
                     standing.save(os.path.join(trainers_out, f"outfit-{outfit_id}-{gender}.png"))
 
     print()
-    from package_game_assets import package
-    package(Path.cwd())
+    # Native runtime bundles are built by the validated update workflow.
     print("Done. Desktop builds load brisk-dex-data.json and brisk-dex-icons automatically.")
 
 if __name__ == "__main__":
