@@ -38,6 +38,78 @@ index 16aee6d2..25cdcf74 100644
 +GAME_DEFINES := -DMODERN=1 -DPLATFORM_NATIVE=1 -DBRISK_NATIVE=1
  # Plain char is unsigned on ARM; the game was written for that.
  GAME_CHAR_FLAGS := -funsigned-char
+diff --git a/platform/inspect.c b/platform/inspect.c
+index 34a71363..753be5fb 100644
+--- a/platform/inspect.c
++++ b/platform/inspect.c
+@@ -46,6 +46,13 @@
+ #include "task.h"
+ #include "title_screen.h"
+ #include "wallclock.h"
++#if BRISK_NATIVE
++#include "brisk_multisave.h"
++#include "brisk_modes.h"
++#include "malloc.h"
++#include "constants/abilities.h"
++#include "constants/opponents.h"
++#endif
+ 
+ const char inspect_none_text[] = "none";
+ 
+@@ -346,7 +353,53 @@ static const struct inspect_arg_reader state_arg_readers[] = {
+     {INSPECT_ARG_VAR, arg_var},
+ };
+ 
++#if BRISK_NATIVE
++static void fact_brisk_profile(char *out, size_t size)
++{
++    (void)snprintf(out, size, "%u", (unsigned)BriskMultiSave_CurrentSlot());
++}
++static void fact_brisk_slot0(char *out, size_t size)
++{
++    (void)snprintf(out, size, "%u", (unsigned)BriskMultiSave_SlotOccupied(0));
++}
++static void fact_brisk_slot1(char *out, size_t size)
++{
++    (void)snprintf(out, size, "%u", (unsigned)BriskMultiSave_SlotOccupied(1));
++}
++static void fact_native_heap(char *out, size_t size)
++{
++    (void)snprintf(out, size, "%u", (unsigned)HEAP_SIZE);
++}
++static void fact_brisk_species_count(char *out, size_t size)
++{
++    (void)snprintf(out, size, "%u", (unsigned)NUM_SPECIES);
++}
++static void fact_brisk_trainer_count(char *out, size_t size)
++{
++    (void)snprintf(out, size, "%u", (unsigned)TRAINERS_COUNT);
++}
++static void fact_brisk_mode(char *out, size_t size)
++{
++    (void)snprintf(out, size, "%u", (unsigned)GetBriskDifficulty());
++}
++static void fact_brisk_raw_save_bytes(char *out, size_t size)
++{
++    (void)snprintf(out, size, "%u", (unsigned)(sizeof(struct SaveBlock1) + sizeof(struct SaveBlock2)
++                                         + sizeof(struct SaveBlock3) + sizeof(struct PokemonStorage)));
++}
++#endif
++
+ static const struct inspect_fact facts[] = {
++#if BRISK_NATIVE
++    {"brisk_profile", fact_brisk_profile, NULL},
++    {"brisk_slot0_used", fact_brisk_slot0, NULL},
++    {"brisk_slot1_used", fact_brisk_slot1, NULL},
++    {"native_heap_bytes", fact_native_heap, NULL},
++    {"brisk_species_count", fact_brisk_species_count, NULL},
++    {"brisk_trainer_count", fact_brisk_trainer_count, NULL},
++    {"brisk_mode", fact_brisk_mode, inspect_none_text},
++    {"brisk_raw_save_bytes", fact_brisk_raw_save_bytes, NULL},
++#endif
+     {"frame", fact_frame, NULL},
+     {"callback2", fact_callback2, NULL},
+     {"task_count", fact_task_count, NULL},
 diff --git a/platform/save_convert.c b/platform/save_convert.c
 index a83bb7fa..cdf262a2 100644
 --- a/platform/save_convert.c

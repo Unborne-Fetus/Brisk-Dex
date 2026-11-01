@@ -132,6 +132,10 @@ jobs:
       - run: npm run desktop:ui
 
   brisk-native-build:
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [linux, windows]
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
@@ -142,10 +146,17 @@ jobs:
       - name: Install native build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends build-essential git python3 pkg-config curl clang gcc-multilib libc6-dev-i386 libpng-dev libsdl2-dev
+          sudo apt-get install -y --no-install-recommends build-essential git python3 pkg-config curl clang gcc-multilib libc6-dev-i386 libpng-dev libsdl2-dev gcc-mingw-w64-x86-64 binutils-mingw-w64-x86-64
       - name: Build the complete Brisk Emerald source port
         env:
           BRISK_NATIVE_PROFILE: brisk
-        run: bash tools/build-native-expansion.sh linux
+        run: bash tools/build-native-expansion.sh ${{ matrix.target }}
       - name: Start the Brisk native engine and verify embedded frames
+        if: matrix.target == 'linux'
         run: node tools/test_native_stream.cjs
+      - name: Play through Brisk's opening, save, reload, and profile selection
+        if: matrix.target == 'linux'
+        run: node tools/test_brisk_native.cjs
+      - name: Validate Brisk's native Windows executable layout
+        if: matrix.target == 'windows'
+        run: python3 tools/test_native_pe.py native-game/win32/pokeemerald-native.exe native-src/brisk-emerald-native/platform/build_glue/check_pe_layout.py
