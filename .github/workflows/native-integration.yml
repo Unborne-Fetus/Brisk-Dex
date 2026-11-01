@@ -1,0 +1,32 @@
+name: Native expansion launcher checks
+on:
+  pull_request:
+    paths:
+      - 'main.js'
+      - 'preload.js'
+      - 'native-launcher.js'
+      - 'index.html'
+      - 'tools/build_standalone.mjs'
+      - 'tools/build-native-expansion.sh'
+      - 'tools/test_standalone_game.mjs'
+      - 'test/desktop/**'
+      - 'package.json'
+      - '.github/workflows/native-integration.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  companion-and-launcher:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: node --check main.js && node --check native-launcher.js && node --check preload.js
+      - run: bash -n tools/build-native-expansion.sh
+      - run: npm run desktop:test
+      - run: npm run index:test
