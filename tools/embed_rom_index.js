@@ -22,7 +22,16 @@ function main(){
   if(!data.species||!Array.isArray(data.routeEncounters)||!Array.isArray(trainers.trainers))
     throw Error('Refresh Brisk Dex reference data from the matching ROM source before indexing.');
   data.trainerTeams=trainers.trainers;
-  const manifest={format:'briskdex-rom-v1',meta:{
+  const assets={icons:{},shinyIcons:{}},iconsDir=path.join(__dirname,'..','brisk-dex-icons');
+  if(!process.argv.includes('--no-icons')&&fs.existsSync(iconsDir)){
+    for(const name of fs.readdirSync(iconsDir)){
+      const match=name.match(/^(\\d+)(_shiny)?\\.png$/i);
+      if(!match)continue;
+      const dest=match[2]?assets.shinyIcons:assets.icons;
+      dest[match[1]]='data:image/png;base64,'+fs.readFileSync(path.join(iconsDir,name)).toString('base64');
+    }
+  }
+  const manifest={assets,format:'briskdex-rom-v1',meta:{
     source:'Brisk Dex source-derived data at ROM build time',
     warning:'The index is valid only if the data extraction and ROM build used the same game revision.'
   },data};
@@ -52,6 +61,7 @@ function main(){
   console.log('Species '+Object.keys(data.species).length+
     ' · trainer teams '+data.trainerTeams.length+
     ' · map/encounter areas '+data.routeEncounters.length);
+  console.log('Icons '+Object.keys(assets.icons).length+' normal / '+Object.keys(assets.shinyIcons).length+' shiny.');
   console.log('Index '+raw.length+' bytes raw / '+zipped.length+' bytes compressed; ROM '+length+' bytes.');
   console.log('The original ROM was not modified.');
 }
