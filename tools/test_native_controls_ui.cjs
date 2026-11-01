@@ -19,7 +19,7 @@ const assert=require('node:assert/strict');
   try{
     browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{})});
     const page=await browser.newPage();
-    const errors=[];page.on('pageerror',error=>errors.push(error.message));
+    const errors=[];page.on('pageerror',error=>{errors.push(error.message);console.error('Renderer error:',error.message);});
     await page.addInitScript(()=>{
       window.testKeys=[];window.testPad=null;window.testTransfers=[];window.testOptions=[];
       Object.defineProperty(navigator,'getGamepads',{value:()=>[window.testPad]});
@@ -39,6 +39,7 @@ const assert=require('node:assert/strict');
       };
     });
     await page.goto('http://127.0.0.1:'+server.address().port);
+    await page.waitForFunction(()=>window.BriskNativeUI&&document.querySelectorAll('#native-binding-list button').length===10);
     await page.locator('#native-game-launch').click();
     assert.equal(await page.locator('#native-game-backup').isDisabled(),true);
     await page.keyboard.down('z');

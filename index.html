@@ -7218,6 +7218,17 @@ storageReady = loadExternalStorage();
 saveRestoreReady=restoreLastSave();
 setMainTab('game');
 
+window.BriskNativeUI={
+  get preferences(){return nativePreferences;},set preferences(value){nativePreferences=value;},
+  get binding(){return nativeBinding;},set binding(value){nativeBinding=value;},
+  get panelPaused(){return nativePanelPaused;},set panelPaused(value){nativePanelPaused=value;},
+  get userPaused(){return nativeUserPaused;},set userPaused(value){nativeUserPaused=value;},
+  get blurPaused(){return nativeBlurPaused;},set blurPaused(value){nativeBlurPaused=value;},
+  get fastHeld(){return nativeFastHeld;},set fastHeld(value){nativeFastHeld=value;},
+  get tab(){return currentMainTab;},canvas:nativeCanvas,
+  clearInput:clearNativeInput,savePreferences:saveNativePreferences,applyOptions:applyNativeOptions
+};
+
 window.__briskDexDebug = function(){
   var party = currentSave ? currentSave.party.map(function(m){ return m.species; }) : [];
   var sampleId = Object.keys(NAME_DATA.species)[0];
