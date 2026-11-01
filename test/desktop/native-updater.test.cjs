@@ -4,7 +4,7 @@ const fs=require('node:fs/promises'),os=require('node:os'),path=require('node:pa
 const {gzipSync}=require('node:zlib');
 const {NativeUpdater,sha256,unpack,validateManifest,resolveActiveRoot,safePath,atomic}=require('../../native-updater');
 function bundle(sequence=1,extra=[]){
- const names=['main.js','preload.js','index.html','package.json','native-updater.js','native-settings-ui.js','native-controls.js','native-embedded.js','brisk-dex-data.json','native-game/linux/pokeemerald-native','native-game/linux/build-info.json'];
+ const names=['main.js','preload.js','index.html','package.json','native-updater.js','native-profile-reader.js','native-settings-ui.js','native-controls.js','native-embedded.js','brisk-dex-data.json','native-game/linux/pokeemerald-native','native-game/linux/build-info.json'];
  const files=names.map(name=>{
   const value=name.endsWith('build-info.json')?JSON.stringify({profile:'brisk',save_layout_id:0x42524b31,embedded_protocol:2}):'build '+sequence;
   const data=Buffer.from(value);return {path:name,mode:name.endsWith('pokeemerald-native')?0o755:0o644,sha256:sha256(data),data:data.toString('base64')};
