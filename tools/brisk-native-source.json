@@ -1,7 +1,7 @@
 {
   "native_commit": "bb3fd057061cdd7e6a9e79b76abb41924ee44ecc",
   "expansion_base": "e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7",
-  "brisk_commit": "a364120ef135d5d9e603981ea0d26bc311f81abd",
+  "brisk_commit": "12430a2d0fdf6e0d3dde9998d4648133053a312d",
   "brisk_remote": "https://github.com/Unborne-Fetus/Pokemon-Brisk-Emerald.git",
   "expansion_remote": "https://github.com/rh-hideout/pokeemerald-expansion.git"
 }
