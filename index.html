@@ -1243,6 +1243,7 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
       <p class="dex-muted">Auto-detected unknown Emerald saves open read-only unless a profile can be identified exactly. Explicitly choosing a trusted profile enables the write policy defined by that profile.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button type="button" class="primary" id="btn-import-gba-rom">Import game from .gba ROM</button>
+        <button type="button" class="ghost" id="btn-reset-rom-data">Restore Brisk reference data</button>
         <button type="button" class="ghost" id="btn-import-compat-profile">Import compatibility pack</button>
         <button type="button" class="ghost" id="btn-import-game-data">Import game-data pack</button>
         <button type="button" class="ghost" id="btn-export-original-backup">Export untouched backup</button>
@@ -2358,6 +2359,7 @@ function persistOnlineSession(){
     sessionStorage.removeItem('briskdex_room_code');sessionStorage.removeItem('briskdex_player_id');sessionStorage.removeItem('briskdex_player_index');
   }
 }
+var ROM_ACTIVE_DATA = null;
 var GAME_SHINY_ODDS = 8;
 var DEX_FLAG_BYTES = 129; // Gen IX National Dex (1025 entries + slot 0) in current Brisk Emerald.
 var DEX_SEEN_OFFSET = 0x3598; // SaveBlock1.dexSeen for Brisk Emerald's current save.h configuration.
@@ -2366,11 +2368,17 @@ var dexAnimationTimers = [];
 var dexCryAudio = null;
 
 function rebuildNameData(){
+  if(ROM_ACTIVE_DATA){
+    NAME_DATA.species = Object.assign({},ROM_ACTIVE_DATA.species||{});
+    NAME_DATA.moves = Object.assign({},ROM_ACTIVE_DATA.moves||{});
+    NAME_DATA.items = Object.assign({},ROM_ACTIVE_DATA.items||{});
+    NAME_DATA.abilities = Object.assign({},ROM_ACTIVE_DATA.abilities||{});
+    return;
+  }
   NAME_DATA.species = Object.assign({}, buildDefaultSpecies(), BUNDLED_DATA.species, USER_DATA.species);
   NAME_DATA.moves = Object.assign({}, BUNDLED_DATA.moves, USER_DATA.moves);
   NAME_DATA.items = Object.assign({}, BUNDLED_DATA.items, USER_DATA.items);
   NAME_DATA.abilities = Object.assign({}, BUNDLED_DATA.abilities, USER_DATA.abilities);
-
 }
 
 function loadNameDataFromStorage(){
@@ -3693,7 +3701,7 @@ function renderRouteEncounters(){
 }
 
 function dexSpeciesData(){
-  var merged=Object.assign({}, BUNDLED_DATA.species || {}, USER_DATA.species || {});
+  var merged=ROM_ACTIVE_DATA ? Object.assign({},ROM_ACTIVE_DATA.species||{}) : Object.assign({}, BUNDLED_DATA.species || {}, USER_DATA.species || {});
   Object.keys(merged).forEach(function(id){
     var constant=String((merged[id]||{}).constant||'');
     if(/(^|_)TOTEM(?:_|$)/.test(constant)) delete merged[id];
@@ -6391,6 +6399,7 @@ async function handleSavFromElectron(){
 }
 
 function applyGameDataPack(parsed,skipPersist){
+  ROM_ACTIVE_DATA=null;
   parsed=parsed&&parsed.data&&(!parsed.species&&!parsed.moves)?parsed.data:parsed;
   if(!parsed||typeof parsed!=='object')throw new Error('Game-data pack must be a JSON object.');
   if(!skipPersist){try{localStorage.setItem('briskdex_compat_game_data_pack',JSON.stringify(parsed));}catch(e){}}
@@ -6409,6 +6418,28 @@ function applyGameDataPack(parsed,skipPersist){
   if(Array.isArray(parsed.trainerTeams))TRAINER_DATA=parsed.trainerTeams;
   MOVE_LEARNERS_INDEX=null;ABILITY_USERS_INDEX=null;rebuildNameData();refreshBoxLevels();saveNameDataToStorage();updateDataStatus();renderCurrentReferenceTab();
   if(currentSave)renderAll();
+}
+function applyRomReferenceData(data){
+  // Keep ROM reference data isolated from Brisk's bundled tables and save
+  // compatibility profiles. Do not persist a partial scan as a trusted pack.
+  ROM_ACTIVE_DATA=data;
+  BUNDLED_DATA={
+    species:data.species||{}, moves:data.moves||{},
+    movePP:data.movePP||{}, moveDetails:data.moveDetails||{},
+    items:data.items||{}, abilities:data.abilities||{},
+    itemDetails:data.itemDetails||{}, abilityDetails:data.abilityDetails||{},
+    changes:Array.isArray(data.changes)?data.changes:[]
+  };
+  ITEM_DETAILS=Object.assign({},data.itemDetails||{});
+  MOVE_DETAILS=Object.assign({},data.moveDetails||{});
+  ABILITY_DETAILS=Object.assign({},data.abilityDetails||{});
+  CHANGE_DATA=BUNDLED_DATA.changes;
+  TRAINER_DATA=Array.isArray(data.trainerTeams)?data.trainerTeams:[];
+  ROUTE_DATA=Array.isArray(data.routeEncounters)?data.routeEncounters:[];
+  if(Number.isInteger(data.shinyOdds)&&data.shinyOdds>0)GAME_SHINY_ODDS=data.shinyOdds;
+  MOVE_LEARNERS_INDEX=null;ABILITY_USERS_INDEX=null;
+  selectedRouteId=null;selectedTrainerConstant=null;
+  rebuildNameData();refreshBoxLevels();updateDataStatus();
 }
 var currentRomReport=null;
 function renderRomImportReport(result){
@@ -6433,9 +6464,7 @@ async function handleGbaRomFile(file){
       throw new Error('No trustworthy Pokémon tables were identified in this ROM. A ROM index is needed for this hack.');
     // Clear stale Brisk trainer/encounter tables when the selected ROM lacks them.
     // This is reference data only; importing a ROM NEVER changes save write policies.
-    USER_DATA.species={};USER_DATA.moves={};USER_DATA.items={};USER_DATA.abilities={};
-    USER_DATA.itemDetails={};USER_DATA.moveDetails={};USER_DATA.abilityDetails={};
-    applyGameDataPack(Object.assign({trainerTeams:[],routeEncounters:[]},result.data));
+    applyRomReferenceData(result.data);
     var resolved=Object.assign({},result.iconUrls||{});
     Object.keys(result.icons).forEach(function(id){
       var pixels=result.icons[id],canvas=document.createElement('canvas');
@@ -6445,13 +6474,10 @@ async function handleGbaRomFile(file){
       var frame=ctx.createImageData(32,32);frame.data.set(pixels);ctx.putImageData(frame,0,0);
       if(!resolved[id])resolved[id]=canvas.toDataURL('image/png');
     });
-    SPECIES_ICONS=Object.assign({},SPECIES_ICONS,resolved);
-    SPECIES_SHINY_ICONS=Object.assign({},SPECIES_SHINY_ICONS,result.shinyIconUrls||{});
-    try{
-      var rawIcons=JSON.stringify({icons:resolved,shinyIcons:result.shinyIconUrls||{}});
-      if(rawIcons.length<4*1024*1024)localStorage.setItem('briskdex_compat_rom_icons_v1',rawIcons);
-      else localStorage.removeItem('briskdex_compat_rom_icons_v1');
-    }catch(e){}
+    SPECIES_ICONS=resolved;
+    SPECIES_SHINY_ICONS=Object.assign({},result.shinyIconUrls||{});
+    // ROM images are intentionally session-scoped so an unrelated save or
+    // ROM never inherits another hack's species icons or custom Fakémon.
     currentRomReport=result;
     renderRomImportReport(result);
     renderCurrentReferenceTab();
@@ -6695,6 +6721,7 @@ document.getElementById('file-sav').addEventListener('change', function(e){
 document.getElementById('file-data').addEventListener('change',function(e){if(e.target.files[0])handleDataFile(e.target.files[0]);e.target.value='';});
 document.getElementById('file-gba-rom').addEventListener('change',function(e){if(e.target.files[0])handleGbaRomFile(e.target.files[0]);e.target.value='';});
 document.getElementById('btn-import-gba-rom').addEventListener('click',function(){document.getElementById('file-gba-rom').click();});
+document.getElementById('btn-reset-rom-data').addEventListener('click',function(){window.location.reload();});
 document.getElementById('file-compat-profile').addEventListener('change',function(e){if(e.target.files[0])handleCompatibilityPackFile(e.target.files[0]);e.target.value='';});
 document.getElementById('btn-import-compat-profile').addEventListener('click',function(){document.getElementById('file-compat-profile').click();});
 document.getElementById('btn-import-game-data').addEventListener('click',function(){document.getElementById('file-data').click();});
