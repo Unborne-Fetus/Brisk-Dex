@@ -25,7 +25,8 @@ $quoted = "'" + ($wslRepo.Trim() -replace "'", "'\''") + "'"
 # added. Normalize only the Bash script's input stream, without modifying the
 # working tree or requiring users to install dos2unix.
 $normalizeScript = 'sed ''s/\r$//'' tools/build-native-expansion.sh'
-$wslCommand = "set -o pipefail; cd $quoted && $normalizeScript | bash -s -- windows"
+# Passing the root explicitly preserves Bash filename-relative paths when streamed.
+$wslCommand = "set -o pipefail; cd $quoted && $normalizeScript | BRISK_NATIVE_ROOT=$quoted bash -s -- windows"
 
 Write-Host 'Building the expansion engine into the Brisk Dex internal resource folder...' -ForegroundColor Cyan
 & wsl.exe --exec bash --noprofile --norc -c $wslCommand
