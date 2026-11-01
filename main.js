@@ -2,6 +2,8 @@ const { app, BrowserWindow, ipcMain, dialog, protocol, net } = require('electron
 const path = require('path');
 const fs = require('fs/promises');
 const fsSync = require('fs');
+const {spawn}=require('node:child_process');
+const {validateNativeExecutable}=require('./native-launcher');
 
 protocol.registerSchemesAsPrivileged([{scheme:'brisk',privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true,stream:true}}]);
 const {assetPath}=require('./desktop-content');
@@ -37,7 +39,6 @@ function createWindow(){
 
 app.whenReady().then(async () => {
   protocol.handle('brisk',request=>{const target=assetPath(request.url,__dirname);return target?net.fetch(pathToFileURL(target).href):new Response('Not found',{status:404});});
-  await migrateLegacyCampaign();
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -246,22 +247,41 @@ ipcMain.handle('start-battle-relay',async()=>{
 });
 app.on('before-quit',()=>{if(localBattleRelay)localBattleRelay.server.close();});
 
-let campaignQueue=Promise.resolve();
-function campaignPath(){return path.join(app.getPath('userData'),'brisk-emerald-campaign.json');}
-async function campaignRecords(){try{return JSON.parse(await fs.readFile(campaignPath(),'utf8'));}catch(e){if(e.code==='ENOENT')return {};throw e;}}
-ipcMain.handle('load-native-campaign',(_,key)=>{if(!['current','backup'].includes(key))throw Error('Invalid save slot');return campaignQueue.then(async()=> (await campaignRecords())[key]||null);});
-ipcMain.handle('save-native-campaign',(_,envelope)=>{
- if(envelope?.format!=='brisk-native-backup'||envelope.version!==1||typeof envelope.payload!=='string'||envelope.payload.length>33554432)throw Error('Invalid campaign save');
- const digest=require('node:crypto').createHash('sha256').update(envelope.payload).digest('hex');if(digest!==envelope.sha256)throw Error('Save checksum mismatch');
- const operation=campaignQueue.then(async()=>{const records=await campaignRecords();await writeFileAtomically(campaignPath(),JSON.stringify({current:envelope,backup:records.current||records.backup||null}));});campaignQueue=operation.catch(()=>{});return operation;
-});
 
-async function migrateLegacyCampaign(){
- if(fsSync.existsSync(campaignPath()))return;
- const legacy=new BrowserWindow({show:false,webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true}});
- try{
-  await legacy.loadFile(path.join(__dirname,'game/desktop-migrate.html'));
-  const records=await legacy.webContents.executeJavaScript(`new Promise((resolve,reject)=>{const request=indexedDB.open('brisk-native-campaign',1);request.onupgradeneeded=()=>request.result.createObjectStore('records');request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result,tx=db.transaction('records','readonly'),store=tx.objectStore('records'),current=store.get('current'),backup=store.get('backup');tx.oncomplete=()=>{db.close();resolve({current:current.result||null,backup:backup.result||null});};tx.onabort=()=>{db.close();reject(tx.error);};};})`);
-  if(records.current){for(const value of [records.current,records.backup].filter(Boolean)){if(value.format!=='brisk-native-backup'||typeof value.payload!=='string'||require('node:crypto').createHash('sha256').update(value.payload).digest('hex')!==value.sha256)throw Error('Invalid legacy campaign');}await writeFileAtomically(campaignPath(),JSON.stringify(records));}
- }catch(error){console.warn('Legacy save migration:',error.message);}finally{legacy.destroy();}
+/* Launch only a user-selected, locally built pokeemerald-expansion-native binary.
+   Retired JavaScript campaign saves are left intact in the user's app data. */
+const nativeConfigPath=()=>path.join(app.getPath('userData'),'native-expansion-location.json');
+async function configuredNativeExe(){
+  try{const data=JSON.parse(await fs.readFile(nativeConfigPath(),'utf8'));return typeof data.executable==='string'?data.executable:null;}
+  catch(e){if(e.code==='ENOENT')return null;throw e;}
 }
+async function nativeStatus(){
+  if(!['win32','linux'].includes(process.platform))
+    return {status:'unsupported',message:'The native engine currently supports Windows and Linux desktops only.'};
+  const exe=await configuredNativeExe();
+  if(!exe)return {status:'missing',message:'Choose your locally built native expansion executable.'};
+  const found=await validateNativeExecutable(exe,process.platform);
+  return found.ok
+    ? {status:'ready',message:'Native expansion is configured; it will open in a separate window.',executable:found.executable}
+    : {status:'invalid',message:found.error,executable:exe};
+}
+ipcMain.handle('native-game-status',()=>nativeStatus());
+ipcMain.handle('native-game-select',async()=>{
+  if(!['win32','linux'].includes(process.platform))return nativeStatus();
+  const chosen=await dialog.showOpenDialog(mainWindow,{title:'Choose your built pokeemerald-expansion-native',properties:['openFile'],filters:process.platform==='win32'?[{name:'Native Emerald executable',extensions:['exe']}]:[]});
+  if(chosen.canceled||!chosen.filePaths.length)return nativeStatus();
+  const check=await validateNativeExecutable(chosen.filePaths[0],process.platform);
+  if(!check.ok)return {status:'invalid',message:check.error};
+  await writeFileAtomically(nativeConfigPath(),JSON.stringify({schema:1,executable:check.executable})+'\n');
+  return nativeStatus();
+});
+ipcMain.handle('native-game-launch',async()=>{
+  const state=await nativeStatus();
+  if(state.status!=='ready')return {ok:false,error:state.message};
+  try{
+    const child=spawn(state.executable,[],{cwd:path.dirname(state.executable),detached:true,stdio:'ignore',windowsHide:false});
+    await new Promise((resolve,reject)=>{child.once('spawn',resolve);child.once('error',reject);});
+    child.unref();
+    return {ok:true};
+  }catch(e){return {ok:false,error:'Could not start native expansion: '+e.message};}
+});

@@ -1300,7 +1300,17 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
   </section>
 
   <section id="game-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-game">
-    <iframe id="brisk-game" title="Brisk Emerald recreation" style="width:100%;height:85vh;min-height:560px;border:0;border-radius:12px" allow="fullscreen" allowfullscreen></iframe>
+    <div class="loader-panel" style="max-width:770px;padding:24px">
+      <h2>Pokémon Emerald — Native Expansion</h2>
+      <p>Launch the original expansion C engine on your computer instead of the retired JavaScript game recreation. Gameplay opens in a separate desktop window.</p>
+      <p id="native-game-status" role="status">Checking native support…</p>
+      <div class="top-actions">
+        <button type="button" id="native-game-select">Choose locally built game…</button>
+        <button type="button" class="primary" id="native-game-launch" disabled>Launch native Emerald</button>
+      </div>
+      <p style="font-size:13px;margin-top:16px">Build the <a href="https://github.com/uehlbran/pokeemerald-expansion-native" target="_blank" rel="noopener noreferrer">native expansion source</a> at our pinned revision first. Windows requires <code>SDL2.dll</code> next to the executable. Brisk Dex does not bundle native game binaries or proprietary assets.</p>
+      <p style="font-size:13px">This first stage runs unmodified expansion, not Brisk Emerald's extra features. Brisk's GBA save files cannot yet be imported into this native game.</p>
+    </div>
   </section>
   <section id="guide-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-guide" style="display:none;">
     <div class="guide-hero">
@@ -3080,8 +3090,6 @@ async function exportSaveChangesToFile(){
    UI rendering
    ============================================================ */
 var currentSave = null,saveRestoreReady=null,lastSaveRestoreError=null;
-window.BriskAppGame=Object.freeze({activeSave:async function(){await saveRestoreReady;return currentSave?{bytes:new Uint8Array(currentSave._internal.rawBytes),fileName:currentSave.filePath||'Brisk save'}:lastSaveRestoreError?{error:lastSaveRestoreError}:null;}});
-function notifyGameSave(){var frame=document.getElementById('brisk-game');if(frame&&frame.contentWindow)frame.contentWindow.postMessage({type:'brisk-app-save-changed'},'*');}
 
 var activeBoxIndex = 0;
 var activePokemonDrag = null;
@@ -6541,15 +6549,44 @@ function renderCurrentReferenceTab(){
   else if(currentMainTab==='changes') renderChanges();
 }
 
+
+async function refreshNativeGame(){
+  const api=window.briskDexAPI,status=document.getElementById('native-game-status');
+  const choose=document.getElementById('native-game-select'),launch=document.getElementById('native-game-launch');
+  if(!api?.getNativeGameStatus){
+    status.textContent='Native Emerald is only available in the Windows/Linux desktop edition. Brisk Dex for web and mobile remains a companion.';
+    choose.disabled=true;launch.disabled=true;return;
+  }
+  try{
+    const result=await api.getNativeGameStatus();
+    status.textContent=result.message+(result.executable?' ('+result.executable+')':'');
+    choose.disabled=result.status==='unsupported';launch.disabled=result.status!=='ready';
+  }catch(error){status.textContent='Native game error: '+error.message;launch.disabled=true;}
+}
+document.getElementById('native-game-select').addEventListener('click',async function(){
+  if(!window.briskDexAPI?.selectNativeGame)return;
+  try{
+    const result=await window.briskDexAPI.selectNativeGame();
+    document.getElementById('native-game-status').textContent=result.message;
+    document.getElementById('native-game-launch').disabled=result.status!=='ready';
+  }catch(error){document.getElementById('native-game-status').textContent=error.message;}
+});
+document.getElementById('native-game-launch').addEventListener('click',async function(){
+  this.disabled=true;
+  try{
+    const result=await window.briskDexAPI.launchNativeGame();
+    document.getElementById('native-game-status').textContent=result.ok?'Native expansion launched in a separate window.':result.error;
+  }catch(error){document.getElementById('native-game-status').textContent=error.message;}
+  finally{await refreshNativeGame();}
+});
+
 function setMainTab(tabName){
   currentMainTab = tabName;
   var game = tabName === 'game';
   document.getElementById('game-tab-panel').style.display = game ? 'block' : 'none';
   document.getElementById('tab-game').classList.toggle('active',game);
   document.getElementById('tab-game').setAttribute('aria-selected',String(game));
-  var gameFrame=document.getElementById('brisk-game');
-  if(game&&!gameFrame.getAttribute('src')&&!gameFrame.hasAttribute('srcdoc')){if(window.BriskStandalone?.gameDocument)gameFrame.srcdoc=window.BriskStandalone.gameDocument;else gameFrame.src='game/index.html';}
-  if(gameFrame.contentWindow)gameFrame.contentWindow.postMessage({type:'brisk-game-visibility',visible:game},'*');
+  if(game)refreshNativeGame();
   var routes = tabName === 'routes';
   var dex = tabName === 'dex';
   var trainers = tabName === 'trainers';
@@ -6620,7 +6657,7 @@ function handleSavFile(file){
       var save = parseSav(e.target.result);
       var extMatch = String(file && file.name || '').match(/\.(sav|srm)$/i);
       save.fileExtension = extMatch ? extMatch[1].toLowerCase() : 'sav';
-      currentSave = save;lastSaveRestoreError=null;notifyGameSave();
+      currentSave = save;lastSaveRestoreError=null;
       storeSnapshot(save).catch(function(e){showError('Could not remember this save: '+e.message);});
       loadDexStatusOverrides(save);
       saveSessionId = genId();
@@ -6647,7 +6684,7 @@ async function handleSavFromAndroid(){
     var extMatch = String(result.name || '').match(/\.(sav|srm)$/i);
     save.fileExtension = extMatch ? extMatch[1].toLowerCase() : 'sav';
     save.uri=result.uri||null;
-    currentSave = save;lastSaveRestoreError=null;notifyGameSave();
+    currentSave = save;lastSaveRestoreError=null;
     await storeSnapshot(save);
     loadDexStatusOverrides(save);
     saveSessionId = genId();
@@ -6672,7 +6709,7 @@ async function handleSavFromElectron(){
     save.filePath = result.filePath;
     var extMatch = String(result.filePath || '').match(/\.(sav|srm)$/i);
     save.fileExtension = extMatch ? extMatch[1].toLowerCase() : 'sav';
-    currentSave = save;lastSaveRestoreError=null;notifyGameSave();
+    currentSave = save;lastSaveRestoreError=null;
     await storeSnapshot(save);
     loadDexStatusOverrides(save);
     saveSessionId = genId();
