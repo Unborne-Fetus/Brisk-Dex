@@ -102,7 +102,7 @@ function tilesToRgba(tiles,palette,width,height){
   if(!tiles||tiles.length<(width*height/2)||!palette||palette.length<32)return null;
   var pixels=new Uint8ClampedArray(width*height*4),tilesWide=width/8;
   for(var y=0;y<height;y++)for(var x=0;x<width;x++){
-    var tile=((y>>3)*tilesWide+(x>>3))*32+((y&7)*4)+(x&7>>1);
+    var tile=((y>>3)*tilesWide+(x>>3))*32+((y&7)*4)+((x&7)>>1);
     var val=tiles[tile],c=(x&1)?val>>4:val&15,color=u16(palette,c*2),idx=(y*width+x)*4;
     pixels[idx]=(color&31)*255/31;pixels[idx+1]=((color>>5)&31)*255/31;pixels[idx+2]=((color>>10)&31)*255/31;pixels[idx+3]=c===0?0:255;
   }return pixels;
