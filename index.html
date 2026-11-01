@@ -3168,7 +3168,8 @@ function loadNativeProfile(slot){
   for(let i=0;i<4;i++)sb1.set(sections[i+1].subarray(0,3968),i*3968);
   function briskVar(id){const p=0x139c+(id-0x4000)*2;return sb1[p]|(sb1[p+1]<<8);}
   const randomized=briskVar(0x40db)!==0;
-  document.getElementById('native-profile-status').textContent='Slot '+(slot+1)+' — '+save.trainer.name+' · Randomizer: '+(randomized?'On':'Off')+' · Read-only live-game snapshot';
+  const difficulty=['Normal','Easy','Hard','Kaizo','Expert'][briskVar(0x40bb)]||'Unknown';
+  document.getElementById('native-profile-status').textContent='Slot '+(slot+1)+' — '+save.trainer.name+' · Difficulty: '+difficulty+' · Randomizer: '+(randomized?'On':'Off')+' · Read-only saved-game snapshot';
   renderAll();return true;
 }
 async function refreshNativeProfiles(){
