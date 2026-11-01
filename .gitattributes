@@ -1,0 +1,6 @@
+# Keep WSL/macOS shell scripts readable even when Windows core.autocrlf=true.
+*.sh text eol=lf
+*.py text eol=lf
+# Native Windows scripts may retain Windows line endings.
+*.bat text eol=crlf
+*.ps1 text eol=crlf

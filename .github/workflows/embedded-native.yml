@@ -8,6 +8,9 @@ on:
       - 'native-game/**'
       - 'index.html'
       - 'tools/build-native-expansion.sh'
+      - 'tools/build_integrated_windows.ps1'
+      - 'tools/test_wsl_line_endings.sh'
+      - '.gitattributes'
       - 'tools/patch-native-stream.py'
       - 'test/desktop/**'
       - 'package.json'
@@ -27,6 +30,7 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: python3 tools/patch-native-stream.py --self-test
       - run: bash -n tools/build-native-expansion.sh
+      - run: bash tools/test_wsl_line_endings.sh
       - run: node --check main.js && node --check native-embedded.js && node --check preload.js
       - run: npm run desktop:test
       - run: npm run index:test
@@ -68,6 +72,17 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Check Windows integrated build script syntax
+        shell: powershell
+        run: |
+          $tokens = $null
+          $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD 'tools/build_integrated_windows.ps1'),
+            [ref]$tokens,
+            [ref]$parseErrors
+          ) | Out-Null
+          if ($parseErrors) { throw ($parseErrors | Out-String) }
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

@@ -22,3 +22,7 @@ The embedded bridge currently streams video and input only. Native audio is deli
 ## Limitations / validation
 
 The JavaScript launcher, IPC framing, and build patch are regression-tested. **The patched expansion C source has not yet been compiled or run through a native game-play smoke test in this environment**, so this feature must be regarded as experimental. This still runs unmodified expansion gameplay; Brisk-specific content has not yet been ported. Native backend support is currently Windows and Linux only.
+
+## Windows checkout / WSL line endings
+
+If `build-integrated.bat` previously printed `set: pipefail: invalid option name`, the script was checked out with Windows CRLF line endings. The Windows build wrapper now normalizes its Bash input automatically, and `.gitattributes` keeps future `.sh` checkouts in LF format. Pull the latest version, then rerun `build-integrated.bat`; do not edit the game source or install an extra launcher. A WSL `Failed to start the systemd user session` warning is separate and may be nonfatal; if WSL itself fails to run commands, inspect `wsl --status` and the WSL distro health.
