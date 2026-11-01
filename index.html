@@ -3651,7 +3651,7 @@ function renderRouteEncounters(){
   var selected = filtered.find(function(area){ return area.id === selectedRouteId; });
   detail.innerHTML = '';
   detail.appendChild(el('h2', {text:selected.name}));
-  detail.appendChild(el('div', {class:'route-subtitle', text:(isRouteArea(selected) ? 'Route' : 'Area') + ' · Brisk Emerald wild encounters'}));
+  detail.appendChild(el('div', {class:'route-subtitle', text:(isRouteArea(selected) ? 'Route' : 'Area') + ' · '+(currentRomReport?'Imported ROM':'Brisk Emerald')+' wild encounters'}));
   selected.methods.filter(function(method){ return matchesEncounterMethod(method, methodFilter); }).forEach(function(method){
     var card = el('section', {class:'encounter-card'});
     var heading = el('div', {class:'encounter-heading'});
@@ -6428,11 +6428,13 @@ async function handleGbaRomFile(file){
     await gameDataReady;
     if(!window.BriskRomImporter)throw new Error('ROM reader is not available in this build.');
     if(file.size<0xC0||file.size>128*1024*1024)throw new Error('Select a valid GBA ROM under 128 MB.');
-    var result=BriskRomImporter.importRom(await file.arrayBuffer());
+    var result=await BriskRomImporter.importRomAsync(await file.arrayBuffer());
     if(!result.counts.species&&!result.counts.trainers&&!result.counts.routes)
       throw new Error('No trustworthy Pokémon tables were identified in this ROM. A ROM index is needed for this hack.');
     // Clear stale Brisk trainer/encounter tables when the selected ROM lacks them.
     // This is reference data only; importing a ROM NEVER changes save write policies.
+    USER_DATA.species={};USER_DATA.moves={};USER_DATA.items={};USER_DATA.abilities={};
+    USER_DATA.itemDetails={};USER_DATA.moveDetails={};USER_DATA.abilityDetails={};
     applyGameDataPack(Object.assign({trainerTeams:[],routeEncounters:[]},result.data));
     var resolved={};
     Object.keys(result.icons).forEach(function(id){
