@@ -25,7 +25,7 @@ function main(){
   const assets={icons:{},shinyIcons:{}},iconsDir=path.join(__dirname,'..','brisk-dex-icons');
   if(!process.argv.includes('--no-icons')&&fs.existsSync(iconsDir)){
     for(const name of fs.readdirSync(iconsDir)){
-      const match=name.match(/^(\\d+)(_shiny)?\\.png$/i);
+      const match=name.match(/^(\d+)(_shiny)?\.png$/i);
       if(!match)continue;
       const dest=match[2]?assets.shinyIcons:assets.icons;
       dest[match[1]]='data:image/png;base64,'+fs.readFileSync(path.join(iconsDir,name)).toString('base64');
