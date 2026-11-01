@@ -949,6 +949,8 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
 <style>
 /* Fullscreen is the game framebuffer only; not the Dex panel or controls. */
 #native-game-stage:fullscreen{box-sizing:border-box;width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;display:flex!important;align-items:center;justify-content:center;background:#000;overflow:hidden;}
+body.native-game-immersive #native-game-stage{position:fixed!important;inset:0!important;z-index:2147483647!important;background:#000!important;display:flex!important;align-items:center!important;justify-content:center!important;width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;overflow:hidden!important;}
+body.native-game-immersive #native-game-screen{box-sizing:border-box!important;width:min(100vw,150vh)!important;height:min(100vh,66.6666667vw)!important;max-width:none!important;max-height:none!important;aspect-ratio:3/2!important;margin:0!important;border:0!important;outline:0!important;flex:none!important;image-rendering:pixelated!important;}
 #native-game-stage:fullscreen #native-game-screen{box-sizing:border-box;width:min(100vw, 150vh)!important;height:min(100vh, 66.666667vw)!important;max-width:none!important;max-height:none!important;aspect-ratio:3/2!important;margin:0!important;border:0!important;flex:none;image-rendering:pixelated;object-fit:contain;outline:0;}
 #native-touch-keys button{touch-action:none;}
 </style>
@@ -995,6 +997,15 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
   </nav>
 
   <div id="save-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-save" style="display:none;">
+    <div id="native-profile-panel" class="loader-panel" style="display:none;margin-bottom:14px;">
+      <label for="native-profile-choice"><strong>Integrated Brisk Emerald save</strong></label>
+      <select id="native-profile-choice" aria-label="Select integrated Brisk Emerald save profile">
+        <option value="0">Slot 1</option><option value="1">Slot 2</option>
+      </select>
+      <p id="native-profile-status" role="status">Checking saved profiles…</p>
+      <p>Each slot has its own party, 20 PC boxes, options, difficulty and randomizer settings. The integrated game owns the save; this Dex view is read-only.</p>
+      <button id="native-profile-refresh" type="button">Refresh saved profiles</button>
+    </div>
 
   <div hidden id="dirty-bar" class="loader-panel" style="display:none; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; border-color:var(--accent-soft);">
     <span>Transfers are staged in Pokemon Brisk Emerald. The save file on disk still has the original until you save changes.</span>
@@ -3015,7 +3026,7 @@ async function removeFromStorage(storageId){
   return true;
 }
 
-function markDirty(){ dirty=true;saveRevision++;updateDirtyBanner(); }
+function markDirty(){if(currentSave?._nativeReadOnly)throw new Error('Integrated Brisk Emerald profiles are read-only in Dex. Edit and save them inside the game.');dirty=true;saveRevision++;updateDirtyBanner(); }
 function clearDirty(){ dirty = false; updateDirtyBanner(); }
 
 async function depositFromBox(boxIndex, slotIndex){
@@ -3099,7 +3110,7 @@ async function storeSnapshot(save){
 }
 async function readSnapshot(){var db=await snapshotDB();try{return await new Promise(function(resolve,reject){var r=db.transaction('snapshots').objectStore('snapshots').get('last');r.onsuccess=function(){resolve(r.result);};r.onerror=function(){reject(r.error);};});}finally{db.close();}}
 function saveChangesToFile(){
- clearTimeout(autoSaveTimer);if(!currentSave)return Promise.resolve(false);
+ clearTimeout(autoSaveTimer);if(!currentSave||currentSave._nativeReadOnly)return Promise.resolve(false);
  var save=currentSave,revision=saveRevision,bytes=new Uint8Array(save._internal.rawBytes);
  autoSaveQueue=autoSaveQueue.catch(function(){}).then(async function(){
   try{
@@ -3117,6 +3128,7 @@ function saveChangesToFile(){
 async function restoreLastSave(){
  try{
   await gameDataReady;await storageReady;
+  if(await refreshNativeProfiles())return;
   var saved=IS_ELECTRON&&window.briskDexAPI.loadLastSav?await window.briskDexAPI.loadLastSav():await readSnapshot();
   if(!saved)return;if(saved.error)throw new Error(saved.error);
   var bytes=saved.buffer||saved.bytes;
@@ -3137,6 +3149,61 @@ async function exportSaveChangesToFile(){
    UI rendering
    ============================================================ */
 var currentSave = null,saveRestoreReady=null,lastSaveRestoreError=null;
+var nativeProfiles=null;
+var nativeActiveSlot=Number(localStorage.getItem('brisk-native-dex-slot')||0)===1?1:0;
+function loadNativeProfile(slot){
+  if(!nativeProfiles?.available)return false;
+  var profile=nativeProfiles.profiles?.[slot];
+  if(!profile?.occupied||!profile.virtualSave)return false;
+  var bytes=new Uint8Array(profile.virtualSave);
+  var save=parseSav(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength));
+  save._nativeReadOnly=true;save.nativeSlot=slot;save.filePath=null;
+  currentSave=save;lastSaveRestoreError=null;nativeActiveSlot=slot;
+  localStorage.setItem('brisk-native-dex-slot',String(slot));
+  loadDexStatusOverrides(save);saveSessionId=genId();dirty=false;
+  document.getElementById('empty-state').style.display='none';
+  document.getElementById('app-content').style.display='block';
+  const sections=save._internal.sectionView;
+  const sb1=new Uint8Array(4*3968);
+  for(let i=0;i<4;i++)sb1.set(sections[i+1].subarray(0,3968),i*3968);
+  function briskVar(id){const p=0x139c+(id-0x4000)*2;return sb1[p]|(sb1[p+1]<<8);}
+  const randomized=briskVar(0x40db)!==0;
+  document.getElementById('native-profile-status').textContent='Slot '+(slot+1)+' — '+save.trainer.name+' · Randomizer: '+(randomized?'On':'Off')+' · Read-only live-game snapshot';
+  renderAll();return true;
+}
+async function refreshNativeProfiles(){
+  if(!window.briskDexAPI?.getNativeGameProfiles)return false;
+  const state=await window.briskDexAPI.getNativeGameProfiles();
+  const panel=document.getElementById('native-profile-panel');
+  if(!state?.available){
+    if(state?.error||state?.reason)document.getElementById('native-profile-status').textContent=state.error||state.reason;
+    return false;
+  }
+  nativeProfiles=state;panel.style.display='block';
+  const picker=document.getElementById('native-profile-choice');
+  for(let i=0;i<2;i++){
+    const profile=state.profiles[i];
+    picker.options[i].textContent='Slot '+(i+1)+(profile?.occupied?' (saved)':' (empty)');
+    picker.options[i].disabled=!profile?.occupied;
+  }
+  const wanted=state.profiles[nativeActiveSlot]?.occupied?nativeActiveSlot:(state.profiles[0]?.occupied?0:1);
+  picker.value=String(wanted);
+  if(!state.profiles[wanted]?.occupied){
+    document.getElementById('native-profile-status').textContent='Neither integrated save slot has been saved yet.';
+    return false;
+  }
+  try{return loadNativeProfile(wanted);}catch(e){
+    document.getElementById('native-profile-status').textContent='Could not decode the integrated save: '+e.message;
+    return false;
+  }
+}
+document.getElementById('native-profile-choice').addEventListener('change',event=>{
+  try{loadNativeProfile(Number(event.target.value));}catch(e){showError(e.message);}
+});
+document.getElementById('native-profile-refresh').addEventListener('click',()=>{
+  refreshNativeProfiles().catch(e=>showError(e.message));
+});
+
 
 var activeBoxIndex = 0;
 var activePokemonDrag = null;
@@ -6637,7 +6704,10 @@ window.briskDexAPI?.onNativeState?.(state=>{
   document.getElementById('native-game-stop').disabled=!nativeRunning;
   document.getElementById('native-game-launch').disabled=nativeRunning;
   document.getElementById('native-game-status').textContent=state.message||(nativeRunning?'Game running.':'Game stopped.');
-  if(nativeRunning){nativeBlurPaused=false;applyNativeOptions();}else clearNativeInput();
+  if(nativeRunning){nativeBlurPaused=false;applyNativeOptions();}else{
+    clearNativeInput();
+    refreshNativeProfiles().catch(error=>console.warn('Native profile refresh:',error.message));
+  }
   nativeTransferButtons();
 });
 async function refreshNativeGame(){
@@ -6710,13 +6780,34 @@ function pollNativeController(){
   requestAnimationFrame(pollNativeController);
 }
 requestAnimationFrame(pollNativeController);
+let nativeImmersive=false;
+function updateNativeImmersive(enabled){
+  nativeImmersive=!!enabled;
+  document.body.classList.toggle('native-game-immersive',nativeImmersive);
+  document.getElementById('native-game-fullscreen').textContent=nativeImmersive?'Exit fullscreen':'Fullscreen';
+  if(nativeImmersive)nativeCanvas.focus();
+}
+window.briskDexAPI?.onNativeFullscreenChange?.(updateNativeImmersive);
 document.getElementById('native-game-fullscreen').addEventListener('click',async()=>{
   try{
-    if(document.fullscreenElement)await document.exitFullscreen();
-    else await document.getElementById('native-game-stage').requestFullscreen();
+    if(window.briskDexAPI?.setNativeFullscreen){
+      const result=await window.briskDexAPI.setNativeFullscreen(!nativeImmersive);
+      if(!result.ok)throw new Error(result.error||'Fullscreen failed');
+      updateNativeImmersive(result.fullscreen);
+    }else{
+      if(document.fullscreenElement)await document.exitFullscreen();
+      else await document.getElementById('native-game-stage').requestFullscreen();
+      updateNativeImmersive(!!document.fullscreenElement);
+    }
     nativeCanvas.focus();
   }catch(error){document.getElementById('native-game-status').textContent=error.message;}
 });
+document.addEventListener('keydown',event=>{
+  if(event.code==='Escape'&&nativeImmersive){
+    event.preventDefault();event.stopImmediatePropagation();
+    window.briskDexAPI?.setNativeFullscreen?.(false).then(result=>{if(result.ok)updateNativeImmersive(false);});
+  }
+},true);
 for(const action of ['backup','restore'])document.getElementById('native-game-'+action).addEventListener('click',async()=>{
   try{
     const result=await window.briskDexAPI?.[action==='backup'?'backupNativeSaves':'restoreNativeSaves']?.();
