@@ -25,7 +25,7 @@ function findBytes(b,pattern,from,to){outer:for(var i=from;i+pattern.length<=to;
 function scanHeader(b){
   var needle=[112,111,107,101,109,111,110,32,101,109,101,114,97,108,100,32,118,101,114,115,105,111,110],pos=0;
   while((pos=findBytes(b,needle,pos,Math.min(b.length,1024*1024)))>=0){
-    var base=pos-8;if(base>=0 && u32(b,base)<=25 && offset(b,u32(b,base+188),8)!=null)return {base:base,version:u32(b,base),name:text(b,pos,32),speciesInfo:offset(b,u32(b,base+188),8),iconPalettes:offset(b,u32(b,base+64),8),icons:offset(b,u32(b,base+56),4),iconPaletteIds:offset(b,u32(b,base+60),1),speciesNames:offset(b,u32(b,base+68),1),moveNames:offset(b,u32(b,base+72),1),pokedexCount:u32(b,base+112),nameLength:b[base+118]||10};pos++;
+    var base=pos-8;if(base>=0 && u32(b,base)<=25 && offset(b,u32(b,base+188),8)!=null)return {base:base,version:u32(b,base),name:text(b,pos,32),speciesInfo:offset(b,u32(b,base+188),8),iconPalettes:offset(b,u32(b,base+64),8),icons:offset(b,u32(b,base+56),4),iconPaletteIds:offset(b,u32(b,base+60),1),speciesNames:offset(b,u32(b,base+68),1),moveNames:offset(b,u32(b,base+72),1),itemsInfo:offset(b,u32(b,base+192),4),movesInfo:offset(b,u32(b,base+196),4),pokedexCount:u32(b,base+112),nameLength:b[base+118]||10};pos++;
   }
   return null;
 }
@@ -120,6 +120,55 @@ function extractSpecies(b,layout,count,limit,warnings){
   return out;
 }
 function extractNames(b,base,step,count){var out={};if(base==null||step<2||step>64)return out;for(var i=1;i<Math.min(count,MAX_SPECIES);i++){var s=gbaString(b,base+i*step,step);if(s&&s.length>1)out[String(i)]=s;}return out;}
+// Recover named move/item/ability tables when the ROM retains the
+// documented Emerald/Expansion pointers. Strides are verified against
+// multiple known entries to avoid reading arbitrary code as game data.
+function recognizeName(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
+function inferPointerTable(b,base,fieldOffset,firstNames,count,minStride,maxStride){
+  if(base==null)return null;
+  for(var stride=minStride;stride<=maxStride;stride+=4){
+    var hits=0,total=0;
+    Object.keys(firstNames).forEach(function(key){
+      var p=base+stride*Number(key)+fieldOffset;
+      if(p+4>b.length)return;
+      var nameOff=offset(b,u32(b,p),32);
+      if(nameOff==null)return;
+      total++;
+      if(recognizeName(gbaString(b,nameOff,40))===recognizeName(firstNames[key]))hits++;
+    });
+    if(hits!==Object.keys(firstNames).length||total!==hits)continue;
+    var names={},good=0;
+    for(var n=1;n<Math.min(count||350,4096);n++){
+      var o=base+stride*n+fieldOffset,ptr=offset(b,u32(b,o),2);
+      if(ptr==null)continue;
+      var name=gbaString(b,ptr,40);
+      if(name.length>=2&&name.length<=30&&/^[A-Za-zÀ-ÿ0-9 .!?'-]+$/.test(name)){
+        names[String(n)]=name;
+        if(n<25)good++;
+      }
+    }
+    if(good>=12)return {names:names,stride:stride};
+  }
+  return null;
+}
+function inferInlineNameTable(b,base,names,count,minStride,maxStride){
+  if(base==null)return null;
+  for(var stride=minStride;stride<=maxStride;stride+=4){
+    var hits=0;
+    Object.keys(names).forEach(function(key){
+      var name=gbaString(b,base+stride*Number(key),40);
+      if(recognizeName(name)===recognizeName(names[key]))hits++;
+    });
+    if(hits!==Object.keys(names).length)continue;
+    var out={},good=0;
+    for(var i=1;i<Math.min(count||350,4096);i++){
+      var n=gbaString(b,base+stride*i,Math.min(stride,40));
+      if(n.length>=2&&/^[A-Za-zÀ-ÿ0-9 .!?'-]+$/.test(n)){out[i]=n;if(i<25)good++;}
+    }
+    if(good>=12)return {names:out,stride:stride};
+  }
+  return null;
+}
 function lz77(b,off,maxBytes){
   if(off==null||b[off]!==0x10||off+4>b.length)return null;
   var length=b[off+1]|(b[off+2]<<8)|(b[off+3]<<16);
@@ -215,6 +264,18 @@ function importRom(value,options){
     }
   }
   if(!data.moves&&header&&header.moveNames!=null){data.moves=extractNames(b,header.moveNames,13,Math.min((rhh&&rhh.moves)||355,2048));}
+  if(!data.moves&&header&&header.movesInfo!=null){
+    var foundMoves=inferPointerTable(b,header.movesInfo,0,{1:'Pound',2:'Karate Chop',3:'Double Slap'},(rhh&&rhh.moves)||355,24,256);
+    if(foundMoves)data.moves=foundMoves.names;
+  }
+  if(!data.items&&header&&header.itemsInfo!=null){
+    var foundItems=inferPointerTable(b,header.itemsInfo,20,{1:'Master Ball',2:'Ultra Ball',3:'Great Ball'},(rhh&&rhh.items)||380,32,128);
+    if(foundItems)data.items=foundItems.names;
+  }
+  if(!data.abilities&&rhh&&rhh.abilitiesPointer!=null){
+    var foundAbilities=inferInlineNameTable(b,rhh.abilitiesPointer,{1:'Stench',2:'Drizzle',3:'Speed Boost'},rhh.abilities||80,20,64);
+    if(foundAbilities)data.abilities=foundAbilities.names;
+  }
   var icons={};
   if(data.species&&Object.keys(data.species).length){
     icons=collectIcons(b,header, Object.assign({},layout,{speciesInfo:speciesLayout||layout.speciesInfo}),data.species,MAX_SPECIES,warnings);
