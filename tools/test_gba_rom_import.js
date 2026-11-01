@@ -35,7 +35,7 @@ assert.strictEqual(plain.counts.trainers,0);
 assert.strictEqual(plain.complete,false);
 assert(plain.warnings.some(s=>s.includes('Trainer teams')));
 
-const packed={format:'briskdex-rom-v1',data:{
+const packed={format:'briskdex-rom-v1',assets:{icons:{'1':'data:image/png;base64,aGVsbG8='},shinyIcons:{'1':'data:image/png;base64,aGVsbG8='}},data:{
   species:{'1':{name:'Custommon',types:['Water']}},
   moves:{'1':'Tackle'},items:{'1':'Poké Ball'},abilities:{'1':'Sturdy'},
   trainerTeams:[{constant:'TRAINER_1',name:'TEST',party:[{species:'Custommon',fields:{Level:'42'},moves:['Tackle']}]}],
@@ -51,6 +51,8 @@ assert.strictEqual(loaded.counts.species,1);
 assert.strictEqual(loaded.counts.trainers,1);
 assert.strictEqual(loaded.counts.routes,1);
 assert.strictEqual(loaded.data.species['1'].name,'Custommon');
+assert.strictEqual(loaded.iconUrls['1'],'data:image/png;base64,aGVsbG8=');
+assert.strictEqual(loaded.shinyIconUrls['1'],'data:image/png;base64,aGVsbG8=');
 full[size+10]^=1;
 assert.throws(()=>R.importRom(full),/checksum/i);
 
@@ -64,4 +66,16 @@ const pixels=R.tilesToRgba(new Uint8Array(512).fill(0x11),new Uint8Array(32).fil
 assert.strictEqual(pixels.length,4096);
 assert.strictEqual(pixels[3],255);
 assert.strictEqual(pixels[7],255);
-console.log('GBA ROM importer tests passed');
+const compressed=require('zlib').deflateSync(Buffer.from(JSON.stringify(packed)));
+const zippedRom=new Uint8Array(size+compressed.length+16);
+zippedRom.set(sample);zippedRom.set(compressed,size);
+put32(zippedRom,size+compressed.length,compressed.length);
+put32(zippedRom,size+compressed.length+4,R.crc32(compressed,0,compressed.length));
+writeAscii(zippedRom,size+compressed.length+8,'BDXROMZ!');
+R.importRomAsync(zippedRom).then(result=>{
+  assert.strictEqual(result.complete,true);
+  assert.strictEqual(result.data.trainerTeams[0].party[0].species,'Custommon');
+  assert.strictEqual(result.iconUrls['1'],'data:image/png;base64,aGVsbG8=');
+  console.log('GBA ROM importer tests passed (raw + compressed indexes)');
+}).catch(err=>{console.error(err);process.exitCode=1;});
+
