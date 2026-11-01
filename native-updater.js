@@ -40,7 +40,7 @@ function unpack(bytes,manifest){
     seen.add(item.path);files.push({...item,data});
   }
   const engine='native-game/'+manifest.platform+'/'+(manifest.platform==='win32'?'pokeemerald-native.exe':'pokeemerald-native');
-  for(const name of ['main.js','preload.js','native-settings-ui.js','native-controls.js','index.html','package.json','native-updater.js','native-embedded.js','brisk-dex-data.json',engine,'native-game/'+manifest.platform+'/build-info.json',...(manifest.platform==='win32'?['native-game/win32/SDL2.dll']:[])])if(!seen.has(name))throw new Error('The update is missing '+name+'.');
+  for(const name of ['main.js','preload.js','native-settings-ui.js','native-controls.js','index.html','package.json','native-updater.js','native-embedded.js','native-profile-reader.js','brisk-dex-data.json',engine,'native-game/'+manifest.platform+'/build-info.json',...(manifest.platform==='win32'?['native-game/win32/SDL2.dll']:[])])if(!seen.has(name))throw new Error('The update is missing '+name+'.');
   const info=JSON.parse(files.find(f=>f.path==='native-game/'+manifest.platform+'/build-info.json').data);
   if(info.profile!=='brisk'||info.save_layout_id!==manifest.saveLayout||info.embedded_protocol<2)throw new Error('The update engine uses an incompatible save or controls format.');
   return files;
