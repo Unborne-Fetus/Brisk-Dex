@@ -55,8 +55,9 @@ const assert=require('node:assert/strict');
     await page.keyboard.up('ArrowUp');
     await page.locator('#tab-game').click();
     await page.locator('#native-game-fullscreen').click();
-    await page.waitForFunction(()=>document.fullscreenElement?.id==='native-game-view');
-    await page.locator('#native-game-fullscreen').click();
+    await page.waitForFunction(()=>document.fullscreenElement?.id==='native-game-stage');
+    // Only the canvas is fullscreen; page controls are intentionally hidden.
+    await page.keyboard.press('Escape');
     await page.waitForFunction(()=>!document.fullscreenElement);
     await page.locator('#native-game-settings summary').click();
     await page.getByRole('button',{name:'Remap A keyboard key',exact:true}).click();
