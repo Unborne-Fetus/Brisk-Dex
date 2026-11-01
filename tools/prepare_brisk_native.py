@@ -17,6 +17,14 @@ ROOT = Path(__file__).resolve().parent
 CONFLICT = re.compile(r'^<<<<<<< [^\n]*\n(.*?)^=======\n(.*?)^>>>>>>> [^\n]*\n', re.M | re.S)
 
 
+def apply_port_patch(repo, patch):
+    # Existing Windows checkouts can still have CRLF even after .gitattributes
+    # changes. Imported source bytes are LF; git apply otherwise treats CR as
+    # part of each context line and rejects every hunk.
+    content = patch.read_bytes().replace(b'\r\n', b'\n')
+    subprocess.run(['git', '-C', str(repo), 'apply', '-'], input=content, check=True)
+
+
 def git(repo, *args):
     return subprocess.check_output(['git', '-C', str(repo), *args])
 
@@ -185,3 +193,5 @@ if __name__ == '__main__':
     parser.add_argument('checkout', type=Path)
     args = parser.parse_args()
     prepare(args.checkout.resolve(), json.loads((ROOT / 'brisk-native-source.json').read_text()))
+    apply_port_patch(args.checkout.resolve(), ROOT / 'brisk-native-port.patch')
+    print('Applied native portability patch with normalized line endings')

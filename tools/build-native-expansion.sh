@@ -51,7 +51,6 @@ if [ "$profile" = brisk ]; then
     fetch_source https://github.com/rh-hideout/pokeemerald-expansion.git "$base_pin"
   fi
   python3 "$root/tools/prepare_brisk_native.py" "$checkout"
-  git -C "$checkout" apply "$root/tools/brisk-native-port.patch"
 fi
 python3 "$root/tools/patch-native-compat.py" "$checkout"
 python3 "$root/tools/patch-native-stream.py" "$checkout"

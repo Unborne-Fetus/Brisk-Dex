@@ -33,6 +33,10 @@ CI compiles the complete Brisk port for Windows and Linux. The Linux replay pass
 
 If `build-integrated.bat` previously printed `set: pipefail: invalid option name`, the script was checked out with Windows CRLF line endings. The Windows build wrapper now normalizes its Bash input automatically, and `.gitattributes` keeps future `.sh` checkouts in LF format. Pull the latest version, then rerun `build-integrated.bat`; do not edit the game source or install an extra launcher. A WSL `Failed to start the systemd user session` warning is separate and may be nonfatal; if WSL itself fails to run commands, inspect `wsl --status` and the WSL distro health.
 
+## Portability patch fails on a Windows checkout
+
+If the build reports `patch does not apply` across Route 101, malloc, the starter case and native platform files, an older Windows checkout may have converted `tools/brisk-native-port.patch` to CRLF. The importer writes LF source, so those carriage returns prevent Git from matching the patch context. Pull the latest `main` and rerun `build-integrated.bat`. The importer now normalizes patch bytes before applying them, including on existing checkouts, and `.gitattributes` keeps future patch checkouts in LF format. Cached build objects and player saves do not need to be deleted. Genuine source/patch mismatches still stop the build.
+
 ## Missing WSL compiler packages
 
 The integrated Windows build now installs missing compiler packages automatically, including `gcc-multilib`, `libc6-dev-i386`, `gcc-mingw-w64-x86-64`, `binutils-mingw-w64-x86-64`, and `clang`. Standalone Bash builds only check dependencies; use `bash tools/setup-native-deps.sh windows --install` to install them, or pass `--install` as the second argument to `build-native-expansion.sh`. Package-manager failures stop the build before any clone or packaging.
