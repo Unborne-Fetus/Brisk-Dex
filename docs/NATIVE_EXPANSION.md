@@ -4,6 +4,9 @@ This implements an embedded **viewport and input transport** for the real pokeem
 
 ## One-app local build
 
+On Windows, run `build-integrated.bat` from your Brisk Dex source checkout after installing the native compiler prerequisites in WSL/Ubuntu. This single build command checks out the pinned expansion source, compiles and stages the private internal runtime, runs desktop tests, and packages one Brisk Dex Windows installer. No player has to find or select a separate game executable. The result is for your own build and testing; do not publicly distribute game assets without the necessary rights.
+
+
 Run `bash tools/build-native-expansion.sh windows` in Ubuntu/WSL (or `linux` on Linux), after installing the native upstream dependencies. The script pins upstream to `bb3fd057061cdd7e6a9e79b76abb41924ee44ecc` (expansion `1.17.1`), applies `tools/patch-native-stream.py` to two platform modules and stages the built helper under ignored `native-game/win32/` or `native-game/linux/`.
 
 When `npm run dist:win` or `npm run dist:linux` is subsequently run locally, Electron Builder includes this staged engine in the app's internal resources. **End users install only Brisk Dex; they do not select or install an executable, and gameplay appears inside its game tab.** Technically the native game still runs as a private child process, but it never creates an SDL window or requires a separate launch.
