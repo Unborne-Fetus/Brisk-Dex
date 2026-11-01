@@ -13,9 +13,9 @@ import pathlib
 import struct
 import zlib
 
-MAGIC = b"BDXROM2!"
+MAGIC = b"BDXROMZ!"
 MAX_ROM = 32 * 1024 * 1024
-MAX_PACK = 24 * 1024 * 1024
+MAX_PACK = 12 * 1024 * 1024
 
 def read_json(path):
     with open(path, encoding="utf-8") as f:
@@ -61,7 +61,7 @@ def pack(index):
     encoded = json.dumps(index, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
     compressed = zlib.compress(encoded, level=9)
     if len(compressed) > MAX_PACK:
-        raise ValueError("Compressed index exceeds 24 MiB")
+        raise ValueError("Compressed index exceeds 12 MiB")
     return compressed + struct.pack("<II", len(compressed), zlib.crc32(compressed)) + MAGIC
 
 def install(rom, packed):
