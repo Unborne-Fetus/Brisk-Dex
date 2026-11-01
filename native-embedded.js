@@ -11,13 +11,24 @@ function bundledGamePath({platform=process.platform,resources=process.resourcesP
   const name=platform==='win32'?'pokeemerald-native.exe':'pokeemerald-native';
   return path.join(resources,'native-game',platform,name);
 }
+async function engineInfo(executable){
+  try{
+    const info=JSON.parse(await fs.readFile(path.join(path.dirname(executable),'build-info.json'),'utf8'));
+    if(!['brisk','expansion'].includes(info.profile))throw new Error('Unknown game profile');
+    return {profile:info.profile,briskCommit:info.brisk_commit||null};
+  }catch(error){
+    if(error.code==='ENOENT')return {profile:'expansion'}; // existing native builds
+    return {error:'The native engine build information is invalid. Rebuild Brisk Dex.'};
+  }
+}
 async function embeddedStatus({platform=process.platform,resources=process.resourcesPath}={}){
   if(!['linux','win32'].includes(platform))return {status:'unsupported',message:'Native expansion gameplay is currently Windows/Linux desktop only.'};
   const executable=bundledGamePath({platform,resources});
   const checked=await validateNativeExecutable(executable,platform);
-  return checked.ok
-    ? {status:'ready',message:'Integrated expansion engine is ready.'}
-    : {status:'not-installed',message:'The integrated native engine was not included in this build. Rebuild Brisk Dex with the native source integration enabled.'};
+  if(!checked.ok)return {status:'not-installed',message:'The integrated native engine was not included in this build. Rebuild Brisk Dex with the native source integration enabled.'};
+  const info=await engineInfo(executable);
+  if(info.error)return {status:'invalid-build',message:info.error};
+  return {status:'ready',...info,message:info.profile==='brisk'?'Integrated Brisk Emerald is ready.':'Integrated expansion engine is ready.'};
 }
 class PacketDecoder{
   constructor(onFrame){this.pending=Buffer.alloc(0);this.onFrame=onFrame;}
@@ -54,7 +65,7 @@ class EmbeddedNativeGame{
     const status=await embeddedStatus({platform:this.platform,resources:this.resources});
     if(status.status!=='ready')return {ok:false,error:status.message};
     const executable=bundledGamePath({platform:this.platform,resources:this.resources});
-    const dataDir=path.join(this.userData,'native-expansion');
+    const dataDir=path.join(this.userData,status.profile==='brisk'?'native-brisk-emerald':'native-expansion');
     await fs.mkdir(dataDir,{recursive:true});
     this.errorTail='';
     this.decoder=new PacketDecoder(frame=>this.send('native-game-frame',new Uint8Array(frame)));

@@ -36,6 +36,11 @@ test('native executable comes from internal resources, never renderer-supplied p
  await fs.writeFile(exe,'mock');
  await fs.writeFile(path.join(path.dirname(exe),'SDL2.dll'),'mock');
  assert.equal((await embeddedStatus({platform:'win32',resources:root})).status,'ready');
+ await fs.writeFile(path.join(path.dirname(exe),'build-info.json'),JSON.stringify({profile:'brisk',brisk_commit:'test-source'}));
+ const brisk=await embeddedStatus({platform:'win32',resources:root});
+ assert.equal(brisk.profile,'brisk');assert.equal(brisk.briskCommit,'test-source');
+ await fs.writeFile(path.join(path.dirname(exe),'build-info.json'),'invalid');
+ assert.equal((await embeddedStatus({platform:'win32',resources:root})).status,'invalid-build');
  assert.equal((await embeddedStatus({platform:'darwin',resources:root})).status,'unsupported');
 });
 test('embedded process runs headless, forwards ten-bit keys, and never opens an extra window',async t=>{
@@ -45,6 +50,9 @@ test('embedded process runs headless, forwards ten-bit keys, and never opens an 
  await fs.mkdir(path.dirname(exe),{recursive:true});
  await fs.writeFile(exe,'mock');
  await fs.writeFile(path.join(path.dirname(exe),'SDL2.dll'),'mock');
+ await fs.writeFile(path.join(path.dirname(exe),'build-info.json'),JSON.stringify({profile:'brisk'}));
+ const legacy=path.join(root,'userdata','native-expansion','existing.sav');
+ await fs.mkdir(path.dirname(legacy),{recursive:true});await fs.writeFile(legacy,'keep-existing-save');
  let args,opts,child;
  const events=[];
  const mockSpawn=(file,a,o)=>{
@@ -63,6 +71,8 @@ test('embedded process runs headless, forwards ten-bit keys, and never opens an 
  assert.equal(args.includes('--silent'),false);
  assert.equal(opts.windowsHide,true);
  assert.equal(opts.env.BRISK_FRAME_STREAM,'1');
+ assert.equal(args[args.indexOf('--data-dir')+1],path.join(root,'userdata','native-brisk-emerald'));
+ assert.equal(await fs.readFile(legacy,'utf8'),'keep-existing-save');
  assert.equal(game.input(-1),false);
  assert.equal(game.input(1024),false);
  const inputs=[];child.stdin.on('data',bytes=>inputs.push(bytes.readUInt16LE()));

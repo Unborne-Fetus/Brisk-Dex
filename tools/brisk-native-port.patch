@@ -39,7 +39,7 @@ index 16aee6d2..25cdcf74 100644
  # Plain char is unsigned on ARM; the game was written for that.
  GAME_CHAR_FLAGS := -funsigned-char
 diff --git a/platform/inspect.c b/platform/inspect.c
-index 34a71363..753be5fb 100644
+index 34a71363..f97b81d3 100644
 --- a/platform/inspect.c
 +++ b/platform/inspect.c
 @@ -46,6 +46,13 @@
@@ -49,7 +49,7 @@ index 34a71363..753be5fb 100644
 +#if BRISK_NATIVE
 +#include "brisk_multisave.h"
 +#include "brisk_modes.h"
-+#include "malloc.h"
++#include "../include/malloc.h"
 +#include "constants/abilities.h"
 +#include "constants/opponents.h"
 +#endif

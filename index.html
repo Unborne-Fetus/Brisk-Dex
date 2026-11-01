@@ -1301,8 +1301,8 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
 
   <section id="game-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-game">
     <div class="loader-panel" style="padding:24px;max-width:800px;margin:auto">
-      <h2>Pokémon Emerald — Native Expansion</h2>
-      <p>Play the original expansion engine directly in Brisk Dex. This is the base expansion game; Brisk Emerald additions will follow.</p>
+      <h2 id="native-game-title">Pokémon Brisk Emerald</h2>
+      <p id="native-game-description">Play Brisk Emerald directly in Brisk Dex.</p>
       <p id="native-game-status" role="status">Checking integrated engine…</p>
       <div class="top-actions">
         <button id="native-game-launch" type="button" class="primary" disabled>Start game</button>
@@ -6605,6 +6605,10 @@ async function refreshNativeGame(){
   try{
     const result=await api.getNativeGameStatus();
     status.textContent=nativeRunning?'Game running.':result.message;
+    if(result.status==='ready'){
+      document.getElementById('native-game-title').textContent=result.profile==='brisk'?'Pokémon Brisk Emerald':'Pokémon Emerald — Native Expansion';
+      document.getElementById('native-game-description').textContent=result.profile==='brisk'?'Play Brisk Emerald directly in Brisk Dex.':'Play the expansion engine directly in Brisk Dex.';
+    }
     launch.disabled=result.status!=='ready'||nativeRunning;
   }catch(error){status.textContent='Unable to check native engine: '+error.message;launch.disabled=true;}
 }

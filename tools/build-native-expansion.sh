@@ -22,10 +22,22 @@ sed 's/\r$//' "$root/tools/setup-native-deps.sh" | bash -s -- "$target" "$deps_m
 remote="https://github.com/uehlbran/pokeemerald-expansion-native.git"
 pin="bb3fd057061cdd7e6a9e79b76abb41924ee44ecc"
 if [ ! -d "$checkout/.git" ]; then mkdir -p "$(dirname "$checkout")"; git clone --depth 1 "$remote" "$checkout"; fi
+# Keep shallow source transactions serial; background auto-maintenance can
+# change .git/shallow while another pinned source is being fetched.
+git -C "$checkout" config gc.auto 0
+git -C "$checkout" config maintenance.auto false
+fetch_source() {
+  local attempt
+  for attempt in 1 2 3; do
+    if git -C "$checkout" -c gc.auto=0 -c maintenance.auto=false fetch --depth 1 "$@"; then return 0; fi
+    echo "Pinned source fetch attempt $attempt failed; retrying the transaction..." >&2
+  done
+  return 1
+}
 origin="$(git -C "$checkout" remote get-url origin)"
 if [ "$origin" != "$remote" ] && [ "$origin" != "https://github.com/uehlbran/pokeemerald-expansion-native" ]; then echo "Unexpected native source remote: $origin" >&2; exit 1; fi
 if ! git -C "$checkout" cat-file -e "$pin^{commit}" 2>/dev/null; then
-  git -C "$checkout" fetch --depth 1 origin "$pin"
+  fetch_source origin "$pin"
 fi
 git -C "$checkout" checkout --detach "$pin"
 if [ "$profile" = brisk ]; then
@@ -33,10 +45,10 @@ if [ "$profile" = brisk ]; then
   brisk_pin="8d2b525214a61a89563facde52c79a567ade560b"
   base_pin="e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7"
   if ! git -C "$checkout" cat-file -e "$brisk_pin^{commit}" 2>/dev/null; then
-    git -C "$checkout" fetch --depth 1 https://github.com/Unborne-Fetus/Pokemon-Brisk-Emerald.git "$brisk_pin"
+    fetch_source https://github.com/Unborne-Fetus/Pokemon-Brisk-Emerald.git "$brisk_pin"
   fi
   if ! git -C "$checkout" cat-file -e "$base_pin^{commit}" 2>/dev/null; then
-    git -C "$checkout" fetch --depth 1 https://github.com/rh-hideout/pokeemerald-expansion.git "$base_pin"
+    fetch_source https://github.com/rh-hideout/pokeemerald-expansion.git "$base_pin"
   fi
   python3 "$root/tools/prepare_brisk_native.py" "$checkout"
   git -C "$checkout" apply "$root/tools/brisk-native-port.patch"
@@ -51,12 +63,15 @@ fi
 (cd "$checkout" && BRISK_NATIVE_TARGET="$target" bash tools/build-native.sh --os "$target")
 dest="$root/native-game"
 if [ "$target" = windows ]; then
+  platform_dir=win32
   mkdir -p "$dest/win32"
   cp "$checkout/build/native64-windows/pokeemerald-native.exe" "$dest/win32/pokeemerald-native.exe"
   cp "$checkout/build/native64-windows/SDL2.dll" "$dest/win32/SDL2.dll"
 else
+  platform_dir=linux
   mkdir -p "$dest/linux"
   cp "$checkout/build/native64/pokeemerald-native" "$dest/linux/pokeemerald-native"
 fi
+python3 "$root/tools/native_build_info.py" "$dest/$platform_dir" "$checkout" "$profile" "$pin"
 echo "Internal native engine staged under $dest; it will launch inside Brisk Dex."
 
