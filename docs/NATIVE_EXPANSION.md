@@ -38,3 +38,5 @@ Under WSL, source and object files live in `~/.cache/brisk-dex/<checkout-key>/po
 Some older MinGW GCC versions reject C99 `%zu`/`%zx` formats in standard stdio calls even with ANSI stdio enabled. The build applies a platform-only adapter that explicitly selects MinGW's GNU-format stdio functions. Format checking and warnings-as-errors remain enabled. The Windows native build is checked on both Ubuntu 22.04 and 24.04. Host `libsdl2-dev` is required for the Windows build's Linux data-layout submake and is now checked for both targets.
 
 `build-integrated.bat` records console output in `build-integrated.log` beside the batch file, including failures. Rerunning the build keeps the cached source and objects; no manual source cleanup is needed.
+
+Windows builds run the upstream COFF converter tests and real-object comparisons. macOS-only assembler tests are excluded from Windows builds so older Clang releases do not need to understand Mach-O zero-fill sections. Linux and other upstream build modes keep their original test selection.

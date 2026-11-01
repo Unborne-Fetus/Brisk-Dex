@@ -26,7 +26,7 @@ fi
 git -C "$checkout" checkout --detach "$pin"
 python3 "$root/tools/patch-native-compat.py" "$checkout"
 python3 "$root/tools/patch-native-stream.py" "$checkout"
-(cd "$checkout" && bash tools/build-native.sh --os "$target")
+(cd "$checkout" && BRISK_NATIVE_TARGET="$target" bash tools/build-native.sh --os "$target")
 dest="$root/native-game"
 if [ "$target" = windows ]; then
   mkdir -p "$dest/win32"

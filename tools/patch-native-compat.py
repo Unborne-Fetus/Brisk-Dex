@@ -18,6 +18,38 @@ def apply(source_dir: Path) -> None:
         if '#include <stdio.h>' in data and '#include "brisk_stdio.h"' not in data:
             file.write_text(data.replace('#include <stdio.h>',
                                         '#include <stdio.h>\n#include "brisk_stdio.h"', 1))
+    # Windows conversion checks should not require a macOS-capable assembler.
+    # Keep every COFF round-trip, mutation, and real-object check intact.
+    checker = platform / "build_glue/check_flat.py"
+    if checker.exists():
+        data = checker.read_text()
+        marker = '    # Brisk: assemble only the requested host format in Windows builds.\n'
+        if marker not in data:
+            before = '    listings = {target_name: convert("a.o", obj, target_name, values)[0] for target_name in TARGETS}\n'
+            after = (marker +
+                     '    selected_targets = [name for name in TARGETS if os.environ.get("BRISK_NATIVE_TARGET") != "windows" or name == "coff-x86_64"]\n' +
+                     '    listings = {target_name: convert("a.o", obj, target_name, values)[0] for target_name in selected_targets}\n')
+            if data.count(before) != 1:
+                raise RuntimeError("check_flat: pinned target-selection anchor changed")
+            data = data.replace(before, after)
+            before = '    for target_name, edits in (("macho-x86_64", MACHO_EDITS), ("coff-x86_64", COFF_EDITS)):\n'
+            if data.count(before) != 1:
+                raise RuntimeError("check_flat: pinned edit-test anchor changed")
+            data = data.replace(before, before + '        if target_name not in listings:\n            continue\n')
+            checker.write_text(data)
+    macho = platform / "build_glue/macho_object.py"
+    if macho.exists():
+        data = macho.read_text()
+        before = 'def self_test():\n    failures = []\n'
+        after = ('def self_test():\n'
+                 '    if os.environ.get("BRISK_NATIVE_TARGET") == "windows":\n'
+                 '        print("Mach-O assembler tests are not applicable to the Windows COFF build")\n'
+                 '        return 0\n'
+                 '    failures = []\n')
+        if after not in data:
+            if data.count(before) != 1:
+                raise RuntimeError("macho_object: pinned self-test anchor changed")
+            macho.write_text(data.replace(before, after))
     print("Applied MinGW ANSI stdio compatibility (format warnings remain enabled)")
 
 
