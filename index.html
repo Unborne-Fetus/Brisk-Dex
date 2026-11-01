@@ -947,8 +947,9 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
 @media(max-width:390px){.battle-move-grid,.battle-switch-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.battle-side-panel{width:42px!important}.battle-sim-field{margin:0 42px!important}.battle-preview-mon{grid-template-columns:34px minmax(0,1fr)}.battle-preview-mon button{grid-column:1/-1}}
 </style>
 <style>
-#native-game-view:fullscreen{box-sizing:border-box;max-width:none!important;width:100%;height:100%;overflow:auto;background:#101010;color:#eee;}
-#native-game-view:fullscreen #native-game-screen{max-width:min(1100px, calc((100vh - 280px) * 1.5));}
+/* Fullscreen is the game framebuffer only; not the Dex panel or controls. */
+#native-game-stage:fullscreen{box-sizing:border-box;width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;display:flex!important;align-items:center;justify-content:center;background:#000;overflow:hidden;}
+#native-game-stage:fullscreen #native-game-screen{box-sizing:border-box;width:min(100vw, 150vh)!important;height:min(100vh, 66.666667vw)!important;max-width:none!important;max-height:none!important;aspect-ratio:3/2!important;margin:0!important;border:0!important;flex:none;image-rendering:pixelated;object-fit:contain;outline:0;}
 #native-touch-keys button{touch-action:none;}
 </style>
 </head>
@@ -1335,9 +1336,11 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
         <p id="native-update-status" role="status">Updates are available in the desktop app.</p>
         <div class="top-actions"><button id="native-update-check" type="button">Check for updates</button><button id="native-update-apply" type="button" disabled>Restart and apply update</button><button id="native-update-rollback" type="button" disabled>Roll back update</button></div>
       </details>
+      <div id="native-game-stage">
       <canvas id="native-game-screen" width="240" height="160" tabindex="0"
         aria-label="Pokémon Emerald game screen. Arrow keys move; Z confirms; X goes back; Enter starts."
         style="display:block;max-width:720px;width:100%;aspect-ratio:3/2;height:auto;margin:18px auto 8px;background:#101010;border:2px solid #363636;image-rendering:pixelated;outline-offset:3px"></canvas>
+      </div>
       <p style="font-size:12px">Open “Controls, speed and updates” to change keyboard and controller bindings. Defaults: arrows move; Z/X = A/B; Enter/Backspace = Start/Select; A/S = L/R. Hold Tab to speed up.</p>
       <p id="native-controller-status" role="status" style="font-size:12px">Connect a controller and press a button to use it.</p>
       <div class="top-actions" id="native-touch-keys" aria-label="Game controls" style="justify-content:center">
@@ -6710,7 +6713,7 @@ requestAnimationFrame(pollNativeController);
 document.getElementById('native-game-fullscreen').addEventListener('click',async()=>{
   try{
     if(document.fullscreenElement)await document.exitFullscreen();
-    else await document.getElementById('native-game-view').requestFullscreen();
+    else await document.getElementById('native-game-stage').requestFullscreen();
     nativeCanvas.focus();
   }catch(error){document.getElementById('native-game-status').textContent=error.message;}
 });
