@@ -15,7 +15,7 @@ function baseRom(){
   put32(b,gf+188,0x08000000+species);
   put32(b,gf+112,150);b[gf+118]=10;
   writeAscii(b,h,'RHHEXP');b[h+6]=1;b[h+7]=17;b[h+8]=0;
-  put16(b,h+10,934);put16(b,h+12,30);put16(b,h+14,319);put16(b,h+20,874);
+  put16(b,h+10,934);put16(b,h+12,300);put16(b,h+14,319);put16(b,h+20,874);
   let names=['','Bulbasaur','Ivysaur','Venusaur'];
   for(let i=1;i<29;i++){
     let p=species+i*200;
@@ -27,7 +27,7 @@ function baseRom(){
 const sample=baseRom();
 const plain=R.importRom(sample);
 assert.strictEqual(plain.details.title,'BRISK TEST');
-assert.strictEqual(plain.rhh.species,30);
+assert.strictEqual(plain.rhh.species,300);
 assert.strictEqual(plain.counts.species,28);
 assert.strictEqual(plain.data.species['1'].name,'Bulbasaur');
 assert.strictEqual(plain.data.species['2'].stats.speed,45);
