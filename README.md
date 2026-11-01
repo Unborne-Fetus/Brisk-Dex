@@ -2,9 +2,11 @@
 
 ## Embedded expansion engine (experimental)
 
-The original expansion C engine is being integrated into the **Native Emerald** tab of the desktop Brisk Dex app. There is no executable picker or separate game window. Brisk Dex streams the real native engine's framebuffer to its own canvas and forwards keyboard/touch controls to the engine. A locally built copy is bundled as an internal Electron resource.
+The **Brisk Emerald** desktop tab runs the native C engine with Brisk Emerald's current game source, maps, teams, custom species, abilities and features. Brisk Dex owns the internal game process, framebuffer, controls and audio.
 
-To stage an internal build: install the upstream native build prerequisites, run `bash tools/build-native-expansion.sh windows` inside WSL (Linux: `... linux`), then package Brisk Dex normally. This remains an experimental integration and has not yet passed a real compiled-game smoke test. No proprietary game binary is committed, and public builds without a staged engine show an unavailable message. This is still the **base expansion**, not custom Brisk Emerald gameplay.
+On Windows, run `build-integrated.bat` to build one installer containing the Brisk native runtime. The build imports the pinned Brisk source into the native backend and checks the resulting engine before packaging. On Linux, run `bash tools/build-native-expansion.sh linux` before packaging. Native Brisk uses separate saves from GBA files and the earlier base-expansion native build. Public builds without a locally staged game engine still show gameplay as unavailable.
+
+See [native capacity and remaining limits](docs/BRISK_NATIVE_CAPACITY.md) for storage, heap, IDs, graphics and save constraints.
 
 See [embedded native integration](docs/NATIVE_EXPANSION.md) for build instructions, limitations, and save boundaries.
 

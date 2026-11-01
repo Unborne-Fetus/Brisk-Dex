@@ -21,6 +21,33 @@ fs.writeFileSync(path.join(smoke,'brisk_opening_start.replay'),start);
 let replay=fs.readFileSync(path.join(smoke,'opening.replay'),'utf8');
 replay=replay.replace('include opening_start.replay','include brisk_opening_start.replay');
 replay=replay.replace('wait-until task_first=Task_HandleMainMenuInput max 600',profileGate);
+// Brisk's Route 101 is taller and uses its own nine-starter case.
+replay=replay.replace('# ---- 10. Route 101:', 'hold UP\nwait-until script_running=1 max 600\nrelease UP\n# ---- 10. Route 101:');
+const bagStart=replay.indexOf("# Birch's bag lies");
+const battleStart=replay.indexOf('wait-until in_battle=1',bagStart);
+assert.ok(bagStart>=0 && battleStart>bagStart,'Upstream opening structure changed');
+replay=replay.slice(0,bagStart)+`# Brisk bag at (10,17); stand below it after the chase.
+hold LEFT
+wait-until pos=10,16 max 200
+release LEFT
+hold DOWN
+wait-until pos=10,18 max 200
+release DOWN
+wait 20
+press UP
+wait 10
+press A
+wait-until task_first=Task_BirchCaseMain max 1200
+press DOWN
+wait-until task_first=Task_BirchCaseMain max 300
+wait 20
+press A
+wait-until task_first=Task_BirchCaseConfirmSelection max 300
+press A
+wait-until task_first=Task_BirchCaseRecievedMon max 300
+press B
+`+replay.slice(battleStart);
+
 replay+=`
 expect brisk_profile=0
 expect brisk_slot0_used=1
@@ -74,5 +101,5 @@ child.once('exit',code=>{
   assert.equal(save.readUInt32LE(16),0x42524b31,'Brisk save uses its own layout identifier');
   assert.equal(save.length,131072+28,'Two compact profiles use the native flash container');
   fs.rmSync(work,{recursive:true,force:true});
- }catch(error){console.error(error.message);console.error('Replay diagnostics:',work);process.exitCode=1;}
+ }catch(error){console.error(error.message);console.error('Replay diagnostics:',work);for(const name of fs.readdirSync(output).filter(n=>n.endsWith('.txt')).sort().slice(-3)){console.error(name+'\n'+fs.readFileSync(path.join(output,name),'utf8'));}process.exitCode=1;}
 });

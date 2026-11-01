@@ -52,6 +52,8 @@ jobs:
       - run: npm run desktop:test
       - run: npm run index:test
   native-linux-build:
+    env:
+      BRISK_NATIVE_PROFILE: expansion
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
@@ -69,6 +71,8 @@ jobs:
         run: node tools/test_native_stream.cjs
 
   native-windows-cross-build:
+    env:
+      BRISK_NATIVE_PROFILE: expansion
     strategy:
       fail-fast: false
       matrix:

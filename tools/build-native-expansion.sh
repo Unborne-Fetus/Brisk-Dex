@@ -6,7 +6,7 @@ case "$target" in windows|linux);; *) echo 'Usage: bash tools/build-native-expan
 # BRISK_NATIVE_ROOT allows this script to be read from stdin after CRLF cleanup.
 root="${BRISK_NATIVE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 # WSL compilation belongs on the Linux filesystem, not /mnt/c (NTFS).
-profile="${BRISK_NATIVE_PROFILE:-expansion}"
+profile="${BRISK_NATIVE_PROFILE:-brisk}"
 case "$profile" in expansion|brisk);; *) echo "Unknown native profile: $profile" >&2; exit 2;; esac
 source_name=pokeemerald-expansion-native
 if [ "$profile" = brisk ]; then source_name=brisk-emerald-native; fi

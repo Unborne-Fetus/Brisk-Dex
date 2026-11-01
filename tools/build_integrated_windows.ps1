@@ -28,17 +28,24 @@ $quoted = "'" + ($wslRepo.Trim() -replace "'", "'\''") + "'"
 # working tree or requiring users to install dos2unix.
 $normalizeScript = 'sed ''s/\r$//'' tools/build-native-expansion.sh'
 # Passing the root explicitly preserves Bash filename-relative paths when streamed.
-$wslCommand = "set -o pipefail; cd $quoted && $normalizeScript | BRISK_NATIVE_ROOT=$quoted bash -s -- windows --install"
+$wslCommand = "set -o pipefail; cd $quoted && $normalizeScript | BRISK_NATIVE_ROOT=$quoted BRISK_NATIVE_PROFILE=brisk bash -s -- windows --install"
 
-Write-Host 'Building the expansion engine into the Brisk Dex internal resource folder...' -ForegroundColor Cyan
+Write-Host 'Building Brisk Emerald into the Brisk Dex internal resource folder...' -ForegroundColor Cyan
 & wsl.exe --exec bash --noprofile --norc -c $wslCommand
 if ($LASTEXITCODE -ne 0) {
-    throw 'Native expansion build failed. See the dependency installation or native compiler error above.'
+    throw 'Native Brisk Emerald build failed. See the dependency installation or native compiler error above.'
 }
 $nativeExe=Join-Path $repo 'native-game\win32\pokeemerald-native.exe'
 $nativeDll=Join-Path $repo 'native-game\win32\SDL2.dll'
 if (-not (Test-Path $nativeExe) -or -not (Test-Path $nativeDll)) {
     throw 'Integrated native engine is missing from the staging directory.'
+}
+$buildInfoPath=Join-Path $repo 'native-game\win32\build-info.json'
+if (-not (Test-Path $buildInfoPath)) { throw 'Native Brisk build identity is missing.' }
+$buildInfo=Get-Content -Raw $buildInfoPath | ConvertFrom-Json
+$sourcePin=Get-Content -Raw (Join-Path $PSScriptRoot 'brisk-native-source.json') | ConvertFrom-Json
+if ($buildInfo.profile -ne 'brisk' -or $buildInfo.brisk_commit -ne $sourcePin.brisk_commit) {
+    throw 'The staged engine does not match the required Brisk Emerald source. Installer creation stopped.'
 }
 Write-Host 'Building a single Brisk Dex Windows installer...' -ForegroundColor Cyan
 & npm.cmd ci
@@ -47,5 +54,5 @@ if ($LASTEXITCODE -ne 0) { throw 'npm ci failed.' }
 if ($LASTEXITCODE -ne 0) { throw 'Desktop tests failed.' }
 & npm.cmd run dist:win -- --x64
 if ($LASTEXITCODE -ne 0) { throw 'Windows installer build failed.' }
-Write-Host 'Brisk Dex installer with staged internal expansion engine built into dist/.' -ForegroundColor Green
+Write-Host 'Brisk Dex installer with staged internal Brisk Emerald engine built into dist/.' -ForegroundColor Green
 Write-Host 'Do not publicly distribute compiled game assets without the required rights.'

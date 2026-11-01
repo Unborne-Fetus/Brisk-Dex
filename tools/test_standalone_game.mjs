@@ -3,7 +3,7 @@ import vm from 'node:vm';
 import assert from 'node:assert/strict';
 const html=fs.readFileSync(new URL('../standalone/index.html',import.meta.url),'utf8');
 for(const match of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(match[1]);
-assert.ok(html.includes('Pokémon Emerald — Native Expansion'),'native launcher tab is present');
+assert.ok(html.includes('Pokémon Brisk Emerald'),'native launcher tab is present');
 assert.ok(html.includes('getNativeGameStatus'),'native availability hook is present');
 assert.ok(!html.includes('id="brisk-game"'),'old iframe removed');
 assert.ok(!html.includes('gameDocument:'),'old game archive removed');
