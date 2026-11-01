@@ -299,6 +299,10 @@ ipcMain.handle('native-game-fullscreen',async(event,enabled)=>{
   mainWindow.setFullScreen(enabled);
   return {ok:true,fullscreen:mainWindow.isFullScreen()};
 });
+ipcMain.handle('native-game-export-diagnostics',async event=>{
+  requireMainRenderer(event);
+  return getNativeGame().exportDiagnostics();
+});
 ipcMain.handle('native-game-status',async event=>{
   requireMainRenderer(event);
   return embeddedStatus({resources:nativeResources()});
