@@ -43,10 +43,23 @@ function createWindow(){
 }
 
 app.whenReady().then(async () => {
+  // New runtime packages never require another installer. Downloads are staged
+  // in user-data without touching saves and become active on the next launch.
+  // Restart here, before opening any game or Dex UI, so unsaved progress is safe.
+  try {
+    const config=await nativeUpdater.config();
+    if(config.automatic && (await nativeUpdater.state()).pending){
+      await nativeUpdater.activate();
+      app.relaunch();
+      app.exit(0);
+      return;
+    }
+  } catch(error){console.warn('Automatic update activation:',error.message);}
   protocol.handle('brisk',request=>{const target=assetPath(request.url,__dirname);return target?net.fetch(pathToFileURL(target).href):new Response('Not found',{status:404});});
   createWindow();
-  const checkAutomatic=async()=>{try{if((await nativeUpdater.config()).automatic)await nativeUpdater.check();}catch(error){console.warn('Update check:',error.message);}};
-  setInterval(checkAutomatic,6*60*60*1000).unref();
+  const checkAutomatic=async()=>{try{if((await nativeUpdater.config()).automatic){const result=await nativeUpdater.check();if(!result.ok)console.warn('Update check:',result.message);}}catch(error){console.warn('Update check:',error.message);}};
+  // Regularly download updates; never automatically stop an active game.
+  setInterval(checkAutomatic,30*60*1000).unref();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
