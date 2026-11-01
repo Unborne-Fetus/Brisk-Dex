@@ -108,9 +108,12 @@ function extractSpecies(b,layout,count,limit,warnings){
     var entry={name:nm,constant:'SPECIES_ROM_'+i,romSpeciesId:i};
     var hp=b[p],atk=b[p+1],def=b[p+2],spe=b[p+3],spa=b[p+4],spd=b[p+5];
     if([hp,atk,def,spe,spa,spd].every(function(x){return x>0&&x<=255;})){
-      entry.stats={hp:hp,attack:atk,defense:def,spAttack:spa,spDefense:spd,speed:spe};
+      entry.baseStats=[hp,atk,def,spe,spa,spd];
       entry.bst=hp+atk+def+spe+spa+spd;
     }
+    var typeNames=['Normal','Fighting','Flying','Poison','Ground','Rock','Bug','Ghost','Steel','???','Fire','Water','Grass','Electric','Psychic','Ice','Dragon','Dark','Fairy'];
+    var type1=typeNames[b[p+6]],type2=typeNames[b[p+7]];
+    if(type1&&type1!=='???'&&type2&&type2!=='???')entry.types=type1===type2?[type1]:[type1,type2];
     out[String(i)]=entry;
   }
   if(Object.keys(out).length<10)warnings.push('Species table was not readable at the detected layout.');
