@@ -57,7 +57,9 @@ const assert=require('node:assert/strict');
     await page.locator('#native-game-fullscreen').click();
     await page.waitForFunction(()=>document.fullscreenElement?.id==='native-game-stage');
     // Only the canvas is fullscreen; page controls are intentionally hidden.
-    await page.keyboard.press('Escape');
+    // Headless Chromium doesn't synthesize the browser's Escape fullscreen shortcut.
+    // Exit using the DOM API, as the application's fullscreen button does.
+    await page.evaluate(()=>document.exitFullscreen());
     await page.waitForFunction(()=>!document.fullscreenElement);
     await page.locator('#native-game-settings summary').click();
     await page.getByRole('button',{name:'Remap A keyboard key',exact:true}).click();
