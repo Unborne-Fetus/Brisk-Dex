@@ -41,8 +41,9 @@ Browser saves and external storage are private to that browser profile and web o
 
 ## Features
 
-- **Pokédex:** search Pokémon and forms, inspect stats and evolutions, look up encounters, view sprites, and play cries. Track None, Seen, Caught, and Shiny status from a save, with manual overrides.
+- **Pokédex:** search Pokémon and forms, inspect stats and evolutions, look up encounters, view sprites, and play cries. Sort by National Dex, name, HP, Attack, Defense, Special Attack, Special Defense, Speed, or BST. Track None, Seen, Caught, and Shiny status from a save, with manual overrides.
 - **Reference tabs:** browse moves, abilities, items, locations, and trainer teams, plus competitive set suggestions.
+- **Defeated trainers:** load a Brisk Emerald save to see the exact Hoenn/Kanto trainers you've already beaten, filter beaten versus unbeaten, and view your progress. Results use save-file trainer flags, not guessed completion based on badges.
 - **Save management:** inspect your party and PC boxes, move Pokémon into external storage, and edit supported Pokémon details.
 - **External Pokémon storage:** keep a collection independent of one save, search and sort it, and export or merge portable JSON archives.
 - **Bag storage:** move existing item stacks between the game Bag and external storage, choosing the quantity to transfer. Key items stay in the game.

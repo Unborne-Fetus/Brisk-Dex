@@ -11,6 +11,7 @@ on:
       - 'brisk-dex-icon-manifest.json'
       - 'brisk-dex-data.json'
       - 'brisk-dex-trainer-teams.json'
+      - 'brisk-dex-trainer-flags.json'
       - 'brisk-dex-icons/**'
       - 'brisk-dex-items/**'
       - 'brisk-dex-sprites/**'
@@ -46,6 +47,7 @@ jobs:
         run: |
           test -s web-dist/index.html
           test -s web-dist/brisk-dex-data.json
+          test -s web-dist/brisk-dex-trainer-flags.json
           test -s web-dist/brisk-dex-icon-manifest.json
           test -s web-dist/asset-loader.js
           test -s web-dist/localization.js
