@@ -12,9 +12,16 @@ origin="$(git -C "$checkout" remote get-url origin)"
 if [ "$origin" != "$remote" ] && [ "$origin" != "https://github.com/uehlbran/pokeemerald-expansion-native" ]; then echo "Unexpected native source remote: $origin" >&2; exit 1; fi
 git -C "$checkout" fetch origin "$pin"
 git -C "$checkout" checkout --detach "$pin"
+python3 "$root/tools/patch-native-stream.py" "$checkout"
 (cd "$checkout" && tools/build-native.sh --os "$target")
+dest="$root/native-game"
 if [ "$target" = windows ]; then
-  echo "In Brisk Dex select: $checkout/build/native64-windows/pokeemerald-native.exe (keep SDL2.dll next to it)"
+  mkdir -p "$dest/win32"
+  cp "$checkout/build/native64-windows/pokeemerald-native.exe" "$dest/win32/pokeemerald-native.exe"
+  cp "$checkout/build/native64-windows/SDL2.dll" "$dest/win32/SDL2.dll"
 else
-  echo "In Brisk Dex select: $checkout/build/native64/pokeemerald-native"
+  mkdir -p "$dest/linux"
+  cp "$checkout/build/native64/pokeemerald-native" "$dest/linux/pokeemerald-native"
 fi
+echo "Internal native engine staged under $dest; it will launch inside Brisk Dex."
+
