@@ -66,6 +66,11 @@ class EmbeddedNativeGame{
       });
     }catch(error){return {ok:false,error:'Unable to start embedded native engine: '+error.message};}
     this.child=child;
+    // A child that exits while a key is being sent can close stdin between
+    // writable checks; never let EPIPE crash the companion app.
+    child.stdin.on('error',error=>{
+      this.send('native-game-state',{running:false,message:'Native input pipe closed: '+error.message});
+    });
     child.stdout.on('data',part=>this.decoder.push(part));
     child.stderr.on('data',part=>{this.errorTail=(this.errorTail+part.toString('utf8')).slice(-1500);});
     child.on('exit',(code,signal)=>{
@@ -87,7 +92,8 @@ class EmbeddedNativeGame{
     if(!this.child?.stdin?.writable)return false;
     if(!Number.isInteger(value)||value<0||value>0x3ff)return false;
     const keys=Buffer.allocUnsafe(2);keys.writeUInt16LE(value);
-    return this.child.stdin.write(keys);
+    try{return this.child.stdin.write(keys);}
+    catch(error){return false;}
   }
   stop(){
     if(!this.child)return {ok:true};
