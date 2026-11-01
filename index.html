@@ -1070,6 +1070,12 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
       <aside class="route-list" id="route-list" aria-label="Encounter locations"></aside>
       <div class="route-detail" id="route-detail" aria-live="polite"></div>
     </div>
+    <section id="map-catalog-section" class="dex-card" style="margin-top:18px;display:none;">
+      <div class="section-heading"><h3>All maps from the ROM</h3><span id="map-catalog-count" class="count"></span></div>
+      <p class="dex-muted">Includes new routes, towns, buildings, caves and maps with no wild encounters. Select a map to view its connected maps and warp destinations.</p>
+      <input id="map-catalog-search" type="search" placeholder="Find a route, city or map ID…" aria-label="Search all imported maps" style="width:100%;margin:10px 0;">
+      <div id="map-catalog-list" style="display:grid;gap:7px;"></div>
+    </section>
   </section>
 
   <section id="dex-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-dex" style="display:none;">
@@ -2446,6 +2452,7 @@ async function loadBundledGameData(){
       movePP:data.movePP || {}, moveDetails:data.moveDetails || {},
       items:data.items || {}, abilities:data.abilities || {}, abilityDetails:data.abilityDetails || {},
       itemDetails:data.itemDetails || {},
+      mapCatalog:Array.isArray(data.mapCatalog)?data.mapCatalog:[],
       changes:Array.isArray(data.changes) ? data.changes : []
     };
     CHANGE_DATA = mergeCurrentBriskChanges(BUNDLED_DATA.changes);
@@ -3609,7 +3616,32 @@ function consolidateRouteAreas(areas){
   return groups;
 }
 
+function renderMapCatalog(){
+  var section=document.getElementById('map-catalog-section'),list=document.getElementById('map-catalog-list');
+  if(!section||!list)return;
+  var catalog=(ROM_ACTIVE_DATA&&ROM_ACTIVE_DATA.mapCatalog)||(BUNDLED_DATA&&BUNDLED_DATA.mapCatalog)||[];
+  section.style.display=catalog.length?'block':'none';
+  if(!catalog.length)return;
+  var query=(document.getElementById('map-catalog-search').value||'').trim().toLowerCase();
+  var filtered=catalog.filter(function(map){
+    return [map.id,map.name,map.section,map.region].some(function(x){return String(x||'').toLowerCase().includes(query);});
+  });
+  document.getElementById('map-catalog-count').textContent=filtered.length+' / '+catalog.length+' maps';
+  list.innerHTML='';
+  if(!filtered.length){list.appendChild(el('div',{class:'dex-muted',text:'No maps match the search.'}));return;}
+  filtered.slice(0,150).forEach(function(map){
+    var card=document.createElement('details');
+    card.style.cssText='padding:9px;border:1px solid var(--line);background:var(--panel-2);';
+    card.appendChild(el('summary',{text:String(map.name||map.id)+' · '+String(map.region||map.section||'Map')}));
+    var items=(map.connections||[]).map(function(c){return String(c.direction||'Connection')+' → '+String(c.map||'');});
+    (map.warps||[]).forEach(function(w){items.push('Warp → '+String(w.map||'')+(w.warpId?' (#'+w.warpId+')':''));});
+    card.appendChild(el('div',{class:'dex-muted',style:'margin-top:7px;',text:map.id+' · '+(items.length?items.join(' · '):'No known connections or warps')}));
+    list.appendChild(card);
+  });
+  if(filtered.length>150)list.appendChild(el('div',{class:'dex-muted',text:'Showing the first 150 results. Search to narrow the list.'}));
+}
 function renderRouteEncounters(){
+  renderMapCatalog();
   var list = document.getElementById('route-list');
   var detail = document.getElementById('route-detail');
   if (!list || !detail) return;
@@ -6414,6 +6446,7 @@ function applyGameDataPack(parsed,skipPersist){
   MOVE_DETAILS=Object.assign({},BUNDLED_DATA.moveDetails||{},USER_DATA.moveDetails||{});
   ABILITY_DETAILS=Object.assign({},BUNDLED_DATA.abilityDetails||{},USER_DATA.abilityDetails||{});
   if(Array.isArray(parsed.routeEncounters))ROUTE_DATA=parsed.routeEncounters;
+  if(Array.isArray(parsed.mapCatalog))BUNDLED_DATA.mapCatalog=parsed.mapCatalog;
   if(Array.isArray(parsed.changes))CHANGE_DATA=parsed.changes;
   if(Array.isArray(parsed.trainerTeams))TRAINER_DATA=parsed.trainerTeams;
   MOVE_LEARNERS_INDEX=null;ABILITY_USERS_INDEX=null;rebuildNameData();refreshBoxLevels();saveNameDataToStorage();updateDataStatus();renderCurrentReferenceTab();
@@ -6428,6 +6461,7 @@ function applyRomReferenceData(data){
     movePP:data.movePP||{}, moveDetails:data.moveDetails||{},
     items:data.items||{}, abilities:data.abilities||{},
     itemDetails:data.itemDetails||{}, abilityDetails:data.abilityDetails||{},
+    mapCatalog:Array.isArray(data.mapCatalog)?data.mapCatalog:[],
     changes:Array.isArray(data.changes)?data.changes:[]
   };
   ITEM_DETAILS=Object.assign({},data.itemDetails||{});
@@ -6675,6 +6709,7 @@ document.getElementById('dex-type').addEventListener('change', renderPokedex);
 document.getElementById('dex-status').addEventListener('change', renderPokedex);
 document.getElementById('dex-order').addEventListener('change', renderPokedex);
 document.getElementById('route-search').addEventListener('input', renderRouteEncountersDebounced);
+document.getElementById('map-catalog-search').addEventListener('input',renderMapCatalog);
 document.getElementById('route-kind').addEventListener('change', renderRouteEncounters);
 document.getElementById('route-order').addEventListener('change', renderRouteEncounters);
 document.getElementById('encounter-method').addEventListener('change', renderRouteEncounters);
