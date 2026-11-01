@@ -6,7 +6,7 @@ const assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..');
 const source=process.env.BRISK_NATIVE_SOURCE_DIR||path.join(root,'native-src','brisk-emerald-native');
 const target=process.argv[2]||'linux';
-const executable=path.join(root,'native-game',target==='windows'?'win32':'linux',target==='windows'?'pokeemerald-native.exe':'pokeemerald-native');
+const executable=process.env.BRISK_NATIVE_EXECUTABLE||path.join(root,'native-game',target==='windows'?'win32':'linux',target==='windows'?'pokeemerald-native.exe':'pokeemerald-native');
 const work=fs.mkdtempSync(path.join(os.tmpdir(),'brisk-playthrough-'));
 const output=path.join(work,'out');fs.mkdirSync(output);
 const smoke=path.join(source,'tests','smoke');

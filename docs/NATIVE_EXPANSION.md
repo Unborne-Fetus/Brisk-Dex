@@ -73,6 +73,8 @@ For backend development, `BRISK_NATIVE_PROFILE=expansion bash tools/build-native
 
 Open **Controls, speed and updates** in the game tab to remap each keyboard key and standard controller button. Bindings, normal speed, held speed-up speed, mute and pause-on-focus-loss are saved locally. Speed choices are 1×, 2×, 3×, 4× and unlimited; holding Tab uses the chosen fast speed. Pause/Resume, fullscreen and PNG screenshots are available beside Start/Stop. Native protocol 2 carries these options alongside the ten GBA key bits; old engines retain basic controls and explain that one engine rebuild is required for the new options.
 
+The background tilemap validator accepts host-validated writable native memory instead of rejecting every buffer above the GBA IWRAM address ceiling. This is essential after moving the heap outside emulated EWRAM: the old check silently skipped both populating and uploading text, naming keyboards and map layers. NULL, read-only and out-of-bounds pointers remain rejected.
+
 The native port uploads background/window DMA requests synchronously between complete host-rendered frames. This avoids the cartridge queue's 128-request limit, its 40 KiB single-transfer stall and references to temporary graphics buffers after a callback returns. The GBA build's original DMA scheduling is preserved. The compiled regression covers 48 KiB transfers, 200 temporary glyph uploads, fills and zero-sized requests. The Linux opening replay additionally checks naming-keyboard and overworld image regions; gameplay state alone cannot pass with invisible background layers.
 
 ## Downloadable updates and app rename

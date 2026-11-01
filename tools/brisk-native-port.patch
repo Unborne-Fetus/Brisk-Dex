@@ -338,3 +338,34 @@ index 8ddc36f16..7d8178272 100644
      int cursor;
      int i = 0;
  
+diff --git a/src/bg.c b/src/bg.c
+index fdc777f8b..ea940a04a 100644
+--- a/src/bg.c
++++ b/src/bg.c
+@@ -1,5 +1,8 @@
+ #include <limits.h>
+ #include "global.h"
++#if BRISK_NATIVE
++#include "platform/transfer_bounds.h"
++#endif
+ #include "bg.h"
+ #include "dma3.h"
+ #include "gpu_regs.h"
+@@ -1202,10 +1205,17 @@ static u32 GetBgType(u32 bg)
+ 
+ bool32 IsTileMapOutsideWram(u32 bg)
+ {
++#if BRISK_NATIVE
++    /* Native graphics buffers live in the enlarged executable heap, not
++     * only in the cartridge's IWRAM/EWRAM address windows. Keep rejecting
++     * NULL, read-only data and unmapped pointers through the host bounds. */
++    return !transfer_bounds_ok((uintptr_t)sGpuBgConfigs2[bg].tilemap, 1, TRANSFER_WRITE);
++#else
+     if (sGpuBgConfigs2[bg].tilemap > (void *)IWRAM_END)
+         return TRUE;
+     else if (sGpuBgConfigs2[bg].tilemap == NULL)
+         return TRUE;
+     else
+         return FALSE;
++#endif
+ }

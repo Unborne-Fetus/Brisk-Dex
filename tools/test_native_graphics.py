@@ -47,7 +47,45 @@ int main(void){
     print('Native background uploads: 48 KiB transfer, 200 temporary glyph buffers, fills and zero-length guard passed')
 
 
+
+def test_tilemap_bounds(source):
+    import re
+    function = re.search(r'bool32 IsTileMapOutsideWram\(u32 bg\)\n\{.*?\n\}', source.read_text(), re.S).group(0)
+    with tempfile.TemporaryDirectory(prefix='brisk-tilemap-') as tmp:
+        root = Path(tmp)
+        code = r'''
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <assert.h>
+typedef uint32_t bool32; typedef uint32_t u32;
+#define TRUE 1
+#define FALSE 0
+#define IWRAM_END 0x03008000
+#define TRANSFER_WRITE 1
+static unsigned char native_heap[0x1000];
+static struct {void *tilemap;} sGpuBgConfigs2[4];
+static bool transfer_bounds_ok(uintptr_t address,size_t length,int access){
+ return access==TRANSFER_WRITE&&length==1&&address>=(uintptr_t)native_heap&&address<(uintptr_t)(native_heap+sizeof native_heap);
+}
+'''
+        code += function + r'''
+int main(void){
+ sGpuBgConfigs2[0].tilemap=native_heap+32;assert(!IsTileMapOutsideWram(0));
+ sGpuBgConfigs2[0].tilemap=NULL;assert(IsTileMapOutsideWram(0));
+ sGpuBgConfigs2[0].tilemap=(void*)0x08000000;assert(IsTileMapOutsideWram(0));
+ sGpuBgConfigs2[0].tilemap=native_heap+sizeof native_heap;assert(IsTileMapOutsideWram(0));
+ return 0;
+}
+'''
+        (root/'bounds.c').write_text(code)
+        subprocess.run(['gcc','-std=gnu17','-DBRISK_NATIVE=1','-O2','-Wall','-Wextra','-Werror',str(root/'bounds.c'),'-o',str(root/'bounds')],check=True)
+        subprocess.run([str(root/'bounds')],check=True)
+    print('Native tilemaps accept writable native-heap buffers and reject NULL, ROM and out-of-bounds addresses')
+
 if __name__ == '__main__':
     parser=argparse.ArgumentParser()
     parser.add_argument('source',type=Path)
-    test(parser.parse_args().source)
+    source = parser.parse_args().source
+    test(source)
+    test_tilemap_bounds(source.with_name('bg.c'))
