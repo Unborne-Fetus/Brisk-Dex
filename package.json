@@ -76,6 +76,7 @@
       "native-embedded.js",
       "native-controls.js",
       "native-saves.js",
+      "native-profile-reader.js",
       "native-settings-ui.js",
       "native-updater.js",
       "update-bootstrap.js"
