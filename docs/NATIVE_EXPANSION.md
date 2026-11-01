@@ -4,7 +4,7 @@ This embeds the native C engine with Brisk Emerald game content imported from it
 
 ## One-app local build
 
-On Windows, run `build-integrated.bat` from your Brisk Dex source checkout with WSL Ubuntu and Node.js 22+ installed. The wrapper checks compiler prerequisites and installs missing Debian/Ubuntu packages automatically (it may ask for your WSL password), before fetching or compiling source. Re-run the same command after a failed package download. This single build command checks out the pinned expansion source, compiles and stages the private internal runtime, runs desktop tests, and packages one Brisk Dex Windows installer. No player has to find or select a separate game executable. The result is for your own build and testing; do not publicly distribute game assets without the necessary rights.
+On Windows, run `build-integrated.bat` from your Brisk Dex source checkout with WSL Ubuntu and Node.js 22+ installed. The wrapper checks compiler prerequisites and installs missing Debian/Ubuntu packages automatically (it may ask for your WSL password), before fetching or compiling source. Re-run the same command after a failed package download. This single build command checks out the pinned native backend, imports the pinned Brisk changes, compiles and stages the private internal runtime, runs desktop tests, and packages one Brisk Dex Windows installer. No player has to find or select a separate game executable. The result is for your own build and testing; do not publicly distribute game assets without the necessary rights.
 
 
 Run `bash tools/build-native-expansion.sh windows` in Ubuntu/WSL (or `linux` on Linux), after installing the native upstream dependencies. The script pins the native backend to `bb3fd057061cdd7e6a9e79b76abb41924ee44ecc` and Brisk to the revision in `tools/brisk-native-source.json`. It imports Brisk changes relative to expansion 1.17.0, preserving native ABI guards, applies `tools/brisk-native-port.patch` and the embedded transport, then stages the private runtime under ignored `native-game/win32/` or `native-game/linux/`.
@@ -21,7 +21,7 @@ The embedded bridge streams video and input. SDL plays native audio directly thr
 
 ## Limitations / validation
 
-The JavaScript launcher, IPC framing, and build patch are regression-tested. CI compiles the patched expansion for Windows and Linux and runs a Linux startup/frame-stream smoke test. Windows UI checks also pass. A full gameplay playthrough is still unverified. Brisk game code and content are imported from the source pin; a complete Hoenn/Kanto playthrough remains unverified. Native backend support is currently Windows and Linux only.
+CI compiles the complete Brisk port for Windows and Linux. The Linux replay passes the opening, custom nine-starter case, first battle, in-game saving, cold restart/Continue, and isolation of the two save profiles. The embedded frame transport, desktop bridge, standalone Dex, and Windows UI checks pass. A complete Hoenn/Kanto playthrough remains unverified. Native backend support is currently Windows and Linux only.
 
 ## Windows checkout / WSL line endings
 
@@ -53,7 +53,7 @@ Some MinGW linker versions emit a read-only `.idata` section after writable game
 
 The Brisk native profile moves `gHeap` outside the emulated EWRAM window, sets it to 16 MiB, widens allocation size fields, preserves 8-byte alignment, and gives the compact save data its own layout identifier. The previous base game's cross-width save converter does not apply to this different schema. `build-info.json` identifies the staged game so the app chooses the correct save directory.
 
-The native port also corrects Route 101 rescue triggers that were outside the pinned Brisk map, retaining its relocated bag and nine-starter case.
+The native port also corrects Route 101 rescue triggers that were outside the pinned Brisk map, retaining its relocated bag and nine-starter case. The custom starter case and stat editor yield between graphics-setup frames so host DMA can complete. Battle type icons guard the absence of an Illusion Pokémon, and battle speed control handles the final frame after battle resources are released.
 
 The native symbol map is staged beside the executable for diagnostics and state-based replay validation. CI builds both Windows and Linux Brisk engines and exercises the opening, first battle, saving, restarting and profile selection. See [capacity and remaining limits](BRISK_NATIVE_CAPACITY.md).
 
