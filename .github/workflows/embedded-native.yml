@@ -46,3 +46,19 @@ jobs:
         run: bash tools/build-native-expansion.sh linux
       - name: Smoke test embedded frame transport and native startup
         run: node tools/test_native_stream.cjs
+
+  native-windows-cross-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Native Windows cross-compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential git python3 pkg-config curl clang gcc-multilib libpng-dev libsdl2-dev gcc-mingw-w64-x86-64 binutils-mingw-w64-x86-64
+      - name: Cross-compile embedded Windows engine
+        run: bash tools/build-native-expansion.sh windows
+      - name: Confirm private bundled Windows game dependencies exist
+        run: |
+          test -s native-game/win32/pokeemerald-native.exe
+          test -s native-game/win32/SDL2.dll
