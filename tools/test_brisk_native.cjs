@@ -26,7 +26,11 @@ wait-until callback2=CB2_Overworld max 1200
 wait-until script_running=1 max 600
 mash A until controls_locked=0 max 3000
 wait 20
-expect flag:2144=1
+# FLAG_SET_WALL_CLOCK = 0x51 (81). 2144 is FLAG_SYS_POKEMON_GET,
+# which must remain unset until Birch gives the player a starter.
+wait-until flag:81=1 max 3000
+expect flag:81=1
+expect flag:2144=0
 # The native clock has been initialized from the computer's local time.
 dump 07_clock_set
 screenshot 07_clock_set
