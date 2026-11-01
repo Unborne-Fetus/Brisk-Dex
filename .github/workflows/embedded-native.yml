@@ -62,3 +62,16 @@ jobs:
         run: |
           test -s native-game/win32/pokeemerald-native.exe
           test -s native-game/win32/SDL2.dll
+
+  desktop-windows-ui:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run desktop:test
+      - run: npm run desktop:ui
