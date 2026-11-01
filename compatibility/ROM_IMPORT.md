@@ -10,7 +10,7 @@ There are two import levels:
 
 | Input | Recovery |
 | --- | --- |
-| Ordinary Emerald-family ROM | GBA header, Game Freak ROM header and RHHEXP metadata when present; species names, stats and icon graphics when their table layouts can be verified; move names on compatible vanilla layouts |
+| Ordinary Emerald-family ROM | GBA header, Game Freak ROM header and RHHEXP metadata when present; species names, stats and icon graphics when their table layouts can be verified; move, item and ability names when their table stride is verifiable |
 | Indexed ROM (`BDXROM1!` or `BDXROMZ!`) | All indexed data fields: Pokémon and custom species/forms, moves, abilities, items, route and wild encounter tables, trainer rosters, changes, and normal/shiny icons |
 
 The report gives precise counts and warns about unavailable tables. Unknown trainers, routes or icon palettes are never fabricated. Expanded ROM species IDs are kept as raw ROM IDs; their mapping to save IDs remains the responsibility of a matching compatibility profile.
@@ -30,7 +30,7 @@ Run these commands from the **Brisk-Dex** project root. The Python extractor nee
 npm run rom:index -- /path/to/game.gba /path/to/game-indexed.gba
 ```
 
-The source ROM is left untouched. The indexer compresses the data with zlib, validates its size, and adds a CRC32 footer that the app verifies before loading. It uses only existing `0xFF` tail padding or expands the output to the next power-of-two ROM size, never above **32 MiB**. If space is insufficient, the command *fails safely* and the build needs additional reserved ROM space. This is a reference-metadata embedding workflow, **not** a universal binary decompiler. Emulator/hardware boot testing of the new output is required before publishing; the tool does not claim that every ROM modification will work on every flashcart.
+For computers without Node.js, the Python standard-library indexer produces the same ROM format:\n\n```sh\npython tools/embed_rom_index.py /path/to/game.gba --output /path/to/game-indexed.gba\n```\n\nThe source ROM is left untouched. The indexer compresses the data with zlib, validates its size, and adds a CRC32 footer that the app verifies before loading. It uses only existing `0xFF` tail padding or expands the output to the next power-of-two ROM size, never above **32 MiB**. If space is insufficient, the command *fails safely* and the build needs additional reserved ROM space. This is a reference-metadata embedding workflow, **not** a universal binary decompiler. Emulator/hardware boot testing of the new output is required before publishing; the tool does not claim that every ROM modification will work on every flashcart.
 
 If assets push the index over the ROM space budget, pass `--no-icons` to the indexer to omit PNG assets. The importer can still try to decode icons directly from recognized ROM graphics tables, but colors/palette identification in custom expansion structures can be incomplete.
 
@@ -73,4 +73,4 @@ The entire trailer fits in the ROM image (or its verified padding), with a maxim
 
 ## Save compatibility and limitations
 
-Loading a ROM does **not** authorize writes to an unknown hack's `.sav`; save write policies remain conservative and independent. Reference data is persisted in local storage where possible; very large icon collections may need re-importing after a restart. ROM identity and save identity are not yet cryptographically tied to each other, so do not assume an unknown `.sav` matches a loaded ROM. Trainer teams from alternate difficulty modes are represented only when the matching source extractor and manifest contain them. Features implemented procedurally in code (e.g., runtime-generated encounters or randomized teams) cannot always be reconstructed as a finite ROM table.
+Loading a ROM does **not** authorize writes to an unknown hack's `.sav`; save write policies remain conservative and independent. Imported ROM reference data and ROM-specific icons are held separately for the current app session to avoid leaking one hack's IDs or trainer teams into another. Re-import the ROM after restarting, or select **Restore Brisk reference data** to reload the bundled data. ROM identity and save identity are not yet cryptographically tied to each other, so do not assume an unknown `.sav` matches a loaded ROM. Trainer teams from alternate difficulty modes are represented only when the matching source extractor and manifest contain them. Features implemented procedurally in code (e.g., runtime-generated encounters or randomized teams) cannot always be reconstructed as a finite ROM table.
