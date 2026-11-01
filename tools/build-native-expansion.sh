@@ -56,6 +56,7 @@ if [ "$profile" = brisk ]; then
   python3 "$root/tools/prepare_brisk_native.py" "$checkout"
   # Fail the build when source events/maps diverge from the pinned Brisk game.
   python3 "$root/tools/test_native_event_parity.py" "$checkout"
+  python3 "$root/tools/test_birch_cleanup.py" "$checkout/src/ui_birch_case.c"
   python3 "$root/tools/test_native_graphics.py" "$checkout/src/dma3_manager.c"
 fi
 python3 "$root/tools/patch-native-compat.py" "$checkout"
