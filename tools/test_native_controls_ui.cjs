@@ -21,13 +21,17 @@ const assert=require('node:assert/strict');
     const page=await browser.newPage();
     const errors=[];page.on('pageerror',error=>{errors.push(error.message);console.error('Renderer error:',error.message);});
     await page.addInitScript(()=>{
-      window.testKeys=[];window.testPad=null;window.testTransfers=[];window.testOptions=[];
+      window.testKeys=[];window.testPad=null;window.testTransfers=[];window.testOptions=[];window.testUpdateChecks=0;
       Object.defineProperty(navigator,'getGamepads',{value:()=>[window.testPad]});
       window.briskDexAPI={
         loadGameData:async()=>(await fetch('brisk-dex-data.json')).json(),
         loadTrainerData:async()=>(await fetch('brisk-dex-trainer-teams.json')).json(),
         loadBundledIcons:async()=>(await fetch('brisk-dex-icon-manifest.json')).json(),
         loadStorage:async()=>[],saveStorage:async()=>({ok:true}),loadLastSav:async()=>null,
+        updateStatus:async()=>({automatic:true,current:'1.0.0',pending:null,canRollback:false,busy:false}),
+        checkForUpdates:async()=>{window.testUpdateChecks++;return {ok:true,message:'Already up to date.'};},
+        automaticUpdates:async()=>({ok:true}),applyUpdate:async()=>({ok:true}),rollbackUpdate:async()=>({ok:true}),
+        exportNativeDiagnostics:async()=>({ok:false,error:'No native failure has been recorded.'}),
         configureNativeGame:async options=>{window.testOptions.push(options);return {ok:true};},
         getNativeGameStatus:async()=>({status:'ready',profile:'brisk',message:'Integrated Brisk Emerald is ready.'}),
         getNativeGameProfiles:async()=>({available:false,reason:'No integrated save exists yet.'}),
@@ -43,6 +47,12 @@ const assert=require('node:assert/strict');
     });
     await page.goto('http://127.0.0.1:'+server.address().port);
     await page.waitForFunction(()=>window.BriskNativeUI&&document.querySelectorAll('#native-binding-list button').length===10);
+    for(const id of ['native-update-status','native-update-check','native-update-apply','native-update-rollback','native-auto-updates'])
+      assert.equal(await page.locator('header.top #'+id).count(),1,'Updater control should be in application header: '+id);
+    await page.locator('#native-update-check').click();
+    await page.waitForFunction(()=>window.testUpdateChecks===1);
+    assert.match(await page.locator('#native-update-status').innerText(),/Already up to date/);
+    assert.equal(await page.locator('#native-game-settings #native-update-check').count(),0);
     await page.locator('#native-game-launch').click();
     assert.equal(await page.locator('#native-game-backup').isDisabled(),true);
     await page.keyboard.down('z');
@@ -62,6 +72,8 @@ const assert=require('node:assert/strict');
     assert.equal(await page.locator('#native-game-stage').count(),1);
     await page.keyboard.press('Escape');
     await page.waitForFunction(()=>window.testFullscreen===false&&!document.body.classList.contains('native-game-immersive'));
+    await page.locator('#native-game-diagnostics').click();
+    assert.match(await page.locator('#native-game-status').innerText(),/No native failure has been recorded/);
     await page.locator('#native-game-settings summary').click();
     await page.getByRole('button',{name:'Remap A keyboard key',exact:true}).click();
     await page.keyboard.press('c');
