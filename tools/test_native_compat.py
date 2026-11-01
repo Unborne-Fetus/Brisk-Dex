@@ -51,6 +51,23 @@ class CompatibilityPatchTests(unittest.TestCase):
             self.assertEqual((platform / 'build_glue/brisk_pe_imports.py').read_bytes(),
                              Path(__file__).with_name('native_pe_imports.py').read_bytes())
 
+    def test_embedded_rtc_reseeds_host_timezone_and_is_idempotent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            platform = root / 'platform'
+            platform.mkdir()
+            (platform / 'bios_internal.c').write_text('#include <stdio.h>\n')
+            rtc = platform / 'rtc.c'
+            rtc.write_text('#include <stdio.h>\n#include <time.h>\n'
+                           '    chip.source = source != NULL ? source : system_clock;\n'
+                           '    if (!found) {\n')
+            compat.apply(root)
+            first = rtc.read_text()
+            self.assertIn('#include <stdlib.h>', first)
+            self.assertIn('getenv("BRISK_FRAME_STREAM") != NULL && seed_from_host_zone', first)
+            compat.apply(root)
+            self.assertEqual(rtc.read_text(), first)
+
     def test_unexpected_source_checkout_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaisesRegex(RuntimeError, "platform sources not found"):
