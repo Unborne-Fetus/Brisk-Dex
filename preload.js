@@ -11,6 +11,13 @@ contextBridge.exposeInMainWorld('briskDexAPI', {
   applyUpdate:()=>ipcRenderer.invoke('app-update-apply'),
   rollbackUpdate:()=>ipcRenderer.invoke('app-update-rollback'),
   getNativeGameStatus:()=>ipcRenderer.invoke('native-game-status'),
+  getNativeGameProfiles:()=>ipcRenderer.invoke('native-game-profiles'),
+  setNativeFullscreen:enabled=>ipcRenderer.invoke('native-game-fullscreen',enabled),
+  onNativeFullscreenChange:callback=>{
+    const listener=(_,fullscreen)=>callback(fullscreen);
+    ipcRenderer.on('native-game-fullscreen-changed',listener);
+    return ()=>ipcRenderer.removeListener('native-game-fullscreen-changed',listener);
+  },
   startNativeGame:()=>ipcRenderer.invoke('native-game-start'),
   stopNativeGame:()=>ipcRenderer.invoke('native-game-stop'),
   sendNativeKeys:mask=>{if(Number.isInteger(mask)&&mask>=0&&mask<=1023)ipcRenderer.send('native-game-input',mask);},
