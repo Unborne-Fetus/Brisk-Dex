@@ -227,3 +227,45 @@ index 21012396..6d637236 100644
  #else
  #line 10
  ALIGNED(4) EWRAM_DATA u8 gHeap[HEAP_SIZE] = {0};
+diff --git a/src/ui_birch_case.c b/src/ui_birch_case.c
+index 250a27ab..c3acd203 100644
+--- a/src/ui_birch_case.c
++++ b/src/ui_birch_case.c
+@@ -588,11 +588,16 @@ void BirchCase_Init(MainCallback callback)
+ 
+ static void BirchCaseRunSetup(void)
+ {
++#if defined(PLATFORM_NATIVE)
++    // Host DMA completion is serviced between frames; never spin waiting for it.
++    (void)BirchCaseDoGfxSetup();
++#else
+     while (1)
+     {
+         if (BirchCaseDoGfxSetup() == TRUE)
+             break;
+     }
++#endif
+ }
+ 
+ static void BirchCaseMainCB(void)
+diff --git a/src/ui_stat_editor.c b/src/ui_stat_editor.c
+index 7bf8c444..e1c5ab12 100644
+--- a/src/ui_stat_editor.c
++++ b/src/ui_stat_editor.c
+@@ -279,11 +279,16 @@ void StatEditor_Init(MainCallback callback)
+ 
+ static void StatEditor_RunSetup(void)
+ {
++#if defined(PLATFORM_NATIVE)
++    // Host DMA completion is serviced between frames; never spin waiting for it.
++    (void)StatEditor_DoGfxSetup();
++#else
+     while (1)
+     {
+         if (StatEditor_DoGfxSetup() == TRUE)
+             break;
+     }
++#endif
+ }
+ 
+ static void StatEditor_MainCB(void)
