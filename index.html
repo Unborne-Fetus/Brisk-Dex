@@ -1300,16 +1300,28 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
   </section>
 
   <section id="game-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-game">
-    <div class="loader-panel" style="max-width:770px;padding:24px">
+    <div class="loader-panel" style="padding:24px;max-width:800px;margin:auto">
       <h2>Pokémon Emerald — Native Expansion</h2>
-      <p>Launch the original expansion C engine on your computer instead of the retired JavaScript game recreation. Gameplay opens in a separate desktop window.</p>
-      <p id="native-game-status" role="status">Checking native support…</p>
+      <p>Play the original expansion engine directly in Brisk Dex. This is the base expansion game; Brisk Emerald additions will follow.</p>
+      <p id="native-game-status" role="status">Checking integrated engine…</p>
       <div class="top-actions">
-        <button type="button" id="native-game-select">Choose locally built game…</button>
-        <button type="button" class="primary" id="native-game-launch" disabled>Launch native Emerald</button>
+        <button id="native-game-launch" type="button" class="primary" disabled>Start game</button>
+        <button id="native-game-stop" type="button" disabled>Stop game</button>
       </div>
-      <p style="font-size:13px;margin-top:16px">Build the <a href="https://github.com/uehlbran/pokeemerald-expansion-native" target="_blank" rel="noopener noreferrer">native expansion source</a> at our pinned revision first. Windows requires <code>SDL2.dll</code> next to the executable. Brisk Dex does not bundle native game binaries or proprietary assets.</p>
-      <p style="font-size:13px">This first stage runs unmodified expansion, not Brisk Emerald's extra features. Brisk's GBA save files cannot yet be imported into this native game.</p>
+      <canvas id="native-game-screen" width="240" height="160" tabindex="0"
+        aria-label="Pokémon Emerald game screen. Arrow keys move; Z confirms; X goes back; Enter starts."
+        style="display:block;max-width:720px;width:100%;aspect-ratio:3/2;height:auto;margin:18px auto 8px;background:#101010;border:2px solid #363636;image-rendering:pixelated;outline-offset:3px"></canvas>
+      <p style="font-size:12px">Controls: arrows to move; Z = A, X = B, Enter = Start, Backspace = Select, A = L, S = R. Click the game screen to capture keyboard controls.</p>
+      <div class="top-actions" id="native-touch-keys" aria-label="Game controls" style="justify-content:center">
+        <button type="button" data-native-key="6">Up</button>
+        <button type="button" data-native-key="5">Left</button>
+        <button type="button" data-native-key="7">Down</button>
+        <button type="button" data-native-key="4">Right</button>
+        <button type="button" data-native-key="0">A</button>
+        <button type="button" data-native-key="1">B</button>
+        <button type="button" data-native-key="3">Start</button>
+      </div>
+      <p style="font-size:12px">This game needs a native engine built and staged inside the Brisk Dex installation. If it is missing, the companion app still works normally. No executable selection or external game window is used.</p>
     </div>
   </section>
   <section id="guide-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-guide" style="display:none;">
@@ -6550,34 +6562,76 @@ function renderCurrentReferenceTab(){
 }
 
 
+const nativeCanvas=document.getElementById('native-game-screen');
+const nativeCtx=nativeCanvas.getContext('2d',{alpha:false});
+const nativeImage=nativeCtx.createImageData(240,160);
+let nativeRunning=false,nativeKeymask=0;
+const nativeCodeBits={KeyZ:0,KeyX:1,Backspace:2,Enter:3,ArrowRight:4,ArrowLeft:5,ArrowUp:6,ArrowDown:7,KeyS:8,KeyA:9};
+function nativeKeys(mask){nativeKeymask=mask;window.briskDexAPI?.sendNativeKeys?.(mask);}
+function onNativeFrame(frame){
+  if(!nativeRunning||currentMainTab!=='game')return;
+  const bytes=frame instanceof Uint8Array?frame:new Uint8Array(frame);
+  if(bytes.byteLength!==240*160*2)return;
+  const out=nativeImage.data;
+  for(let i=0,j=0;i<bytes.length;i+=2,j+=4){
+    const pixel=bytes[i]|(bytes[i+1]<<8);
+    const r=pixel&31,g=(pixel>>5)&31,b=(pixel>>10)&31;
+    out[j]=(r<<3)|(r>>2);
+    out[j+1]=(g<<3)|(g>>2);
+    out[j+2]=(b<<3)|(b>>2);
+    out[j+3]=255;
+  }
+  nativeCtx.putImageData(nativeImage,0,0);
+}
+window.briskDexAPI?.onNativeFrame?.(onNativeFrame);
+window.briskDexAPI?.onNativeState?.(state=>{
+  nativeRunning=state.running===true;
+  document.getElementById('native-game-stop').disabled=!nativeRunning;
+  document.getElementById('native-game-launch').disabled=nativeRunning;
+  if(state.message)document.getElementById('native-game-status').textContent=state.message;
+  if(!nativeRunning)nativeKeys(0);
+});
 async function refreshNativeGame(){
-  const api=window.briskDexAPI,status=document.getElementById('native-game-status');
-  const choose=document.getElementById('native-game-select'),launch=document.getElementById('native-game-launch');
+  const api=window.briskDexAPI;
+  const status=document.getElementById('native-game-status');
+  const launch=document.getElementById('native-game-launch');
   if(!api?.getNativeGameStatus){
-    status.textContent='Native Emerald is only available in the Windows/Linux desktop edition. Brisk Dex for web and mobile remains a companion.';
-    choose.disabled=true;launch.disabled=true;return;
+    status.textContent='Integrated native gameplay is not available in the browser or mobile edition.';
+    launch.disabled=true;return;
   }
   try{
     const result=await api.getNativeGameStatus();
-    status.textContent=result.message+(result.executable?' ('+result.executable+')':'');
-    choose.disabled=result.status==='unsupported';launch.disabled=result.status!=='ready';
-  }catch(error){status.textContent='Native game error: '+error.message;launch.disabled=true;}
+    status.textContent=result.message;
+    launch.disabled=result.status!=='ready'||nativeRunning;
+  }catch(error){status.textContent='Unable to check native engine: '+error.message;launch.disabled=true;}
 }
-document.getElementById('native-game-select').addEventListener('click',async function(){
-  if(!window.briskDexAPI?.selectNativeGame)return;
+document.getElementById('native-game-launch').addEventListener('click',async()=>{
   try{
-    const result=await window.briskDexAPI.selectNativeGame();
-    document.getElementById('native-game-status').textContent=result.message;
-    document.getElementById('native-game-launch').disabled=result.status!=='ready';
+    const started=await window.briskDexAPI.startNativeGame();
+    if(!started.ok)document.getElementById('native-game-status').textContent=started.error;
+    else nativeCanvas.focus();
   }catch(error){document.getElementById('native-game-status').textContent=error.message;}
 });
-document.getElementById('native-game-launch').addEventListener('click',async function(){
-  this.disabled=true;
-  try{
-    const result=await window.briskDexAPI.launchNativeGame();
-    document.getElementById('native-game-status').textContent=result.ok?'Native expansion launched in a separate window.':result.error;
-  }catch(error){document.getElementById('native-game-status').textContent=error.message;}
-  finally{await refreshNativeGame();}
+document.getElementById('native-game-stop').addEventListener('click',async()=>{
+  nativeKeys(0);await window.briskDexAPI?.stopNativeGame?.();await refreshNativeGame();
+});
+document.addEventListener('keydown',event=>{
+  const bit=nativeCodeBits[event.code];
+  if(currentMainTab!=='game'||!nativeRunning||bit===undefined||event.altKey||event.ctrlKey||event.metaKey)return;
+  if(event.target instanceof HTMLInputElement||event.target instanceof HTMLTextAreaElement)return;
+  event.preventDefault();nativeKeys(nativeKeymask|(1<<bit));
+},true);
+document.addEventListener('keyup',event=>{
+  const bit=nativeCodeBits[event.code];
+  if(bit===undefined||!(nativeKeymask&(1<<bit)))return;
+  event.preventDefault();nativeKeys(nativeKeymask&~(1<<bit));
+},true);
+window.addEventListener('blur',()=>nativeKeys(0));
+document.querySelectorAll('#native-touch-keys [data-native-key]').forEach(btn=>{
+  const bit=Number(btn.dataset.nativeKey);
+  btn.addEventListener('pointerdown',event=>{event.preventDefault();if(nativeRunning)nativeKeys(nativeKeymask|(1<<bit));});
+  for(const type of ['pointerup','pointercancel','pointerleave'])
+    btn.addEventListener(type,()=>nativeKeys(nativeKeymask&~(1<<bit)));
 });
 
 function setMainTab(tabName){
@@ -6586,7 +6640,7 @@ function setMainTab(tabName){
   document.getElementById('game-tab-panel').style.display = game ? 'block' : 'none';
   document.getElementById('tab-game').classList.toggle('active',game);
   document.getElementById('tab-game').setAttribute('aria-selected',String(game));
-  if(game)refreshNativeGame();
+  if(game)refreshNativeGame();else if(nativeKeymask)nativeKeys(0);
   var routes = tabName === 'routes';
   var dex = tabName === 'dex';
   var trainers = tabName === 'trainers';

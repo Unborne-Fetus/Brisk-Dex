@@ -1,12 +1,12 @@
 # Brisk Dex
 
-## Native expansion (first milestone)
+## Embedded expansion engine (experimental)
 
-The retired JavaScript game recreation has been replaced by a desktop launcher for [pokeemerald-expansion-native](https://github.com/uehlbran/pokeemerald-expansion-native). It launches the **real C expansion game engine** in a separate window, not the old JS battle/map simulation. For now this is **unmodified expansion**, not Brisk Emerald's custom content.
+The original expansion C engine is being integrated into the **Native Emerald** tab of the desktop Brisk Dex app. There is no executable picker or separate game window. Brisk Dex streams the real native engine's framebuffer to its own canvas and forwards keyboard/touch controls to the engine. A locally built copy is bundled as an internal Electron resource.
 
-Build locally using `bash tools/build-native-expansion.sh windows` inside Ubuntu/WSL (or `bash tools/build-native-expansion.sh linux` on Linux) after installing the dependencies in the upstream README. The script pins native source commit `bb3fd057061cdd7e6a9e79b76abb41924ee44ecc`. Open the **Native Emerald** tab in the desktop app, choose the resulting `pokeemerald-native.exe` or Linux `pokeemerald-native`, then launch. Windows requires `SDL2.dll` beside the executable. No native binary or proprietary game asset is committed or published from Brisk Dex.
+To stage an internal build: install the upstream native build prerequisites, run `bash tools/build-native-expansion.sh windows` inside WSL (Linux: `... linux`), then package Brisk Dex normally. This remains an experimental integration and has not yet passed a real compiled-game smoke test. No proprietary game binary is committed, and public builds without a staged engine show an unavailable message. This is still the **base expansion**, not custom Brisk Emerald gameplay.
 
-The web and mobile editions remain companion apps. Native engine saves do not yet import Brisk Emerald GBA `.sav` files. Former JavaScript campaign archives on disk are preserved but no longer executed. See [native integration notes](docs/NATIVE_EXPANSION.md).
+See [embedded native integration](docs/NATIVE_EXPANSION.md) for build instructions, limitations, and save boundaries.
 
 Brisk Dex is a companion app for [Pokémon Brisk Emerald](https://github.com/Unborne-Fetus/Pokemon-Brisk-Emerald). Browse the game's reference data, manage Pokémon and items across saves, and battle another player using Pokémon from your collection.
 

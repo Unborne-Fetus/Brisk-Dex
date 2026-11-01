@@ -2,8 +2,19 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('briskDexAPI', {
   getNativeGameStatus:()=>ipcRenderer.invoke('native-game-status'),
-  selectNativeGame:()=>ipcRenderer.invoke('native-game-select'),
-  launchNativeGame:()=>ipcRenderer.invoke('native-game-launch'),
+  startNativeGame:()=>ipcRenderer.invoke('native-game-start'),
+  stopNativeGame:()=>ipcRenderer.invoke('native-game-stop'),
+  sendNativeKeys:mask=>{if(Number.isInteger(mask)&&mask>=0&&mask<=1023)ipcRenderer.send('native-game-input',mask);},
+  onNativeFrame:callback=>{
+    const listener=(_,pixels)=>callback(pixels);
+    ipcRenderer.on('native-game-frame',listener);
+    return ()=>ipcRenderer.removeListener('native-game-frame',listener);
+  },
+  onNativeState:callback=>{
+    const listener=(_,state)=>callback(state);
+    ipcRenderer.on('native-game-state',listener);
+    return ()=>ipcRenderer.removeListener('native-game-state',listener);
+  },
   getBattleRelayInfo: () => ipcRenderer.invoke('get-battle-relay-info'),
   startBattleRelay: () => ipcRenderer.invoke('start-battle-relay'),
   loadAssetPatch: (file) => ipcRenderer.invoke('load-asset-patch',file),
