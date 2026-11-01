@@ -243,7 +243,8 @@ function basicDetails(b){
 function normalizedManifest(manifest){
   var d=manifest.data||{},o={};
   ['species','moves','items','abilities','itemDetails','moveDetails','abilityDetails','movePP'].forEach(function(k){if(d[k]&&typeof d[k]==='object'&&!Array.isArray(d[k]))o[k]=d[k];});
-  ['routeEncounters','trainerTeams','changes'].forEach(function(k){if(Array.isArray(d[k]))o[k]=d[k];});
+  ['routeEncounters','trainerTeams','changes','mapCatalog'].forEach(function(k){if(Array.isArray(d[k]))o[k]=d[k];});
+  if(Number.isInteger(d.shinyOdds)&&d.shinyOdds>0)o.shinyOdds=d.shinyOdds;
   return o;
 }
 function importRom(value,options){
