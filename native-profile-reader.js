@@ -82,11 +82,15 @@ function pcOffset(raw){
     if(raw[start]>19)continue;
     const rem=raw.length-start-RAW_PC_BYTES;
     if(rem<0||rem>14*116)continue;
+    // The real currentBox sits before three alignment bytes. A shifted
+    // candidate inside BoxPokemon data is not a valid layout boundary.
+    if(raw[start+1]!==0||raw[start+2]!==0||raw[start+3]!==0)continue;
     let n=0;
     for(let box=0;box<20;box++){
       const nameStart=start+48004+box*9;
+      if(raw[nameStart]===0xff||raw[nameStart]===0)continue;
       let seenFF=false;
-      for(let i=0;i<9;i++)if(raw[nameStart+i]===0xff){seenFF=true;break;}
+      for(let i=1;i<9;i++)if(raw[nameStart+i]===0xff){seenFF=true;break;}
       if(seenFF)n++;
     }
     if(n>score){runnerUp=score;score=n;best=start;}
