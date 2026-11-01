@@ -56,9 +56,46 @@ class EmbeddedNativeGame{
     this.webContents=webContents;this.resources=resources;this.userData=userData;
     this.platform=platform;this.spawnChild=spawnChild;this.child=null;this.decoder=null;
     this.errorTail='';this.keys=0;this.options={speed:1,paused:false,mute:false};this.protocol=1;
+    this.frameCount=0;this.lastFrameTime=0;this.blackSince=0;this.blackFrames=0;
+    this.diagnosticReason=null;this.diagnosticTimer=null;this.engineCommit=null;
   }
   send(event,payload){
     if(this.webContents&&!this.webContents.isDestroyed())this.webContents.send(event,payload);
+  }
+  noteFrame(frame){
+    this.lastFrameTime=Date.now();this.frameCount++;
+    // Sample a spread of real BGR555 pixels; a fade should recover quickly.
+    let blank=true;
+    for(let i=0;i<PIXELS;i+=512){
+      if(frame.readUInt16LE(i)!==0){blank=false;break;}
+    }
+    if(blank){this.blackFrames++;this.blackSince||=this.lastFrameTime;}
+    else{this.blackSince=0;this.blackFrames=0;}
+    if(this.blackSince&&this.lastFrameTime-this.blackSince>10000&&!this.options.paused)
+      this.recordDiagnostic('Continuous black game frames for more than 10 seconds');
+    this.send('native-game-frame',new Uint8Array(frame));
+  }
+  async recordDiagnostic(reason,extra={}){
+    if(this.diagnosticReason)return;
+    this.diagnosticReason=reason;
+    const report={format:'brisk-native-diagnostic',version:1,at:new Date().toISOString(),
+      reason,platform:this.platform,engineCommit:this.engineCommit,frames:this.frameCount,
+      lastFrameAt:this.lastFrameTime?new Date(this.lastFrameTime).toISOString():null,
+      consecutiveBlackFrames:this.blackFrames,paused:this.options.paused,
+      errorTail:this.errorTail.slice(-1500),...extra};
+    try{
+      const directory=path.join(this.userData,'native-diagnostics');
+      await fs.mkdir(directory,{recursive:true});
+      const output=path.join(directory,'last-native-failure.json');
+      await fs.writeFile(output+'.tmp',JSON.stringify(report,null,2),'utf8');
+      await fs.rename(output+'.tmp',output);
+      this.send('native-game-state',{running:!!this.child,message:'Native game issue detected. Diagnostic saved to '+output});
+    }catch(error){this.send('native-game-state',{running:!!this.child,message:'Native diagnostic could not be saved: '+error.message});}
+  }
+  async exportDiagnostics(){
+    const file=path.join(this.userData,'native-diagnostics','last-native-failure.json');
+    try{return {ok:true,diagnostic:JSON.parse(await fs.readFile(file,'utf8'))};}
+    catch(error){return {ok:false,error:error.code==='ENOENT'?'No native failure has been recorded.':error.message};}
   }
   async start(){
     if(this.stopping)return {ok:false,error:'The game is still stopping. Try again in a moment.'};
@@ -70,12 +107,13 @@ class EmbeddedNativeGame{
     if(this.child)return {ok:true,alreadyRunning:true};
     const status=await embeddedStatus({platform:this.platform,resources:this.resources});
     if(status.status!=='ready')return {ok:false,error:status.message};
-    this.protocol=status.protocol||1;
+    this.protocol=status.protocol||1;this.engineCommit=status.briskCommit||null;
     const executable=bundledGamePath({platform:this.platform,resources:this.resources});
     const dataDir=path.join(this.userData,status.profile==='brisk'?'native-brisk-emerald':'native-expansion');
     await fs.mkdir(dataDir,{recursive:true});
-    this.errorTail='';
-    const decoder=new PacketDecoder(frame=>this.send('native-game-frame',new Uint8Array(frame)));
+    this.errorTail='';this.frameCount=0;this.lastFrameTime=0;
+    this.blackSince=0;this.blackFrames=0;this.diagnosticReason=null;
+    const decoder=new PacketDecoder(frame=>this.noteFrame(frame));
     this.decoder=decoder;
     let child;
     try{
@@ -92,15 +130,25 @@ class EmbeddedNativeGame{
     });
     child.stdout.on('data',part=>{if(this.child===child)decoder.push(part);});
     child.stderr.on('data',part=>{this.errorTail=(this.errorTail+part.toString('utf8')).slice(-1500);});
+    this.diagnosticTimer=setInterval(()=>{
+      if(this.child===child&&!this.options.paused&&this.lastFrameTime&&Date.now()-this.lastFrameTime>12000)
+        this.recordDiagnostic('Game stopped producing video frames for more than 12 seconds');
+    },2000);
+    this.diagnosticTimer.unref?.();
     child.on('exit',(code,signal)=>{
       if(this.child===child){
+        clearInterval(this.diagnosticTimer);this.diagnosticTimer=null;
+        const intentional=!!this.stopping;
+        if(!intentional&&code!==0)this.recordDiagnostic('Native process exited unexpectedly',{exitCode:code,signal});
         this.child=null;
         this.send('native-game-state',{running:false,code,signal,
           message:code===0?'Game stopped.':('Native engine stopped: '+(this.errorTail.trim()||String(code??signal)))});
       }
     });
     child.on('error',error=>{
-      if(this.child===child){this.child=null;this.send('native-game-state',{running:false,message:error.message});}
+      if(this.child===child){clearInterval(this.diagnosticTimer);this.diagnosticTimer=null;
+        this.recordDiagnostic('Native process error',{error:error.message});
+        this.child=null;this.send('native-game-state',{running:false,message:error.message});}
     });
     return await new Promise(resolve=>{
       child.once('spawn',()=>{this.writeInput();this.send('native-game-state',{running:true});resolve({ok:true});});
