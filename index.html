@@ -6436,19 +6436,20 @@ async function handleGbaRomFile(file){
     USER_DATA.species={};USER_DATA.moves={};USER_DATA.items={};USER_DATA.abilities={};
     USER_DATA.itemDetails={};USER_DATA.moveDetails={};USER_DATA.abilityDetails={};
     applyGameDataPack(Object.assign({trainerTeams:[],routeEncounters:[]},result.data));
-    var resolved={};
+    var resolved=Object.assign({},result.iconUrls||{});
     Object.keys(result.icons).forEach(function(id){
       var pixels=result.icons[id],canvas=document.createElement('canvas');
       canvas.width=32;canvas.height=32;
       var ctx=canvas.getContext('2d');
       if(!ctx)return;
       var frame=ctx.createImageData(32,32);frame.data.set(pixels);ctx.putImageData(frame,0,0);
-      resolved[id]=canvas.toDataURL('image/png');
+      if(!resolved[id])resolved[id]=canvas.toDataURL('image/png');
     });
     SPECIES_ICONS=Object.assign({},SPECIES_ICONS,resolved);
+    SPECIES_SHINY_ICONS=Object.assign({},SPECIES_SHINY_ICONS,result.shinyIconUrls||{});
     try{
-      var rawIcons=JSON.stringify(resolved);
-      if(rawIcons.length<2*1024*1024)localStorage.setItem('briskdex_compat_rom_icons_v1',rawIcons);
+      var rawIcons=JSON.stringify({icons:resolved,shinyIcons:result.shinyIconUrls||{}});
+      if(rawIcons.length<4*1024*1024)localStorage.setItem('briskdex_compat_rom_icons_v1',rawIcons);
       else localStorage.removeItem('briskdex_compat_rom_icons_v1');
     }catch(e){}
     currentRomReport=result;
@@ -6842,7 +6843,7 @@ if(ONLINE_STATE.roomCode&&ONLINE_STATE.playerId){
 }
 updateDataStatus();
 var gameDataReady=loadBundledGameData().then(function(){
-  try{var savedPack=localStorage.getItem('briskdex_compat_game_data_pack');if(savedPack)applyGameDataPack(JSON.parse(savedPack),true);var cachedIcons=localStorage.getItem('briskdex_compat_rom_icons_v1');if(cachedIcons)SPECIES_ICONS=Object.assign({},SPECIES_ICONS,JSON.parse(cachedIcons));}catch(e){showError('Saved compatibility data pack could not be restored: '+e.message);}
+  try{var savedPack=localStorage.getItem('briskdex_compat_game_data_pack');if(savedPack)applyGameDataPack(JSON.parse(savedPack),true);var cachedIcons=localStorage.getItem('briskdex_compat_rom_icons_v1');if(cachedIcons){var parsedIcons=JSON.parse(cachedIcons);SPECIES_ICONS=Object.assign({},SPECIES_ICONS,parsedIcons.icons||parsedIcons);SPECIES_SHINY_ICONS=Object.assign({},SPECIES_SHINY_ICONS,parsedIcons.shinyIcons||{});}}catch(e){showError('Saved compatibility data pack could not be restored: '+e.message);}
 });
 storageReady = loadExternalStorage();
 restoreLastSave();
