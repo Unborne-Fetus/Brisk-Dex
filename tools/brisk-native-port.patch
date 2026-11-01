@@ -149,6 +149,25 @@ index 6d86a20a..a50fdbd8 100644
  
  /* The ABI an image was written with. */
  struct save_file_layout {
+diff --git a/src/load_save.c b/src/load_save.c
+index 00fccb62..15a6d024 100644
+--- a/src/load_save.c
++++ b/src/load_save.c
+@@ -127,8 +127,14 @@ void MoveSaveBlocks_ResetHeap(void)
+     gTrainerHillVBlankCounter = NULL;
+ 
+     saveBlock2Copy = (struct SaveBlock2 *)(gHeap);
++#if BRISK_NATIVE
++    // Temporary SaveBlock1 contains host pointers and must remain 8-byte aligned.
++    saveBlock1Copy = (struct SaveBlock1 *)(gHeap + ((sizeof(struct SaveBlock2) + 7) & ~(size_t)7));
++    pokemonStorageCopy = (struct PokemonStorage *)(gHeap + ((sizeof(struct SaveBlock2) + 7) & ~(size_t)7) + ((sizeof(struct SaveBlock1) + 7) & ~(size_t)7));
++#else
+     saveBlock1Copy = (struct SaveBlock1 *)(gHeap + sizeof(struct SaveBlock2));
+     pokemonStorageCopy = (struct PokemonStorage *)(gHeap + sizeof(struct SaveBlock2) + sizeof(struct SaveBlock1));
++#endif
+ 
+     // backup the saves.
+     *saveBlock2Copy = *gSaveBlock2Ptr;
 diff --git a/src/malloc.c b/src/malloc.c
 index 21012396..6d637236 100644
 --- a/src/malloc.c

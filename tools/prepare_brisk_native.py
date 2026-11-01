@@ -70,7 +70,7 @@ def resolve_conflicts(name, data):
         'src/battle_setup.c': 'native', 'src/m4a.c': 'brisk',
         'src/save.c': 'brisk', 'src/battle_util.c': 'stab',
         'src/data/abilities.h': 'abilities',
-        'src/data/pokemon/species_info/gen_7_families.h': 'brisk',
+        'src/data/pokemon/species_info/gen_7_families.h': 'native',
     }
     if name not in strategies:
         raise RuntimeError('Unreviewed Brisk/native conflict: ' + name)

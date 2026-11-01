@@ -67,10 +67,12 @@ if [ "$target" = windows ]; then
   mkdir -p "$dest/win32"
   cp "$checkout/build/native64-windows/pokeemerald-native.exe" "$dest/win32/pokeemerald-native.exe"
   cp "$checkout/build/native64-windows/SDL2.dll" "$dest/win32/SDL2.dll"
+  cp "$checkout/build/native64-windows/pokeemerald-native.exe.symbols" "$dest/win32/pokeemerald-native.exe.symbols"
 else
   platform_dir=linux
   mkdir -p "$dest/linux"
   cp "$checkout/build/native64/pokeemerald-native" "$dest/linux/pokeemerald-native"
+  cp "$checkout/build/native64/pokeemerald-native.symbols" "$dest/linux/pokeemerald-native.symbols"
 fi
 python3 "$root/tools/native_build_info.py" "$dest/$platform_dir" "$checkout" "$profile" "$pin"
 echo "Internal native engine staged under $dest; it will launch inside Brisk Dex."
