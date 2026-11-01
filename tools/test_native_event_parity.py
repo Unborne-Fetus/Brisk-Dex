@@ -50,8 +50,12 @@ def movement(script, label, position):
             raise RuntimeError('Unverified rescue step ' + cmd)
         dx, dy = offsets.get(cmd, (0, 0))
         x, y = x + dx, y + dy
-        if not (9 <= x <= 13 and y == 14):
-            raise RuntimeError(f'{label} hits the Route 101 cliff at {x},{y}')
+        if label == 'Route101_Movement_EnterScene':
+            safe = 10 <= x <= 11 and 18 <= y <= 19
+        else:
+            safe = 9 <= x <= 13 and y == 14
+        if not safe:
+            raise RuntimeError(f'{label} leaves the intended Route 101 corridor at {x},{y}')
     return x, y
 
 
