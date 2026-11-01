@@ -297,7 +297,7 @@ function importRom(value,options){
       });
     });
   }
-  var counts={species:Object.keys(data.species||{}).length,icons:new Set(Object.keys(icons).concat(Object.keys(urls))).size,trainers:(data.trainerTeams||[]).length,routes:(data.routeEncounters||[]).length,moves:Object.keys(data.moves||{}).length,items:Object.keys(data.items||{}).length,abilities:Object.keys(data.abilities||{}).length};
+  var counts={species:Object.keys(data.species||{}).length,icons:new Set(Object.keys(icons).concat(Object.keys(urls))).size,trainers:(data.trainerTeams||[]).length,routes:(data.routeEncounters||[]).length,maps:(data.mapCatalog||[]).length,moves:Object.keys(data.moves||{}).length,items:Object.keys(data.items||{}).length,abilities:Object.keys(data.abilities||{}).length};
   return {details:details,header:header,rhh:rhh,data:data,icons:icons,iconUrls:urls,shinyIconUrls:shinyUrls,counts:counts,source:source,warnings:warnings,complete:!!embedded&&counts.species>0&&counts.trainers>0&&counts.routes>0};
 }
 async function importRomAsync(value,options){
