@@ -68,7 +68,8 @@ test('two native compact slots decode independently with separate randomizer and
   assert.deepEqual(r.slots[1].raw,raws[1]);
   const a=makeVirtualSave(r.slots[0].raw),b=makeVirtualSave(r.slots[1].raw);
   assert.equal(a[0],0xbb);assert.equal(b[0],0xc9);
-  const optionsAt=4096+0x139c+(0x40db-0x4000)*2;
+  const optionLogical=0x139c+(0x40db-0x4000)*2;
+  const optionsAt=4096*(1+Math.floor(optionLogical/3968))+(optionLogical%3968);
   assert.equal(a.readUInt16LE(optionsAt),1);
   assert.equal(b.readUInt16LE(optionsAt),0);
   assert.equal(a.readUInt32LE(0xff8),0x08012025);
