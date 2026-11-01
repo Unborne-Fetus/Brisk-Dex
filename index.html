@@ -1089,6 +1089,13 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
       <select id="dex-order" aria-label="Sort Pokédex">
         <option value="national">National Dex order</option>
         <option value="alphabetical">Alphabetical</option>
+        <option value="bst">BST (highest first)</option>
+        <option value="hp">HP (highest first)</option>
+        <option value="attack">Attack (highest first)</option>
+        <option value="defense">Defense (highest first)</option>
+        <option value="spAttack">Sp. Atk (highest first)</option>
+        <option value="spDefense">Sp. Def (highest first)</option>
+        <option value="speed">Speed (highest first)</option>
       </select>
     </div>
     <div class="dex-layout">
@@ -1108,6 +1115,11 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
         <option value="Hard">Hard</option>
         <option value="Kaizo">Kaizo</option>
       </select>
+      <select id="trainer-progress" aria-label="Filter trainers by battle progress">
+        <option value="all">All trainers</option>
+        <option value="beaten">Defeated</option>
+        <option value="unbeaten">Not defeated</option>
+      </select>
       <select id="trainer-class" aria-label="Filter trainers by class"><option value="all">All classes</option></select>
       <select id="trainer-size" aria-label="Filter trainers by party size">
         <option value="all">Any team size</option>
@@ -1119,6 +1131,7 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
         <option value="6">6 Pok&eacute;mon</option>
       </select>
     </div>
+    <p class="route-intro" id="trainer-progress-summary" aria-live="polite">Load a Brisk Emerald save to view trainers you've defeated.</p>
     <div class="trainer-layout">
       <aside class="trainer-list" id="trainer-list" aria-label="Brisk trainers"></aside>
       <div class="trainer-detail" id="trainer-detail" aria-live="polite"></div>
@@ -1845,6 +1858,23 @@ function parseSav(arrayBuffer){
   var dexSeen=saveBlock1Bytes.slice(DEX_SEEN_OFFSET,DEX_SEEN_OFFSET+DEX_FLAG_BYTES);
   var dexCaught=saveBlock1Bytes.slice(DEX_SEEN_OFFSET+DEX_FLAG_BYTES,DEX_SEEN_OFFSET+(DEX_FLAG_BYTES*2));
 
+  // Brisk's Hoenn trainer defeat flags are in SaveBlock1. Kanto trainer
+  // flags are in SaveBlock3's 116-byte chunks at the end of save sectors.
+  // Reassemble by logical sector ID; physical sectors rotate every save.
+  var trainerHoennFlags=saveBlock1Bytes.slice(TRAINER_FLAG_INFO.hoennFlagsOffset||0x1270);
+  var chunkSize=TRAINER_FLAG_INFO.saveChunkSize||116;
+  var chunkStart=TRAINER_FLAG_INFO.saveChunkStart||3968;
+  var saveBlock3Bytes=new Uint8Array(14*chunkSize), validExtension=true;
+  for(var sectorId=0;sectorId<14;sectorId++){
+    var sectorFileOffset=block.fileOffsets[sectorId];
+    if(sectorFileOffset===undefined || sectorFileOffset+chunkStart+chunkSize>bytes.length){
+      validExtension=false; break;
+    }
+    saveBlock3Bytes.set(bytes.subarray(sectorFileOffset+chunkStart,sectorFileOffset+chunkStart+chunkSize),sectorId*chunkSize);
+  }
+  var kantoOffset=TRAINER_FLAG_INFO.kantoFlagsOffset||120;
+  var trainerKantoFlags=validExtension ? saveBlock3Bytes.slice(kantoOffset,kantoOffset+78) : new Uint8Array(0);
+
   return {
     keyItemIds: Array.from({length:30},function(_,i){return v1.getUint16(0x5d8+i*4,true);}).filter(Boolean),
     bag: readSaveBag(v1,securityKey),
@@ -1853,6 +1883,8 @@ function parseSav(arrayBuffer){
     money: money,
     dexSeen: dexSeen,
     dexCaught: dexCaught,
+    trainerHoennFlags: trainerHoennFlags,
+    trainerKantoFlags: trainerKantoFlags,
     party: party,
     boxes: boxes,
     boxNames: boxNames,
@@ -2441,6 +2473,7 @@ var ROUTE_DATA = [];
 var selectedRouteId = null;
 var selectedDexSpeciesId = null;
 var TRAINER_DATA = [];
+var TRAINER_FLAG_INFO = {ids:{},hoennFlagBase:0x500,hoennFlagsOffset:0x1270,kantoTrainerBase:865,kantoFlagsOffset:120,saveChunkSize:116,saveChunkStart:3968};
 var selectedTrainerConstant = null;
 var ITEM_DETAILS = {};
 var selectedItemId = null;
@@ -2452,6 +2485,11 @@ var MOVE_LEARNERS_INDEX = null;
 var ABILITY_USERS_INDEX = null;
 var CHANGE_DATA = [];
 var CURRENT_BRISK_CHANGES = [
+  {category:"Brisk-specific · Scott's Trainer Summit",changes:[
+    "The Route 135 Trainer Summit rematches previously defeated trainers in shuffled order and offers configurable healing, bag access, enemy levels and battle rules.",
+    "Summit streak prizes are cumulative at 10, 25, 50, 75 and each further 25 wins; later milestones include all earlier reward tiers and escalating shiny Legendary rewards.",
+    "The Trainer Teams tab reads Hoenn and Kanto defeat flags directly from your loaded Brisk Emerald save."
+  ]},
   {category:"Brisk-specific · Progression & Quality of Life",changes:[
     "Gym progression level caps are currently 25, 35, 45, 50, 55, 65, 75 and 100.",
     "The current progression level cap is displayed in Brisk Emerald's pause menu.",
@@ -2680,6 +2718,10 @@ async function loadBundledGameData(){
       icons = await responses[2].json();
     }
     TRAINER_DATA = Array.isArray(trainerData && trainerData.trainers) ? trainerData.trainers : [];
+    try {
+      var trainerFlagsResponse=await fetch('brisk-dex-trainer-flags.json');
+      if(trainerFlagsResponse.ok) TRAINER_FLAG_INFO=await trainerFlagsResponse.json();
+    } catch(error) { console.warn('Trainer flag metadata unavailable:',error); }
     if (Number.isInteger(data.shinyOdds) && data.shinyOdds > 0) GAME_SHINY_ODDS = data.shinyOdds;
     BUNDLED_DATA = {
       species:data.species || {}, moves:data.moves || {},
@@ -3727,6 +3769,7 @@ function renderAll(){
   renderStoragePanel();
   updateDirtyBanner();
   renderPokedex();
+  if (currentMainTab==='trainers') renderTrainerTeams();
 }
 
 function isRouteArea(area){ return area.mapType === 'MAP_TYPE_ROUTE'; }
@@ -4142,6 +4185,17 @@ function renderPokedex(){
       var an=dexSpeciesDisplayName(ae).localeCompare(dexSpeciesDisplayName(be));
       return an || Number(a)-Number(b);
     }
+    var statIndex={hp:0,attack:1,defense:2,speed:3,spAttack:4,spDefense:5};
+    if(order==='bst' || Object.prototype.hasOwnProperty.call(statIndex,order)){
+      var statScore=function(entry){
+        if(!Array.isArray(entry.baseStats) || entry.baseStats.length!==6) return -1;
+        return order==='bst'
+          ? entry.baseStats.reduce(function(total,n){return total+Number(n||0);},0)
+          : Number(entry.baseStats[statIndex[order]]||0);
+      };
+      var diff=statScore(be)-statScore(ae);
+      if(diff) return diff;
+    }
     var ad=Number(ae.nationalDex||99999), bd=Number(be.nationalDex||99999);
     return ad-bd || Number(ae.isMega)-Number(be.isMega) || Number(a)-Number(b);
   });
@@ -4510,6 +4564,19 @@ function trainerSearchText(t){
   });
   return parts.filter(Boolean).join(' ').toLowerCase();
 }
+
+function briskTrainerDefeated(trainer) {
+  if(!currentSave || !currentSave.trainerHoennFlags || !trainer) return null;
+  var id=TRAINER_FLAG_INFO.ids && TRAINER_FLAG_INFO.ids[trainer.constant];
+  if(!Number.isInteger(id) || id<=0) return null;
+  var kantoBase=TRAINER_FLAG_INFO.kantoTrainerBase||865;
+  var kanto=id>=kantoBase;
+  var bit=kanto ? id-kantoBase : (TRAINER_FLAG_INFO.hoennFlagBase||0x500)+id;
+  var flags=kanto ? currentSave.trainerKantoFlags : currentSave.trainerHoennFlags;
+  if(!flags || (bit>>3)>=flags.length) return null;
+  return (flags[bit>>3] & (1<<(bit&7)))!==0;
+}
+
 function renderTrainerTeams(){
   var list=document.getElementById('trainer-list'), detail=document.getElementById('trainer-detail');
   if(!list||!detail) return;
@@ -4517,13 +4584,23 @@ function renderTrainerTeams(){
   var q=(document.getElementById('trainer-search').value||'').trim().toLowerCase();
   var classFilter=document.getElementById('trainer-class').value;
   var sizeFilter=document.getElementById('trainer-size').value;
-  var filtered=TRAINER_DATA.filter(function(t){
-    if(t.constant==='TRAINER_NONE') return false;
+  var progressFilter=document.getElementById('trainer-progress').value;
+  var playable=TRAINER_DATA.filter(function(t){return t.constant!=='TRAINER_NONE' && t.constant!=='TRAINER_BRISK_KANTO_NONE';});
+  var known=playable.filter(function(t){return briskTrainerDefeated(t)!==null;});
+  var beaten=known.filter(function(t){return briskTrainerDefeated(t)===true;}).length;
+  var progressSummary=document.getElementById('trainer-progress-summary');
+  if(progressSummary)progressSummary.textContent=currentSave
+    ? beaten+' of '+known.length+' tracked trainers defeated ('+(playable.length-known.length)+' untracked).'
+    : 'Load a Brisk Emerald save to view trainers you have defeated.';
+  var filtered=playable.filter(function(t){
+    var won=briskTrainerDefeated(t);
+    if(progressFilter==='beaten' && won!==true) return false;
+    if(progressFilter==='unbeaten' && won!==false) return false;
     if(classFilter!=='all' && (t.class||'Pkmn Trainer')!==classFilter) return false;
     if(sizeFilter!=='all' && String(trainerParty(t).length)!==sizeFilter) return false;
     return !q || trainerSearchText(t).includes(q);
   });
-  document.getElementById('trainer-count').textContent=filtered.length+' of '+TRAINER_DATA.filter(function(t){return t.constant!=='TRAINER_NONE';}).length+' trainers';
+  document.getElementById('trainer-count').textContent=filtered.length+' of '+playable.length+' trainers';
   list.innerHTML=''; detail.innerHTML='';
   if(!TRAINER_DATA.length){
     list.appendChild(el('div',{class:'route-empty',text:'Trainer team data is not loaded.'}));
@@ -4544,7 +4621,9 @@ function renderTrainerTeams(){
     left.appendChild(el('strong',{text:t.name||t.constant.replace(/^TRAINER_/,'')}));
     left.appendChild(el('small',{text:t.class||'Pkmn Trainer'}));
     btn.appendChild(left);
-    btn.appendChild(el('span',{class:'trainer-entry-count',text:trainerParty(t).length+' mon'}));
+    var won=briskTrainerDefeated(t);
+    if(won!==null) btn.appendChild(el('span',{class:'trainer-entry-count',text:won?'✓ Beaten':'Not beaten'}));
+    else btn.appendChild(el('span',{class:'trainer-entry-count',text:trainerParty(t).length+' mon'}));
     btn.addEventListener('click',function(){selectedTrainerConstant=t.constant;renderTrainerTeams();});
     list.appendChild(btn);
   });
@@ -4559,6 +4638,7 @@ function renderTrainerTeams(){
   [
     t.class||'Pkmn Trainer',
     t.region||'Hoenn',
+    briskTrainerDefeated(t)===true ? '✓ Previously defeated' : briskTrainerDefeated(t)===false ? 'Not defeated yet' : 'Load a save to check battle status',
     t.modeTeams ? trainerSelectedMode()+' difficulty' : 'Original team',
     profile.battleType ? ((String(profile.battleType).toLowerCase()==='yes'||String(profile.battleType).toLowerCase()==='doubles')?'Double Battle':(String(profile.battleType).toLowerCase()==='no'?'Single Battle':profile.battleType)) : null,
     profile.ai ? 'AI: '+profile.ai : null,
@@ -6787,6 +6867,7 @@ document.getElementById('trainer-search').addEventListener('input', renderTraine
  document.getElementById('trainer-mode').addEventListener('change', renderTrainerTeams);
 document.getElementById('trainer-class').addEventListener('change', renderTrainerTeams);
 document.getElementById('trainer-size').addEventListener('change', renderTrainerTeams);
+document.getElementById('trainer-progress').addEventListener('change', renderTrainerTeams);
 document.getElementById('competitive-search').addEventListener('input', renderCompetitiveSetsDebounced);
 document.getElementById('competitive-type').addEventListener('change', renderCompetitiveSets);
 document.getElementById('competitive-order').addEventListener('change', renderCompetitiveSets);
