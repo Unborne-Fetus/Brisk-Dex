@@ -24,19 +24,18 @@ replay=replay.replace('wait-until task_first=Task_HandleMainMenuInput max 600',p
 // Brisk exposes DexNav from the start, before Pokemon/Bag/Player/Save.
 replay=replay.replace('# POKeMON, BAG, the player, SAVE: three down', '# DEXNAV, POKeMON, BAG, the player, SAVE: four down\npress DOWN\nwait 8');
 // Brisk's Route 101 is taller and uses its own nine-starter case.
-replay=replay.replace('# ---- 10. Route 101:', 'hold DOWN\nwait-until script_running=1 max 600\nrelease DOWN\n# ---- 10. Route 101:');
 const bagStart=replay.indexOf("# Birch's bag lies");
 const battleStart=replay.indexOf('wait-until in_battle=1',bagStart);
 assert.ok(bagStart>=0 && battleStart>bagStart,'Upstream opening structure changed');
-replay=replay.slice(0,bagStart)+`# Brisk bag at (10,17); stand below it after the chase.
+replay=replay.slice(0,bagStart)+`# Brisk bag at (10,17); approach it from the north after the chase.
+hold DOWN
+wait-until pos=11,16 max 200
+release DOWN
 hold LEFT
 wait-until pos=10,16 max 200
 release LEFT
-hold DOWN
-wait-until pos=10,18 max 200
-release DOWN
 wait 20
-press UP
+press DOWN
 wait 10
 press A
 wait-until task_first=Task_BirchCaseMain max 1200

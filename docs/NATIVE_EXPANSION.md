@@ -53,6 +53,8 @@ Some MinGW linker versions emit a read-only `.idata` section after writable game
 
 The Brisk native profile moves `gHeap` outside the emulated EWRAM window, sets it to 16 MiB, widens allocation size fields, preserves 8-byte alignment, and gives the compact save data its own layout identifier. The previous base game's cross-width save converter does not apply to this different schema. `build-info.json` identifies the staged game so the app chooses the correct save directory.
 
+The native port also corrects Route 101 rescue triggers that were outside the pinned Brisk map, retaining its relocated bag and nine-starter case.
+
 The native symbol map is staged beside the executable for diagnostics and state-based replay validation. CI builds both Windows and Linux Brisk engines and exercises the opening, first battle, saving, restarting and profile selection. See [capacity and remaining limits](BRISK_NATIVE_CAPACITY.md).
 
 For backend development, `BRISK_NATIVE_PROFILE=expansion bash tools/build-native-expansion.sh linux` retains the base-expansion profile. The integrated Windows installer entrypoint always selects Brisk.
