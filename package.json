@@ -35,7 +35,8 @@
     "index:test": "npm run index:build && node tools/test_standalone_game.mjs",
     "desktop:test": "node --test test/desktop/*.test.cjs",
     "native:build": "bash tools/build-native-expansion.sh windows",
-    "native:bridge:test": "node --test test/desktop/embedded-game.test.cjs"
+    "native:bridge:test": "node --test test/desktop/embedded-game.test.cjs",
+    "desktop:ui": "node tools/test_embedded_ui.cjs"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.0.0",
