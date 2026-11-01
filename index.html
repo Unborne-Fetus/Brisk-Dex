@@ -76,7 +76,15 @@ header.top{
   text-shadow:none;
 }
 .brand p{ margin:0; color:var(--muted); font-size:13px; }
-.top-actions{ display:flex; gap:10px; flex-wrap:wrap; }
+.top-actions{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+/* Update controls belong in the app-level header, not the game's settings drawer. */
+.top-update-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.top-update-controls button{padding:8px 11px;font-size:12px;}
+.top-update-controls label{font-size:12px;color:var(--muted);white-space:nowrap;display:flex;gap:5px;align-items:center;}
+#native-update-status{font-size:12px;color:var(--muted);max-width:330px;overflow-wrap:anywhere;}
+#native-update-apply:disabled,#native-update-rollback:disabled{display:none;}
+@media(max-width:950px){.top-update-controls{width:100%;order:1}.top-update-controls #native-update-status{max-width:100%;}}
+
 
 button, .btn{
   font-family:var(--font-body);
@@ -969,6 +977,13 @@ body.native-game-immersive #native-game-screen{box-sizing:border-box!important;w
       </div>
     </div>
     <div class="top-actions">
+      <div class="top-update-controls" aria-label="Application updates">
+        <span id="native-update-status" role="status" aria-live="polite">Checking for updates…</span>
+        <button id="native-update-check" type="button">Check updates</button>
+        <button id="native-update-apply" type="button" disabled>Restart &amp; apply</button>
+        <button id="native-update-rollback" type="button" disabled>Roll back</button>
+        <label title="Check and download updates automatically"><input type="checkbox" id="native-auto-updates" checked>Auto-update</label>
+      </div>
       <button hidden class="ghost" id="btn-load-data">Load species/move data</button>
       <button hidden class="ghost" id="btn-load-icons">Load icon folder</button>
       <button id="btn-export-save">Export saved copy</button>
@@ -1331,7 +1346,7 @@ body.native-game-immersive #native-game-screen{box-sizing:border-box!important;w
         <button id="native-game-restore" type="button" disabled>Restore saves</button>
       </div>
       <details id="native-game-settings" style="margin-top:12px">
-        <summary>Controls, speed and updates</summary>
+        <summary>Controls and speed</summary>
         <div style="display:flex;gap:14px;flex-wrap:wrap;margin:12px 0">
           <label>Game speed <select id="native-speed"><option value="1">1×</option><option value="2">2×</option><option value="3">3×</option><option value="4">4×</option><option value="0">Unlimited</option></select></label>
           <label>Hold speed-up <select id="native-fast-speed"><option value="2">2×</option><option value="3">3×</option><option value="4">4×</option><option value="0">Unlimited</option></select></label>
@@ -1342,17 +1357,13 @@ body.native-game-immersive #native-game-screen{box-sizing:border-box!important;w
         <p>Click a keyboard binding and press a key. Escape cancels. Controller numbers use the standard Gamepad mapping (starting at 0).</p>
         <div id="native-binding-list" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px"></div>
         <button id="native-controls-reset" type="button">Reset controls</button>
-        <hr>
-        <label><input type="checkbox" id="native-auto-updates" checked>Automatically check and download updates</label>
-        <p id="native-update-status" role="status">Updates are available in the desktop app.</p>
-        <div class="top-actions"><button id="native-update-check" type="button">Check for updates</button><button id="native-update-apply" type="button" disabled>Restart and apply update</button><button id="native-update-rollback" type="button" disabled>Roll back update</button></div>
-      </details>
+       </details>
       <div id="native-game-stage">
       <canvas id="native-game-screen" width="240" height="160" tabindex="0"
         aria-label="Pokémon Emerald game screen. Arrow keys move; Z confirms; X goes back; Enter starts."
         style="display:block;max-width:720px;width:100%;aspect-ratio:3/2;height:auto;margin:18px auto 8px;background:#101010;border:2px solid #363636;image-rendering:pixelated;outline-offset:3px"></canvas>
       </div>
-      <p style="font-size:12px">Open “Controls, speed and updates” to change keyboard and controller bindings. Defaults: arrows move; Z/X = A/B; Enter/Backspace = Start/Select; A/S = L/R. Hold Tab to speed up.</p>
+      <p style="font-size:12px">Open “Controls and speed” to change keyboard and controller bindings. Defaults: arrows move; Z/X = A/B; Enter/Backspace = Start/Select; A/S = L/R. Hold Tab to speed up.</p>
       <p id="native-controller-status" role="status" style="font-size:12px">Connect a controller and press a button to use it.</p>
       <div class="top-actions" id="native-touch-keys" aria-label="Game controls" style="justify-content:center">
         <button type="button" data-native-key="6">Up</button>
