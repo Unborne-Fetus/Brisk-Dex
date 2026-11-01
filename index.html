@@ -968,6 +968,7 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
       <input type="file" id="file-sav" accept=".sav,.srm">
       <input type="file" id="file-data" accept=".json">
       <input type="file" id="file-compat-profile" accept=".json">
+      <input type="file" id="file-gba-rom" accept=".gba,.bin,application/octet-stream">
     </div>
   </header>
 
@@ -1241,11 +1242,13 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
       <label>Emerald save profile <select id="setting-emerald-profile" translate="no"><option value="auto">Auto detect</option></select></label>
       <p class="dex-muted">Auto-detected unknown Emerald saves open read-only unless a profile can be identified exactly. Explicitly choosing a trusted profile enables the write policy defined by that profile.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button type="button" class="primary" id="btn-import-gba-rom">Import game from .gba ROM</button>
         <button type="button" class="ghost" id="btn-import-compat-profile">Import compatibility pack</button>
         <button type="button" class="ghost" id="btn-import-game-data">Import game-data pack</button>
         <button type="button" class="ghost" id="btn-export-original-backup">Export untouched backup</button>
       </div>
       <div id="compat-profile-status" class="dex-muted" role="status"></div>
+      <div id="gba-rom-import-report" class="dex-muted" role="status" aria-live="polite">Choose a GBA ROM to inspect species, custom Pokémon and icons. Complete trainer teams and routes require a ROM-embedded Brisk Dex metadata index; unsupported fields are reported rather than guessed. ROM files stay on this device.</div>
     </div>
   </section>
   <section id="bag-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-bag" style="display:none;">
@@ -1485,6 +1488,7 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
 <script src="asset-loader.js"></script>
 <script src="localization.js"></script>
 <script src="emerald-compat.js"></script>
+<script src="gba-rom-import.js"></script>
 <script>
 (function(){
 "use strict";
@@ -6406,6 +6410,52 @@ function applyGameDataPack(parsed,skipPersist){
   MOVE_LEARNERS_INDEX=null;ABILITY_USERS_INDEX=null;rebuildNameData();refreshBoxLevels();saveNameDataToStorage();updateDataStatus();renderCurrentReferenceTab();
   if(currentSave)renderAll();
 }
+var currentRomReport=null;
+function renderRomImportReport(result){
+  var node=document.getElementById('gba-rom-import-report');
+  if(!node)return;
+  node.innerHTML='';
+  var d=result.details,c=result.counts;
+  node.appendChild(el('div',{style:'font-weight:bold;margin-bottom:6px;',text:'ROM: '+(d.title||'Unknown')+' ('+(d.gameCode||'no code')+') · '+(result.complete?'Full index':'Partial extraction')}));
+  node.appendChild(el('div',{text:'Imported '+c.species+' species, '+c.icons+' icons, '+c.trainers+' trainer teams, '+c.routes+' map areas, '+c.moves+' moves, '+c.items+' items and '+c.abilities+' abilities.'}));
+  node.appendChild(el('div',{text:'Source: '+(result.source==='embedded-manifest'?'validated embedded ROM index':'recoverable ROM tables')+' · '+(result.rhh?'Expansion '+result.rhh.version:'GBA / Emerald family')}));
+  (result.warnings||[]).forEach(function(w){node.appendChild(el('div',{style:'margin-top:5px;',text:'Note: '+w}));});
+}
+async function handleGbaRomFile(file){
+  var status=document.getElementById('gba-rom-import-report');
+  if(status)status.textContent='Inspecting '+file.name+' locally…';
+  try{
+    await gameDataReady;
+    if(!window.BriskRomImporter)throw new Error('ROM reader is not available in this build.');
+    if(file.size<0xC0||file.size>128*1024*1024)throw new Error('Select a valid GBA ROM under 128 MB.');
+    var result=BriskRomImporter.importRom(await file.arrayBuffer());
+    if(!result.counts.species&&!result.counts.trainers&&!result.counts.routes)
+      throw new Error('No trustworthy Pokémon tables were identified in this ROM. A ROM index is needed for this hack.');
+    // Clear stale Brisk trainer/encounter tables when the selected ROM lacks them.
+    // This is reference data only; importing a ROM NEVER changes save write policies.
+    applyGameDataPack(Object.assign({trainerTeams:[],routeEncounters:[]},result.data));
+    var resolved={};
+    Object.keys(result.icons).forEach(function(id){
+      var pixels=result.icons[id],canvas=document.createElement('canvas');
+      canvas.width=32;canvas.height=32;
+      var ctx=canvas.getContext('2d');
+      if(!ctx)return;
+      var frame=ctx.createImageData(32,32);frame.data.set(pixels);ctx.putImageData(frame,0,0);
+      resolved[id]=canvas.toDataURL('image/png');
+    });
+    SPECIES_ICONS=Object.assign({},SPECIES_ICONS,resolved);
+    try{
+      var rawIcons=JSON.stringify(resolved);
+      if(rawIcons.length<2*1024*1024)localStorage.setItem('briskdex_compat_rom_icons_v1',rawIcons);
+      else localStorage.removeItem('briskdex_compat_rom_icons_v1');
+    }catch(e){}
+    currentRomReport=result;
+    renderRomImportReport(result);
+    renderCurrentReferenceTab();
+    if(currentSave)renderAll();
+    showNotice('ROM inspection finished: '+result.counts.species+' species; '+(result.complete?'full':'partial')+' game-data index.');
+  }catch(err){if(status)status.textContent='ROM import failed: '+(err.message||String(err));showError('ROM import: '+(err.message||String(err)));}
+}
 function handleDataFile(file){
   var reader=new FileReader();
   reader.onload=function(e){try{applyGameDataPack(JSON.parse(e.target.result));showNotice('Game-data pack imported.');}catch(err){showError('Could not parse that game-data pack: '+err.message);}};
@@ -6640,6 +6690,8 @@ document.getElementById('file-sav').addEventListener('change', function(e){
   if (e.target.files[0]) handleSavFile(e.target.files[0]);
 });
 document.getElementById('file-data').addEventListener('change',function(e){if(e.target.files[0])handleDataFile(e.target.files[0]);e.target.value='';});
+document.getElementById('file-gba-rom').addEventListener('change',function(e){if(e.target.files[0])handleGbaRomFile(e.target.files[0]);e.target.value='';});
+document.getElementById('btn-import-gba-rom').addEventListener('click',function(){document.getElementById('file-gba-rom').click();});
 document.getElementById('file-compat-profile').addEventListener('change',function(e){if(e.target.files[0])handleCompatibilityPackFile(e.target.files[0]);e.target.value='';});
 document.getElementById('btn-import-compat-profile').addEventListener('click',function(){document.getElementById('file-compat-profile').click();});
 document.getElementById('btn-import-game-data').addEventListener('click',function(){document.getElementById('file-data').click();});
@@ -6788,7 +6840,7 @@ if(ONLINE_STATE.roomCode&&ONLINE_STATE.playerId){
 }
 updateDataStatus();
 var gameDataReady=loadBundledGameData().then(function(){
-  try{var savedPack=localStorage.getItem('briskdex_compat_game_data_pack');if(savedPack)applyGameDataPack(JSON.parse(savedPack),true);}catch(e){showError('Saved compatibility data pack could not be restored: '+e.message);}
+  try{var savedPack=localStorage.getItem('briskdex_compat_game_data_pack');if(savedPack)applyGameDataPack(JSON.parse(savedPack),true);var cachedIcons=localStorage.getItem('briskdex_compat_rom_icons_v1');if(cachedIcons)SPECIES_ICONS=Object.assign({},SPECIES_ICONS,JSON.parse(cachedIcons));}catch(e){showError('Saved compatibility data pack could not be restored: '+e.message);}
 });
 storageReady = loadExternalStorage();
 restoreLastSave();
