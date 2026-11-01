@@ -47,3 +47,7 @@ Do not use weak fingerprints to enable writes. Prefer a read-only profile when a
 ## Game-data packs
 
 The optional data object can provide the same fields the existing Brisk data importer accepts, including `species`, `moves`, `items`, `abilities`, `itemDetails`, `moveDetails`, `abilityDetails`, `routeEncounters`, `trainerTeams`, and `changes`.
+
+## Direct .gba ROM importing
+
+The compatibility build also reads game data directly from local GBA ROM files. The base reader detects Emerald/Expansion headers, recoverable species data and icon graphics. Full trainer, route, custom form and shiny icon coverage is available from an indexed ROM built using the source-matched indexer. See [ROM_IMPORT.md](ROM_IMPORT.md) for the on-ROM format, setup and limitations.
