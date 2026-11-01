@@ -23,6 +23,18 @@ fastKeyField.addEventListener('keydown',event=>{event.preventDefault();event.sto
 document.getElementById('native-controls-reset').onclick=()=>{nativeUI.preferences=BriskNativeControls.settings();nativeUI.savePreferences();renderNativeBindings();for(const id of ['native-speed','native-fast-speed','native-mute','native-blur-pause']){const field=document.getElementById(id);const prop={'native-speed':'speed','native-fast-speed':'fastSpeed','native-mute':'mute','native-blur-pause':'pauseOnBlur'}[id];if(field.type==='checkbox')field.checked=nativeUI.preferences[prop];else field.value=nativeUI.preferences[prop];}fastKeyField.value=nativeUI.preferences.fastKey;};
 document.getElementById('native-game-pause').onclick=()=>{nativeUI.userPaused=!nativeUI.userPaused;document.getElementById('native-game-pause').textContent=nativeUI.userPaused?'Resume':'Pause';nativeUI.clearInput();nativeUI.applyOptions();};
 document.getElementById('native-game-screenshot').onclick=()=>{const link=document.createElement('a');link.download='Brisk-Emerald-'+new Date().toISOString().replace(/[:.]/g,'-')+'.png';link.href=nativeUI.canvas.toDataURL('image/png');link.click();};
+document.getElementById('native-game-diagnostics').onclick=async()=>{
+  const status=document.getElementById('native-game-status');
+  try{
+    const result=await window.briskDexAPI?.exportNativeDiagnostics?.();
+    if(!result?.ok){status.textContent=result?.error||'Diagnostics are available in the desktop application.';return;}
+    const file=new Blob([JSON.stringify(result.diagnostic,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(file),link=document.createElement('a');
+    link.href=url;link.download='brisk-native-diagnostics.json';link.click();
+    setTimeout(()=>URL.revokeObjectURL(url),3000);
+    status.textContent='Native diagnostic exported. No save or Pokémon data is included.';
+  }catch(error){status.textContent='Unable to export diagnostics: '+error.message;}
+};
 const updateMessage=document.getElementById('native-update-status');
 async function refreshUpdateStatus(){
   if(!window.briskDexAPI?.updateStatus){for(const id of ['native-auto-updates','native-update-check'])document.getElementById(id).disabled=true;return;}
