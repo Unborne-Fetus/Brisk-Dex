@@ -9,21 +9,21 @@
  * Keep -Wformat and -Werror enabled. */
 #if defined(__MINGW32__)
 #undef printf
-#define printf __mingw_printf
+#define printf(...) __mingw_printf(__VA_ARGS__)
 #undef fprintf
-#define fprintf __mingw_fprintf
+#define fprintf(...) __mingw_fprintf(__VA_ARGS__)
 #undef sprintf
-#define sprintf __mingw_sprintf
+#define sprintf(...) __mingw_sprintf(__VA_ARGS__)
 #undef snprintf
-#define snprintf __mingw_snprintf
+#define snprintf(...) __mingw_snprintf(__VA_ARGS__)
 #undef vprintf
-#define vprintf __mingw_vprintf
+#define vprintf(...) __mingw_vprintf(__VA_ARGS__)
 #undef vfprintf
-#define vfprintf __mingw_vfprintf
+#define vfprintf(...) __mingw_vfprintf(__VA_ARGS__)
 #undef vsprintf
-#define vsprintf __mingw_vsprintf
+#define vsprintf(...) __mingw_vsprintf(__VA_ARGS__)
 #undef vsnprintf
-#define vsnprintf __mingw_vsnprintf
+#define vsnprintf(...) __mingw_vsnprintf(__VA_ARGS__)
 #endif
 
 #endif
