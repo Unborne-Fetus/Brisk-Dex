@@ -52,9 +52,10 @@ def movement(script, label, position):
         x, y = x + dx, y + dy
         if label == 'Route101_Movement_EnterScene':
             safe = 10 <= x <= 11 and 18 <= y <= 19
-        elif label in ('Route101_Movement_BirchStepNorth', 'Route101_Movement_BirchStepSouth'):
-            safe = x == 13 and y in (15, 16)
+        elif label == 'Route101_Movement_ZigzagoonStepSouth':
+            safe = x == 12 and y in (16, 17)
         else:
+            # No actor may be moved onto the solid ledge at y=15.
             safe = 10 <= x <= 13 and y == 16
         if not safe:
             raise RuntimeError(f'{label} leaves the intended Route 101 corridor at {x},{y}')
@@ -75,14 +76,16 @@ def check_route101(checkout):
         raise RuntimeError('Route 101 rescue triggers are incorrectly positioned')
     script = (checkout / 'data/maps/Route101/scripts.inc').read_text()
     scene_order = ['Route101_Movement_BirchRunInCircles', 'Route101_Movement_BirchFaceZigzagoon',
-                   'Route101_Movement_BirchStepNorth', 'Route101_Text_PleaseHelp']
+                   'Route101_Movement_ZigzagoonStepSouth', 'Route101_Text_PleaseHelp']
     rescue = script.split('Route101_EventScript_StartBirchRescue::\n', 1)[1].split('\n\tend', 1)[0]
     positions = [rescue.find(token) for token in scene_order]
     if -1 in positions or positions != sorted(positions):
-        raise RuntimeError('Birch north-facing stage is not after the rescue chase')
+        raise RuntimeError('Zigzagoon must step south after the chase and before Birch asks for help')
     bag = script.split('Route101_EventScript_BirchsBag::\n', 1)[1].split('\n\tend', 1)[0]
-    if not bag.find('Route101_Movement_BirchStepSouth') < bag.find('Route101_Movement_BirchApproachPlayer') or 'Route101_Movement_BirchStepSouth' not in bag:
-        raise RuntimeError('Birch has no safe transition back before meeting player')
+    if 'Route101_Movement_BirchApproachPlayer' not in bag:
+        raise RuntimeError('Birch must approach the player from the lower grass')
+    if 'Route101_Movement_BirchStepNorth' in script or 'Route101_Movement_BirchStepSouth' in script:
+        raise RuntimeError('Birch cannot step onto the raised ledge')
     scene = script.split('Route101_EventScript_StartBirchRescue::\n', 1)[1].split('\n\tend', 1)[0]
     def spawn(actor):
         matches = re.findall(r'^\s*setobjectxy ' + re.escape(actor) + r',\s*(\d+),\s*(\d+)$', scene, re.M)
@@ -104,14 +107,11 @@ def check_route101(checkout):
     zig = movement(script, 'Route101_Movement_ZigzagoonChaseInCircles', zig)
     if birch != (13, 16) or zig != (12, 16):
         raise RuntimeError('Rescue chase ends outside the intended area')
-    # Do not shift Birch's entire chase onto the western cliff; he steps north
-    # only after the chase and returns to the walkable row before approaching.
-    birch = movement(script, 'Route101_Movement_BirchStepNorth', birch)
-    if birch != (13, 15):
-        raise RuntimeError('Birch is not raised a tile for his rescue dialogue')
-    birch = movement(script, 'Route101_Movement_BirchStepSouth', birch)
-    if birch != (13, 16):
-        raise RuntimeError('Birch did not return to the approach corridor')
+    # This row is grass. The northern row (y=15) is the solid horizontal ledge.
+    # Separate Birch and the attacker without walking Birch into a cliff.
+    zig = movement(script, 'Route101_Movement_ZigzagoonStepSouth', zig)
+    if birch != (13, 16) or zig != (12, 17):
+        raise RuntimeError('The rescue poses must occupy separate safe grass rows')
     # The introductory movement must stop below the bag, not walk onto a cliff.
     if movement(script, 'Route101_Movement_EnterScene', (10, 19)) != (10, 18):
         raise RuntimeError('Player is displaced from the lower starter-bag approach')
