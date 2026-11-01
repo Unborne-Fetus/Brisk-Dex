@@ -4,6 +4,7 @@ const fs = require('fs/promises');
 const fsSync = require('fs');
 const {EmbeddedNativeGame,embeddedStatus}=require('./native-embedded');
 const nativeSaves=require('./native-saves');
+const {getNativeProfiles}=require('./native-profile-reader');
 const {NativeUpdater}=require('./native-updater');
 const nativeUpdater=new NativeUpdater({userData:app.getPath('userData'),bundledRoot:process.env.BRISK_BUNDLED_ROOT||__dirname});
 function nativeResources(){
@@ -291,6 +292,16 @@ function requireMainRenderer(event){
 ipcMain.handle('native-game-status',async event=>{
   requireMainRenderer(event);
   return embeddedStatus({resources:nativeResources()});
+});
+// Read-only profile projection; the engine continues to own and save both
+// independent Brisk profiles. Never write a synthetic Dex view to PENSAVE.
+ipcMain.handle('native-game-profiles',async event=>{
+  requireMainRenderer(event);
+  try{
+    return await getNativeProfiles(app.getPath('userData'),{
+      running:!!(nativeGame?.child||nativeGame?.starting||nativeGame?.stopping||nativeTransferBusy)
+    });
+  }catch(error){return {available:false,error:error.message};}
 });
 ipcMain.handle('native-game-start',async event=>{
   requireMainRenderer(event);
