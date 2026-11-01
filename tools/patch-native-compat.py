@@ -86,6 +86,28 @@ def apply(source_dir: Path) -> None:
             data = data.replace(before, after)
         if data != makefile.read_text():
             makefile.write_text(data)
+    # Desktop embedding should follow the computer's current time zone at
+    # every launch, including after daylight-saving or time-zone changes.
+    # Deterministic --rtc-fixed replay mode stays unchanged.
+    rtc = platform / "rtc.c"
+    if rtc.is_file():
+        data = rtc.read_text()
+        before = '    chip.source = source != NULL ? source : system_clock;\n    if (!found) {\n'
+        after = ('    chip.source = source != NULL ? source : system_clock;\n'
+                 '    if (getenv("BRISK_FRAME_STREAM") != NULL && seed_from_host_zone)\n'
+                 '        found = 0;  /* seed a fresh host-local RTC offset on launch */\n'
+                 '    if (!found) {\n')
+        if after not in data:
+            if data.count(before) != 1:
+                raise RuntimeError("rtc.c: pinned host-clock initialization anchor changed")
+            data = data.replace(before, after)
+        if '#include <stdlib.h>' not in data:
+            include = '#include <time.h>\n'
+            if data.count(include) != 1:
+                raise RuntimeError("rtc.c: missing time header")
+            data = data.replace(include, include + '#include <stdlib.h>\n')
+        if data != rtc.read_text():
+            rtc.write_text(data)
     print("Applied native compiler and PE layout compatibility (validation remains enabled)")
 
 
