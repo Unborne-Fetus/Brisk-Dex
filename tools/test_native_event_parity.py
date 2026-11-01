@@ -53,7 +53,7 @@ def movement(script, label, position):
         if label == 'Route101_Movement_EnterScene':
             safe = 10 <= x <= 11 and 18 <= y <= 19
         else:
-            safe = 9 <= x <= 13 and y == 14
+            safe = 10 <= x <= 13 and y == 16
         if not safe:
             raise RuntimeError(f'{label} leaves the intended Route 101 corridor at {x},{y}')
     return x, y
@@ -78,22 +78,27 @@ def check_route101(checkout):
         if len(matches) != 1:
             raise RuntimeError('Missing rescue actor: ' + actor)
         return tuple(map(int, matches[0]))
+    actors = {event['local_id']: event for event in route['object_events'] if 'local_id' in event}
+    for local, expected in [('LOCALID_ROUTE101_BIRCH',(11,16)),('LOCALID_ROUTE101_ZIGZAGOON',(10,16))]:
+        actor = actors[local]
+        if (actor['x'],actor['y']) != expected or actor['elevation'] != 3:
+            raise RuntimeError('Route 101 physical NPC spawn does not match safe rescue corridor')
     birch = spawn('LOCALID_ROUTE101_BIRCH')
     zig = spawn('LOCALID_ROUTE101_ZIGZAGOON')
-    if birch != (11, 14) or zig != (10, 14):
+    if birch != (11, 16) or zig != (10, 16):
         raise RuntimeError('Birch and Zigzagoon are no longer on the accessible side of the cliff')
     birch = movement(script, 'Route101_Movement_BirchRunAway1', birch)
     zig = movement(script, 'Route101_Movement_ZigzagoonChase1', zig)
     birch = movement(script, 'Route101_Movement_BirchRunInCircles', birch)
     zig = movement(script, 'Route101_Movement_ZigzagoonChaseInCircles', zig)
-    if birch != (13, 14) or zig != (12, 14):
+    if birch != (13, 16) or zig != (12, 16):
         raise RuntimeError('Rescue chase ends outside the intended area')
     # The introductory movement must stop below the bag, not walk onto a cliff.
     if movement(script, 'Route101_Movement_EnterScene', (10, 19)) != (10, 18):
         raise RuntimeError('Player is displaced from the lower starter-bag approach')
     if movement(script, 'Route101_Movement_EnterScene', (11, 19)) != (11, 18):
         raise RuntimeError('Second rescue trigger displaces the player')
-    if movement(script, 'Route101_Movement_BirchApproachPlayer', birch) != (9, 14):
+    if movement(script, 'Route101_Movement_BirchApproachPlayer', birch) != (11, 16):
         raise RuntimeError('Birch cannot approach the player after the starter selection')
     print('Route 101 event: trigger, actor positions and movement path valid')
 
