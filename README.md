@@ -1,19 +1,12 @@
 # Brisk Dex
 
-### Play Brisk Emerald inside Brisk Dex
+## Native expansion (first milestone)
 
-Open **Play Brisk Emerald** in the app's tabs. The native recreation now ships inside the desktop, mobile, web, and generated single-file HTML editions. It loads on first use, keeps the same session when changing tabs, and pauses movement while hidden. Campaign saves and original GBA imports retain their existing independent storage; online trading and battle services remain disconnected.
+The retired JavaScript game recreation has been replaced by a desktop launcher for [pokeemerald-expansion-native](https://github.com/uehlbran/pokeemerald-expansion-native). It launches the **real C expansion game engine** in a separate window, not the old JS battle/map simulation. For now this is **unmodified expansion**, not Brisk Emerald's custom content.
 
-This is **not yet a 1:1 recreation**. The source import now contains 550 Emerald-format maps with source graphics, 1,295 resolved warps, NPC hide flags, elevations, and shared scripts. The renderer uses the GBA's 15-by-10-tile viewport, source facing frames, and walking frames. Object visibility/position changes, flag checks, conditional calls, and switches are supported transactionally. Starter selection currently skips the introduction/rescue sequence and initializes the matching Route 101 object flags.
+Build locally using `bash tools/build-native-expansion.sh windows` inside Ubuntu/WSL (or `bash tools/build-native-expansion.sh linux` on Linux) after installing the dependencies in the upstream README. The script pins native source commit `bb3fd057061cdd7e6a9e79b76abb41924ee44ecc`. Open the **Native Emerald** tab in the desktop app, choose the resulting `pokeemerald-native.exe` or Linux `pokeemerald-native`, then launch. Windows requires `SDL2.dll` beside the executable. No native binary or proprietary game asset is committed or published from Brisk Dex.
 
-Full story progression, native special functions, map callbacks, coordinate-triggered cutscenes, moving NPC schedules, field HMs, sound, battle presentation, and exact battle mechanics still require porting and playthrough verification. Procedural areas retain their source static layouts; their generation logic is not implemented. FRLG-format layouts are listed separately as unsupported. `game/port-report.json` lists import limitations; its unresolved-event count is a conservative extraction report, not a runtime coverage or completion percentage.
-
-Source story events now suspend for dialogue, choices, single/double battles, and parallel NPC/player movement groups, then resume the same script. Battle victories can execute the original badge, TM, gift, trainer-flag, and follow-up branches. Regression tests run the source badge scripts for all eight gym leaders; these tests simulate the victory result and separately exercise the local doubles engine. Map entry/frame/coordinate tables drive scene selection. Source metatile atlases and transactional tile overrides preserve puzzle graphics and collision, including Mauville's barrier deactivation and Petalburg's door changes. The generated script-data pack supplies numeric operands, shared text, and 863 trainer teams.
-
-Field traversal now follows Brisk's badge unlock rules and its custom rule that HMs do not need to be learned. Surf includes mounting, shoreline dismounting, ocean connections, and source rider/Surf-blob graphics. Dive and surfacing follow the source connection coordinates; Waterfall uses its source badge gate. Rod fishing selects from the rod's source encounter slots without consuming the rod. The field-data exporter reads the actual map encounter tables and metatile flags, restoring cave/indoor floor encounters that grouped Dex entries missed. Native water saves and GBA underwater locations retain their traversal mode; original GBA files remain byte-for-byte archived.
-
-Rebuild source maps with `npm run game:port -- /path/to/Pokemon-Brisk-Emerald`. Run `npm run game:test` for campaign/source tests and `npm run index:test` to rebuild and inspect the single-file game's script/resource packaging.
-
+The web and mobile editions remain companion apps. Native engine saves do not yet import Brisk Emerald GBA `.sav` files. Former JavaScript campaign archives on disk are preserved but no longer executed. See [native integration notes](docs/NATIVE_EXPANSION.md).
 
 Brisk Dex is a companion app for [Pokémon Brisk Emerald](https://github.com/Unborne-Fetus/Pokemon-Brisk-Emerald). Browse the game's reference data, manage Pokémon and items across saves, and battle another player using Pokémon from your collection.
 
@@ -310,27 +303,3 @@ Web, mobile, desktop and standalone builds include the packed graphics.
 
 Validation: `python tools/test_extracted_data.py`, `npm run web:build`,
 and `npm run index:build`.
-
-### Standalone Brisk Emerald development
-
-A separate playable remake is under `game/`. Run `launch-game-prototype.bat` or `npm run game:dev`. It now includes 90 converted Brisk maps, original map/player/NPC artwork, actual encounters and trainer teams, source level-up moves, offline use of the Dex battle engine, Mega stone checks, party/storage, healing and independent saves. This remains a partial port: the full story and several systems are unfinished. The normal Dex interface and online features remain disconnected. See [scope, testing and migration notes](docs/STANDALONE_GAME.md).
-
-
-### Play Brisk Emerald inside the Windows app
-
-Install the latest **Brisk-Dex-Windows** artifact from the **Build Brisk Dex - Windows + Android** workflow, launch Brisk Dex, and open **Play Brisk Emerald**. The game, source maps and Pokémon graphics are included in the installer; no browser, local server or separate game folder is needed. An older installed EXE must be replaced with the new installer to receive these changes.
-
-**New game** begins with Birch’s introduction, character/name selection and the moving truck. **Quick start** retains the starter shortcut. Brisk’s original nine-starter case is available during the Route 101 rescue. Early source story scenes now include moving in, setting the bedroom clock, the TV broadcast, meeting the rival, the starter delivery, first rival battle, Pokédex delivery and Wally’s tutorial. Later scripts use the shared transactional scene runner; this is not yet a verified complete playthrough of the entire source story. Wally’s catching demonstration currently uses staged dialogue.
-
-Visible encounters use map-specific source species/levels and the source overworld sheets where available, with shiny palettes, roaming, contact/interaction battles and persistent identity across saves. Toggle **Visible overworld encounters** in Options to return to random encounters. Interact with trees, rocks and boulders for Cut, Rock Smash and Strength. **Field moves** provides Flash, Dig, Teleport and Fly to visited towns when allowed; Surf, Dive and Waterfall retain their contextual source prompts and badge requirements.
-
-Windows campaign saves and their previous backup are written atomically under the app’s user data folder, outside the installation. Existing file-origin campaigns are migrated on startup. Export/import remains available for portable backups. GBA imports restore named story flags, defeated trainers, saved script variables and supported options using source-derived 14-box and 20-box layouts. Original bytes remain archived; native progress is still one-way and cannot be written back into the GBA file.
-
-Developer verification: `npm run game:test`, `npm run desktop:test`, and `npm run desktop:ui`. The Windows installer workflow runs the game tests and an actual Electron opening/save/reload test before packaging.
-
-
-### Default game tab and app-save resume (1.2)
-
-**Play Brisk Emerald** is the first tab and opens automatically. If Dex has a remembered GBA save, the game imports it automatically on the first launch, including supported party/PC records, bag, money, location, badges and source story state. Later launches keep newer native progress associated with that source file. Opening a different GBA save selects that file’s journey after any active battle or scene finishes; the previous native journey becomes the backup. A failed source import displays an error and preserves the existing save.
-
-The source dialogue font, window frame and battle environments are bundled locally. Story dialogue retains source line/page breaks in a two-line text box. Scene fades, movement speeds, pauses, cries, emotion markers, variable rival graphics and source choice menus are supported. Double battles display both allies and both opponents. Further quest checks cover Petalburg Woods, the Peeko rescue, Devon president, Steven’s letter and the museum confrontation. These additions extend the source port; a full end-to-end parity playthrough remains outstanding.

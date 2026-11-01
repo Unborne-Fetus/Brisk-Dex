@@ -1,8 +1,9 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('briskDexAPI', {
-  loadNativeCampaign: key => ipcRenderer.invoke('load-native-campaign',key),
-  saveNativeCampaign: envelope => ipcRenderer.invoke('save-native-campaign',envelope),
+  getNativeGameStatus:()=>ipcRenderer.invoke('native-game-status'),
+  selectNativeGame:()=>ipcRenderer.invoke('native-game-select'),
+  launchNativeGame:()=>ipcRenderer.invoke('native-game-launch'),
   getBattleRelayInfo: () => ipcRenderer.invoke('get-battle-relay-info'),
   startBattleRelay: () => ipcRenderer.invoke('start-battle-relay'),
   loadAssetPatch: (file) => ipcRenderer.invoke('load-asset-patch',file),
