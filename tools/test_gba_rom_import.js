@@ -30,7 +30,7 @@ assert.strictEqual(plain.details.title,'BRISK TEST');
 assert.strictEqual(plain.rhh.species,300);
 assert.strictEqual(plain.counts.species,28);
 assert.strictEqual(plain.data.species['1'].name,'Bulbasaur');
-assert.strictEqual(plain.data.species['2'].stats.speed,45);
+assert.strictEqual(plain.data.species['2'].baseStats[3],45);
 assert.strictEqual(plain.counts.trainers,0);
 assert.strictEqual(plain.complete,false);
 assert(plain.warnings.some(s=>s.includes('Trainer teams')));
