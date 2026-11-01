@@ -4,7 +4,7 @@
   root.BriskRomImporter=api;
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
 'use strict';
-var MAGIC='BDXROM1!', MAX_PACK=12*1024*1024, MAX_SPECIES=4096;
+var MAGIC='BDXROM1!', MAGIC_V2='BDXROM2!', MAX_PACK=24*1024*1024, MAX_SPECIES=4096;
 function bytesOf(value){
   if(value instanceof Uint8Array)return value;
   if(value instanceof ArrayBuffer)return new Uint8Array(value);
@@ -37,20 +37,55 @@ function scanRhh(b){
     pos++;
   }return null;
 }
-function parseEmbedded(b){
-  var magic=Array.from(MAGIC).map(function(c){return c.charCodeAt(0);}),min=Math.max(0,b.length-16*1024*1024),found=-1;
-  for(var i=b.length-magic.length;i>=min;i--){if(b[i]!==magic[0])continue;var ok=true;for(var j=1;j<magic.length;j++)if(b[i+j]!==magic[j]){ok=false;break;}if(ok){found=i;break;}}
-  if(found<0)return null;
-  var size=u32(b,found-8),checksum=u32(b,found-4),start=found-8-size;
-  if(size==null||size<2||size>MAX_PACK||start<0)throw new Error('ROM metadata trailer has invalid size.');
-  if(crc32(b,start,found-8)!==checksum)throw new Error('ROM metadata checksum does not match.');
-  var payload=b.slice(start,found-8),raw;
-  if(typeof TextDecoder!=='undefined')raw=new TextDecoder('utf-8',{fatal:true}).decode(payload);
-  else if(typeof Buffer!=='undefined')raw=Buffer.from(payload).toString('utf8');
+function findTrailer(b){
+  var first=Math.max(0,b.length-32*1024*1024),magic1=Array.from(MAGIC).map(function(c){return c.charCodeAt(0);}),magic2=Array.from(MAGIC_V2).map(function(c){return c.charCodeAt(0);});
+  for(var i=b.length-8;i>=first;i--){
+    if(b[i]!==magic1[0])continue;
+    var version=0;
+    for(var choice=1;choice<=2;choice++){
+      var magic=choice===1?magic1:magic2,ok=true;
+      for(var j=1;j<8;j++)if(b[i+j]!==magic[j]){ok=false;break;}
+      if(ok){version=choice;break;}
+    }
+    if(!version)continue;
+    var size=u32(b,i-8),checksum=u32(b,i-4),start=i-8-size;
+    if(size==null||size<2||size>MAX_PACK||start<0)throw new Error('ROM metadata trailer has invalid size.');
+    if(crc32(b,start,i-8)!==checksum)throw new Error('ROM metadata checksum does not match.');
+    return {version:version,bytes:b.subarray(start,i-8)};
+  }
+  return null;
+}
+function parseManifestBytes(data){
+  var raw;
+  if(typeof TextDecoder!=='undefined')raw=new TextDecoder('utf-8',{fatal:true}).decode(data);
+  else if(typeof Buffer!=='undefined')raw=Buffer.from(data).toString('utf8');
   else throw new Error('No UTF-8 decoder is available.');
   var manifest=JSON.parse(raw);
-  if(!manifest||manifest.format!=='briskdex-rom-v1'||!manifest.data||typeof manifest.data!=='object')throw new Error('Unsupported embedded ROM data format.');
+  if(!manifest||manifest.format!=='briskdex-rom-v1'||!manifest.data||typeof manifest.data!=='object')
+    throw new Error('Unsupported embedded ROM data format.');
   return manifest;
+}
+function parseEmbedded(b){
+  var trailer=findTrailer(b);
+  if(!trailer)return null;
+  if(trailer.version!==1)throw new Error('Compressed ROM index requires asynchronous import.');
+  return parseManifestBytes(trailer.bytes);
+}
+async function parseEmbeddedAsync(b){
+  var trailer=findTrailer(b);
+  if(!trailer)return null;
+  if(trailer.version===1)return parseManifestBytes(trailer.bytes);
+  if(typeof DecompressionStream!=='undefined'&&typeof Blob!=='undefined'){
+    var stream=new Blob([trailer.bytes]).stream().pipeThrough(new DecompressionStream('deflate'));
+    var buf=await new Response(stream).arrayBuffer();
+    if(buf.byteLength>64*1024*1024)throw new Error('Decompressed ROM index exceeds safety limit.');
+    return parseManifestBytes(new Uint8Array(buf));
+  }
+  if(typeof module==='object'&&module.exports&&typeof require==='function'){
+    var z=require('zlib'),decompressed=z.inflateSync(Buffer.from(trailer.bytes),{maxOutputLength:64*1024*1024});
+    return parseManifestBytes(decompressed);
+  }
+  throw new Error('This browser cannot decompress the ROM data index.');
 }
 function findSpeciesLayout(b,base,count){
   var names=['Bulbasaur','Ivysaur','Venusaur'],variants=names.map(function(x){return [encodeGba(x),encodeGba(x.toUpperCase()),Array.from(x).map(function(c){return c.charCodeAt(0);})];});
