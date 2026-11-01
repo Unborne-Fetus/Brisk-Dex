@@ -228,6 +228,10 @@ The Mac needs SSH enabled, Node.js 22+, npm, Xcode, and Xcode command-line tools
 
 All completed artifacts are copied into `dist/`.
 
+## GBA ROM importer
+
+On `compat-branch`, open **Settings → Import game from .gba ROM**. This imports reference data locally without touching your save. The importer recovers ROM headers, recognizable Pokémon names/stats and icons where layouts permit. For a complete dataset (including trainer teams, Fakémon, new routes, items and normal/shiny icons), embed a source-matched index in a new `.gba` with `npm run rom:index -- game.gba`; see [ROM import instructions](compatibility/ROM_IMPORT.md). Unsupported fields are reported, not guessed.
+
 ## Emerald compatibility build
 
 The `compat-branch` release adds profile-based support for standard Pokémon Emerald saves and Emerald-derived ROM hacks while preserving Brisk Emerald's expanded format.
