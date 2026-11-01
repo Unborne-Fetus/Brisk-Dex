@@ -11,7 +11,8 @@ function usage(){
   process.exit(2);
 }
 function main(){
-  const input=process.argv[2],output=process.argv[3]||input&&path.join(path.dirname(input),path.basename(input,'.gba')+'-indexed.gba');
+  const args=process.argv.slice(2).filter(arg=>arg!=='--no-icons');
+  const input=args[0],output=args[1]||input&&path.join(path.dirname(input),path.basename(input,'.gba')+'-indexed.gba');
   if(!input||!/^.+\.gba$/i.test(input)||!/^.+\.gba$/i.test(output))usage();
   if(path.resolve(input)===path.resolve(output))throw Error('Output must be a different path: source ROM is immutable.');
   const original=fs.readFileSync(input);
