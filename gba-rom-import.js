@@ -226,9 +226,9 @@ function importRom(value,options){
       var raw=embedded.assets[k],target=k==='icons'?urls:shinyUrls;
       if(!raw||typeof raw!=='object')return;
       Object.keys(raw).forEach(function(id){
-        if(!/^\\d{1,5}$/.test(id))return;
+        if(!/^\d{1,5}$/.test(id))return;
         var value=raw[id];
-        if(typeof value==='string'&&value.length<100000&&/^data:image\\/png;base64,[a-z0-9+/=]+$/i.test(value))target[id]=value;
+        if(typeof value==='string'&&value.length<100000&&/^data:image\/png;base64,[a-z0-9+/=]+$/i.test(value))target[id]=value;
       });
     });
   }
