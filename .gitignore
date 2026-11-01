@@ -15,3 +15,5 @@ www/
 /build-integrated.log
 
 /update-dist/
+
+/native-diagnostics/

@@ -85,9 +85,23 @@ const args=['--headless','--silent','--unthrottled','--rtc-fixed','1700000000',
  '--replay',script,'--out',output];
 const env={...process.env};delete env.BRISK_FRAME_STREAM;
 const debug=process.env.BRISK_REPLAY_DEBUG==='1';
-const child=spawn(debug?'gdb':executable,debug?['-batch','-ex','set pagination off','-ex','run','-ex','thread apply all bt','--args',executable,...args]:args,{cwd:source,env,stdio:['ignore','pipe','pipe']});
+const debugScript=path.join(work,'visual-debug.gdb');
+fs.writeFileSync(debugScript,`set pagination off
+break video_write_frame_ppm
+commands
+silent
+printf "GPU snapshot: %s\\n", path
+x/24xh 0x04000000
+x/8xh 0x04000040
+x/16xh 0x05000000
+continue
+end
+run
+thread apply all bt
+`);
+const child=spawn(debug?'gdb':executable,debug?['-batch','-x',debugScript,'--args',executable,...args]:args,{cwd:source,env,stdio:['ignore','pipe','pipe']});
 let stdout='',stderr='';
-child.stdout.on('data',b=>{stdout=(stdout+b).slice(-12000);});
+child.stdout.on('data',b=>{stdout=(stdout+b).slice(-64000);});
 child.stderr.on('data',b=>{stderr=(stderr+b).slice(-16000);});
 const timer=setTimeout(()=>{child.kill('SIGKILL');console.error('Brisk playthrough timed out');process.exitCode=1;},240000);
 child.once('error',e=>{clearTimeout(timer);console.error(e);process.exitCode=1;});
@@ -106,5 +120,5 @@ child.once('exit',(code,signal)=>{
   assert.equal(save.readUInt32LE(16),0x42524b31,'Brisk save uses its own layout identifier');
   assert.equal(save.length,131072+28,'Two compact profiles use the native flash container');
   fs.rmSync(work,{recursive:true,force:true});
- }catch(error){console.error(error.message);console.error('Replay diagnostics:',work);for(const name of fs.readdirSync(output).filter(n=>n.endsWith('.txt')).sort().slice(-3)){console.error(name+'\n'+fs.readFileSync(path.join(output,name),'utf8'));}process.exitCode=1;}
+ }catch(error){fs.cpSync(output,path.join(root,'native-diagnostics'),{recursive:true});console.error(error.message);console.error('Replay diagnostics:',work);for(const name of fs.readdirSync(output).filter(n=>n.endsWith('.txt')).sort().slice(-3)){console.error(name+'\n'+fs.readFileSync(path.join(output,name),'utf8'));}process.exitCode=1;}
 });

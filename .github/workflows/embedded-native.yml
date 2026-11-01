@@ -192,6 +192,15 @@ jobs:
         env:
           BRISK_REPLAY_DEBUG: '1'
         run: node tools/test_brisk_native.cjs
+      - name: Preserve failed Linux visual replay for inspection
+        if: failure() && matrix.target == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: brisk-linux-visual-diagnostics
+          path: |
+            native-game/linux
+            native-diagnostics
+          retention-days: 1
       - name: Validate Brisk's native Windows executable layout
         if: matrix.target == 'windows'
         run: python3 tools/test_native_pe.py native-game/win32/pokeemerald-native.exe native-src/brisk-emerald-native/platform/build_glue/check_pe_layout.py
