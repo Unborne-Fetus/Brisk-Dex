@@ -176,8 +176,13 @@ jobs:
       - name: Start the Brisk native engine and verify embedded frames
         if: matrix.target == 'linux'
         run: node tools/test_native_stream.cjs
+      - name: Native replay debugger
+        if: matrix.target == 'linux'
+        run: sudo apt-get install -y --no-install-recommends gdb
       - name: Play through Brisk's opening, save, reload, and profile selection
         if: matrix.target == 'linux'
+        env:
+          BRISK_REPLAY_DEBUG: '1'
         run: node tools/test_brisk_native.cjs
       - name: Validate Brisk's native Windows executable layout
         if: matrix.target == 'windows'

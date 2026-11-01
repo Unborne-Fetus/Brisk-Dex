@@ -85,16 +85,18 @@ const args=['--headless','--silent','--unthrottled','--rtc-fixed','1700000000',
  '--save',path.join(work,'brisk.sav'),'--rtc-offset',path.join(work,'brisk.rtc'),
  '--replay',script,'--out',output];
 const env={...process.env};delete env.BRISK_FRAME_STREAM;
-const child=spawn(executable,args,{cwd:source,env,stdio:['ignore','pipe','pipe']});
+const debug=process.env.BRISK_REPLAY_DEBUG==='1';
+const child=spawn(debug?'gdb':executable,debug?['-batch','-ex','set pagination off','-ex','run','-ex','thread apply all bt','--args',executable,...args]:args,{cwd:source,env,stdio:['ignore','pipe','pipe']});
 let stdout='',stderr='';
 child.stdout.on('data',b=>{stdout=(stdout+b).slice(-12000);});
 child.stderr.on('data',b=>{stderr=(stderr+b).slice(-16000);});
 const timer=setTimeout(()=>{child.kill('SIGKILL');console.error('Brisk playthrough timed out');process.exitCode=1;},240000);
 child.once('error',e=>{clearTimeout(timer);console.error(e);process.exitCode=1;});
-child.once('exit',code=>{
+child.once('exit',(code,signal)=>{
  clearTimeout(timer);
+ if(debug)console.log(stdout+'\n'+stderr);
  try{
-  assert.equal(code,0,'Brisk playthrough failed\n'+stdout+'\n'+stderr);
+  assert.equal(code,0,'Brisk playthrough failed ('+signal+')\n'+stdout+'\n'+stderr);
   const final=fs.readFileSync(path.join(output,'29_profile0_restored.txt'),'utf8');
   console.log('Brisk opening, first battle, in-game save, cold reload, and profile isolation passed.');
   console.log(final.split('\n').filter(l=>/^(native_heap|brisk_|party0_|player_name|map_name|save_counter)/.test(l)).join('\n'));
