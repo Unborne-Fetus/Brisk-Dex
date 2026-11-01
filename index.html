@@ -6482,7 +6482,7 @@ function renderRomImportReport(result){
   node.innerHTML='';
   var d=result.details,c=result.counts;
   node.appendChild(el('div',{style:'font-weight:bold;margin-bottom:6px;',text:'ROM: '+(d.title||'Unknown')+' ('+(d.gameCode||'no code')+') · '+(result.complete?'Full index':'Partial extraction')}));
-  node.appendChild(el('div',{text:'Imported '+c.species+' species, '+c.icons+' icons, '+c.trainers+' trainer teams, '+c.routes+' map areas, '+c.moves+' moves, '+c.items+' items and '+c.abilities+' abilities.'}));
+  node.appendChild(el('div',{text:'Imported '+c.species+' species, '+c.icons+' icons, '+c.trainers+' trainer teams, '+c.routes+' encounter areas, '+(c.maps||0)+' maps, '+c.moves+' moves, '+c.items+' items and '+c.abilities+' abilities.'}));
   node.appendChild(el('div',{text:'Source: '+(result.source==='embedded-manifest'?'validated embedded ROM index':'recoverable ROM tables')+' · '+(result.rhh?'Expansion '+result.rhh.version:'GBA / Emerald family')}));
   (result.warnings||[]).forEach(function(w){node.appendChild(el('div',{style:'margin-top:5px;',text:'Note: '+w}));});
 }
