@@ -189,6 +189,21 @@ index 6d86a20a..a50fdbd8 100644
  
  /* The ABI an image was written with. */
  struct save_file_layout {
+diff --git a/src/battle_controllers.c b/src/battle_controllers.c
+index 7221c8f9..225cbd21 100644
+--- a/src/battle_controllers.c
++++ b/src/battle_controllers.c
+@@ -3084,6 +3084,10 @@ void BtlController_HandleBattleAnimation(enum BattlerId battler)
+ }
+ u32 Rogue_GetBattleSpeedScale(bool32 forHealthbar)
+ {
++    // The controller can finish the battle before the last CB2 of the frame.
++    if (gBattleStruct == NULL)
++        return 1;
++
+     u8 battleSceneOption = VarGet(VAR_BATTLE_SPEED); // Originally GetBattleSceneOption() with a saveblock stored value;
+ 
+     // Hold L to slow down
 diff --git a/src/load_save.c b/src/load_save.c
 index 00fccb62..15a6d024 100644
 --- a/src/load_save.c
