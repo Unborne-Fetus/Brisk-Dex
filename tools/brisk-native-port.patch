@@ -227,6 +227,20 @@ index 21012396..6d637236 100644
  #else
  #line 10
  ALIGNED(4) EWRAM_DATA u8 gHeap[HEAP_SIZE] = {0};
+diff --git a/src/type_icons.c b/src/type_icons.c
+index b4df1db2..e30a9871 100644
+--- a/src/type_icons.c
++++ b/src/type_icons.c
+@@ -305,7 +305,8 @@ static enum Type GetMonPublicType(enum BattlerId battlerId, u32 typeNum)
+         return TYPE_MYSTERY;
+ 
+     monIllusion = GetIllusionMonPtr(battlerId);
+-    illusionSpecies = GetMonData(monIllusion,MON_DATA_SPECIES,NULL);
++    // Most battlers have no Illusion mon; NULL is unmapped on the host.
++    illusionSpecies = monIllusion != NULL ? GetMonData(monIllusion, MON_DATA_SPECIES, NULL) : monSpecies;
+ 
+     if (GetActiveGimmick(battlerId) == GIMMICK_TERA)
+         return GetMonDefensiveTeraType(mon,monIllusion,battlerId,typeNum,illusionSpecies,monSpecies);
 diff --git a/src/ui_birch_case.c b/src/ui_birch_case.c
 index 250a27ab..c3acd203 100644
 --- a/src/ui_birch_case.c
