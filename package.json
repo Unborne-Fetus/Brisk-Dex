@@ -60,6 +60,7 @@
       "brisk-dex-asset-patches/**/*",
       "brisk-dex-icon-manifest.json",
       "emerald-compat.js",
+      "gba-rom-import.js",
       "compatibility/**/*"
     ],
     "directories": {
