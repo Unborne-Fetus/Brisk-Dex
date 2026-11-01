@@ -54,6 +54,8 @@ if [ "$profile" = brisk ]; then
     fetch_source https://github.com/rh-hideout/pokeemerald-expansion.git "$base_pin"
   fi
   python3 "$root/tools/prepare_brisk_native.py" "$checkout"
+  # Fail the build when source events/maps diverge from the pinned Brisk game.
+  python3 "$root/tools/test_native_event_parity.py" "$checkout"
   python3 "$root/tools/test_native_graphics.py" "$checkout/src/dma3_manager.c"
 fi
 python3 "$root/tools/patch-native-compat.py" "$checkout"
