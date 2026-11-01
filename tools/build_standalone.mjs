@@ -49,7 +49,7 @@ for(const file of new Set(Object.values(graphicManifest))) {
     add(name,Buffer.from(url.slice(url.indexOf(',')+1),'base64'));
   }
 }
-for(const filename of ['brisk-dex-data.json','brisk-dex-trainer-teams.json']) {
+for(const filename of ['brisk-dex-data.json','brisk-dex-trainer-teams.json','brisk-dex-trainer-flags.json']) {
   add(filename, await fs.readFile(path.join(root, filename)));
 }
 const icons = {}, shinyIcons = {};

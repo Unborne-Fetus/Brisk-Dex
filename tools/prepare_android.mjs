@@ -8,7 +8,7 @@ const webDir = path.join(root, 'www');
 await fs.rm(webDir, { recursive: true, force: true });
 await fs.mkdir(webDir, { recursive: true });
 
-for (const file of ['brisk-dex-data.json', 'brisk-dex-trainer-teams.json', 'localization.js', 'asset-loader.js']) {
+for (const file of ['brisk-dex-data.json', 'brisk-dex-trainer-teams.json', 'brisk-dex-trainer-flags.json', 'localization.js', 'asset-loader.js']) {
   await fs.copyFile(path.join(root, file), path.join(webDir, file));
 }
 
