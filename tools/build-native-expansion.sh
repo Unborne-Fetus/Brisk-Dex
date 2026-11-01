@@ -3,7 +3,8 @@
 set -euo pipefail
 target="${1:-}"
 case "$target" in windows|linux);; *) echo 'Usage: bash tools/build-native-expansion.sh windows|linux' >&2; exit 2;; esac
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# BRISK_NATIVE_ROOT allows this script to be read from stdin after CRLF cleanup.
+root="${BRISK_NATIVE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 checkout="${BRISK_NATIVE_SOURCE_DIR:-$root/native-src/pokeemerald-expansion-native}"
 remote="https://github.com/uehlbran/pokeemerald-expansion-native.git"
 pin="bb3fd057061cdd7e6a9e79b76abb41924ee44ecc"
