@@ -28,7 +28,7 @@ class PacketDecoder{
     let latest=null;
     while(this.pending.length>=HEADER){
       const start=this.pending.indexOf(MAGIC);
-      if(start<0){this.pending=this.pending.subarray(Math.max(0,this.pending.length-3));return;}
+      if(start<0){this.pending=this.pending.subarray(Math.max(0,this.pending.length-3));break;}
       if(start>0)this.pending=this.pending.subarray(start);
       if(this.pending.length<HEADER)break;
       if(this.pending.readUInt32LE(4)!==PIXELS){this.pending=this.pending.subarray(1);continue;}
@@ -60,7 +60,7 @@ class EmbeddedNativeGame{
     this.decoder=new PacketDecoder(frame=>this.send('native-game-frame',new Uint8Array(frame)));
     let child;
     try{
-      child=this.spawnChild(executable,['--headless','--silent','--data-dir',dataDir],{
+      child=this.spawnChild(executable,['--headless','--data-dir',dataDir],{
         cwd:path.dirname(executable),stdio:['pipe','pipe','pipe'],windowsHide:true,
         env:{...process.env,BRISK_FRAME_STREAM:'1'}
       });

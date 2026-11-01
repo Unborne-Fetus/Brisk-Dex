@@ -8,6 +8,8 @@ Require-Command 'wsl.exe' 'WSL Ubuntu is required to compile the internal native
 Require-Command 'node.exe' 'Node.js 22 or newer is required to build Brisk Dex.'
 Require-Command 'npm.cmd' 'npm was not found. Install Node.js.'
 
+& node.exe -e "if (Number(process.versions.node.split('.')[0]) < 22) process.exit(1)"
+if ($LASTEXITCODE -ne 0) { throw 'Node.js 22 or newer is required. Update Node.js and rerun this build.' }
 $repo=(Get-Location).Path
 # --exec bypasses the WSL distro's login shell. A systemd-user-session warning
 # may still appear on some installations, but only a nonzero exit code is fatal.
@@ -26,12 +28,12 @@ $quoted = "'" + ($wslRepo.Trim() -replace "'", "'\''") + "'"
 # working tree or requiring users to install dos2unix.
 $normalizeScript = 'sed ''s/\r$//'' tools/build-native-expansion.sh'
 # Passing the root explicitly preserves Bash filename-relative paths when streamed.
-$wslCommand = "set -o pipefail; cd $quoted && $normalizeScript | BRISK_NATIVE_ROOT=$quoted bash -s -- windows"
+$wslCommand = "set -o pipefail; cd $quoted && $normalizeScript | BRISK_NATIVE_ROOT=$quoted bash -s -- windows --install"
 
 Write-Host 'Building the expansion engine into the Brisk Dex internal resource folder...' -ForegroundColor Cyan
 & wsl.exe --exec bash --noprofile --norc -c $wslCommand
 if ($LASTEXITCODE -ne 0) {
-    throw 'Native expansion build failed. Verify WSL build dependencies and see the native compiler error above.'
+    throw 'Native expansion build failed. See the dependency installation or native compiler error above.'
 }
 $nativeExe=Join-Path $repo 'native-game\win32\pokeemerald-native.exe'
 $nativeDll=Join-Path $repo 'native-game\win32\SDL2.dll'
@@ -43,7 +45,7 @@ Write-Host 'Building a single Brisk Dex Windows installer...' -ForegroundColor C
 if ($LASTEXITCODE -ne 0) { throw 'npm ci failed.' }
 & npm.cmd run desktop:test
 if ($LASTEXITCODE -ne 0) { throw 'Desktop tests failed.' }
-& npm.cmd run dist:win
+& npm.cmd run dist:win -- --x64
 if ($LASTEXITCODE -ne 0) { throw 'Windows installer build failed.' }
 Write-Host 'Brisk Dex installer with staged internal expansion engine built into dist/.' -ForegroundColor Green
 Write-Host 'Do not publicly distribute compiled game assets without the required rights.'

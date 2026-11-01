@@ -8,6 +8,7 @@ on:
       - 'native-game/**'
       - 'index.html'
       - 'tools/build-native-expansion.sh'
+      - 'tools/setup-native-deps.sh'
       - 'tools/build_integrated_windows.ps1'
       - 'tools/test_wsl_line_endings.sh'
       - '.gitattributes'
@@ -29,7 +30,7 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: python3 tools/patch-native-stream.py --self-test
-      - run: bash -n tools/build-native-expansion.sh
+      - run: bash -n tools/build-native-expansion.sh tools/setup-native-deps.sh
       - run: bash tools/test_wsl_line_endings.sh
       - run: node --check main.js && node --check native-embedded.js && node --check preload.js
       - run: npm run desktop:test
@@ -45,7 +46,7 @@ jobs:
       - name: Native toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends build-essential git python3 pkg-config curl clang gcc-multilib libpng-dev libsdl2-dev
+          sudo apt-get install -y --no-install-recommends build-essential git python3 pkg-config curl clang gcc-multilib libc6-dev-i386 libpng-dev libsdl2-dev
       - name: Compile real expansion source with embedded frame/input hooks
         run: bash tools/build-native-expansion.sh linux
       - name: Smoke test embedded frame transport and native startup
@@ -59,7 +60,7 @@ jobs:
       - name: Native Windows cross-compiler
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends build-essential git python3 pkg-config curl clang gcc-multilib libpng-dev libsdl2-dev gcc-mingw-w64-x86-64 binutils-mingw-w64-x86-64
+          sudo apt-get install -y --no-install-recommends build-essential git python3 pkg-config curl clang gcc-multilib libc6-dev-i386 libpng-dev libsdl2-dev gcc-mingw-w64-x86-64 binutils-mingw-w64-x86-64
       - name: Cross-compile embedded Windows engine
         run: bash tools/build-native-expansion.sh windows
       - name: Confirm private bundled Windows game dependencies exist

@@ -59,7 +59,8 @@ test('embedded process runs headless, forwards ten-bit keys, and never opens an 
   resources:root,userData:path.join(root,'userdata'),platform:'win32',spawnChild:mockSpawn
  });
  assert.equal((await game.start()).ok,true);
- assert.deepEqual(args.slice(0,2),['--headless','--silent']);
+ assert.equal(args[0],'--headless');
+ assert.equal(args.includes('--silent'),false);
  assert.equal(opts.windowsHide,true);
  assert.equal(opts.env.BRISK_FRAME_STREAM,'1');
  assert.equal(game.input(-1),false);
@@ -71,4 +72,11 @@ test('embedded process runs headless, forwards ten-bit keys, and never opens an 
  assert.equal(events.filter(x=>x.name==='native-game-frame').length,1);
  assert.equal((await game.stop()).ok,true);
  assert.equal(game.child,null);
+});
+
+test('native decoder delivers a completed frame followed by diagnostic text',()=>{
+ const frames=[],decoder=new PacketDecoder(frame=>frames.push(frame));
+ decoder.push(Buffer.concat([packet(7),Buffer.from('startup diagnostic')]));
+ assert.equal(frames.length,1);
+ assert.equal(frames[0].readUInt16LE(),7);
 });

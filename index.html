@@ -1320,8 +1320,11 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
         <button type="button" data-native-key="0">A</button>
         <button type="button" data-native-key="1">B</button>
         <button type="button" data-native-key="3">Start</button>
+        <button type="button" data-native-key="2">Select</button>
+        <button type="button" data-native-key="9">L</button>
+        <button type="button" data-native-key="8">R</button>
       </div>
-      <p style="font-size:12px">This game needs a native engine built and staged inside the Brisk Dex installation. If it is missing, the companion app still works normally. No executable selection or external game window is used.</p>
+      <p style="font-size:12px">Save using the in-game menu before stopping. Your game saves are kept between app updates.</p>
     </div>
   </section>
   <section id="guide-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-guide" style="display:none;">
@@ -6588,7 +6591,7 @@ window.briskDexAPI?.onNativeState?.(state=>{
   nativeRunning=state.running===true;
   document.getElementById('native-game-stop').disabled=!nativeRunning;
   document.getElementById('native-game-launch').disabled=nativeRunning;
-  if(state.message)document.getElementById('native-game-status').textContent=state.message;
+  document.getElementById('native-game-status').textContent=state.message||(nativeRunning?'Game running.':'Game stopped.');
   if(!nativeRunning)nativeKeys(0);
 });
 async function refreshNativeGame(){
@@ -6601,7 +6604,7 @@ async function refreshNativeGame(){
   }
   try{
     const result=await api.getNativeGameStatus();
-    status.textContent=result.message;
+    status.textContent=nativeRunning?'Game running.':result.message;
     launch.disabled=result.status!=='ready'||nativeRunning;
   }catch(error){status.textContent='Unable to check native engine: '+error.message;launch.disabled=true;}
 }
@@ -6629,8 +6632,11 @@ document.addEventListener('keyup',event=>{
 window.addEventListener('blur',()=>nativeKeys(0));
 document.querySelectorAll('#native-touch-keys [data-native-key]').forEach(btn=>{
   const bit=Number(btn.dataset.nativeKey);
-  btn.addEventListener('pointerdown',event=>{event.preventDefault();if(nativeRunning)nativeKeys(nativeKeymask|(1<<bit));});
-  for(const type of ['pointerup','pointercancel','pointerleave'])
+  btn.addEventListener('pointerdown',event=>{
+    event.preventDefault();
+    if(nativeRunning){btn.setPointerCapture(event.pointerId);nativeKeys(nativeKeymask|(1<<bit));}
+  });
+  for(const type of ['pointerup','pointercancel','lostpointercapture'])
     btn.addEventListener(type,()=>nativeKeys(nativeKeymask&~(1<<bit)));
 });
 
