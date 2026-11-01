@@ -16,7 +16,7 @@ class CompatibilityPatchTests(unittest.TestCase):
             root = Path(tmp)
             platform = root / "platform"
             platform.mkdir()
-            source = '#include <stdio.h>\nvoid diagnostic(void) { fprintf(stderr, "%zu", (size_t)1); }\n'
+            source = '#include <stdio.h>\nvoid logger(const char *, ...) __attribute__((format(printf, 1, 2)));\nvoid diagnostic(void) { fprintf(stderr, "%zu", (size_t)1); }\n'
             (platform / "bios_internal.c").write_text(source)
             untouched = 'int value(void) { return 1; }\n'
             (platform / "pure.c").write_text(untouched)
@@ -27,6 +27,7 @@ class CompatibilityPatchTests(unittest.TestCase):
             compat.apply(root)
             self.assertEqual(first, {p.name: p.read_bytes() for p in platform.iterdir()})
             self.assertIn('#include "brisk_stdio.h"', (platform / "bios_internal.c").read_text())
+            self.assertIn('format(gnu_printf,', (platform / "bios_internal.c").read_text())
             self.assertEqual((platform / "pure.c").read_text(), untouched)
             self.assertEqual((root / "src/game.c").read_text(), source)
 

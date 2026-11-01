@@ -15,9 +15,15 @@ def apply(source_dir: Path) -> None:
     # Only the host platform's C code needs this adapter; leave gameplay alone.
     for file in sorted(platform.glob("*.c")):
         data = file.read_text()
+        original = data
         if '#include <stdio.h>' in data and '#include "brisk_stdio.h"' not in data:
-            file.write_text(data.replace('#include <stdio.h>',
-                                        '#include <stdio.h>\n#include "brisk_stdio.h"', 1))
+            data = data.replace('#include <stdio.h>',
+                                '#include <stdio.h>\n#include "brisk_stdio.h"', 1)
+        # Custom variadic loggers also need GNU checking on older MinGW.
+        # Their implementations use the GNU stdio adapter above.
+        data = data.replace('format(printf,', 'format(gnu_printf,')
+        if data != original:
+            file.write_text(data)
     # Windows conversion checks should not require a macOS-capable assembler.
     # Keep every COFF round-trip, mutation, and real-object check intact.
     checker = platform / "build_glue/check_flat.py"
