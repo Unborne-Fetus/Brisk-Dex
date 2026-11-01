@@ -2,8 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, protocol, net } = require('electron
 const path = require('path');
 const fs = require('fs/promises');
 const fsSync = require('fs');
-const {spawn}=require('node:child_process');
-const {validateNativeExecutable}=require('./native-launcher');
+const {EmbeddedNativeGame,embeddedStatus}=require('./native-embedded');
 
 protocol.registerSchemesAsPrivileged([{scheme:'brisk',privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true,stream:true}}]);
 const {assetPath}=require('./desktop-content');
@@ -248,40 +247,37 @@ ipcMain.handle('start-battle-relay',async()=>{
 app.on('before-quit',()=>{if(localBattleRelay)localBattleRelay.server.close();});
 
 
-/* Launch only a user-selected, locally built pokeemerald-expansion-native binary.
-   Retired JavaScript campaign saves are left intact in the user's app data. */
-const nativeConfigPath=()=>path.join(app.getPath('userData'),'native-expansion-location.json');
-async function configuredNativeExe(){
-  try{const data=JSON.parse(await fs.readFile(nativeConfigPath(),'utf8'));return typeof data.executable==='string'?data.executable:null;}
-  catch(e){if(e.code==='ENOENT')return null;throw e;}
+
+/* A single Brisk Dex installation owns this native process and its game tab.
+   No executable selection, shell execution, or second SDL window. */
+let nativeGame=null;
+function getNativeGame(){
+  if(!nativeGame){
+    nativeGame=new EmbeddedNativeGame({
+      webContents:mainWindow.webContents,
+      resources:app.isPackaged?process.resourcesPath:__dirname,
+      userData:app.getPath('userData')
+    });
+  }
+  return nativeGame;
 }
-async function nativeStatus(){
-  if(!['win32','linux'].includes(process.platform))
-    return {status:'unsupported',message:'The native engine currently supports Windows and Linux desktops only.'};
-  const exe=await configuredNativeExe();
-  if(!exe)return {status:'missing',message:'Choose your locally built native expansion executable.'};
-  const found=await validateNativeExecutable(exe,process.platform);
-  return found.ok
-    ? {status:'ready',message:'Native expansion is configured; it will open in a separate window.',executable:found.executable}
-    : {status:'invalid',message:found.error,executable:exe};
+function requireMainRenderer(event){
+  if(!mainWindow||event.sender!==mainWindow.webContents||event.senderFrame!==mainWindow.webContents.mainFrame)
+    throw new Error('Native game command must originate from the Brisk Dex main page');
 }
-ipcMain.handle('native-game-status',()=>nativeStatus());
-ipcMain.handle('native-game-select',async()=>{
-  if(!['win32','linux'].includes(process.platform))return nativeStatus();
-  const chosen=await dialog.showOpenDialog(mainWindow,{title:'Choose your built pokeemerald-expansion-native',properties:['openFile'],filters:process.platform==='win32'?[{name:'Native Emerald executable',extensions:['exe']}]:[]});
-  if(chosen.canceled||!chosen.filePaths.length)return nativeStatus();
-  const check=await validateNativeExecutable(chosen.filePaths[0],process.platform);
-  if(!check.ok)return {status:'invalid',message:check.error};
-  await writeFileAtomically(nativeConfigPath(),JSON.stringify({schema:1,executable:check.executable})+'\n');
-  return nativeStatus();
+ipcMain.handle('native-game-status',async event=>{
+  requireMainRenderer(event);
+  return embeddedStatus({resources:app.isPackaged?process.resourcesPath:__dirname});
 });
-ipcMain.handle('native-game-launch',async()=>{
-  const state=await nativeStatus();
-  if(state.status!=='ready')return {ok:false,error:state.message};
-  try{
-    const child=spawn(state.executable,[],{cwd:path.dirname(state.executable),detached:true,stdio:'ignore',windowsHide:false});
-    await new Promise((resolve,reject)=>{child.once('spawn',resolve);child.once('error',reject);});
-    child.unref();
-    return {ok:true};
-  }catch(e){return {ok:false,error:'Could not start native expansion: '+e.message};}
+ipcMain.handle('native-game-start',async event=>{
+  requireMainRenderer(event);
+  return getNativeGame().start();
 });
+ipcMain.handle('native-game-stop',event=>{
+  requireMainRenderer(event);
+  return nativeGame?nativeGame.stop():{ok:true};
+});
+ipcMain.on('native-game-input',(event,mask)=>{
+  try{requireMainRenderer(event);if(nativeGame)nativeGame.input(mask);}catch(error){console.warn('native input ignored:',error.message);}
+});
+app.on('before-quit',()=>{if(nativeGame)nativeGame.stop();});

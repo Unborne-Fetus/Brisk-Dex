@@ -1,0 +1,77 @@
+name: Embedded expansion native bridge
+on:
+  pull_request:
+    paths:
+      - 'main.js'
+      - 'preload.js'
+      - 'native-embedded.js'
+      - 'native-game/**'
+      - 'index.html'
+      - 'tools/build-native-expansion.sh'
+      - 'tools/patch-native-stream.py'
+      - 'test/desktop/**'
+      - 'package.json'
+      - '.github/workflows/embedded-native.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  companion:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: python3 tools/patch-native-stream.py --self-test
+      - run: bash -n tools/build-native-expansion.sh
+      - run: node --check main.js && node --check native-embedded.js && node --check preload.js
+      - run: npm run desktop:test
+      - run: npm run index:test
+  native-linux-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Native toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential git python3 pkg-config curl clang gcc-multilib libpng-dev libsdl2-dev
+      - name: Compile real expansion source with embedded frame/input hooks
+        run: bash tools/build-native-expansion.sh linux
+      - name: Smoke test embedded frame transport and native startup
+        run: node tools/test_native_stream.cjs
+
+  native-windows-cross-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Native Windows cross-compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential git python3 pkg-config curl clang gcc-multilib libpng-dev libsdl2-dev gcc-mingw-w64-x86-64 binutils-mingw-w64-x86-64
+      - name: Cross-compile embedded Windows engine
+        run: bash tools/build-native-expansion.sh windows
+      - name: Confirm private bundled Windows game dependencies exist
+        run: |
+          test -s native-game/win32/pokeemerald-native.exe
+          test -s native-game/win32/SDL2.dll
+
+  desktop-windows-ui:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run desktop:test
+      - run: npm run desktop:ui

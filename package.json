@@ -34,7 +34,9 @@
     "index:build": "node tools/build_standalone.mjs",
     "index:test": "npm run index:build && node tools/test_standalone_game.mjs",
     "desktop:test": "node --test test/desktop/*.test.cjs",
-    "native:build": "bash tools/build-native-expansion.sh windows"
+    "native:build": "bash tools/build-native-expansion.sh windows",
+    "native:bridge:test": "node --test test/desktop/embedded-game.test.cjs",
+    "desktop:ui": "node tools/test_embedded_ui.cjs"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.0.0",
@@ -68,7 +70,8 @@
       "brisk-dex-asset-patches/**/*",
       "brisk-dex-icon-manifest.json",
       "desktop-content.js",
-      "native-launcher.js"
+      "native-launcher.js",
+      "native-embedded.js"
     ],
     "directories": {
       "output": "dist"
@@ -100,7 +103,16 @@
       ],
       "category": "Utility",
       "artifactName": "${productName}-${version}-linux-${arch}.${ext}"
-    }
+    },
+    "extraResources": [
+      {
+        "from": "native-game",
+        "to": "native-game",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ]
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
