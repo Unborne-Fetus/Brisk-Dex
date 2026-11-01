@@ -732,6 +732,42 @@ def extract_trainer_teams(repo):
     return trainers
 
 
+def extract_map_catalog(repo):
+    """Export all compiled map definitions, including routes with no wild grass."""
+    catalog = []
+    maps_dir = os.path.join(repo, "data", "maps")
+    if not os.path.isdir(maps_dir):
+        return catalog
+    for root, _, files in os.walk(maps_dir):
+        if "map.json" not in files:
+            continue
+        try:
+            info = json.loads(read(os.path.join(root, "map.json")))
+        except (ValueError, TypeError, OSError):
+            continue
+        if not isinstance(info, dict) or not info.get("id"):
+            continue
+        connections = [
+            {"map": c.get("map"), "direction": c.get("direction")}
+            for c in info.get("connections", []) if isinstance(c, dict) and c.get("map")
+        ]
+        warps = [
+            {"map": w.get("dest_map"), "warpId": str(w.get("dest_warp_id", ""))}
+            for w in info.get("warp_events", []) if isinstance(w, dict) and w.get("dest_map")
+        ]
+        catalog.append({
+            "id": info["id"],
+            "name": info.get("name") or os.path.basename(root),
+            "region": info.get("region", ""),
+            "section": info.get("region_map_section", ""),
+            "type": info.get("map_type", ""),
+            "connections": connections,
+            "warps": warps,
+        })
+    catalog.sort(key=lambda entry: entry["id"])
+    return catalog
+
+
 def extract_route_encounters(repo, species_ids):
     encounters_path = os.path.join(repo, "src/data/wild_encounters.json")
     if not os.path.isfile(encounters_path):
@@ -1425,13 +1461,14 @@ def main():
         }
 
     route_encounters = extract_route_encounters(repo, species_ids)
+    map_catalog = extract_map_catalog(repo)
     trainer_teams = extract_trainer_teams(repo)
     change_catalog = extract_feature_catalog(repo)
     for trainer in trainer_teams:
         trainer["locations"] = trainer_locations.get(trainer["constant"], [])
     data = {"species": out_species, "moves": out_moves, "movePP": out_move_pp, "moveDetails": move_details,
             "abilities": out_abilities, "abilityDetails": ability_details, "items": out_items, "itemDetails": item_details, "routeEncounters": route_encounters,
-            "changes": change_catalog, "shinyOdds": shiny_odds}
+            "changes": change_catalog, "shinyOdds": shiny_odds, "mapCatalog": map_catalog}
     primary_effects = sorted({m.get("effect") for m in move_details.values() if m.get("effect")})
     secondary_effects = sorted({e.get("effect") for m in move_details.values() for e in m.get("moveEffects", []) if e.get("effect")})
     battle_manifest = {
