@@ -58,7 +58,7 @@ const wrong=sample.slice();wrong[0xB2]=0;
 assert.throws(()=>R.importRom(wrong),/Game Boy Advance ROM/i);
 const uncompressed=R.lz77(new Uint8Array([0x10,4,0,0,0,1,2,3,4]),0);
 assert.deepStrictEqual(Array.from(uncompressed),[1,2,3,4]);
-const repeat=R.lz77(new Uint8Array([0x10,6,0,0,0x40,7,0,0x10]),0);
+const repeat=R.lz77(new Uint8Array([0x10,6,0,0,0x40,7,0x20,0]),0);
 assert.deepStrictEqual(Array.from(repeat),[7,7,7,7,7,7]);
 const pixels=R.tilesToRgba(new Uint8Array(512).fill(0x11),new Uint8Array(32).fill(0x7F),32,32);
 assert.strictEqual(pixels.length,4096);
