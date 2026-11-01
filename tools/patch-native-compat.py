@@ -24,6 +24,15 @@ def apply(source_dir: Path) -> None:
         data = data.replace('format(printf,', 'format(gnu_printf,')
         if data != original:
             file.write_text(data)
+    target_make = platform / "target.mk"
+    if target_make.exists():
+        data = target_make.read_text()
+        before = 'TARGET_CFLAGS := -mno-ms-bitfields -D__USE_MINGW_ANSI_STDIO=1'
+        after = 'TARGET_CFLAGS := -mno-ms-bitfields -D_WIN32_WINNT=0x0A00 -DWINVER=0x0A00 -D__USE_MINGW_ANSI_STDIO=1'
+        if after not in data:
+            if data.count(before) != 1:
+                raise RuntimeError("target.mk: pinned Windows flags anchor changed")
+            target_make.write_text(data.replace(before, after))
     # Windows conversion checks should not require a macOS-capable assembler.
     # Keep every COFF round-trip, mutation, and real-object check intact.
     checker = platform / "build_glue/check_flat.py"

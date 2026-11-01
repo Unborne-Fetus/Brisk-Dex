@@ -82,6 +82,18 @@ jobs:
           printf '#include <stddef.h>\nvoid checked(const char *, ...) __attribute__((format(printf, 1, 2)));\nvoid checked_gnu(const char *, ...) __attribute__((format(gnu_printf, 1, 2)));\nint main(void) { size_t n = 1; checked_gnu("%%zu %%llu", n, (unsigned long long)n); return fprintf(stderr, "%%#zx %%zu", n, n) < 0; }\n' > /tmp/brisk-stdio-probe.c
           x86_64-w64-mingw32-gcc --version | head -1
           x86_64-w64-mingw32-gcc -std=gnu17 -Wall -Wextra -Werror -D__USE_MINGW_ANSI_STDIO=1 -include tools/native-stdio.h -c /tmp/brisk-stdio-probe.c -o /tmp/brisk-stdio-probe.o
+      - name: Check the Windows host API declarations with older MinGW headers
+        run: |
+          cat > /tmp/brisk-winapi-probe.c <<'EOF'
+          #include <windows.h>
+          int main(void) {
+              ULONG_PTR low, high;
+              STARTUPINFOEXW info = {0};
+              GetCurrentThreadStackLimits(&low, &high);
+              return (int)(GetTickCount64() + GetErrorMode() + info.StartupInfo.cb);
+          }
+          EOF
+          x86_64-w64-mingw32-gcc -std=gnu17 -Wall -Wextra -Werror -D_WIN32_WINNT=0x0A00 -DWINVER=0x0A00 -c /tmp/brisk-winapi-probe.c -o /tmp/brisk-winapi-probe.o
       - name: Cross-compile embedded Windows engine
         run: bash tools/build-native-expansion.sh windows
       - name: Confirm private bundled Windows game dependencies exist

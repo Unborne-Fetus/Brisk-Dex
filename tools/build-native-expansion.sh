@@ -26,6 +26,11 @@ fi
 git -C "$checkout" checkout --detach "$pin"
 python3 "$root/tools/patch-native-compat.py" "$checkout"
 python3 "$root/tools/patch-native-stream.py" "$checkout"
+if [ "$target" = windows ]; then
+  # Diagnose host compiler/API issues before the expensive asset conversion.
+  (cd "$checkout" && make -f Makefile.native sdl2-mingw BITS=64 TARGET_OS=windows \
+    && make -C platform -j"$(nproc)" lib BITS=64 TARGET_OS=windows NOSAN=1)
+fi
 (cd "$checkout" && BRISK_NATIVE_TARGET="$target" bash tools/build-native.sh --os "$target")
 dest="$root/native-game"
 if [ "$target" = windows ]; then

@@ -40,3 +40,5 @@ Some older MinGW GCC versions reject C99 `%zu`/`%zx` formats in standard stdio c
 `build-integrated.bat` records console output in `build-integrated.log` beside the batch file, including failures. Rerunning the build keeps the cached source and objects; no manual source cleanup is needed.
 
 Windows builds run the upstream COFF converter tests and real-object comparisons. macOS-only assembler tests are excluded from Windows builds so older Clang releases do not need to understand Mach-O zero-fill sections. Linux and other upstream build modes keep their original test selection.
+
+The Windows target explicitly sets `WINVER` and `_WIN32_WINNT` to Windows 10 so older MinGW headers expose the required host APIs. The build compiles the Windows platform library before converting game assets, reporting compiler failures earlier.
