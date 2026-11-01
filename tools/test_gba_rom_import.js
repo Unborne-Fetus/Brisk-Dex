@@ -22,6 +22,21 @@ function baseRom(){
     [45,49,49,45,65,65,12,4].forEach((v,k)=>b[p+k]=v);
     writeGba(b,p+48,names[i]||('Species'+i));
   }
+  const moveBase=0x20000,itemBase=0x30000,abilityBase=0x40000,nameBase=0x60000;
+  put32(b,gf+196,0x08000000+moveBase);
+  put32(b,gf+192,0x08000000+itemBase);
+  put32(b,h+16,0x08000000+abilityBase);
+  const moveNames=['','Pound','Karate Chop','Double Slap'];
+  const itemNames=['','Master Ball','Ultra Ball','Great Ball'];
+  const abilityNames=['','Stench','Drizzle','Speed Boost'];
+  for(let i=1;i<26;i++){
+    let mo=nameBase+i*128,io=mo+40,ao=abilityBase+i*28;
+    writeGba(b,mo,moveNames[i]||'Custom Move '+i);
+    writeGba(b,io,itemNames[i]||'Custom Item '+i);
+    writeGba(b,ao,abilityNames[i]||'Ability '+i);
+    put32(b,moveBase+i*32,0x08000000+mo);
+    put32(b,itemBase+i*64+20,0x08000000+io);
+  }
   return b;
 }
 const sample=baseRom();
@@ -29,6 +44,9 @@ const plain=R.importRom(sample);
 assert.strictEqual(plain.details.title,'BRISK TEST');
 assert.strictEqual(plain.rhh.species,300);
 assert.strictEqual(plain.counts.species,28);
+assert.strictEqual(plain.data.moves['2'],'Karate Chop');
+assert.strictEqual(plain.data.items['1'],'Master Ball');
+assert.strictEqual(plain.data.abilities['3'],'Speed Boost');
 assert.strictEqual(plain.data.species['1'].name,'Bulbasaur');
 assert.strictEqual(plain.data.species['2'].baseStats[3],45);
 assert.strictEqual(plain.counts.trainers,0);
