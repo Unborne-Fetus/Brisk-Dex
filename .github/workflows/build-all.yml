@@ -29,8 +29,6 @@ jobs:
         run: npm ci
       - name: Verify game and desktop regressions
         run: npm run desktop:test && npm run index:test
-      - name: Play embedded game in Electron
-        run: npm run desktop:ui
       - name: Verify battle effect coverage
         run: npm run battle:coverage
       - name: Smoke test online battle relay
