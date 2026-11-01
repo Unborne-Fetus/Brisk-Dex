@@ -8,6 +8,9 @@ on:
       - 'native-game/**'
       - 'index.html'
       - 'tools/build-native-expansion.sh'
+      - 'tools/build_integrated_windows.ps1'
+      - 'tools/test_wsl_line_endings.sh'
+      - '.gitattributes'
       - 'tools/patch-native-stream.py'
       - 'test/desktop/**'
       - 'package.json'
@@ -27,6 +30,7 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: python3 tools/patch-native-stream.py --self-test
       - run: bash -n tools/build-native-expansion.sh
+      - run: bash tools/test_wsl_line_endings.sh
       - run: node --check main.js && node --check native-embedded.js && node --check preload.js
       - run: npm run desktop:test
       - run: npm run index:test
