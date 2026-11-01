@@ -14,6 +14,9 @@ const child=spawn(executable,['--headless','--silent','--frames','30','--data-di
  {env:{...process.env,BRISK_FRAME_STREAM:'1'},stdio:['pipe','pipe','pipe']});
 const decoder=new PacketDecoder(()=>frames++);
 child.stdout.on('data',b=>decoder.push(b));
+// The test uses --frames and has no interactive user; EOF releases the
+// dedicated native stdin reader so engine teardown can complete normally.
+child.stdin.end();
 let err='';child.stderr.on('data',b=>{err=(err+b.toString()).slice(-3000);});
 const timeout=setTimeout(()=>{child.kill('SIGKILL');console.error('Native smoke timeout');process.exitCode=1;},120000);
 child.once('exit',(code)=>{
