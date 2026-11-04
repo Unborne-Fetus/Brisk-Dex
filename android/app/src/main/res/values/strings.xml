@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Brisk Dex</string>
+    <string name="title_activity_main">Brisk Dex</string>
+    <string name="package_name">com.briskemerald.briskdex</string>
+    <string name="custom_url_scheme">com.briskemerald.briskdex</string>
+</resources>
