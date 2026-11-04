@@ -244,3 +244,5 @@ if(!manifest.includes('android.permission.ACCESS_NETWORK_STATE')){
 if(/android:usesCleartextTraffic=/.test(manifest))manifest=manifest.replace(/android:usesCleartextTraffic="[^"]*"/,'android:usesCleartextTraffic="true"');
 else manifest=manifest.replace('<application','<application android:usesCleartextTraffic="true"');
 await fs.writeFile(manifestPath,manifest);
+// Keep local file-picker customizations and add the pinned native-game transport.
+await import('./install_android_native.mjs');

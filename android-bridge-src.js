@@ -1,4 +1,6 @@
 import { Capacitor, CapacitorHttp, registerPlugin } from '@capacitor/core';
+import { installAndroidNativeGame } from './android-native/src/mobile-native-game.js';
+import { installAndroidAppUpdates } from './android-native/src/mobile-app-updates.js';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 
@@ -84,4 +86,8 @@ const mobileAPI = {
 window.briskMobileAPI = mobileAPI;
 window.briskAndroidAPI = mobileAPI;
 window.briskIOSAPI = mobileAPI;
+
+// Do not replace the companion app: extend its existing native game API.
+installAndroidNativeGame({Capacitor,registerPlugin});
+installAndroidAppUpdates({Capacitor,registerPlugin});
 

@@ -16,7 +16,7 @@ const { _electron: electron }=require('playwright');
   assert.equal(await page.locator('#brisk-game').count(),0,'legacy embedded remake iframe must be absent');
   await page.locator('#native-game-status').waitFor({state:'visible',timeout:20000});
   const status=await page.locator('#native-game-status').textContent();
-  assert.ok(status.includes('internal')||status.includes('integrated')||status.includes('not included')||status.includes('engine'),status);
+  assert.match(status,/internal|integrated|not included|engine/i,'Native engine status should be visible regardless of capitalization');
   await page.locator('#tab-dex').click();
   await page.locator('#tab-game').click();
   assert.equal(await canvas.isVisible(),true);

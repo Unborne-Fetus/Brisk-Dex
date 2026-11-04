@@ -1,0 +1,81 @@
+# Real Android ARM64 native game source build. NOT a ROM/emulator.
+#
+# Run from the prepared pinned native checkout:
+#   make -f Makefile.android -j2 android-game-archive \
+#        ANDROID_CC=/path/to/aarch64-linux-android26-clang \
+#        ANDROID_AR=/path/to/llvm-ar SDL_INCLUDE=/path/to/SDL2/include \
+#        OBJ_DIR=build/android-arm64
+#
+# Reuse the COMPLETE original expansion/native dependency graph, including
+# data/maps, animation scripts, and songs. Change only the compiler,
+# assembler, memory/layout host and C division semantics. Native desktop
+# Makefile is not modified.
+BITS := 64
+TEST := 0
+SANITIZE := 0
+ANDROID_CC ?= aarch64-linux-android26-clang
+ANDROID_AR ?= llvm-ar
+SDL_INCLUDE ?= /tmp/brisk-sdl2/include
+OBJ_DIR ?= build/android-arm64
+TARGET_CC := $(ANDROID_CC)
+include Makefile.native
+
+# Replace fixed-address x86 compile code with Android PIE ARM64.
+override ARCH_FLAGS := -fPIC -funsigned-char
+override CPP := $(ANDROID_CC) -E -fPIC -funsigned-char
+override CPPFLAGS += -DBRISK_ANDROID=1 -DBRISK_NATIVE=1 -Iplatform
+override CFLAGS := -std=gnu17 -fPIC -funsigned-char -O2
+override TARGET_AS := python3 tools/android_assemble.py --compiler $(ANDROID_CC)
+override ASFLAGS := -fPIC
+# Each original gameplay translation unit must get GBA-compatible division
+# semantics via the LLVM IR rewrite; the desktop C command is insufficient.
+override COMPILE_C = $(CPP) $(CPPFLAGS) $< | $(PREPROC) -i -g $(ASSETS_DIR_NAME) $< charmap.txt | $(C_FILTER) > $(C_PREPROCESSED) \
+          && python3 tools/android_compile_source.py --compiler $(ANDROID_CC) --source $(C_PREPROCESSED) --output $@; status=$$?; rm -f $(C_PREPROCESSED); exit $$status
+
+# Android does not load host_linux.c, host_linked.c or the x86 divide fault
+# decoder. Replacements live in platform/ with the exact same native symbols.
+ANDROID_PLATFORM_EXCLUDED := host_linux.c host_linked.c arm_division.c \
+    host_windows.c host_windows_console.c host_windows_fault.c \
+    host_windows_stack.c host_windows_thread.c
+ANDROID_PLATFORM_C := $(filter-out $(addprefix platform/,$(ANDROID_PLATFORM_EXCLUDED)),\
+    $(wildcard platform/*.c)) $(wildcard platform/m4a/m4a_*.c)
+ANDROID_PLATFORM_C_OBJS := $(patsubst platform/%.c,$(OBJ_DIR)/platform/%.o,$(ANDROID_PLATFORM_C))
+ANDROID_PLATFORM_STACK := $(OBJ_DIR)/platform/host_android_stack.o
+ANDROID_PLATFORM_OBJS := $(ANDROID_PLATFORM_C_OBJS) $(ANDROID_PLATFORM_STACK)
+ANDROID_ARCHIVE := $(OBJ_DIR)/libbrisk-game-arm64.a
+
+# Keep these C modules in platform/ for actual gameplay. The main() symbol
+# must be a callable library entry point owned by the Java/JNI bridge.
+$(OBJ_DIR)/platform/main.o: private PLATFORM_ANDROID_MAIN := -Dmain=brisk_android_game_main
+$(OBJ_DIR)/platform/%.o: platform/%.c
+	@mkdir -p $(@D)
+	python3 tools/android_compile_source.py \
+	    --compiler $(ANDROID_CC) --source $< --output $@ \
+	    --platform --sdl-include $(SDL_INCLUDE) $(if $(PLATFORM_ANDROID_MAIN),--rename-main,)
+
+# IMPORTANT: do NOT rewrite the body of the GBA div helpers. Rewriting
+# their intentional nonzero-denominator divisions would turn each helper
+# into an infinitely recursive call to itself. Compile these eight semantic
+# primitives directly; they already explicitly guard their edge cases.
+$(OBJ_DIR)/platform/gba_division_android.o: platform/gba_division_android.c
+	@mkdir -p $(@D)
+	$(ANDROID_CC) -std=gnu17 -fPIC -funsigned-char -O2 -c $< -o $@
+
+$(ANDROID_PLATFORM_STACK): platform/host_android_stack.S
+	@mkdir -p $(@D)
+	$(ANDROID_CC) -fPIC -c $< -o $@
+
+# Early pilot: compile one real game module and an actual native script data
+# source to validate Android assembler relocations before full archive.
+.PHONY: android-port-pilot android-game-archive
+android-port-pilot: $(OBJ_DIR)/src/main.o $(OBJ_DIR)/platform/gba_memmap.o \
+                    $(OBJ_DIR)/data/event_scripts.o $(OBJ_DIR)/platform/host_android_regions.o
+	@echo "Android source/data pilot compiled; full game archive not yet built."
+
+# Archive ONLY after every original game C, original data, generated song and
+# Android platform object is compiled. If any fail, no library is emitted.
+android-game-archive: objects $(ANDROID_PLATFORM_OBJS)
+	@mkdir -p $(dir $(ANDROID_ARCHIVE))
+	$(ANDROID_AR) rcs $(ANDROID_ARCHIVE) $(OBJS) $(ANDROID_PLATFORM_OBJS)
+	@echo "Complete ARM64 game object archive: $(ANDROID_ARCHIVE)"
+	@echo "Must still pass the strict Android PIE shared-library link and gameplay tests."
