@@ -31,6 +31,8 @@ git -C "$checkout" fetch --depth 1 \
 git -C "$checkout" checkout "$native_pin" -- \
   platform/video.c platform/input.c platform/frame.c platform/main.c
 python3 "$root/tools/prepare_brisk_native.py" "$checkout"
+python3 "$root/tools/patch_native_vblank.py" "$checkout"
+python3 "$root/tools/patch_native_trainer_script.py" "$checkout"
 python3 "$root/tools/patch-native-compat.py" "$checkout"
 python3 "$root/tools/patch-native-stream.py" "$checkout"
 python3 "$root/tools/patch-native-android.py" "$checkout"
