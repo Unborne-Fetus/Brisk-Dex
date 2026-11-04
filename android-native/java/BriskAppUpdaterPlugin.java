@@ -4,6 +4,8 @@ import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.net.ConnectivityManager;
+import android.net.NetworkCapabilities;
 import android.os.Build;
 import android.provider.Settings;
 
@@ -15,7 +17,6 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
-import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
@@ -24,6 +25,8 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.net.UnknownHostException;
+import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -40,8 +43,7 @@ import java.util.concurrent.Executors;
  */
 @CapacitorPlugin(name="BriskAppUpdater")
 public class BriskAppUpdaterPlugin extends Plugin {
-    private static final String RELEASE_API =
-        "https://api.github.com/repos/Unborne-Fetus/Brisk-Dex/releases/tags/android-updates";
+    // Use fixed GitHub release assets directly instead of api.github.com.
     private static final String ASSET_PREFIX =
         "https://github.com/Unborne-Fetus/Brisk-Dex/releases/download/android-updates/";
     private static final String APK_NAME="Brisk-Dex-Android.apk";
@@ -95,17 +97,22 @@ public class BriskAppUpdaterPlugin extends Plugin {
         connection.setConnectTimeout(15000);connection.setReadTimeout(30000);
         return connection;
     }
-    private static String asset(JSONObject release,String name) throws Exception{
-        JSONArray assets=release.getJSONArray("assets");
-        for(int i=0;i<assets.length();i++){
-            JSONObject item=assets.getJSONObject(i);
-            if(name.equals(item.optString("name"))){
-                String url=item.getString("browser_download_url");
-                if(!url.equals(ASSET_PREFIX+name))throw new Exception("Unexpected update asset URL");
-                return url;
-            }
-        }
-        throw new Exception("The Android release is missing "+name);
+    private boolean hasInternetNetwork(){
+        try{
+            ConnectivityManager cm=(ConnectivityManager)getContext().getSystemService(android.content.Context.CONNECTIVITY_SERVICE);
+            if(cm==null||cm.getActiveNetwork()==null)return false;
+            NetworkCapabilities cap=cm.getNetworkCapabilities(cm.getActiveNetwork());
+            return cap!=null&&cap.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+        }catch(Exception ignored){return true;}
+    }
+    private String updateError(Exception error){
+        if(!hasInternetNetwork())
+            return "No internet connection detected. Connect Wi-Fi or mobile data, then try Check updates again.";
+        if(error instanceof UnknownHostException)
+            return "Your device cannot resolve GitHub. Check Wi-Fi/mobile data, Private DNS, VPN or ad blockers. Try opening github.com in your browser, then retry.";
+        if(error instanceof SocketTimeoutException)
+            return "GitHub did not respond in time. Check your network and try again.";
+        return "Android update unavailable: "+error.getMessage();
     }
     private static byte[] digestFile(File file) throws Exception{
         MessageDigest digest=MessageDigest.getInstance("SHA-256");
@@ -163,20 +170,17 @@ public class BriskAppUpdaterPlugin extends Plugin {
         executor.execute(()->{
             try{
                 long installedCode=code(installed());
-                HttpURLConnection link=connect(RELEASE_API+"?t="+System.currentTimeMillis());
-                if(link.getResponseCode()==404){
-                    link.disconnect();
-                    call.resolve(message(true,"No signed Android update has been published yet."));
-                    return;
-                }
-                JSONObject release;
-                try{release=new JSONObject(new String(read(link,256*1024),StandardCharsets.UTF_8));}
-                finally{link.disconnect();}
-                String manifestUrl=asset(release,"android-update.json");
-                HttpURLConnection index=connect(manifestUrl+"?t="+System.currentTimeMillis());
+                // Direct download avoids the API hostname while preserving APK checks.
+                HttpURLConnection index=connect(ASSET_PREFIX+"android-update.json?t="+System.currentTimeMillis());
                 JSONObject meta;
-                try{meta=new JSONObject(new String(read(index,64*1024),StandardCharsets.UTF_8));}
-                finally{index.disconnect();}
+                try{
+                    int response=index.getResponseCode();
+                    if(response==404){
+                        call.resolve(message(true,"No Android update has been published to the in-app channel yet."));
+                        return;
+                    }
+                    meta=new JSONObject(new String(read(index,64*1024),StandardCharsets.UTF_8));
+                }finally{index.disconnect();}
                 long nextCode=meta.getLong("versionCode"),bytes=meta.getLong("bytes");
                 String checksum=meta.getString("sha256"),version=meta.getString("versionName");
                 if(!getContext().getPackageName().equals(meta.getString("packageName"))||
@@ -186,7 +190,7 @@ public class BriskAppUpdaterPlugin extends Plugin {
                     call.resolve(message(true,"You already have the latest published Android APK."));
                     return;
                 }
-                String url=asset(release,APK_NAME);
+                String url=ASSET_PREFIX+APK_NAME;
                 File dest=apk();
                 if(dest.isFile()&&dest.length()==bytes&&
                    hex(digestFile(dest)).equals(checksum)){
@@ -223,7 +227,7 @@ public class BriskAppUpdaterPlugin extends Plugin {
                 JSObject result=message(true,"Android update "+version+" downloaded. Tap Install update and approve Android's prompt.");
                 result.put("pending",version);call.resolve(result);
             }catch(Exception error){
-                call.resolve(message(false,"Android update unavailable: "+error.getMessage()));
+                call.resolve(message(false,updateError(error)));
             }finally{busy=false;}
         });
     }
