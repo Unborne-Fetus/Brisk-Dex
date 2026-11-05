@@ -37,10 +37,21 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @CapacitorPlugin(name = "SaveFilePicker")
 public class SaveFilePickerPlugin extends Plugin {
+    // Reopening an external document needs a persisted system picker grant.
+    private void requireDocumentGrant(Uri uri, boolean writable) {
+        if (uri == null || !"content".equals(uri.getScheme()))
+            throw new SecurityException("Select the external save again using Browse device files.");
+        for (android.content.UriPermission permission : getContext().getContentResolver().getPersistedUriPermissions()) {
+            if (uri.equals(permission.getUri()) && permission.isReadPermission()
+                && (!writable || permission.isWritePermission())) return;
+        }
+        throw new SecurityException("Android document access expired. Select the external save again using Browse device files.");
+    }
     @PluginMethod
     public void readSaveFile(PluginCall call) {
         try {
             Uri uri = Uri.parse(call.getString("uri"));
+            requireDocumentGrant(uri, false);
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             try (InputStream input = getContext().getContentResolver().openInputStream(uri)) {
                 if (input == null) throw new Exception("Could not read save file");
@@ -56,6 +67,7 @@ public class SaveFilePickerPlugin extends Plugin {
     public void writeSaveFile(PluginCall call) {
         try {
             Uri uri = Uri.parse(call.getString("uri"));
+            requireDocumentGrant(uri, true);
             byte[] data = Base64.decode(call.getString("data"), Base64.DEFAULT);
             if (data.length < 114688) throw new Exception("Save file is incomplete");
             // Keep a recovery copy before changing the document.
@@ -165,8 +177,17 @@ public class SaveFilePickerPlugin extends Plugin {
         }
 
         try {
-            int flags = result.getData().getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-            getContext().getContentResolver().takePersistableUriPermission(uri, flags);
+            int flags = result.getData().getFlags() &
+                (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            if ((flags & Intent.FLAG_GRANT_READ_URI_PERMISSION) == 0)
+                throw new SecurityException("The selected file provider did not grant read access.");
+            try {
+                getContext().getContentResolver().takePersistableUriPermission(uri, flags);
+            } catch (SecurityException refusedWrite) {
+                // A read-only provider may still allow viewing a save.
+                getContext().getContentResolver().takePersistableUriPermission(
+                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            }
             String name = "save.sav";
             Cursor cursor = getContext().getContentResolver().query(uri, null, null, null, null);
             if (cursor != null) {
