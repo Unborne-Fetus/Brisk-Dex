@@ -3144,7 +3144,19 @@ async function restoreLastSave(){
   var saved=IS_ELECTRON&&window.briskDexAPI.loadLastSav?await window.briskDexAPI.loadLastSav():await readSnapshot();
   if(!saved)return;if(saved.error)throw new Error(saved.error);
   var bytes=saved.buffer||saved.bytes;
-  if(IS_ANDROID&&saved.uri&&MOBILE_API.readSaveFile){var fresh=await MOBILE_API.readSaveFile(saved.uri);bytes=base64ToBytes(fresh.data);}
+  if(IS_ANDROID&&saved.uri&&MOBILE_API.readSaveFile){
+    try{
+      var fresh=await MOBILE_API.readSaveFile(saved.uri);
+      bytes=base64ToBytes(fresh.data);
+    }catch(error){
+      if(/permission|ACTION_OPEN_DOCUMENT|SecurityException|document access|reselect/i.test(String(error?.message||error))){
+        lastSaveRestoreError='Android no longer allows access to this external save. Choose Browse device files to select it again. Integrated game saves are unaffected.';
+        showNotice(lastSaveRestoreError);
+        return;
+      }
+      throw error;
+    }
+  }
   var raw=new Uint8Array(bytes),save=parseSav(raw.buffer);save.filePath=saved.filePath||null;save.uri=saved.uri||null;save.fileExtension=saved.fileExtension||(/\.srm$/i.test(saved.filePath||'')?'srm':'sav');
   currentSave=save;loadDexStatusOverrides(save);saveSessionId=genId();dirty=false;
   document.getElementById('empty-state').style.display='none';document.getElementById('app-content').style.display='block';renderAll();
