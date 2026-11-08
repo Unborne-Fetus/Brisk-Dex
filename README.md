@@ -6,12 +6,13 @@ Species, forms, stats, moves, abilities, items, encounters, and trainer teams co
 
 ## Features
 
+**Compatibility edition:** competitive sets, online battles, trading and the relay service are not included. This branch focuses on ROM inspection and safe save management.
+
 - **Pokédex:** search Pokémon and forms, inspect stats and evolutions, look up encounters, view sprites, and play cries. Track None, Seen, Caught, and Shiny status from a save, with manual overrides.
-- **Reference tabs:** browse moves, abilities, items, locations, and trainer teams, plus competitive set suggestions.
+- **Reference tabs:** browse moves, abilities, items, locations, and trainer teams.
 - **Save management:** inspect your party and PC boxes, move Pokémon into external storage, and edit supported Pokémon details.
 - **External Pokémon storage:** keep a collection independent of one save, search and sort it, and export or merge portable JSON archives.
 - **Bag storage:** move existing item stacks between the game Bag and external storage, choosing the quantity to transfer. Key items stay in the game.
-- **Online Battle:** host or join a private singles battle with up to six Pokémon selected from your party, PC boxes, or external storage.
 - **Settings:** light/dark mode, zoom, and eight language choices.
 - **Guides:** player instructions inside the app.
 
@@ -64,7 +65,7 @@ Settings includes **English, Spanish, Italian, French, Russian, Japanese, Mandar
 
 English and bundled reference data work offline. Other languages use an online translation service for uncached text; previously cached translations remain available offline. Service limits or connection failures can leave some text in English. These are automatic translations, not fully reviewed translation packs.
 
-Multiplayer needs a connection to the relay. Building and downloading app packages also needs internet access.
+Building and downloading app packages needs internet access. ROM inspection itself is local.
 
 ## Build files
 
@@ -132,64 +133,12 @@ npm.cmd start
 
 Android local builds require Java and the Android SDK. iOS compilation requires macOS and Xcode; `npm run ios:build` prepares and syncs the project rather than producing an IPA by itself. The combined GitHub workflow handles native compilation and IPA packaging.
 
-The browser interface is `index.html`. Serve the complete app folder through a local web server so its JSON and graphics can load; copying only the HTML file is not enough. Browser hosting does not start a battle relay automatically.
-
-## Multiplayer: PC and Android on the same network
-
-Use the latest build on both devices.
-
-1. Connect the PC and Android device to the same Wi-Fi/LAN.
-2. On the PC, open **Online Battle**, choose your team, and set **Battle relay URL** to `http://localhost:8787`.
-3. Click **Host Battle**. The desktop app starts a local relay when needed and creates a six-character room code.
-4. Allow Brisk Dex through Windows Firewall on **private networks** if prompted.
-5. On Android, enter the PC's network relay address, then enter the generated room code and click **Join Battle**.
-6. Both players mark themselves ready to begin.
-
-For example, if the PC's IPv4 address is `192.168.1.50`, Android uses:
-
-```text
-http://192.168.1.50:8787
-```
-
-To find that address, run `ipconfig` on Windows and look under the active Wi-Fi or Ethernet adapter. Use its **IPv4 Address**, not a disconnected adapter or WSL virtual adapter.
-
-**localhost means the device you are currently using.** Entering localhost on Android will not connect to your PC.
-
-### Start a relay manually
-
-For browser testing or builds without automatic hosting, leave this running in a terminal:
-
-```powershell
-npm.cmd run battle-server
-```
-
-The relay listens on port **8787** by default. To check it on the host PC, open:
-
-```text
-http://localhost:8787/health
-```
-
-A working relay returns JSON containing `"ok":true`. Check the same endpoint from Android using the PC's IPv4 address. If it works on PC but not Android, check the firewall and whether the network isolates devices, such as on guest Wi-Fi.
-
-### Play across different networks
-
-Both players need to reach the **same publicly accessible relay**, preferably through HTTPS. A local Wi-Fi address does not provide internet hosting on its own. Run `battle-server.js` on a reachable server and enter its relay URL on both devices.
-
-Rooms live in relay memory and are lost when it restarts. They expire after six hours of inactivity. Session tokens can reconnect a refreshed page while the room still exists.
-
-### Battle engine scope
-
-The relay resolves battles on the server, including turn order, damage, RNG, switching, status, field effects, and supported gimmicks. Teams can use Pokémon from the loaded save or external storage.
-
-The engine's effect-family coverage check accounts for all families in its generated Brisk move manifest. **Effect-family coverage is not proof of exact parity with every ROM mechanic or interaction.** PC-to-Android connectivity and complex battle interactions still need device and gameplay testing.
+The browser interface is `index.html`. Serve the complete app folder through a local web server so its JSON and graphics can load; copying only the HTML file is not enough. Browser hosting requires the complete static asset bundle.
 
 ## Troubleshooting
 
 | Problem | What to check |
 | --- | --- |
-| Host Battle appears to do nothing | Check the connection status beside the buttons and any error at the top of the page. Verify the relay health endpoint. |
-| Android cannot join | Use the PC's IPv4 address, the correct six-character code, the same network, and a private-network firewall allowance. |
-| Instructions still say to start the relay manually | You may be running an older installed build. Rebuild and install the new EXE/APK. |
 | PowerShell blocks npm.ps1 | Run `npm.cmd` instead. |
 | build.bat reports a missing PowerShell file | Pull or extract the entire repository, including `tools/build_all.ps1`. |
 | One platform build fails | Read the failed step printed in the build window. `build.bat` covers Windows/Android; `build-all.bat` also reports whether WSL/Linux or the remote Mac/Apple stage failed. |
@@ -206,13 +155,6 @@ python3 tools/extract_data.py /path/to/Pokemon-Brisk-Emerald
 ```
 
 Commit the regenerated data and graphics, then rebuild the app. The extractor reads the ROM source; it does not substitute official-game stats for Brisk's changes.
-
-Useful battle checks:
-
-```bash
-npm run battle:coverage
-npm run battle:smoke
-```
 
 ## Local release builds
 
