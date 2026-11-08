@@ -1030,9 +1030,6 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
     <button id="tab-routes" role="tab" aria-selected="false" aria-controls="routes-tab-panel">Route Encounters</button>
     <button id="tab-dex" role="tab" aria-selected="false" aria-controls="dex-tab-panel">Pok&eacute;dex</button>
     <button id="tab-trainers" role="tab" aria-selected="false" aria-controls="trainers-tab-panel">Trainer Teams</button>
-    <button id="tab-competitive" role="tab" aria-selected="false" aria-controls="competitive-tab-panel">Competitive Sets</button>
-    <button id="tab-online" role="tab" aria-selected="false" aria-controls="online-tab-panel">Online Battle</button>
-    <button id="tab-trading" role="tab" aria-selected="false" aria-controls="trading-tab-panel">Trading</button>
     <button id="tab-moves" role="tab" aria-selected="false" aria-controls="moves-tab-panel">Moves</button>
     <button id="tab-abilities" role="tab" aria-selected="false" aria-controls="abilities-tab-panel">Abilities</button>
     <button id="tab-items" role="tab" aria-selected="false" aria-controls="items-tab-panel">Items</button>
@@ -1175,75 +1172,6 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
     <div class="trainer-layout">
       <aside class="trainer-list" id="trainer-list" aria-label="Brisk trainers"></aside>
       <div class="trainer-detail" id="trainer-detail" aria-live="polite"></div>
-    </div>
-  </section>
-
-  <section id="competitive-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-competitive" style="display:none;">
-    <div class="section-heading"><h3>Competitive Sets</h3><span class="count" id="competitive-count"></span></div>
-    <p class="route-intro">Suggested builds are generated from Brisk Emerald's current species stats, abilities, typing, and legal movepools, so Brisk-specific buffs and movepool changes are reflected automatically.</p>
-    <div class="dex-tools">
-      <input id="competitive-search" type="search" placeholder="Search Pokémon, type, ability, move, or role…" aria-label="Search competitive Pokémon sets">
-      <select id="competitive-type" aria-label="Filter competitive sets by type"><option value="all">All types</option></select>
-      <select id="competitive-order" aria-label="Sort competitive sets">
-        <option value="national">National Dex order</option>
-        <option value="alphabetical">Alphabetical</option>
-        <option value="bst">Highest BST</option>
-      </select>
-    </div>
-    <div class="comp-layout">
-      <aside class="comp-list" id="competitive-list" aria-label="Pokémon with competitive sets"></aside>
-      <div id="competitive-detail" aria-live="polite"></div>
-    </div>
-  </section>
-
-  <section id="online-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-online" style="display:none;">
-    <div class="section-heading"><h3>Online Battle</h3><span class="count" id="online-count">Host / Join</span></div>
-    <p class="route-intro">Private Brisk battles using Pokémon from your loaded save, plus offline-style Bot Battles against Brisk trainers or generated teams.</p>
-    <div class="online-card" id="bot-battle-card" style="margin-bottom:14px;">
-      <h4>Bot Trainer Battle</h4>
-      <p class="route-intro">Battle an AI-controlled opponent using either an actual party from Brisk Emerald, a generated Brisk team, or a mix of both. Your currently selected Online Battle team is used.</p>
-      <div class="online-form">
-        <label>Opponent
-          <select id="bot-battle-source">
-            <option value="mixed">Mixed — Brisk trainer or random</option>
-            <option value="trainer">Brisk Emerald trainer</option>
-            <option value="random">Random generated team</option>
-          </select>
-        </label>
-        <label>Difficulty
-          <select id="bot-battle-difficulty">
-            <option value="easy">Easy</option>
-            <option value="normal" selected>Normal</option>
-            <option value="hard">Hard</option>
-            <option value="expert">Expert</option>
-          </select>
-        </label>
-        <div class="online-actions"><button class="primary" id="bot-battle-start">Battle Bot</button></div>
-        <div id="bot-battle-status" class="online-status">Select your battle team below, then start a Bot Battle.</div>
-      </div>
-    </div>
-    <div id="online-root"></div>
-  </section>
-
-  <section id="trading-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-trading" style="display:none;">
-    <div class="section-heading"><h3>Trading</h3><span class="count">Brisk verified Pokémon only</span></div>
-    <p class="route-intro">Offline Wonder Trade works locally. Online Wonder Box, Link Trade, and GTS use the same relay as Online Battle. Debug-created, hacked, corrupted, or otherwise unverified Pokémon cannot be traded.</p>
-    <div class="online-shell">
-      <div class="online-card">
-        <h4>Trade Pokémon</h4>
-        <div class="online-form">
-          <label>Relay <input id="trade-relay" type="text" placeholder="http://host:8787"></label>
-          <label>Pokémon <select id="trade-mon"></select></label>
-          <div class="online-actions"><button id="trade-refresh">Refresh eligible Pokémon</button></div>
-          <div id="trade-status" class="online-status">Choose an eligible boxed or externally stored Pokémon.</div>
-        </div>
-      </div>
-      <div style="display:grid;gap:14px;">
-        <div class="online-card"><h4>Offline Wonder Trade</h4><p class="route-intro">Open a Pokémon from your party or PC and choose Wonder Trade. Offline trades use Brisk's bundled eligible species pool and now enforce trusted provenance.</p></div>
-        <div class="online-card"><h4>Wonder Box</h4><p class="route-intro">Deposit up to 10 Pokémon. Matches happen independently, like Pokémon HOME's Wonder Box.</p><div class="online-actions"><button class="primary" id="wonderbox-deposit">Deposit selected</button><button id="wonderbox-check">Check / claim matches</button></div><div id="wonderbox-list" class="online-status"></div></div>
-        <div class="online-card"><h4>Link Trade</h4><div class="online-form"><label>Room code <input id="linktrade-code" maxlength="6" placeholder="ABC123"></label><div class="online-actions"><button class="primary" id="linktrade-host">Host</button><button id="linktrade-join">Join</button><button id="linktrade-confirm">Confirm trade</button></div><div id="linktrade-status" class="online-status"></div></div></div>
-        <div class="online-card"><h4>GTS</h4><div class="online-form"><label>Requested species # (0 = any) <input id="gts-species" type="number" min="0" step="1" value="0"></label><label>Requested type (blank = any) <input id="gts-type" placeholder="e.g. Water"></label><div style="display:flex;gap:8px"><label style="flex:1">Min Lv <input id="gts-min" type="number" min="1" max="100" value="1"></label><label style="flex:1">Max Lv <input id="gts-max" type="number" min="1" max="100" value="100"></label></div><div class="online-actions"><button class="primary" id="gts-deposit">Deposit selected</button><button id="gts-search">Search listings</button><button id="gts-check">Check my listing</button></div><div id="gts-list" class="online-status"></div></div></div>
-      </div>
     </div>
   </section>
 
@@ -6336,8 +6264,6 @@ function renderCurrentReferenceTab(){
   if(currentMainTab==='routes') renderRouteEncounters();
   else if(currentMainTab==='dex') renderPokedex();
   else if(currentMainTab==='trainers') renderTrainerTeams();
-  else if(currentMainTab==='competitive') renderCompetitiveSets();
-  else if(currentMainTab==='online') renderOnlineBattle();
   else if(currentMainTab==='moves') renderMoves();
   else if(currentMainTab==='abilities') renderAbilities();
   else if(currentMainTab==='items') renderItems();
@@ -6350,9 +6276,6 @@ function setMainTab(tabName){
   var routes = tabName === 'routes';
   var dex = tabName === 'dex';
   var trainers = tabName === 'trainers';
-  var competitive = tabName === 'competitive';
-  var online = tabName === 'online';
-  var trading = tabName === 'trading';
   var moves = tabName === 'moves';
   var abilities = tabName === 'abilities';
   var items = tabName === 'items';
@@ -6363,14 +6286,11 @@ function setMainTab(tabName){
   document.getElementById('settings-tab-panel').style.display=settings?'block':'none';
   document.getElementById('tab-settings').classList.toggle('active',settings);
   document.getElementById('tab-settings').setAttribute('aria-selected',String(settings));
-  var save = !settings && !routes && !dex && !trainers && !competitive && !online && !trading && !moves && !abilities && !items && !bag && !guide && !changes;
+  var save = !settings && !routes && !dex && !trainers && !moves && !abilities && !items && !bag && !guide && !changes;
   document.getElementById('save-tab-panel').style.display = save ? 'block' : 'none';
   document.getElementById('routes-tab-panel').style.display = routes ? 'block' : 'none';
   document.getElementById('dex-tab-panel').style.display = dex ? 'block' : 'none';
   document.getElementById('trainers-tab-panel').style.display = trainers ? 'block' : 'none';
-  document.getElementById('competitive-tab-panel').style.display = competitive ? 'block' : 'none';
-  document.getElementById('online-tab-panel').style.display = online ? 'block' : 'none';
-  document.getElementById('trading-tab-panel').style.display = trading ? 'block' : 'none';
   document.getElementById('moves-tab-panel').style.display = moves ? 'block' : 'none';
   document.getElementById('abilities-tab-panel').style.display = abilities ? 'block' : 'none';
   document.getElementById('items-tab-panel').style.display = items ? 'block' : 'none';
@@ -6385,12 +6305,6 @@ function setMainTab(tabName){
   document.getElementById('tab-dex').setAttribute('aria-selected', String(dex));
   document.getElementById('tab-trainers').classList.toggle('active', trainers);
   document.getElementById('tab-trainers').setAttribute('aria-selected', String(trainers));
-  document.getElementById('tab-competitive').classList.toggle('active', competitive);
-  document.getElementById('tab-competitive').setAttribute('aria-selected', String(competitive));
-  document.getElementById('tab-online').classList.toggle('active', online);
-  document.getElementById('tab-online').setAttribute('aria-selected', String(online));
-  document.getElementById('tab-trading').classList.toggle('active', trading);
-  document.getElementById('tab-trading').setAttribute('aria-selected', String(trading));
   document.getElementById('tab-moves').classList.toggle('active', moves);
   document.getElementById('tab-moves').setAttribute('aria-selected', String(moves));
   document.getElementById('tab-abilities').classList.toggle('active', abilities);
@@ -6716,15 +6630,6 @@ async function gtsSearch(){
  out.querySelectorAll('[data-gts-take]').forEach(function(btn){btn.addEventListener('click',async function(){try{var mon=selectedTradeCandidate();if(!mon)throw new Error('Choose the Pokémon you want to offer.');var x=await tradeFetch('/trades/gts/take',{method:'POST',body:JSON.stringify({listingId:btn.dataset.gtsTake,ownerToken:TRADE_STATE.ownerToken,raw80:mon.rewardRaw80})});await replaceTradeSource(mon.key,x.received);out.textContent='GTS trade complete: received '+speciesName(x.receivedMon.species)+'.';}catch(e){out.textContent=e.message;}});});
  }catch(e){out.textContent=e.message;}
 }
-document.getElementById('trade-refresh').addEventListener('click',renderTrading);
-document.getElementById('wonderbox-deposit').addEventListener('click',depositWonderBox);
-document.getElementById('wonderbox-check').addEventListener('click',checkWonderBox);
-document.getElementById('linktrade-host').addEventListener('click',hostLinkTrade);
-document.getElementById('linktrade-join').addEventListener('click',joinLinkTrade);
-document.getElementById('linktrade-confirm').addEventListener('click',confirmLinkTrade);
-document.getElementById('gts-deposit').addEventListener('click',gtsDeposit);
-document.getElementById('gts-search').addEventListener('click',gtsSearch);
-document.getElementById('gts-check').addEventListener('click',gtsCheckMine);
 
 /* ============================================================
    Wiring
@@ -6733,10 +6638,6 @@ document.getElementById('tab-save').addEventListener('click', function(){ setMai
 document.getElementById('tab-routes').addEventListener('click', function(){ setMainTab('routes'); });
 document.getElementById('tab-dex').addEventListener('click', function(){ setMainTab('dex'); });
 document.getElementById('tab-trainers').addEventListener('click', function(){ setMainTab('trainers'); });
-document.getElementById('tab-competitive').addEventListener('click', function(){ setMainTab('competitive'); });
-document.getElementById('tab-online').addEventListener('click', function(){ setMainTab('online'); });
-document.getElementById('bot-battle-start').addEventListener('click',startBotBattle);
-document.getElementById('tab-trading').addEventListener('click', function(){ setMainTab('trading'); renderTrading(); });
 document.getElementById('tab-moves').addEventListener('click', function(){ setMainTab('moves'); });
 document.getElementById('tab-abilities').addEventListener('click', function(){ setMainTab('abilities'); });
 document.getElementById('tab-items').addEventListener('click', function(){ setMainTab('items'); });
@@ -6755,9 +6656,6 @@ document.querySelectorAll('#bag-subtabs [data-bag-category]').forEach(function(b
 document.getElementById('trainer-search').addEventListener('input', renderTrainerTeamsDebounced);
 document.getElementById('trainer-class').addEventListener('change', renderTrainerTeams);
 document.getElementById('trainer-size').addEventListener('change', renderTrainerTeams);
-document.getElementById('competitive-search').addEventListener('input', renderCompetitiveSetsDebounced);
-document.getElementById('competitive-type').addEventListener('change', renderCompetitiveSets);
-document.getElementById('competitive-order').addEventListener('change', renderCompetitiveSets);
 document.getElementById('dex-search').addEventListener('input', renderPokedexDebounced);
 document.getElementById('dex-type').addEventListener('change', renderPokedex);
 document.getElementById('dex-status').addEventListener('change', renderPokedex);
@@ -6910,7 +6808,7 @@ var uiSettings={language:'en',theme:'system',zoom:'1',emeraldProfile:'auto'};
 try{Object.assign(uiSettings,JSON.parse(localStorage.getItem('briskdex_settings')||'{}'));}catch(e){}
 try{if(localStorage.getItem('briskdex_emerald_profile'))uiSettings.emeraldProfile=localStorage.getItem('briskdex_emerald_profile');}catch(e){}
 var UNUSED_UI_TRANSLATIONS={es:['Ajustes','Guardado','Ubicaciones','Pokédex','Entrenadores','Sets competitivos','Batallas online','Movimientos','Habilidades','Objetos','Bolsa','Guía','Cambios'],fr:['Paramètres','Sauvegarde','Lieux','Pokédex','Dresseurs','Sets compétitifs','Combats en ligne','Capacités','Talents','Objets','Sac','Guide','Changements'],de:['Einstellungen','Spielstand','Fundorte','Pokédex','Trainer','Strategien','Online-Kämpfe','Attacken','Fähigkeiten','Items','Beutel','Anleitung','Änderungen']};
-var uiTabNames=['settings','save','routes','dex','trainers','competitive','online','moves','abilities','items','bag','guide','changes'];
+var uiTabNames=['settings','save','routes','dex','trainers','moves','abilities','items','bag','guide','changes'];
 var uiEnglish=uiTabNames.map(function(n){return document.getElementById('tab-'+n).textContent;});
 function applyUISettings(){
   document.documentElement.lang=uiSettings.language;
@@ -6952,11 +6850,6 @@ applyUISettings();
 
 loadNameDataFromStorage();
 loadBagFromStorage();
-if(ONLINE_STATE.roomCode&&ONLINE_STATE.playerId){
-  battleRequest('/rooms/'+ONLINE_STATE.roomCode+'?playerId='+encodeURIComponent(ONLINE_STATE.playerId),{method:'GET'}).then(function(data){
-    ONLINE_STATE.room=data.room;ONLINE_STATE.playerIndex=data.playerIndex;persistOnlineSession();startBattlePolling();if(currentMainTab==='online')renderOnlineBattle();
-  }).catch(function(){leaveOnlineBattle();});
-}
 updateDataStatus();
 var gameDataReady=loadBundledGameData().then(function(){
   try{var savedPack=localStorage.getItem('briskdex_compat_game_data_pack');if(savedPack)applyGameDataPack(JSON.parse(savedPack),true);var cachedIcons=localStorage.getItem('briskdex_compat_rom_icons_v1');if(cachedIcons){var parsedIcons=JSON.parse(cachedIcons);SPECIES_ICONS=Object.assign({},SPECIES_ICONS,parsedIcons.icons||parsedIcons);SPECIES_SHINY_ICONS=Object.assign({},SPECIES_SHINY_ICONS,parsedIcons.shinyIcons||{});}}catch(e){showError('Saved compatibility data pack could not be restored: '+e.message);}
