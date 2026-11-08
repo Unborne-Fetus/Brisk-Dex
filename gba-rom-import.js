@@ -237,6 +237,92 @@ function collectIcons(b,header,layout,species,limit,warnings){
   return result;
 }
 
+
+// Some expansion forks store four time-of-day encounter sets per map, each
+// with five categories (land, water, rock, fishing and hidden). That compiled
+// header occupies 84 bytes instead of the vanilla 20-byte map record.
+function scanTimedWildEncounters(b,speciesLimit,warnings){
+  var limit=Math.min(b.length,32*1024*1024),stride=84,dayNames=['Morning','Day','Evening','Night'];
+  var kinds=[
+    {key:'land_mons',name:'Walking',counts:[24,12]},
+    {key:'water_mons',name:'Surfing',counts:[11,5]},
+    {key:'rock_smash_mons',name:'Rock Smash',counts:[5]},
+    {key:'fishing_mons',name:'Fishing',counts:[10]},
+    {key:'hidden_mons',name:'Hidden',counts:[5,3]}
+  ];
+  function parseInfo(ptr,counts){
+    var info=offset(b,ptr,8);
+    if(info==null||b[info]<1||b[info]>100)return null;
+    var pointer=u32(b,info+4);
+    for(var ci=0;ci<counts.length;ci++){
+      var n=counts[ci],slotsAt=offset(b,pointer,n*4);
+      if(slotsAt==null)continue;
+      var slots=[],good=true;
+      for(var j=0;j<n;j++){
+        var o=slotsAt+j*4,lo=b[o],hi=b[o+1],mon=u16(b,o+2);
+        if(mon==null||mon>speciesLimit||(!mon&&lo===0&&hi===0)) {
+          if(mon===0&&lo===0&&hi===0)continue;
+          good=false;break;
+        }
+        if(lo<1||hi>100||hi<lo){good=false;break;}
+        if(mon)slots.push({species:mon,minLevel:lo,maxLevel:hi,slot:j+1});
+      }
+      if(good&&slots.length>=2)return {slots:slots,encounterRate:b[info],slotCount:n};
+    }
+    return null;
+  }
+  function rowAt(at){
+    if(at+stride>limit||b[at]===255||b[at]>=100||b[at+1]>=240||b[at+2]!==0||b[at+3]!==0)return null;
+    var methods=[],pointerCount=0,activeDays=0,seenPointers=new Map();
+    for(var day=0;day<4;day++){
+      var dayHas=false;
+      for(var k=0;k<5;k++){
+        var ptr=u32(b,at+4+day*20+k*4);
+        if(ptr===0)continue;
+        var key=ptr+':'+k;
+        var data=seenPointers.has(key)?seenPointers.get(key):parseInfo(ptr,kinds[k].counts);
+        if(!data)return null;
+        seenPointers.set(key,data);
+        pointerCount++;dayHas=true;
+        methods.push({
+          name:dayNames[day]+' · '+kinds[k].name,
+          type:kinds[k].key,encounterRate:data.encounterRate,
+          slots:data.slots
+        });
+      }
+      if(dayHas)activeDays++;
+    }
+    if(pointerCount<2||activeDays<2)return null;
+    return {mapGroup:b[at],mapNumber:b[at+1],methods:methods};
+  }
+  var best=[],bestAt=-1;
+  for(var at=0;at+stride*6<=limit;at+=4){
+    if(b[at+2]!==0||b[at+3]!==0||b[at]>=100)continue;
+    var plausible=false;
+    for(var k=0;k<5;k++){var hi=b[at+7+k*4];if(hi===8||hi===9){plausible=true;break;}}
+    if(!plausible)continue;
+    var first=rowAt(at);if(!first)continue;
+    var rows=[],seen=new Set();
+    for(var off=at;off+stride<=limit&&rows.length<2048;off+=stride){
+      var row=rowAt(off);if(!row)break;
+      var key=row.mapGroup+':'+row.mapNumber;
+      if(seen.has(key))break;
+      seen.add(key);rows.push(row);
+    }
+    if(rows.length>best.length){best=rows;bestAt=at;}
+    if(rows.length>1)at+=stride*(rows.length-1);
+  }
+  if(best.length<6)return scanTimedWildEncounters(b,speciesLimit,warnings);
+  var areas=best.map(function(row){return {
+    id:'ROM_MAP_GROUP_'+row.mapGroup+'_MAP_'+row.mapNumber,
+    name:'Map group '+row.mapGroup+' · map '+row.mapNumber,
+    mapGroup:row.mapGroup,mapNumber:row.mapNumber,
+    source:'verified-time-of-day-wild-headers',methods:row.methods
+  };});
+  warnings.push('Recovered '+areas.length+' multi-time wild-encounter maps (four time periods) at ROM offset 0x'+bestAt.toString(16)+'. All recovered slots are validated, but custom map names, encounters without tables and exact slot chances still require a source-matched index.');
+  return {areas:areas,count:areas.length};
+}
+
 // Recover the standard compiled Emerald gWildMonHeaders structure when there
 // is no source-generated ROM index. This reports map-group/number identity,
 // NOT invented route names or unsupported map geometry.
@@ -426,5 +512,5 @@ async function importRomAsync(value,options){
   if(!manifest||manifest.format!=='briskdex-rom-v1'||!manifest.data)throw new Error('Invalid compressed ROM index.');
   return importRom(b,Object.assign({},options||{},{manifest:manifest}));
 }
-return {scanWildEncounters:scanWildEncounters,importRomAsync:importRomAsync,importRom:importRom,readIcon:readIcon,tilesToRgba:tilesToRgba,lz77:lz77,crc32:crc32,gbaString:gbaString,scanHeader:scanHeader,scanRhh:scanRhh,parseEmbedded:parseEmbedded,MAGIC:MAGIC};
+return {scanTimedWildEncounters:scanTimedWildEncounters,scanWildEncounters:scanWildEncounters,importRomAsync:importRomAsync,importRom:importRom,readIcon:readIcon,tilesToRgba:tilesToRgba,lz77:lz77,crc32:crc32,gbaString:gbaString,scanHeader:scanHeader,scanRhh:scanRhh,parseEmbedded:parseEmbedded,MAGIC:MAGIC};
 });
