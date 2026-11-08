@@ -1476,6 +1476,7 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
 <script src="localization.js"></script>
 <script src="emerald-compat.js"></script>
 <script src="gba-rom-import.js"></script>
+<script src="rom-compat-audit.js"></script>
 <script>
 (function(){
 "use strict";
@@ -1715,6 +1716,19 @@ function base64ToBytes(b64){
   return arr;
 }
 
+function auditAndBindSave(save){
+  if(!save||!currentRomReport||!window.BriskRomAudit)return save;
+  var audit=BriskRomAudit.inspectSave(currentRomReport,save);
+  save.romAudit=audit;
+  if(audit.status==='incompatible'){
+    // Do not allow editing a save whose records conflict with this ROM index.
+    save.profile.writeSafe=false;
+    save.profile.readOnlyReason='ROM/save mismatch: '+audit.conflicts.slice(0,3).join('; ');
+  }
+  if(window.EmeraldCompat)save.compatibility=EmeraldCompat.compatibilityReport(save.profile);
+  return save;
+}
+
 function parseSav(arrayBuffer){
   var bytes=new Uint8Array(arrayBuffer),override=selectedEmeraldProfileOverride();
   var briskProbeProfile=window.EmeraldCompat?EmeraldCompat.profileForId('brisk-emerald'):null;
@@ -1791,7 +1805,7 @@ function parseSav(arrayBuffer){
   var keyItemIds=[];
   if(keyPocket)for(var ki=0;ki<keyPocket.count;ki++){var kid=v1.getUint16(keyPocket.offset+ki*4,true);if(kid)keyItemIds.push(kid);}
 
-  return {
+  var parsedSave={
     profileId:profile.id,profileName:profile.name,profile:profile,compatibility:window.EmeraldCompat?EmeraldCompat.compatibilityReport(profile):null,
     keyItemIds:keyItemIds,bag:bag,securityKey:securityKey,trainer:trainer,money:money,
     dexSeen:dexFlags.seen,dexCaught:dexFlags.caught,dexKnown:dexFlags.known!==false,
@@ -1802,6 +1816,7 @@ function parseSav(arrayBuffer){
       storageExtensionIds:storageExtension.ids||[],storageExtensionSizes:storageExtension.sizes||[],storageExtensionPhysicalSectors:storageExtension.physicalSectors||[]
     }
   };
+  return auditAndBindSave(parsedSave);
 }
 
 function parseTrainer(v0, s0, profile){
@@ -6459,6 +6474,17 @@ function renderRomImportReport(result){
   node.appendChild(el('div',{style:'font-weight:bold;margin-bottom:6px;',text:'ROM: '+(d.title||'Unknown')+' ('+(d.gameCode||'no code')+') · '+(result.complete?'Full index':'Partial extraction')}));
   node.appendChild(el('div',{text:'Imported '+c.species+' species, '+c.icons+' icons, '+c.trainers+' trainer teams, '+c.routes+' encounter areas, '+(c.maps||0)+' maps, '+c.moves+' moves, '+c.items+' items and '+c.abilities+' abilities.'}));
   node.appendChild(el('div',{text:'Source: '+(result.source==='embedded-manifest'?'validated embedded ROM index':'recoverable ROM tables')+' · '+(result.rhh?'Expansion '+result.rhh.version:'GBA / Emerald family')}));
+  if(window.BriskRomAudit){
+    var report=BriskRomAudit.coverage(result);
+    var details=document.createElement('details');
+    details.style.marginTop='10px';
+    details.appendChild(el('summary',{text:'Data coverage: '+report.recoveredCategories+'/10 categories detected — view details'}));
+    Object.keys(report.byType).forEach(function(id){
+      var entry=report.byType[id];
+      details.appendChild(el('div',{style:'margin:5px 0;',text:entry.label+': '+entry.state+' ('+entry.count+') — '+entry.notes}));
+    });
+    node.appendChild(details);
+  }
   if(result.source!=='embedded-manifest')node.appendChild(el('div',{style:'margin-top:6px;',text:'Added species, items, moves and abilities are included only when their ROM tables can be validated. Unindexed encounter maps may show group/number IDs; full custom routes, map names, trainer teams and special encounters require a source-matched index.'}));
   (result.warnings||[]).forEach(function(w){node.appendChild(el('div',{style:'margin-top:5px;',text:'Note: '+w}));});
 }
@@ -6489,6 +6515,7 @@ async function handleGbaRomFile(file){
     // ROM images are intentionally session-scoped so an unrelated save or
     // ROM never inherits another hack's species icons or custom Fakémon.
     currentRomReport=result;
+    if(currentSave)auditAndBindSave(currentSave);
     renderRomImportReport(result);
     renderCurrentReferenceTab();
     if(currentSave)renderAll();
@@ -6954,6 +6981,12 @@ async function openCompatLaunchSession(){
       window.ACTIVE_EMERALD_PROFILE=null;
       document.getElementById('empty-state').querySelector('h2').textContent='No save loaded';
       document.getElementById('empty-state').querySelector('p').textContent='You can explore this ROM without a save. To inspect party, boxes, and progress, load its .sav or .srm later.';
+    }
+    if(currentSave&&currentSave.romAudit){
+      var a=currentSave.romAudit;
+      var profileStatus=document.getElementById('compat-profile-status');
+      if(profileStatus)profileStatus.textContent=(currentSave.profileName||'Save')+' · '+a.headline+' · '+(currentSave.profile.writeSafe?'Writable':'Read-only');
+      if(a.conflicts.length)showError('Save does not match this ROM: '+a.conflicts.slice(0,3).join('; ')+'. No modifications will be written.');
     }
     var counts=result.counts||{};
     document.querySelector('.brand p').textContent=(result.details.title||compatLaunchRom.name)+' · '+(result.complete?'Full':'Partial')+' ROM data';
