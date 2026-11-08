@@ -947,7 +947,8 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
 @media(max-width:390px){.battle-move-grid,.battle-switch-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.battle-side-panel{width:42px!important}.battle-sim-field{margin:0 42px!important}.battle-preview-mon{grid-template-columns:34px minmax(0,1fr)}.battle-preview-mon button{grid-column:1/-1}}
 
 /* ROM-first compatibility launch */
-#compat-launch[hidden],#btn-change-game[hidden],#launch-clear-save[hidden]{display:none!important}
+#compat-launch[hidden],#btn-change-game[hidden],#launch-clear-save[hidden],#compat-import-summary[hidden]{display:none!important}
+#compat-import-summary{padding:12px 16px;margin:0 0 16px;background:#15251f;border:1px solid #345447;border-radius:8px;color:#d8f2e8;font-size:13px;overflow-wrap:anywhere}
 .compat-launch{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;overflow-y:auto;padding:24px 14px;background:#0b0c10;color:#f4f4f4}
 .compat-launch-card{width:min(100%,620px);border:1px solid #354841;background:linear-gradient(160deg,#192722,#111516 65%);border-radius:16px;padding:clamp(22px,5vw,40px);box-shadow:0 26px 90px #0008}
 .compat-launch-kicker{color:#55eee4;text-transform:uppercase;letter-spacing:.15em;font-size:11px;font-weight:700;margin:0 0 12px}
@@ -1021,6 +1022,7 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
       <input type="file" id="file-gba-rom" accept=".gba,.bin,application/octet-stream">
     </div>
   </header>
+  <div id="compat-import-summary" role="status" aria-live="polite" hidden></div>
 
   <nav class="main-tabs" role="tablist" aria-label="Brisk Dex sections">
     <button id="tab-settings" role="tab" aria-selected="false" aria-controls="settings-tab-panel">⚙ Settings</button>
@@ -7049,6 +7051,9 @@ async function openCompatLaunchSession(){
     var counts=result.counts||{};
     document.querySelector('.brand p').textContent=(result.details.title||compatLaunchRom.name)+' · '+(result.complete?'Full':'Partial')+' ROM data';
     document.getElementById('btn-change-game').hidden=false;
+    var importSummary=document.getElementById('compat-import-summary');
+    importSummary.textContent=(result.details.title||compatLaunchRom.name)+' · '+(counts.species||0)+' Pokémon · '+(counts.moves||0)+' moves · '+(counts.abilities||0)+' abilities · '+(counts.trainers||0)+' trainers · '+(counts.routes||0)+' encounter areas — '+(result.complete?'Full indexed ROM data':'Partial ROM extraction; see Settings for missing fields');
+    importSummary.hidden=false;
     compatLaunchDialog.hidden=true;
     document.querySelector('.wrap').inert=false;
     setMainTab(compatLaunchSave?'save':'dex');
@@ -7082,6 +7087,9 @@ document.getElementById('launch-clear-save').addEventListener('click',function()
   launchStatus('Save removed. You can browse the ROM without a save.');
 });
 compatLaunchForm.addEventListener('submit',function(e){e.preventDefault();openCompatLaunchSession();});
+compatLaunchForm.addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&!e.repeat&&compatLaunchRom){e.preventDefault();openCompatLaunchSession();}
+});
 document.getElementById('btn-change-game').addEventListener('click',function(){
   if(dirty&&!window.confirm('Unsaved Pokémon changes will be lost. Choose a different game?'))return;
   window.location.reload();
