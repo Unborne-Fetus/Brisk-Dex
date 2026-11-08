@@ -38,7 +38,7 @@ Download packages from a successful run in the repository's [Actions tab](https:
 
 Normal ROMs may expose only some tables; a source-indexed ROM exposes the full supported reference dataset. Importing a ROM does not prove that an unknown save belongs to it, nor does it enable unsafe writes.
 
-Bundled game data and graphics load automatically. The app also attempts to reopen your last-used save when launched.
+The compatibility app asks for a ROM every time it launches and does not silently reopen an earlier save. Bundled reference assets remain available for Brisk-specific tools, but the selected ROM replaces the displayed game reference data for the session.
 
 Keep a separate copy of your save and export your external storage periodically. Close the game/emulator before editing its save so the emulator does not overwrite your changes.
 
