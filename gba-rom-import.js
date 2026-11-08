@@ -527,7 +527,14 @@ function importRom(value,options){
     });
   }
   var counts={species:Object.keys(data.species||{}).length,icons:new Set(Object.keys(icons).concat(Object.keys(urls))).size,trainers:(data.trainerTeams||[]).length,routes:(data.routeEncounters||[]).length,maps:(data.mapCatalog||[]).length,moves:Object.keys(data.moves||{}).length,items:Object.keys(data.items||{}).length,abilities:Object.keys(data.abilities||{}).length};
-  return {details:details,header:header,rhh:rhh,data:data,icons:icons,iconUrls:urls,shinyIconUrls:shinyUrls,counts:counts,source:source,warnings:warnings,complete:!!embedded&&counts.species>0&&counts.trainers>0&&counts.routes>0};
+  var requiredObjects=['species','moves','abilities','items','itemDetails','moveDetails','abilityDetails'];
+  var requiredArrays=['routeEncounters','trainerTeams','mapCatalog'];
+  var missingIndexFields=embedded?requiredObjects.filter(function(k){return !data[k]||!Object.keys(data[k]).length;})
+    .concat(requiredArrays.filter(function(k){return !Array.isArray(data[k]);})):[];
+  var isComplete=!!embedded&&!missingIndexFields.length;
+  if(embedded&&missingIndexFields.length)
+    warnings.push('This ROM has an incomplete reference index: '+missingIndexFields.join(', ')+'. Missing fields are not verified.');
+  return {details:details,header:header,rhh:rhh,data:data,icons:icons,iconUrls:urls,shinyIconUrls:shinyUrls,counts:counts,source:source,warnings:warnings,complete:isComplete,missingIndexFields:missingIndexFields};
 }
 async function importRomAsync(value,options){
   var b=bytesOf(value),pat=[66,68,88,82,79,77,90,33],found=-1;
