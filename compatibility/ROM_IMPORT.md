@@ -10,10 +10,10 @@ There are two import levels:
 
 | Input | Recovery |
 | --- | --- |
-| Ordinary Emerald-family ROM | GBA header, Game Freak ROM header and RHHEXP metadata when present; species names, stats and icon graphics when their table layouts can be verified; move, item and ability names when their table stride is verifiable |
-| Indexed ROM (`BDXROM1!` or `BDXROMZ!`) | All indexed data fields: Pokémon and custom species/forms, moves, abilities, items, route and wild encounter tables, trainer rosters, changes, and normal/shiny icons |
+| Ordinary Emerald-family ROM | GBA header, Game Freak ROM header and RHHEXP metadata when present; species names, stats and icon graphics when layouts can be verified (including recognizable custom/Fakémon slots); move, item and ability names, including expanded item IDs, when table layout and anchors are verified; compiled standard-layout wild encounters when a sufficiently long, internally consistent map table is found. For those maps, the app reports **map group/number**, not guessed route names, and marks unknown encounter odds. |
+| Indexed ROM (`BDXROM1!` or `BDXROMZ!`) | All source-indexed data fields: Pokémon and Fakémon/forms, moves, abilities, items, all added map definitions (including maps with no wild encounters), custom routes and wild/static/gift encounter tables, trainer rosters, changes, and normal/shiny icons |
 
-The report gives precise counts and warns about unavailable tables. Unknown trainers, routes or icon palettes are never fabricated. Expanded ROM species IDs are kept as raw ROM IDs; their mapping to save IDs remains the responsibility of a matching compatibility profile.
+The report gives precise counts and warns about unavailable tables. The indexed source extractor no longer drops Kanto/FireRed-labelled encounter areas or other custom regions, and includes gift/static encounters even when a fork lacks a standard wild-encounter JSON file. Unknown trainers, routes or icon palettes are never fabricated. Expanded ROM species IDs are kept as raw ROM IDs; their mapping to save IDs remains the responsibility of a matching compatibility profile.
 
 ## Making a single-file, fully indexed Brisk Emerald ROM
 
