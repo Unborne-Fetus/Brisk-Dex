@@ -7,11 +7,11 @@ const fs=require('fs'),path=require('path'),zlib=require('zlib');
 const {crc32}=require('../gba-rom-import.js');
 const MAGIC=Buffer.from('BDXROMZ!','ascii'),MAX_GBA=32*1024*1024,MAX_INDEX=12*1024*1024;
 function usage(){
-  console.error('Usage: node tools/embed_rom_index.js game.gba [game-indexed.gba]');
+  console.error('Usage: node tools/embed_rom_index.js game.gba [game-indexed.gba] [--with-art] [--no-icons]');
   process.exit(2);
 }
 function main(){
-  const args=process.argv.slice(2).filter(arg=>arg!=='--no-icons');
+  const args=process.argv.slice(2).filter(arg=>arg!=='--no-icons'&&arg!=='--with-art');
   const input=args[0],output=args[1]||input&&path.join(path.dirname(input),path.basename(input,'.gba')+'-indexed.gba');
   if(!input||!/^.+\.gba$/i.test(input)||!/^.+\.gba$/i.test(output))usage();
   if(path.resolve(input)===path.resolve(output))throw Error('Output must be a different path: source ROM is immutable.');
@@ -29,6 +29,32 @@ function main(){
   if(!data.mapCatalog.length)
     throw Error('Map catalog is empty. Run the extractor on a checkout with data/maps/map.json definitions to include added routes and regions.');
   data.trainerTeams=trainers.trainers;
+  // The source exporter uses paths relative to the Brisk Dex checkout.
+  // They would otherwise resolve against the recipient's *different* bundled
+  // game and display incorrect artwork for same-numbered Fakémon.
+  const includeArt=process.argv.includes('--with-art');
+  const artRoot=path.resolve(__dirname,'..');
+  const fields=['frontSprite','backSprite','frontShinySprite','backShinySprite',
+    'frontAnimation','backAnimation','frontShinyAnimation','backShinyAnimation','cry'];
+  const mimetypes={png:'image/png',gif:'image/gif',wav:'audio/wav',ogg:'audio/ogg',mp3:'audio/mpeg'};
+  let artCount=0,artBytes=0;
+  for(const species of Object.values(data.species)){
+    if(!species||typeof species!=='object')continue;
+    for(const field of fields){
+      const original=species[field];
+      if(typeof original!=='string'||original.startsWith('data:'))continue;
+      const valid=/^brisk-dex-(?:sprites|cries)\/[A-Za-z0-9_.-]+\.(?:png|gif|wav|ogg|mp3)$/i.test(original);
+      if(!valid||!includeArt){delete species[field];continue;}
+      const fullPath=path.resolve(artRoot,original);
+      const ext=path.extname(original).slice(1).toLowerCase();
+      if(!fullPath.startsWith(artRoot+path.sep)||!fs.existsSync(fullPath)){delete species[field];continue;}
+      const asset=fs.readFileSync(fullPath);
+      if(asset.length>1024*1024)throw Error('Art asset is too large for ROM indexing: '+original);
+      artBytes+=asset.length;
+      species[field]='data:'+mimetypes[ext]+';base64,'+asset.toString('base64');
+      artCount++;
+    }
+  }
   const assets={icons:{},shinyIcons:{}},iconsDir=path.join(__dirname,'..','brisk-dex-icons');
   if(!process.argv.includes('--no-icons')&&fs.existsSync(iconsDir)){
     for(const name of fs.readdirSync(iconsDir)){
@@ -71,6 +97,7 @@ function main(){
     ' · all maps '+data.mapCatalog.length+
     ' · items '+Object.keys(data.items).length);
   console.log('Icons '+Object.keys(assets.icons).length+' normal / '+Object.keys(assets.shinyIcons).length+' shiny.');
+  console.log('Embedded battle art/cry assets: '+artCount+' ('+artBytes+' raw bytes). Use --with-art to include source files, subject to the 12 MiB reference budget.');
   console.log('Index '+raw.length+' bytes raw / '+zipped.length+' bytes compressed; ROM '+length+' bytes.');
   console.log('The original ROM was not modified.');
 }
