@@ -45,8 +45,13 @@ def index_from_exports(data_path, trainer_path, icons_dir):
         trainers = trainers.get("trainers")
     if not isinstance(trainers, list):
         raise ValueError("Trainer export must contain a trainers array")
-    if not isinstance(data.get("species"), dict) or len(data["species"]) < 1:
-        raise ValueError("Game data must contain species")
+    for key in ("species", "moves", "abilities", "items", "itemDetails"):
+        if not isinstance(data.get(key), dict) or not data[key]:
+            raise ValueError("Missing " + key + " data; regenerate the source exports before indexing")
+    if not isinstance(data.get("mapCatalog"), list) or not data["mapCatalog"]:
+        raise ValueError("Missing or empty mapCatalog: source-defined custom routes and maps must be indexed")
+    if not isinstance(data.get("routeEncounters"), list):
+        raise ValueError("Missing routeEncounters: regenerate the source wild encounter export")
     payload = dict(data)
     payload["trainerTeams"] = trainers
     icons, shiny = collect_icons(icons_dir)
@@ -135,6 +140,8 @@ def main():
     print("ROM bytes:", len(rom), "->", len(full), " | index offset:", hex(at))
     print("Species:", len(data["species"]), "| trainers:", len(data["trainerTeams"]),
           "| routes:", len(data.get("routeEncounters", [])),
+          "| maps:", len(data.get("mapCatalog", [])),
+          "| items:", len(data.get("items", {})),
           "| icons:", len(index["assets"]["icons"]),
           "| shiny icons:", len(index["assets"]["shinyIcons"]))
     print("Original ROM unchanged. Use indexed .gba in Brisk Dex ROM importer.")
