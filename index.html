@@ -4852,7 +4852,7 @@ async function openCompatLaunchSession(){
       var a=currentSave.romAudit;
       var profileStatus=document.getElementById('compat-profile-status');
       if(profileStatus)profileStatus.textContent=(currentSave.profileName||'Save')+' · '+a.headline+' · '+(currentSave.profile.writeSafe?'Writable':'Read-only');
-      if(a.conflicts.length)showError('Save does not match this ROM: '+a.conflicts.slice(0,3).join('; ')+'. No modifications will be written.');
+
     }
     var counts=result.counts||{};
     document.querySelector('.brand p').textContent=(result.details.title||compatLaunchRom.name)+' · '+(result.complete?'Full':'Partial')+' ROM data';
@@ -4867,7 +4867,9 @@ async function openCompatLaunchSession(){
     document.querySelector('.wrap').inert=false;
     setMainTab(compatLaunchSave?'save':'dex');
     launchStatus('Game loaded.');
-    showNotice('Loaded '+(result.details.title||compatLaunchRom.name)+' — '+(counts.species||0)+' Pokémon, '+(counts.moves||0)+' moves, '+(counts.trainers||0)+' trainer teams. '+(result.complete?'Complete indexed data.':'Some data may be unavailable for this ROM.'));
+    if(currentSave&&currentSave.romAudit&&currentSave.romAudit.conflicts.length)
+      showError('ROM/save mismatch — editing blocked: '+currentSave.romAudit.conflicts.slice(0,3).join('; '));
+    else showNotice('Loaded '+(result.details.title||compatLaunchRom.name)+' — '+(counts.species||0)+' Pokémon, '+(counts.moves||0)+' moves, '+(counts.trainers||0)+' trainer teams. '+(result.complete?'Complete indexed data.':'Some data may be unavailable for this ROM.'));
   }catch(err){
     launchStatus(err&&err.message?err.message:String(err),true);
   }finally{
