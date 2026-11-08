@@ -39,6 +39,8 @@ assert.strictEqual(Audit.inspectSave(full,save(1200,{heldItem:999})).status,'inc
 assert.strictEqual(Audit.inspectSave(full,save(1200,{moves:[999]})).status,'incompatible');
 assert.strictEqual(Audit.inspectSave(full,save(1200,{checksumValid:false})).status,'incompatible');
 assert.strictEqual(Audit.inspectSave(partial,save(999)).status,'unverified');
-assert.strictEqual(Audit.inspectSave(partial,save(999)).writeSafe,true);
+assert.strictEqual(Audit.inspectSave(partial,save(999)).writeSafe,false);
+const trusted=save(999);trusted.profile.confidence='explicit';
+assert.strictEqual(Audit.inspectSave(partial,trusted).writeSafe,true,'Explicit trusted profile should remain available for an incomplete ROM');
 assert.strictEqual(Audit.inspectSave(full,null).status,'no-save');
 console.log('ROM coverage and conservative save mismatch tests passed');
