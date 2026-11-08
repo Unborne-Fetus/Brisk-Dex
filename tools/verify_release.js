@@ -9,7 +9,7 @@ function check(condition,message){if(!condition)fail(message);}
 
 const pkg=json('package.json');
 const requiredRoot=[
-  'index.html','main.js','preload.js','battle-server.js','asset-loader.js','localization.js',
+  'index.html','main.js','preload.js','asset-loader.js','localization.js',
   'emerald-compat.js','gba-rom-import.js','rom-compat-audit.js','brisk-dex-data.json','brisk-dex-trainer-teams.json',
   'brisk-dex-icon-manifest.json','compatibility/README.md',
   'compatibility/emerald-compat-profile.schema.json','compatibility/example-expansion-pack.json'
@@ -31,6 +31,17 @@ check(html.includes('id="launch-rom-file"'),'Required ROM selector is missing');
 check(html.includes('id="launch-save-file"'),'Optional save selector is missing');
 check(html.includes('id="launch-enter"'),'Enter Brisk Dex launch action is missing');
 check(html.includes('openCompatLaunchSession'),'ROM-first session loading is missing');
+for(const removed of ['tab-competitive','tab-online','tab-trading','competitive-tab-panel','online-tab-panel','trading-tab-panel']){
+  check(!html.includes('id="'+removed+'"'),'Removed compatibility screen still exists: '+removed);
+}
+for(const removedName of ['function renderCompetitiveSets(','function renderOnlineBattle(','function renderTrading(','function wonderTradeAtLocation(']){
+  check(!html.includes(removedName),'Removed app feature is still bundled: '+removedName);
+}
+check(!packaged.has('battle-server.js'),'The removed online battle relay must not be packaged');
+check(!pkg.scripts['battle-server'],'The removed battle relay must not be a release script');
+check(html.includes('rom-compat-audit.js'),'The ROM/save audit is missing from app scripts');
+check(html.includes('auditAndBindSave'),'ROM save mismatch write protection is missing');
+
 check(html.includes('await handleGbaRomFile(compatLaunchRom)'),'Launch must load selected ROM before opening the app');
 check(html.includes("compatLaunchSave?'save':'dex'"),'ROM-only launch must open the Pokedex');
 check(!/^[^\n]*restoreLastSave\(\);\s*$/m.test(html),'Compat launch must not automatically restore a previously opened save');
@@ -47,7 +58,6 @@ const inlineEnd=html.indexOf('</script>',inlineStart);
 check(inlineStart>=0&&inlineEnd>inlineStart,'Could not locate main inline application script');
 new Function(html.slice(inlineStart+8,inlineEnd));
 
-new Function(read('battle-server.js'));
 json('brisk-dex-data.json');
 json('brisk-dex-trainer-teams.json');
 json('brisk-dex-icon-manifest.json');
