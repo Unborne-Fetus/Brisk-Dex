@@ -20,8 +20,14 @@ function main(){
   if(original.length>MAX_GBA)throw Error('This tool only supports ROMs up to the 32 MiB GBA address limit.');
   const data=JSON.parse(fs.readFileSync(path.join(__dirname,'..','brisk-dex-data.json'),'utf8'));
   const trainers=JSON.parse(fs.readFileSync(path.join(__dirname,'..','brisk-dex-trainer-teams.json'),'utf8'));
-  if(!data.species||!Array.isArray(data.routeEncounters)||!Array.isArray(trainers.trainers))
-    throw Error('Refresh Brisk Dex reference data from the matching ROM source before indexing.');
+  if(!Array.isArray(trainers.trainers)||!Array.isArray(data.routeEncounters)||!Array.isArray(data.mapCatalog))
+    throw Error('Refresh Brisk Dex source data: trainer teams, wild encounters, and custom map catalog must all be exported before indexing.');
+  for(const key of ['species','moves','abilities','items','itemDetails']){
+    if(!data[key]||typeof data[key]!=='object'||Array.isArray(data[key])||!Object.keys(data[key]).length)
+      throw Error('Missing '+key+' export; regenerate all reference tables from the exact ROM source revision before indexing.');
+  }
+  if(!data.mapCatalog.length)
+    throw Error('Map catalog is empty. Run the extractor on a checkout with data/maps/map.json definitions to include added routes and regions.');
   data.trainerTeams=trainers.trainers;
   const assets={icons:{},shinyIcons:{}},iconsDir=path.join(__dirname,'..','brisk-dex-icons');
   if(!process.argv.includes('--no-icons')&&fs.existsSync(iconsDir)){
@@ -61,7 +67,9 @@ function main(){
   console.log('Indexed ROM written: '+output);
   console.log('Species '+Object.keys(data.species).length+
     ' · trainer teams '+data.trainerTeams.length+
-    ' · map/encounter areas '+data.routeEncounters.length);
+    ' · map/encounter areas '+data.routeEncounters.length+
+    ' · all maps '+data.mapCatalog.length+
+    ' · items '+Object.keys(data.items).length);
   console.log('Icons '+Object.keys(assets.icons).length+' normal / '+Object.keys(assets.shinyIcons).length+' shiny.');
   console.log('Index '+raw.length+' bytes raw / '+zipped.length+' bytes compressed; ROM '+length+' bytes.');
   console.log('The original ROM was not modified.');
