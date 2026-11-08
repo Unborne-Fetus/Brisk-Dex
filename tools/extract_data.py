@@ -644,8 +644,12 @@ def extract_reference_locations(repo):
 
 def extract_trainer_teams(repo):
     """Parse Brisk Emerald's trainers.party into JSON-friendly trainer/team records."""
-    path = os.path.join(repo, "src/data/trainers.party")
-    if not os.path.isfile(path):
+    path = next((candidate for candidate in (
+        os.path.join(repo, "src/data/trainers.party"),
+        os.path.join(repo, "data/trainers.party"),
+        os.path.join(repo, "src/data/trainers/trainer_parties.party"),
+    ) if os.path.isfile(candidate)), None)
+    if not path:
         return []
 
     text = open(path, encoding="utf-8").read()
@@ -806,8 +810,25 @@ def extract_route_encounters(repo, species_ids):
         "land_mons": "Walking",
         "water_mons": "Surfing",
         "rock_smash_mons": "Rock Smash",
-        "fishing_mons": "Fishing"
+        "fishing_mons": "Fishing",
+        "hidden_mons": "Hidden",
+        "cave_mons": "Cave",
+        "sky_mons": "Sky",
+        "lava_mons": "Lava"
     }
+    custom_keys = sorted({
+        key for group in source.get("wild_encounter_groups", [])
+        for raw in group.get("encounters", [])
+        for key in raw.keys()
+        if key.endswith("_mons") and key not in method_names
+    })
+    for key in custom_keys:
+        method_names[key] = key.removesuffix("_mons").replace("_", " ").title()
+    # Brisk's encounter implementation intentionally selects uniformly across
+    # non-NONE land/water slots. Other Emerald forks generally use the JSON
+    # encounter-rate weights and must not inherit Brisk's probability rules.
+    wild_impl = find_source(repo, "src/wild_encounter.c")
+    brisk_uniform = "Count actual Pokémon, ignoring SPECIES_NONE" in wild_impl
     rod_names = {"old_rod": "Old Rod", "good_rod": "Good Rod", "super_rod": "Super Rod"}
     out = []
     for group in source.get("wild_encounter_groups", []):
@@ -837,13 +858,13 @@ def extract_route_encounters(repo, species_ids):
                     sections = [(method_title, list(range(len(mons))))]
                 for section_name, indices in sections:
                     valid_indices = [i for i in indices if 0 <= i < len(mons)]
-                    # Brisk Emerald chooses land/water slots uniformly and skips NONE.
-                    uniform = method_key in ("land_mons", "water_mons")
-                    if uniform:
-                        valid_indices = [i for i in valid_indices
-                                         if mons[i].get("species") != "SPECIES_NONE"]
+                    valid_indices = [i for i in valid_indices
+                                     if mons[i].get("species") not in ("SPECIES_NONE", None)]
+                    uniform = brisk_uniform and method_key in ("land_mons", "water_mons")
                     weights = {i: 1 if uniform else (rates[i] if i < len(rates) else 0)
                                for i in valid_indices}
+                    if valid_indices and not sum(weights.values()):
+                        weights = {i: 1 for i in valid_indices}
                     total_weight = sum(weights.values())
                     slots = []
                     for i in valid_indices:
@@ -1446,6 +1467,10 @@ def main():
         5: "PREMIER_BALL",
     }
     for iid, name in core_ball_slots.items():
+        # Never overwrite a fork's actual custom item ID with a vanilla ball.
+        # This compatibility correction applies only when numeric IDs match.
+        if item_ids.get(name) != iid:
+            continue
         block = item_blocks.get(name)
         if not block:
             continue
