@@ -123,7 +123,7 @@ function extractNames(b,base,step,count){var out={};if(base==null||step<2||step>
 // Recover named move/item/ability tables when the ROM retains the
 // documented Emerald/Expansion pointers. Strides are verified against
 // multiple known entries to avoid reading arbitrary code as game data.
-function recognizeName(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
+function recognizeName(s){return String(s||'').normalize('NFKD').toLowerCase().replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');}
 function inferPointerTable(b,base,fieldOffset,firstNames,count,minStride,maxStride){
   if(base==null)return null;
   for(var stride=minStride;stride<=maxStride;stride+=4){
@@ -352,11 +352,27 @@ function importRom(value,options){
     if(foundMoves)data.moves=foundMoves.names;
   }
   if(!data.items&&header&&header.itemsInfo!=null){
-    var foundItems=inferPointerTable(b,header.itemsInfo,20,{1:'Master Ball',2:'Ultra Ball',3:'Great Ball'},(rhh&&rhh.items)||380,32,128);
+    // Vanilla Emerald and pokeemerald-expansion assign different IDs to the
+    // core Poké Balls, and some forks move the name pointer within ItemInfo.
+    var knownItemOrders=[
+      {1:'Master Ball',2:'Ultra Ball',3:'Great Ball'},
+      {1:'Poke Ball',2:'Great Ball',3:'Ultra Ball',4:'Master Ball'},
+      {1:'Poké Ball',2:'Great Ball',3:'Ultra Ball',4:'Master Ball'}
+    ];
+    var foundItems=null;
+    outerItems:for(var f=0;f<=40;f+=4){
+      for(var order=0;order<knownItemOrders.length;order++){
+        var candidate=inferPointerTable(b,header.itemsInfo,f,knownItemOrders[order],(rhh&&rhh.items)||380,32,192);
+        if(candidate){foundItems=candidate;break outerItems;}
+      }
+    }
     if(foundItems)data.items=foundItems.names;
   }
   if(!data.abilities&&rhh&&rhh.abilitiesPointer!=null){
-    var foundAbilities=inferInlineNameTable(b,rhh.abilitiesPointer,{1:'Stench',2:'Drizzle',3:'Speed Boost'},rhh.abilities||80,20,64);
+    var abilityAnchors={1:'Stench',2:'Drizzle',3:'Speed Boost'};
+    var foundAbilities=inferInlineNameTable(b,rhh.abilitiesPointer,abilityAnchors,rhh.abilities||80,20,96);
+    if(!foundAbilities)for(var af=0;af<=24&&!foundAbilities;af+=4)
+      foundAbilities=inferPointerTable(b,rhh.abilitiesPointer,af,abilityAnchors,rhh.abilities||80,20,128);
     if(foundAbilities)data.abilities=foundAbilities.names;
   }
   var icons={};
