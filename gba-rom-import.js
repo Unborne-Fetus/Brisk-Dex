@@ -312,7 +312,7 @@ function scanTimedWildEncounters(b,speciesLimit,warnings){
     if(rows.length>best.length){best=rows;bestAt=at;}
     if(rows.length>1)at+=stride*(rows.length-1);
   }
-  if(best.length<6)return scanTimedWildEncounters(b,speciesLimit,warnings);
+  if(best.length<6)return {areas:[],count:0};
   var areas=best.map(function(row){return {
     id:'ROM_MAP_GROUP_'+row.mapGroup+'_MAP_'+row.mapNumber,
     name:'Map group '+row.mapGroup+' · map '+row.mapNumber,
@@ -389,7 +389,7 @@ function scanWildEncounters(b,speciesLimit,warnings){
   }
   // A handful of plausible structs can occur by coincidence; avoid claiming
   // real encounters until enough independent map records agree.
-  if(best.length<6)return {areas:[],count:0};
+  if(best.length<6)return scanTimedWildEncounters(b,speciesLimit,warnings);
   var areas=best.map(function(row){
     return {
       id:'ROM_MAP_GROUP_'+row.mapGroup+'_MAP_'+row.mapNumber,
