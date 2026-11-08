@@ -1343,10 +1343,13 @@ function auditAndBindSave(save){
   if(!save||!currentRomReport||!window.BriskRomAudit)return save;
   var audit=BriskRomAudit.inspectSave(currentRomReport,save);
   save.romAudit=audit;
-  if(audit.status==='incompatible'){
-    // Do not allow editing a save whose records conflict with this ROM index.
+  if(!audit.writeSafe){
+    // A full matching source index or an explicitly trusted profile is needed
+    // before unknown ROM/save pairings are allowed to write to disk.
     save.profile.writeSafe=false;
-    save.profile.readOnlyReason='ROM/save mismatch: '+audit.conflicts.slice(0,3).join('; ');
+    save.profile.readOnlyReason=audit.status==='incompatible'
+      ?'ROM/save mismatch: '+audit.conflicts.slice(0,3).join('; ')
+      :'The selected ROM cannot yet verify this save layout. Import or select a trusted compatibility profile to allow editing.';
   }
   if(window.EmeraldCompat)save.compatibility=EmeraldCompat.compatibilityReport(save.profile);
   return save;
