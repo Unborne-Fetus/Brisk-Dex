@@ -45,4 +45,22 @@ let blocked=false;
 try{EmeraldCompat.convertPokemonRecord(itemRaw,expansion,vanilla);}catch(e){blocked=/mapping|namespace/i.test(e.message);}
 assert(blocked,'ID namespace safety did not block an unmapped cross-profile held item');
 
+
+const rom={
+  details:{title:'Custom Emerald',gameCode:'BPEE'},
+  rhh:{species:1205,moves:980,items:800,abilities:350},
+  header:{pokedexCount:1205,saveLayout:{
+    partyCountOffset:0x300,partyOffset:0x304,
+    saveBlock1Size:3900,saveBlock2Size:3500
+  }}
+};
+const inferred=EmeraldCompat.inferProfileFromRom(rom);
+assert(inferred&&inferred.inferredFromRom,'ROM-derived profile must be created');
+assert(inferred.writePolicy==='readonly','Auto-inferred profiles must never grant write permissions');
+assert(inferred.save.partyOffset===0x304,'ROM-provided party offset was not honored');
+assert(inferred.idLimits.species>=1205,'Custom species limit was truncated');
+const profile=EmeraldCompat.detectProfile({bytes:new Uint8Array(128*1024),rom:rom,override:'auto'});
+assert(profile.confidence==='inferred-rom','Unknown save should use ROM-inferred read-only profile');
+assert(profile.writeSafe===false,'Unknown save should not automatically become writable');
+
 console.log('Emerald compatibility tests passed');
