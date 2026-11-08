@@ -47,24 +47,38 @@ def run():
         out_file = root / "src/data/wild_encounters.json"
         write_json(out_file, {
             "wild_encounter_groups": [{
-                "fields": [{"type": "land_mons", "encounter_rates": [100]}],
+                "fields": [
+                    {"type": "land_mons", "encounter_rates": [70, 30]},
+                    {"type": "hidden_mons", "encounter_rates": [100]}
+                ],
                 "encounters": [{
                     "map": "MAP_ROUTE223",
                     "base_label": "FIRERED_ROUTE223",
                     "land_mons": {
                         "encounter_rate": 20,
-                        "mons": [{"species": "SPECIES_COPPERHAWK", "min_level": 15, "max_level": 19}]
+                        "mons": [
+                            {"species": "SPECIES_COPPERHAWK", "min_level": 15, "max_level": 19},
+                            {"species": "SPECIES_MISTWING", "min_level": 20, "max_level": 22}
+                        ]
+                    },
+                    "hidden_mons": {
+                        "encounter_rate": 5,
+                        "mons": [{"species": "SPECIES_MISTWING", "min_level": 8, "max_level": 8}]
                     }
                 }]
             }]
         })
-        species = {"COPPERHAWK": 1200}
+        species = {"COPPERHAWK": 1200, "MISTWING": 1201}
         routes = extractor.extract_route_encounters(str(root), species)
         catalog = extractor.extract_map_catalog(str(root))
         assert any(x["id"] == "MAP_ROUTE223" for x in catalog), "Kanto map absent from catalog"
         assert any(x["id"] == "MAP_CUSTOM_ISLAND" for x in catalog), "Custom new-region map absent"
         assert any(x["id"] == "MAP_ROUTE223" and any(m["type"] == "land_mons" for m in x["methods"]) for x in routes), "Kanto wild encounters omitted"
         assert any(x["id"] == "MAP_CUSTOM_ISLAND" and any(m["type"] == "gift" for m in x["methods"]) for x in routes), "Custom gift encounters omitted"
+        route223 = next(x for x in routes if x["id"] == "MAP_ROUTE223")
+        assert any(m["type"] == "hidden_mons" for m in route223["methods"]), "Custom hidden encounters omitted"
+        grass = next(m for m in route223["methods"] if m["type"] == "land_mons")
+        assert [slot["chance"] for slot in grass["slots"]] == [70.0, 30.0], "Generic encounter rates should not inherit Brisk-only uniform odds"
         # Re-run without a JSON wild table: scripts and map definitions must
         # continue to be recognized rather than losing all custom places.
         out_file.unlink()
