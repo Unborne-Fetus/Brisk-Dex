@@ -24,7 +24,7 @@
     "ios:add": "npm run ios:prepare && npx cap add ios",
     "ios:sync": "npm run ios:prepare && npx cap sync ios",
     "ios:build": "npm run ios:prepare && npx cap sync ios",
-    "compat:test": "node tools/test_emerald_compat.js && node tools/test_gba_rom_import.js",
+    "compat:test": "node tools/test_emerald_compat.js && node tools/test_gba_rom_import.js && node tools/test_rom_compat_audit.js",
     "rom:index": "node tools/embed_rom_index.js",
     "release:test": "npm run compat:test && npm run release:verify",
     "release:verify": "node tools/verify_release.js"
