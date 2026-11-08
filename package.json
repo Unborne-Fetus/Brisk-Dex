@@ -57,7 +57,8 @@
       "brisk-dex-icon-manifest.json",
       "emerald-compat.js",
       "gba-rom-import.js",
-      "compatibility/**/*"
+      "compatibility/**/*",
+      "rom-compat-audit.js"
     ],
     "directories": {
       "output": "dist"
