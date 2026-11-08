@@ -237,6 +237,37 @@ function runtimeProfile(profile,confidence,writeSafe,reason){
   return p;
 }
 
+// Build a conservative, session-only save profile from the public GF ROM
+// header and expansion metadata. This is a layout suggestion, not proof that
+// the selected .sav was produced by this exact ROM revision.
+function inferProfileFromRom(rom){
+  if(!rom||!rom.details)return null;
+  var hdr=rom.header||{},rhh=rom.rhh||{},layout=hdr.saveLayout||{};
+  var count=Number(rhh.species)||Number(hdr.pokedexCount)||0;
+  var expanded=count>420||Number(rhh.moves)>355;
+  var profile=deepClone(expanded?BUILTINS['pokeemerald-expansion-generic']:BUILTINS.emerald);
+  var title=String(rom.details.title||hdr.name||'Emerald-family ROM').slice(0,60);
+  var gameCode=String(rom.details.gameCode||'').replace(/[^a-z0-9]/gi,'').slice(0,4).toLowerCase();
+  profile.id='detected-rom-'+(gameCode||'unknown');
+  profile.name='Inferred: '+title;
+  profile.description='Generated from the selected GBA ROM header; verify against a source-matched save profile before editing.';
+  profile.writePolicy='readonly';
+  profile.fingerprints=[];
+  profile.brisk=false;
+  if(count>0&&count<=4096)profile.idLimits.species=Math.max(profile.idLimits.species,count);
+  if(Number(rhh.moves)>0)profile.idLimits.moves=Math.max(profile.idLimits.moves,Math.min(4096,rhh.moves));
+  if(Number(rhh.items)>0)profile.idLimits.items=Math.max(profile.idLimits.items,Math.min(4096,rhh.items));
+  if(Number(rhh.abilities)>0)profile.idLimits.abilities=Math.max(profile.idLimits.abilities,Math.min(4096,rhh.abilities));
+  if(Number.isInteger(layout.partyCountOffset)&&layout.partyCountOffset>=0&&layout.partyCountOffset<3968)
+    profile.save.partyCountOffset=layout.partyCountOffset;
+  if(Number.isInteger(layout.partyOffset)&&layout.partyOffset>=0&&layout.partyOffset+600<=3968)
+    profile.save.partyOffset=layout.partyOffset;
+  profile.romGameCode=rom.details.gameCode||'';
+  profile.inferredFromRom=true;
+  profile.inferredFields=hdr.saveLayout?['partyCountOffset','partyOffset','speciesLimit','expansionFamily']:['speciesLimit','expansionFamily'];
+  return profile;
+}
+
 function detectProfile(context){
   context=context||{};
   var bytes=context.bytes instanceof Uint8Array?context.bytes:new Uint8Array(context.bytes||0);
@@ -249,6 +280,11 @@ function detectProfile(context){
   for(var i=0;i<all.length;i++){
     if(all[i].fingerprints && all[i].fingerprints.length && fingerprintMatches(all[i],bytes,context))
       return runtimeProfile(all[i],'exact',all[i].writePolicy==='full','');
+  }
+  if(context.rom){
+    var inferred=inferProfileFromRom(context.rom);
+    if(inferred)return runtimeProfile(inferred,'inferred-rom',false,
+      'This save layout was inferred from a ROM, but the file cannot be verified as belonging to that exact game. Import a matching trusted profile before editing.');
   }
   // A standard 14-sector Emerald-looking save is deliberately only "likely":
   // there is no reliable hack identity inside a generic .sav.
@@ -426,6 +462,7 @@ global.EmeraldCompat={
   importPack:importPack,
   removeCustomProfile:removeCustomProfile,
   detectProfile:detectProfile,
+  inferProfileFromRom:inferProfileFromRom,
   mapId:mapId,
   emeraldInternalSpeciesToNational:emeraldInternalSpeciesToNational,
   nationalSpeciesToEmeraldInternal:nationalSpeciesToEmeraldInternal,
