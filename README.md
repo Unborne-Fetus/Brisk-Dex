@@ -29,11 +29,14 @@ Players installing a packaged app do not need Node.js or npm.
 
 Download packages from a successful run in the repository's [Actions tab](https://github.com/Unborne-Fetus/Brisk-Dex/actions). The combined workflow provides **Brisk-Dex-Windows**, **Brisk-Dex-Android**, and **Brisk-Dex-iOS-Unsigned** artifacts. Extract the downloaded ZIP to get the installer.
 
-### First launch
+### First launch (compat-branch)
 
-1. Open your Brisk Emerald save file.
-2. Check the trainer, party, boxes, and Bag before making changes.
-3. Use the reference tabs or Guides as needed.
+1. Open Brisk Dex. The initial screen asks for a **Game ROM (.gba)** and an **optional save (.sav or .srm)**.
+2. Choose a ROM. Optionally choose the save that belongs to the same game, then press **Enter Brisk Dex**.
+3. Brisk Dex imports verified ROM data locally and opens the Pokédex, moves, abilities, trainers and encounters where recognized. Without a save, you can browse the ROM but player party, storage and progress aren't available.
+4. If a save is included, Brisk Dex displays its party and boxes and follows the chosen save profile's write-safety rules. Use **Change game** to return to the chooser (this reloads the app).
+
+Normal ROMs may expose only some tables; a source-indexed ROM exposes the full supported reference dataset. Importing a ROM does not prove that an unknown save belongs to it, nor does it enable unsafe writes.
 
 Bundled game data and graphics load automatically. The app also attempts to reopen your last-used save when launched.
 
