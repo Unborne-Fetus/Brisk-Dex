@@ -3,7 +3,7 @@ const assert=require('assert');
 const Audit=require('../rom-compat-audit.js');
 function rom(indexed){
   return {
-    source:indexed?'embedded-manifest':'rom-tables',
+    source:indexed?'embedded-manifest':'rom-tables',complete:!!indexed,
     details:{title:'Custom Emerald',gameCode:'BPEE'},
     data:{
       species:{'1':{name:'Bulbasaur'},'1200':{name:'Copperhawk'}},
@@ -33,6 +33,7 @@ assert.strictEqual(Audit.coverage(partial).byType.maps.state,'unavailable');
 assert.strictEqual(Audit.coverage(partial).byType.species.state,'partial');
 assert.strictEqual(Audit.inspectSave(full,save(1200)).status,'plausible');
 assert.strictEqual(Audit.inspectSave(full,save(1200)).writeSafe,true);
+assert.strictEqual(Audit.inspectSave(full,save(999,{rawSpecies:1200})).status,'plausible');
 assert.strictEqual(Audit.inspectSave(full,save(999)).status,'incompatible');
 assert.strictEqual(Audit.inspectSave(full,save(1200,{heldItem:999})).status,'incompatible');
 assert.strictEqual(Audit.inspectSave(full,save(1200,{moves:[999]})).status,'incompatible');
