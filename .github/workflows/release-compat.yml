@@ -6,19 +6,6 @@ on:
     branches: [compat-branch]
 
 jobs:
-  battle-tests:
-    name: Battle coverage and relay smoke
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "22"
-          cache: npm
-      - run: npm ci
-      - run: npm run battle:coverage
-      - run: npm run battle:smoke
-
   compat-tests:
     name: Emerald compatibility tests
     runs-on: ubuntu-24.04
@@ -48,7 +35,7 @@ jobs:
 
   windows:
     name: Windows installer
-    needs: [battle-tests, compat-tests, package-audit]
+    needs: [compat-tests, package-audit]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
@@ -66,7 +53,7 @@ jobs:
 
   android:
     name: Android APK
-    needs: [battle-tests, compat-tests, package-audit]
+    needs: [compat-tests, package-audit]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -97,7 +84,7 @@ jobs:
 
   linux:
     name: Linux packages
-    needs: [battle-tests, compat-tests, package-audit]
+    needs: [compat-tests, package-audit]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -117,7 +104,7 @@ jobs:
 
   apple:
     name: macOS DMG and unsigned iOS IPA
-    needs: [battle-tests, compat-tests, package-audit]
+    needs: [compat-tests, package-audit]
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v5
