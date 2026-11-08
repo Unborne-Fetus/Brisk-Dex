@@ -3777,7 +3777,7 @@ function renderRouteEncounters(){
       speciesCell.appendChild(speciesLabel);
       row.appendChild(speciesCell);
       row.appendChild(el('td', {class:'encounter-level', text:slot.minLevel === slot.maxLevel ? 'Lv' + slot.minLevel : 'Lv' + slot.minLevel + '–' + slot.maxLevel}));
-      row.appendChild(el('td', {text:slot.chance === undefined ? (method.type === 'gift' ? 'Gift' : 'Stationary') : String(slot.chance) + '%'}));
+      row.appendChild(el('td', {text:slot.chance === undefined ? (method.type === 'gift' ? 'Gift' : method.type === 'static' ? 'Stationary' : 'Unknown') : String(slot.chance) + '%'}));
       tbody.appendChild(row);
     });
     table.appendChild(tbody); card.appendChild(table); detail.appendChild(card);
@@ -6536,6 +6536,7 @@ function renderRomImportReport(result){
   node.appendChild(el('div',{style:'font-weight:bold;margin-bottom:6px;',text:'ROM: '+(d.title||'Unknown')+' ('+(d.gameCode||'no code')+') · '+(result.complete?'Full index':'Partial extraction')}));
   node.appendChild(el('div',{text:'Imported '+c.species+' species, '+c.icons+' icons, '+c.trainers+' trainer teams, '+c.routes+' encounter areas, '+(c.maps||0)+' maps, '+c.moves+' moves, '+c.items+' items and '+c.abilities+' abilities.'}));
   node.appendChild(el('div',{text:'Source: '+(result.source==='embedded-manifest'?'validated embedded ROM index':'recoverable ROM tables')+' · '+(result.rhh?'Expansion '+result.rhh.version:'GBA / Emerald family')}));
+  if(result.source!=='embedded-manifest')node.appendChild(el('div',{style:'margin-top:6px;',text:'Added species, items, moves and abilities are included only when their ROM tables can be validated. Unindexed encounter maps may show group/number IDs; full custom routes, map names, trainer teams and special encounters require a source-matched index.'}));
   (result.warnings||[]).forEach(function(w){node.appendChild(el('div',{style:'margin-top:5px;',text:'Note: '+w}));});
 }
 async function handleGbaRomFile(file){
@@ -7054,6 +7055,9 @@ async function openCompatLaunchSession(){
     }
     var counts=result.counts||{};
     document.querySelector('.brand p').textContent=(result.details.title||compatLaunchRom.name)+' · '+(result.complete?'Full':'Partial')+' ROM data';
+    // Let reference tabs and their filters refresh from this game's data.
+    ['dex-search','move-search','ability-search','item-search','trainer-search','route-search','map-catalog-search'].forEach(function(id){var field=document.getElementById(id);if(field)field.value='';});
+    ['dex-type','dex-status','move-type','move-category','trainer-class','trainer-size','route-kind','route-order','encounter-method'].forEach(function(id){var field=document.getElementById(id);if(field&&field.options&&field.options.length)field.selectedIndex=0;});
     document.getElementById('btn-change-game').hidden=false;
     var importSummary=document.getElementById('compat-import-summary');
     importSummary.textContent=(result.details.title||compatLaunchRom.name)+' · '+(counts.species||0)+' Pokémon · '+(counts.moves||0)+' moves · '+(counts.abilities||0)+' abilities · '+(counts.trainers||0)+' trainers · '+(counts.routes||0)+' encounter areas — '+(result.complete?'Full indexed ROM data':'Partial ROM extraction; see Settings for missing fields');
