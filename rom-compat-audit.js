@@ -27,6 +27,11 @@ function coverage(rom){
   record('trainers','Trainer teams',Array.isArray(data.trainerTeams),trainers,indexed?'source-indexed teams':'unavailable','Dynamic battle teams and difficulty modes may not be statically recoverable.');
   record('icons','Pokémon icons',normalIcons>0,normalIcons,'identified icon tables or indexed artwork','Some custom palettes may be ambiguous.');
   record('shiny','Shiny icon artwork',shinies>0,shinies,indexed?'indexed artwork':'unavailable','Normal palette rendering does not imply shiny art was recovered.');
+  // An index with only some graphics is not full sprite coverage.
+  if(species>0){
+    if(normalIcons<species&&byType.icons.state==='indexed')byType.icons.state='partial';
+    if(shinies<species&&byType.shiny.state==='indexed')byType.shiny.state='partial';
+  }
   record('changes','Custom game changes',Array.isArray(data.changes),Array.isArray(data.changes)?data.changes.length:0,indexed?'source-indexed changes':'unavailable','Procedural features cannot be guaranteed by scanning.');
   var recovered=Object.values(byType).filter(x=>x.state!=='unavailable').length;
   var fullyIndexed=Object.values(byType).filter(x=>x.state==='indexed').length;
@@ -37,7 +42,7 @@ function coverage(rom){
 function inspectSave(rom,save){
   if(!save)return {status:'no-save',writeSafe:false,headline:'No save selected',warnings:[],conflicts:[],checked:0};
   var findings=[],conflicts=[],checked=0;
-  var complete=rom&&rom.source==='embedded-manifest',data=rom&&rom.data||{};
+  var complete=!!(rom&&rom.complete),data=rom&&rom.data||{};
   var knownSpecies=keySet(data.species),knownMoves=keySet(data.moves),knownItems=keySet(data.items);
   var members=(save.party||[]).slice();
   (save.boxes||[]).forEach(function(box){(box||[]).forEach(function(mon){members.push(mon);});});
@@ -45,8 +50,8 @@ function inspectSave(rom,save){
     if(!mon||mon.empty)return;
     checked++;
     if(mon.checksumValid===false)conflicts.push('Pokémon checksum failed');
-    var species=Number(mon.species)||0;
-    if(species&&complete&&knownSpecies.size&&!knownSpecies.has(species))
+    var species=Number(mon.species)||0,rawSpecies=Number(mon.rawSpecies)||0;
+    if(species&&complete&&knownSpecies.size&&!knownSpecies.has(species)&&!knownSpecies.has(rawSpecies))
       conflicts.push('Species ID '+species+' is absent from the ROM index');
     // Custom moves and items can have disjoint numeric namespaces. Only
     // reject when the matching complete ROM index proves the ID is absent.
@@ -55,7 +60,7 @@ function inspectSave(rom,save){
       if(id>0&&!knownMoves.has(id))conflicts.push('Move ID '+id+' is absent from the ROM index');
     });
     var item=Number(mon.heldItem)||0;
-    if(complete&&knownItems.size&&item>0&&!knownItems.has(item))
+    if(complete&&knownItems.size&&item>0&&!knownItems.has(item)&&!knownItems.has(Number(mon.rawHeldItem)||0))
       conflicts.push('Held item ID '+item+' is absent from the ROM index');
   });
   if(save.profile&&save.profile.confidence==='inferred-rom')
