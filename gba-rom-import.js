@@ -227,9 +227,14 @@ function tilesToRgba(tiles,palette,width,height){
   }return pixels;
 }
 function readIcon(b,iconPtr,palettePtr){
-  var icon=asOffset(b,iconPtr,512),pal=asOffset(b,palettePtr,32);
+  // Most Emerald icons are raw 4bpp, but expanded graphics packs can use
+  // LZ77 for either tiles or the palette.
+  var icon=asOffset(b,iconPtr,4),pal=asOffset(b,palettePtr,4);
   if(icon==null||pal==null)return null;
-  var tiles=b.subarray(icon,icon+512),palette=b.subarray(pal,pal+32);
+  var packedTiles=b[icon]===0x10?lz77(b,icon,512):null;
+  var packedPalette=b[pal]===0x10?lz77(b,pal,32):null;
+  var tiles=packedTiles&&packedTiles.length===512?packedTiles:b.subarray(icon,icon+512);
+  var palette=packedPalette&&packedPalette.length>=32?packedPalette:b.subarray(pal,pal+32);
   return tilesToRgba(tiles,palette,32,32);
 }
 function collectIcons(b,header,layout,species,limit,warnings){
@@ -475,7 +480,11 @@ function importRom(value,options){
     var knownItemOrders=[
       {1:'Master Ball',2:'Ultra Ball',3:'Great Ball'},
       {1:'Poke Ball',2:'Great Ball',3:'Ultra Ball',4:'Master Ball'},
-      {1:'Poké Ball',2:'Great Ball',3:'Ultra Ball',4:'Master Ball'}
+      {1:'Poké Ball',2:'Great Ball',3:'Ultra Ball',4:'Master Ball'},
+      // Expansion forks may prepend Strange Ball and other new Poké Balls.
+      {2:'Poké Ball',3:'Great Ball',4:'Ultra Ball',5:'Master Ball'},
+      {3:'Poké Ball',4:'Great Ball',5:'Ultra Ball',6:'Master Ball'},
+      {4:'Poké Ball',5:'Great Ball',6:'Ultra Ball',7:'Master Ball'}
     ];
     var foundItems=null;
     outerItems:for(var f=0;f<=40;f+=4){
