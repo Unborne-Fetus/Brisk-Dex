@@ -24,12 +24,9 @@
     "ios:add": "npm run ios:prepare && npx cap add ios",
     "ios:sync": "npm run ios:prepare && npx cap sync ios",
     "ios:build": "npm run ios:prepare && npx cap sync ios",
-    "battle-server": "node battle-server.js",
-    "battle:coverage": "node tools/check_battle_coverage.js",
-    "battle:smoke": "node tools/test_battle_server.js",
     "compat:test": "node tools/test_emerald_compat.js && node tools/test_gba_rom_import.js",
     "rom:index": "node tools/embed_rom_index.js",
-    "release:test": "npm run battle:coverage && npm run battle:smoke && npm run compat:test && npm run release:verify",
+    "release:test": "npm run compat:test && npm run release:verify",
     "release:verify": "node tools/verify_release.js"
   },
   "devDependencies": {
@@ -53,8 +50,6 @@
       "brisk-dex-trainer-pics/**/*",
       "brisk-dex-sprites/**/*",
       "brisk-dex-cries/**/*",
-      "battle-server.js",
-      "brisk-battle-effects.json",
       "localization.js",
       "translation-service.js",
       "asset-loader.js",
