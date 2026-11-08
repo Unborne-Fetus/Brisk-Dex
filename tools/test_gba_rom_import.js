@@ -72,6 +72,31 @@ assert.strictEqual(customScan.counts.routes,9);
 assert.strictEqual(customScan.data.routeEncounters[0].mapGroup,2);
 assert(customScan.data.routeEncounters.some(a=>a.methods.some(m=>m.slots.some(slot=>slot.species===customSpecies))));
 assert(!customScan.complete,'Unindexed custom ROM must not claim complete coverage');
+
+// Some expansion forks (including time-of-day variants) encode four sets of
+// land/water/rock/fishing/hidden pointers per map, with up to 24 land slots.
+const timed=baseRom();
+const timedInfo=0x70000,timedSlots=0x70100,timedHeaders=0x68000;
+timed[timedInfo]=40;
+for(let p=1;p<4;p++)timed[timedInfo+p]=0;
+put32(timed,timedInfo+4,0x08000000+timedSlots);
+for(let i=0;i<24;i++){
+  const slot=timedSlots+i*4;timed[slot]=5;timed[slot+1]=12;put16(timed,slot+2,i+1);
+}
+for(let m=0;m<9;m++){
+  const row=timedHeaders+m*84;
+  timed[row]=3;timed[row+1]=m+1;timed[row+2]=timed[row+3]=0;
+  for(let day=0;day<4;day++){
+    put32(timed,row+4+day*20,0x08000000+timedInfo);
+    for(let kind=1;kind<5;kind++)put32(timed,row+4+day*20+kind*4,0);
+  }
+}
+const timedScan=R.importRom(timed);
+assert.strictEqual(timedScan.counts.routes,9,'Four-period encounter headers should be detected');
+assert.strictEqual(timedScan.data.routeEncounters[0].methods.length,4);
+assert.strictEqual(timedScan.data.routeEncounters[0].methods[0].slots.length,24);
+assert.strictEqual(timedScan.data.routeEncounters[0].methods[0].name,'Morning · Walking');
+
 const noWild=R.importRom(baseRom());
 assert.strictEqual(noWild.counts.routes,0,'Unverified encounters must not be fabricated');
 
