@@ -1,8 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('briskDexAPI', {
-  getBattleRelayInfo: () => ipcRenderer.invoke('get-battle-relay-info'),
-  startBattleRelay: () => ipcRenderer.invoke('start-battle-relay'),
   loadAssetPatch: (file) => ipcRenderer.invoke('load-asset-patch',file),
   loadLastSav: () => ipcRenderer.invoke('load-last-sav'),
   translateText: (text, language) => ipcRenderer.invoke('translate-text',text,language),
