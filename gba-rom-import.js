@@ -25,7 +25,39 @@ function findBytes(b,pattern,from,to){outer:for(var i=from;i+pattern.length<=to;
 function scanHeader(b){
   var needle=[112,111,107,101,109,111,110,32,101,109,101,114,97,108,100,32,118,101,114,115,105,111,110],pos=0;
   while((pos=findBytes(b,needle,pos,Math.min(b.length,1024*1024)))>=0){
-    var base=pos-8;if(base>=0 && u32(b,base)<=25 && offset(b,u32(b,base+188),8)!=null)return {base:base,version:u32(b,base),name:text(b,pos,32),speciesInfo:offset(b,u32(b,base+188),8),iconPalettes:offset(b,u32(b,base+64),8),icons:offset(b,u32(b,base+56),4),iconPaletteIds:offset(b,u32(b,base+60),1),speciesNames:offset(b,u32(b,base+68),1),moveNames:offset(b,u32(b,base+72),1),itemsInfo:offset(b,u32(b,base+192),4),movesInfo:offset(b,u32(b,base+196),4),pokedexCount:u32(b,base+112),nameLength:b[base+118]||10};pos++;
+    var base=pos-8;
+    if(base<0||u32(b,base)>25||offset(b,u32(b,base+188),8)==null){pos++;continue;}
+    // This layout follows the public GFRomHeader in pokeemerald-expansion.
+    // Older forks use a shortened header; retain conservative fallback
+    // pointers only when the current layout's fields are unresolvable.
+    var itemNew=offset(b,u32(b,base+200),4),moveNew=offset(b,u32(b,base+204),4);
+    var itemLegacy=offset(b,u32(b,base+192),4),moveLegacy=offset(b,u32(b,base+196),4);
+    var saveBlock2=u32(b,base+136),saveBlock1=u32(b,base+140);
+    var partyCount=u32(b,base+144),partyOffset=u32(b,base+148);
+    var hasLayout=saveBlock1>=1024&&saveBlock1<=65536&&saveBlock2>=256&&saveBlock2<=65536&&
+      partyCount<3968&&partyOffset<3968&&partyOffset>partyCount&&partyOffset+600<=3968;
+    return {
+      base:base,version:u32(b,base),name:text(b,pos,32),
+      speciesInfo:offset(b,u32(b,base+188),8),
+      iconPalettes:offset(b,u32(b,base+64),8),
+      icons:offset(b,u32(b,base+56),4),
+      iconPaletteIds:offset(b,u32(b,base+60),1),
+      speciesNames:offset(b,u32(b,base+68),1),
+      moveNames:offset(b,u32(b,base+72),1),
+      itemsInfo:itemNew!=null?itemNew:itemLegacy,
+      movesInfo:moveNew!=null?moveNew:moveLegacy,
+      abilitiesInfo:offset(b,u32(b,base+192),4),
+      abilityDescriptions:offset(b,u32(b,base+196),4),
+      pokedexCount:u32(b,base+112),nameLength:b[base+118]||10,
+      saveLayout:hasLayout?{
+        saveBlock1Size:saveBlock1,saveBlock2Size:saveBlock2,
+        partyCountOffset:partyCount,partyOffset:partyOffset,
+        playerNameOffset:u32(b,base+160),playerGenderOffset:u32(b,base+164),
+        seenOffset:u32(b,base+92),
+        bagCounts:[b[base+228],b[base+229],b[base+230],b[base+231],b[base+232]],
+        pcItemsOffset:u32(b,base+236)
+      }:null
+    };
   }
   return null;
 }
@@ -454,11 +486,11 @@ function importRom(value,options){
     }
     if(foundItems)data.items=foundItems.names;
   }
-  if(!data.abilities&&rhh&&rhh.abilitiesPointer!=null){
-    var abilityAnchors={1:'Stench',2:'Drizzle',3:'Speed Boost'};
-    var foundAbilities=inferInlineNameTable(b,rhh.abilitiesPointer,abilityAnchors,rhh.abilities||80,20,96);
+  if(!data.abilities&&((rhh&&rhh.abilitiesPointer!=null)||(header&&header.abilitiesInfo!=null))){
+    var abilityAnchors={1:'Stench',2:'Drizzle',3:'Speed Boost'},abilityBase=(rhh&&rhh.abilitiesPointer!=null)?rhh.abilitiesPointer:header.abilitiesInfo;
+    var foundAbilities=inferInlineNameTable(b,abilityBase,abilityAnchors,(rhh&&rhh.abilities)||80,20,96);
     if(!foundAbilities)for(var af=0;af<=24&&!foundAbilities;af+=4)
-      foundAbilities=inferPointerTable(b,rhh.abilitiesPointer,af,abilityAnchors,rhh.abilities||80,20,128);
+      foundAbilities=inferPointerTable(b,abilityBase,af,abilityAnchors,(rhh&&rhh.abilities)||80,20,128);
     if(foundAbilities)data.abilities=foundAbilities.names;
   }
   var icons={};
