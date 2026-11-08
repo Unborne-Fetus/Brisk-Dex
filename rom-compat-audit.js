@@ -66,11 +66,12 @@ function inspectSave(rom,save){
   if(save.profile&&save.profile.confidence==='inferred-rom')
     findings.push('Save layout inferred from ROM header; editing is disabled.');
   if(!complete)findings.push('ROM data is partial; unmatched custom IDs cannot be checked reliably.');
+  if(!complete&&save.profile&&save.profile.confidence!=='explicit')findings.push('Automatic save writes are disabled until the game layout is verified or a trusted profile is selected.');
   if(!checked)findings.push('No occupied Pokémon records found to compare.');
   findings.push('A Gen III save generally lacks a trustworthy hash of its source ROM; matching IDs alone cannot prove exact game identity.');
   var unique=Array.from(new Set(conflicts)).slice(0,12),bad=unique.length>0;
   return {status:bad?'incompatible':checked&&complete?'plausible':'unverified',
-    writeSafe:!bad&&!!(save.profile&&save.profile.writeSafe),
+    writeSafe:!bad&&!!(save.profile&&save.profile.writeSafe)&&(!!(complete&&checked>0)||!!(save.profile&&save.profile.confidence==='explicit')),
     headline:bad?'Potentially wrong ROM or save profile':checked&&complete?'Structurally consistent, identity unverified':'ROM/save identity unverified',
     checked:checked,conflicts:unique,warnings:findings,
     profile:save.profile&&save.profile.name||'Unknown save format'};
