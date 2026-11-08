@@ -236,6 +236,88 @@ function collectIcons(b,header,layout,species,limit,warnings){
     warnings.push('Expansion icon palettes could not be identified per species; preview colors may be inaccurate.');
   return result;
 }
+
+// Recover the standard compiled Emerald gWildMonHeaders structure when there
+// is no source-generated ROM index. This reports map-group/number identity,
+// NOT invented route names or unsupported map geometry.
+function scanWildEncounters(b,speciesLimit,warnings){
+  var kinds=[
+    {key:'land_mons',name:'Walking',slots:12},
+    {key:'water_mons',name:'Surfing',slots:5},
+    {key:'rock_smash_mons',name:'Rock Smash',slots:5},
+    {key:'fishing_mons',name:'Fishing',slots:10}
+  ];
+  var cache=new Map(),limit=Math.min(b.length,32*1024*1024);
+  function infoAt(ptr,slotCount){
+    var p=offset(b,ptr,8);
+    if(p==null)return null;
+    var rate=b[p],slotBase=offset(b,u32(b,p+4),slotCount*4);
+    if(rate<1||rate>100||slotBase==null)return null;
+    var slots=[],good=0,nonzero=0;
+    for(var i=0;i<slotCount;i++){
+      var o=slotBase+i*4,lo=b[o],hi=b[o+1],species=u16(b,o+2);
+      if(lo<1||lo>100||hi<lo||hi>100||species==null||species>speciesLimit)return null;
+      if(species!==0){
+        nonzero++;
+        slots.push({species:species,minLevel:lo,maxLevel:hi,slot:i+1});
+      }
+      good++;
+    }
+    return good===slotCount&&nonzero>=2?{encounterRate:rate,slots:slots}:null;
+  }
+  function rowAt(at){
+    if(cache.has(at))return cache.get(at);
+    var row=null;
+    if(at+20<=limit&&b[at]!==255&&b[at]<100&&b[at+1]<240&&b[at+2]===0&&b[at+3]===0){
+      var mapGroup=b[at],mapNumber=b[at+1],valid=true,methods=[];
+      for(var k=0;k<4;k++){
+        var ptr=u32(b,at+4+k*4);
+        if(!ptr)continue;
+        var parsed=infoAt(ptr,kinds[k].slots);
+        if(!parsed){valid=false;break;}
+        methods.push({name:kinds[k].name,type:kinds[k].key,encounterRate:parsed.encounterRate,slots:parsed.slots});
+      }
+      if(valid&&methods.length)row={mapGroup:mapGroup,mapNumber:mapNumber,methods:methods};
+    }
+    cache.set(at,row);
+    return row;
+  }
+  var best=[],bestStart=-1;
+  // Quickly prefilter aligned structs. For each promising row, require a long
+  // consecutive run of independently validated wild-mon pointers and slots.
+  for(var at=0;at+160<=limit;at+=4){
+    if(b[at+2]!==0||b[at+3]!==0||b[at]===255||b[at]>90)continue;
+    var ptrBits=b[at+7],ptr2=b[at+11],ptr3=b[at+15],ptr4=b[at+19];
+    if(ptrBits!==8&&ptrBits!==9&&ptr2!==8&&ptr2!==9&&ptr3!==8&&ptr3!==9&&ptr4!==8&&ptr4!==9)continue;
+    var first=rowAt(at);if(!first)continue;
+    var rows=[],keys=new Set();
+    for(var next=at;next+20<=limit&&rows.length<2048;next+=20){
+      var row=rowAt(next);
+      if(!row)break;
+      var key=row.mapGroup+':'+row.mapNumber;
+      if(keys.has(key))break;
+      keys.add(key);rows.push(row);
+    }
+    if(rows.length>best.length){best=rows;bestStart=at;}
+    if(rows.length>1)at+=20*(rows.length-1);
+  }
+  // A handful of plausible structs can occur by coincidence; avoid claiming
+  // real encounters until enough independent map records agree.
+  if(best.length<6)return {areas:[],count:0};
+  var areas=best.map(function(row){
+    return {
+      id:'ROM_MAP_GROUP_'+row.mapGroup+'_MAP_'+row.mapNumber,
+      name:'Map group '+row.mapGroup+' · map '+row.mapNumber,
+      mapGroup:row.mapGroup,mapNumber:row.mapNumber,
+      source:'verified-emerald-wild-headers',
+      methods:row.methods
+    };
+  });
+  warnings.push('Recovered '+areas.length+' compiled wild-encounter maps at ROM offset 0x'+bestStart.toString(16)+'. These have verified species and levels but only map group/number IDs; route names, custom slot counts and maps with no wild encounters require a source-matched ROM index.');
+  warnings.push('Unindexed wild encounter slot percentages are unknown and intentionally not estimated.');
+  return {areas:areas,count:best.length};
+}
+
 function basicDetails(b){
   if(b.length<0xC0||b[0xB2]!==0x96)throw new Error('This is not a recognizable Game Boy Advance ROM (invalid header).');
   return {title:text(b,0xA0,12),gameCode:text(b,0xAC,4),maker:text(b,0xB0,2),size:b.length,version:b[0xBC]};
@@ -281,8 +363,12 @@ function importRom(value,options){
   if(data.species&&Object.keys(data.species).length){
     icons=collectIcons(b,header, Object.assign({},layout,{speciesInfo:speciesLayout||layout.speciesInfo}),data.species,MAX_SPECIES,warnings);
   }
+  if(!Array.isArray(data.routeEncounters)){
+    var wildScan=scanWildEncounters(b,Math.max(386,Math.min(MAX_SPECIES,count)),warnings);
+    if(wildScan.areas.length)data.routeEncounters=wildScan.areas;
+  }
   if(!Array.isArray(data.trainerTeams))warnings.push('Trainer teams are not indexed in this ROM; a validated ROM metadata manifest is required for complete trainer data.');
-  if(!Array.isArray(data.routeEncounters))warnings.push('Map/route encounter tables are not indexed in this ROM; a validated ROM metadata manifest is required for complete locations.');
+  if(!Array.isArray(data.routeEncounters))warnings.push('Unable to identify a reliable compiled wild-encounter table; complete routes and maps require a source-matched ROM metadata index.');
   if(!header)warnings.push('The standard Emerald GF ROM header was not located.');
   if(!rhh)warnings.push('Expansion metadata (RHHEXP) was not located; species limits may be incomplete.');
   var urls={},shinyUrls={};
@@ -324,5 +410,5 @@ async function importRomAsync(value,options){
   if(!manifest||manifest.format!=='briskdex-rom-v1'||!manifest.data)throw new Error('Invalid compressed ROM index.');
   return importRom(b,Object.assign({},options||{},{manifest:manifest}));
 }
-return {importRomAsync:importRomAsync,importRom:importRom,readIcon:readIcon,tilesToRgba:tilesToRgba,lz77:lz77,crc32:crc32,gbaString:gbaString,scanHeader:scanHeader,scanRhh:scanRhh,parseEmbedded:parseEmbedded,MAGIC:MAGIC};
+return {scanWildEncounters:scanWildEncounters,importRomAsync:importRomAsync,importRom:importRom,readIcon:readIcon,tilesToRgba:tilesToRgba,lz77:lz77,crc32:crc32,gbaString:gbaString,scanHeader:scanHeader,scanRhh:scanRhh,parseEmbedded:parseEmbedded,MAGIC:MAGIC};
 });
