@@ -10,7 +10,7 @@ function check(condition,message){if(!condition)fail(message);}
 const pkg=json('package.json');
 const requiredRoot=[
   'index.html','main.js','preload.js','battle-server.js','asset-loader.js','localization.js',
-  'emerald-compat.js','gba-rom-import.js','brisk-dex-data.json','brisk-dex-trainer-teams.json',
+  'emerald-compat.js','gba-rom-import.js','rom-compat-audit.js','brisk-dex-data.json','brisk-dex-trainer-teams.json',
   'brisk-dex-icon-manifest.json','compatibility/README.md',
   'compatibility/emerald-compat-profile.schema.json','compatibility/example-expansion-pack.json'
 ];
@@ -37,6 +37,9 @@ check(!/^[^\n]*restoreLastSave\(\);\s*$/m.test(html),'Compat launch must not aut
 
 check(html.includes('<script src="gba-rom-import.js"></script>'),'index.html does not load gba-rom-import.js');
 new Function(read('gba-rom-import.js'));
+check(html.includes('<script src="rom-compat-audit.js"></script>'),'ROM audit module not loaded');
+check(packaged.has('rom-compat-audit.js'),'Electron build missing ROM audit module');
+new Function(read('rom-compat-audit.js'));
 const compat=read('emerald-compat.js');
 new Function(compat);
 const inlineStart=html.lastIndexOf('<script>');
@@ -60,6 +63,7 @@ if(process.argv.includes('--mobile')){
   exists('www/index.html');
   exists('www/emerald-compat.js');
   exists('www/gba-rom-import.js');
+  exists('www/rom-compat-audit.js');
   exists('www/compatibility/emerald-compat-profile.schema.json');
   const mobileHtml=read('www/index.html');
   check(mobileHtml.includes('<script src="emerald-compat.js"></script>'),'Prepared mobile index lost emerald-compat.js');
