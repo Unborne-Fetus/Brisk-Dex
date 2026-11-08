@@ -39,6 +39,42 @@ function baseRom(){
   }
   return b;
 }
+
+// A non-indexed Emerald-family ROM must recover additional species, alternate
+// expansion item IDs, and validated compiled wild encounters when available.
+const custom=baseRom();
+const speciesBase=0x10000,customSpecies=29,customSpeciesAt=speciesBase+customSpecies*200;
+[90,104,70,92,100,86,10,10].forEach((v,k)=>custom[customSpeciesAt+k]=v);
+writeGba(custom,customSpeciesAt+48,'Copperhawk');
+['Poke Ball','Great Ball','Ultra Ball','Master Ball'].forEach((name,i)=>{
+  const id=i+1,ptr=0x60000+id*128+40;
+  writeGba(custom,ptr,name);
+});
+const customItemId=40,customItemPtr=0x60000+customItemId*128+40;
+writeGba(custom,customItemPtr,'Meteor Lens');
+put32(custom,0x30000+customItemId*64+20,0x08000000+customItemPtr);
+const wildTable=0x68000,wildInfo=0x70000,wildSlots=0x70100;
+custom[wildInfo]=25;custom[wildInfo+1]=0;custom[wildInfo+2]=0;custom[wildInfo+3]=0;
+put32(custom,wildInfo+4,0x08000000+wildSlots);
+for(let i=0;i<12;i++){
+  const slot=wildSlots+i*4;custom[slot]=4;custom[slot+1]=8;put16(custom,slot+2,i===11?29:i+1);
+}
+for(let map=0;map<9;map++){
+  const row=wildTable+map*20;
+  custom[row]=2;custom[row+1]=map+1;custom[row+2]=0;custom[row+3]=0;
+  put32(custom,row+4,0x08000000+wildInfo);
+  for(let f=8;f<20;f++)custom[row+f]=0;
+}
+const customScan=R.importRom(custom);
+assert.strictEqual(customScan.data.species[String(customSpecies)].name,'Copperhawk');
+assert.strictEqual(customScan.data.items[String(customItemId)],'Meteor Lens');
+assert.strictEqual(customScan.counts.routes,9);
+assert.strictEqual(customScan.data.routeEncounters[0].mapGroup,2);
+assert(customScan.data.routeEncounters.some(a=>a.methods.some(m=>m.slots.some(slot=>slot.species===customSpecies))));
+assert(!customScan.complete,'Unindexed custom ROM must not claim complete coverage');
+const noWild=R.importRom(baseRom());
+assert.strictEqual(noWild.counts.routes,0,'Unverified encounters must not be fabricated');
+
 const sample=baseRom();
 const plain=R.importRom(sample);
 assert.strictEqual(plain.details.title,'BRISK TEST');
@@ -57,7 +93,8 @@ const packed={format:'briskdex-rom-v1',assets:{icons:{'1':'data:image/png;base64
   species:{'1':{name:'Custommon',types:['Water']}},
   moves:{'1':'Tackle'},items:{'1':'Poké Ball'},abilities:{'1':'Sturdy'},
   trainerTeams:[{constant:'TRAINER_1',name:'TEST',party:[{species:'Custommon',fields:{Level:'42'},moves:['Tackle']}]}],
-  routeEncounters:[{id:'CustomRoute',name:'New Route',methods:[{name:'Grass',type:'land',encounterRate:20,slots:[{species:1,minLevel:4,maxLevel:8,chance:100}]}]}]
+  routeEncounters:[{id:'CustomRoute',name:'New Route',methods:[{name:'Grass',type:'land',encounterRate:20,slots:[{species:1,minLevel:4,maxLevel:8,chance:100}]}]}],
+  mapCatalog:[{id:'MAP_CUSTOM_ISLAND',name:'Custom Island',type:'MAP_TYPE_ROUTE',connections:[],warps:[]}]
 }};
 let data=enc.encode(JSON.stringify(packed)),size=sample.length,full=new Uint8Array(size+data.length+16);
 full.set(sample);full.set(data,size);put32(full,size+data.length,data.length);
@@ -68,6 +105,8 @@ assert.strictEqual(loaded.complete,true);
 assert.strictEqual(loaded.counts.species,1);
 assert.strictEqual(loaded.counts.trainers,1);
 assert.strictEqual(loaded.counts.routes,1);
+assert.strictEqual(loaded.counts.maps,1);
+assert.strictEqual(loaded.data.mapCatalog[0].name,'Custom Island');
 assert.strictEqual(loaded.data.species['1'].name,'Custommon');
 assert.strictEqual(loaded.iconUrls['1'],'data:image/png;base64,aGVsbG8=');
 assert.strictEqual(loaded.shinyIconUrls['1'],'data:image/png;base64,aGVsbG8=');
