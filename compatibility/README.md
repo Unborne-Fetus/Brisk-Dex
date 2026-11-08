@@ -1,5 +1,11 @@
 # Emerald compatibility packs
 
+## ROM-first launch
+
+On every app launch, select a locally stored `.gba` ROM, optionally select its `.sav` or `.srm` file, and press **Enter Brisk Dex**. The game reference views are populated from identifiable ROM tables or the validated embedded index. If no save is supplied, Brisk Dex opens the Pokédex without importing any previous save. A save may be added later from the normal **Load .sav / .srm file** button. **Change game** returns to the chooser via reload.
+
+When a ROM lacks reliably extractable data, the chooser remains open and displays an actionable import error. Partial ROM scans list their unavailable fields. For an extensive game-specific dataset, generate a source-matched ROM index as described in [ROM_IMPORT.md](ROM_IMPORT.md). A ROM import never grants write permission to a save whose layout cannot be established.
+
 The `compat-branch` build is Emerald-only. It supports vanilla Emerald directly and can load additional Emerald-derived save layouts through JSON compatibility packs.
 
 A compatibility pack can contain one `profile`, an array of `profiles`, and optional `data` / `gameData` used by the Pokédex, Move Dex, Item Dex, Ability Dex, encounter tables, and trainer data.
