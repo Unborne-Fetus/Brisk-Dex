@@ -26,6 +26,14 @@ check(html.includes('<script src="emerald-compat.js"></script>'),'index.html doe
 check(html.includes('setting-emerald-profile'),'Compatibility profile UI is missing');
 check(html.includes('assertSaveWritable'),'Save write safety guard is missing');
 check(html.includes('validateSaveForWrite'),'Round-trip save validation is missing');
+check(html.includes('id="compat-launch"'),'ROM-first launch dialog is missing');
+check(html.includes('id="launch-rom-file"'),'Required ROM selector is missing');
+check(html.includes('id="launch-save-file"'),'Optional save selector is missing');
+check(html.includes('id="launch-enter"'),'Enter Brisk Dex launch action is missing');
+check(html.includes('openCompatLaunchSession'),'ROM-first session loading is missing');
+check(html.includes('await handleGbaRomFile(compatLaunchRom)'),'Launch must load selected ROM before opening the app');
+check(html.includes("compatLaunchSave?'save':'dex'"),'ROM-only launch must open the Pokedex');
+check(!/^[^\n]*restoreLastSave\(\);\s*$/m.test(html),'Compat launch must not automatically restore a previously opened save');
 
 check(html.includes('<script src="gba-rom-import.js"></script>'),'index.html does not load gba-rom-import.js');
 new Function(read('gba-rom-import.js'));
