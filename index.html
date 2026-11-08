@@ -1591,18 +1591,27 @@ function profileSaveConfig(profile){return profile&&profile.save||{};}
 function readBlock(bytes, blockOffset, profile){
   var cfg=profileSaveConfig(profile),sectionSize=Number(cfg.sectionSize)||SECTION_SIZE,dataSize=Number(cfg.sectionDataSize)||SECTION_DATA_SIZE;
   var sectionCount=Number(cfg.sectionCount)||14,signature=cfg.signature==null?SIGNATURE:Number(cfg.signature);
-  var sections={},fileOffsets={},lastIndexSaveIdx=-1,anyValid=false;
+  var sections={},fileOffsets={},saveIndices=[],checksumFailures=0;
   for(var i=0;i<sectionCount;i++){
     var off=blockOffset+i*sectionSize;
     if(off+sectionSize>bytes.length)continue;
     var view=new DataView(bytes.buffer,bytes.byteOffset+off,sectionSize);
-    var sig=u32(view,sectionSize-8),id=u16(view,sectionSize-12),saveIdx=u32(view,sectionSize-4);
-    if(sig===signature){
-      anyValid=true;sections[id]=bytes.subarray(off,off+dataSize);fileOffsets[id]=off;
+    var sig=u32(view,sectionSize-8),id=u16(view,sectionSize-12),checksum=u16(view,sectionSize-10),saveIndex=u32(view,sectionSize-4);
+    if(sig!==signature||id>=sectionCount||sections[id])continue;
+    var data=bytes.subarray(off,off+dataSize);
+    var checksumSize=window.EmeraldCompat?EmeraldCompat.checksumSize(profile,id):({0:3884,4:3848,13:2000}[id]||3968);
+    if(profile&&profile.pc&&profile.pc.extension&&Array.isArray(profile.pc.mainSectionIds)&&profile.pc.mainSectionIds.indexOf(id)>=0)
+      checksumSize=Number(profile.pc.sectionSize)||3968;
+    if(checksumSize<=0||checksumSize>data.length||computeSectionChecksum(new DataView(data.buffer,data.byteOffset,data.byteLength),checksumSize)!==checksum){
+      checksumFailures++;continue;
     }
-    if(i===sectionCount-1)lastIndexSaveIdx=saveIdx;
+    sections[id]=data;fileOffsets[id]=off;saveIndices.push(saveIndex);
   }
-  return {sections:sections,fileOffsets:fileOffsets,saveIndex:lastIndexSaveIdx,valid:anyValid};
+  // Reject partially valid 14-sector blocks and mixed generations.
+  var count=Object.keys(sections).length;
+  var consistent=saveIndices.length===sectionCount&&saveIndices.every(function(x){return x===saveIndices[0];});
+  return {sections:sections,fileOffsets:fileOffsets,saveIndex:saveIndices[0]||0,valid:count===sectionCount&&consistent,
+    validSections:count,checksumFailures:checksumFailures};
 }
 
 function computeSectionChecksum(view,size){
@@ -1711,7 +1720,7 @@ function parseSav(arrayBuffer){
   var briskProbeProfile=window.EmeraldCompat?EmeraldCompat.profileForId('brisk-emerald'):null;
   var briskProbe=briskProbeProfile?readStorageExtension(bytes,briskProbeProfile):{present:false};
   var profile=window.EmeraldCompat
-    ? EmeraldCompat.detectProfile({storageExtensionPresent:briskProbe.present,bytes:bytes,override:override})
+    ? EmeraldCompat.detectProfile({storageExtensionPresent:briskProbe.present,bytes:bytes,override:override,rom:currentRomReport})
     : {id:'emerald',name:'Pokémon Emerald',save:{},pc:{boxCount:14,slotsPerBox:30,mainSectionIds:[5,6,7,8,9,10,11,12,13],sectionSize:3968,lastSectionSize:2000},features:{}};
   window.ACTIVE_EMERALD_PROFILE=profile;
 
