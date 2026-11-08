@@ -7060,7 +7060,7 @@ async function openCompatLaunchSession(){
     ['dex-type','dex-status','move-type','move-category','trainer-class','trainer-size','route-kind','route-order','encounter-method'].forEach(function(id){var field=document.getElementById(id);if(field&&field.options&&field.options.length)field.selectedIndex=0;});
     document.getElementById('btn-change-game').hidden=false;
     var importSummary=document.getElementById('compat-import-summary');
-    importSummary.textContent=(result.details.title||compatLaunchRom.name)+' · '+(counts.species||0)+' Pokémon · '+(counts.moves||0)+' moves · '+(counts.abilities||0)+' abilities · '+(counts.trainers||0)+' trainers · '+(counts.routes||0)+' encounter areas — '+(result.complete?'Full indexed ROM data':'Partial ROM extraction; see Settings for missing fields');
+    importSummary.textContent=(result.details.title||compatLaunchRom.name)+' · '+(counts.species||0)+' Pokémon · '+(counts.moves||0)+' moves · '+(counts.abilities||0)+' abilities · '+(counts.items||0)+' items · '+(counts.trainers||0)+' trainers · '+(counts.routes||0)+' encounter areas · '+(counts.maps||0)+' maps — '+(result.complete?'Full indexed ROM data':'Partial ROM extraction; see Settings for missing fields');
     importSummary.hidden=false;
     compatLaunchDialog.hidden=true;
     document.querySelector('.wrap').inert=false;
