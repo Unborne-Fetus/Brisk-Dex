@@ -124,6 +124,7 @@ assert(plain.warnings.some(s=>s.includes('Trainer teams')));
 const packed={format:'briskdex-rom-v1',assets:{icons:{'1':'data:image/png;base64,aGVsbG8='},shinyIcons:{'1':'data:image/png;base64,aGVsbG8='}},data:{
   species:{'1':{name:'Custommon',types:['Water']}},
   moves:{'1':'Tackle'},items:{'1':'Poké Ball'},abilities:{'1':'Sturdy'},
+  itemDetails:{'1':{name:'Poké Ball'}},moveDetails:{'1':{name:'Tackle'}},abilityDetails:{'1':{name:'Sturdy'}},
   trainerTeams:[{constant:'TRAINER_1',name:'TEST',party:[{species:'Custommon',fields:{Level:'42'},moves:['Tackle']}]}],
   routeEncounters:[{id:'CustomRoute',name:'New Route',methods:[{name:'Grass',type:'land',encounterRate:20,slots:[{species:1,minLevel:4,maxLevel:8,chance:100}]}]}],
   mapCatalog:[{id:'MAP_CUSTOM_ISLAND',name:'Custom Island',type:'MAP_TYPE_ROUTE',connections:[],warps:[]}]
@@ -134,6 +135,9 @@ put32(full,size+data.length+4,R.crc32(data,0,data.length));writeAscii(full,size+
 let loaded=R.importRom(full);
 assert.strictEqual(loaded.source,'embedded-manifest');
 assert.strictEqual(loaded.complete,true);
+const incomplete=R.importRom(sample,{manifest:{format:'briskdex-rom-v1',data:{species:{'1':{name:'Test'}},moves:{},routeEncounters:[]}}});
+assert.strictEqual(incomplete.complete,false);
+assert(incomplete.warnings.some(msg=>msg.includes('incomplete reference index')));
 assert.strictEqual(loaded.counts.species,1);
 assert.strictEqual(loaded.counts.trainers,1);
 assert.strictEqual(loaded.counts.routes,1);
