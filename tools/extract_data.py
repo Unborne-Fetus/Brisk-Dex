@@ -769,13 +769,14 @@ def extract_map_catalog(repo):
 
 
 def extract_route_encounters(repo, species_ids):
-    encounters_path = os.path.join(repo, "src/data/wild_encounters.json")
-    if not os.path.isfile(encounters_path):
-        return []
+    encounters_path = next((path for path in (
+        os.path.join(repo, "src/data/wild_encounters.json"),
+        os.path.join(repo, "data/wild_encounters.json"),
+    ) if os.path.isfile(path)), None)
     try:
-        source = json.loads(read(encounters_path))
+        source = json.loads(read(encounters_path)) if encounters_path else {"wild_encounter_groups": []}
     except (ValueError, TypeError):
-        return []
+        source = {"wild_encounter_groups": []}
 
     map_info = {}
     maps_dir = os.path.join(repo, "data/maps")
@@ -817,8 +818,8 @@ def extract_route_encounters(repo, species_ids):
                 continue
             info = map_info.get(map_id, {})
             source_label = (raw.get("base_label") or "").upper()
-            if info.get("gameRegion") == "REGION_KANTO" or any(tag in source_label for tag in ("FIRERED", "LEAFGREEN", "FRLG")):
-                continue
+            # Include Kanto, custom islands, additional regions and every other
+            # source-defined encounter area; no region-specific exclusions.
             methods = []
             variant_match = re.search(r'ALTERINGCAVE(\d+)', source_label)
             for method_key, method_title in method_names.items():
@@ -878,6 +879,7 @@ def extract_route_encounters(repo, species_ids):
                 })
 
     # Add stationary encounters and handed-out Pokémon from map scripts.
+    # Even hacks without wild_encounters.json may expose these map events.
     # This includes visible/event Pokémon (seteventmon) and battle-triggered
     # encounters (setwildbattle), plus explicit NPC gifts (givemon).
     area_by_id = {area["id"]: area for area in out}
@@ -890,7 +892,7 @@ def extract_route_encounters(repo, species_ids):
         except (ValueError, TypeError):
             continue
         map_id = info.get("id")
-        if not map_id or info.get("region") == "REGION_KANTO":
+        if not map_id:
             continue
         script = strip_comments(read(os.path.join(root, "scripts.inc")) or "")
         for match in re.finditer(r'\b(setwildbattle|seteventmon|givemon)\s+SPECIES_([A-Z0-9_]+)\s*,\s*(\d+)\b', script):
