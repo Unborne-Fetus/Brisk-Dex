@@ -23,8 +23,11 @@ function baseRom(){
     writeGba(b,p+48,names[i]||('Species'+i));
   }
   const moveBase=0x20000,itemBase=0x30000,abilityBase=0x40000,nameBase=0x60000;
-  put32(b,gf+196,0x08000000+moveBase);
-  put32(b,gf+192,0x08000000+itemBase);
+  // Actual current GF ROM header offsets from pokeemerald-expansion.
+  put32(b,gf+136,3500);put32(b,gf+140,3900);
+  put32(b,gf+144,0x234);put32(b,gf+148,0x238);
+  put32(b,gf+200,0x08000000+itemBase);
+  put32(b,gf+204,0x08000000+moveBase);
   put32(b,h+16,0x08000000+abilityBase);
   const moveNames=['','Pound','Karate Chop','Double Slap'];
   const itemNames=['','Master Ball','Ultra Ball','Great Ball'];
@@ -103,6 +106,10 @@ assert.strictEqual(noWild.counts.routes,0,'Unverified encounters must not be fab
 const sample=baseRom();
 const plain=R.importRom(sample);
 assert.strictEqual(plain.details.title,'BRISK TEST');
+assert.strictEqual(plain.header.itemsInfo,0x30000);
+assert.strictEqual(plain.header.movesInfo,0x20000);
+assert.strictEqual(plain.header.saveLayout.partyCountOffset,0x234);
+assert.strictEqual(plain.header.saveLayout.partyOffset,0x238);
 assert.strictEqual(plain.rhh.species,300);
 assert.strictEqual(plain.counts.species,28);
 assert.strictEqual(plain.data.moves['2'],'Karate Chop');
