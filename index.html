@@ -7026,6 +7026,10 @@ async function openCompatLaunchSession(){
   try{
     var result=await handleGbaRomFile(compatLaunchRom);
     if(!result)throw new Error('Could not import game data from this ROM. Check the report under Settings or try a source-indexed ROM.');
+    // A profile chosen for an earlier ROM must not silently apply to this game.
+    uiSettings.emeraldProfile='auto';
+    try{localStorage.setItem('briskdex_emerald_profile','auto');localStorage.setItem('briskdex_settings',JSON.stringify(uiSettings));}catch(e){}
+    refreshCompatibilityProfileOptions();
     if(compatLaunchSave){
       launchStatus('Reading the selected save…');
       var raw=compatLaunchSave.file?await compatLaunchSave.file.arrayBuffer():compatLaunchSave.data;
