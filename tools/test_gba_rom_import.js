@@ -5,7 +5,7 @@ const enc=new TextEncoder();
 function put32(b,o,n){b[o]=n&255;b[o+1]=n>>>8&255;b[o+2]=n>>>16&255;b[o+3]=n>>>24&255;}
 function put16(b,o,n){b[o]=n&255;b[o+1]=n>>>8&255;}
 function writeAscii(b,o,s){for(let i=0;i<s.length;i++)b[o+i]=s.charCodeAt(i);}
-function writeGba(b,o,s){for(let i=0;i<s.length;i++){let v=s.charCodeAt(i);b[o+i]=v>=65&&v<=90?0xBB+v-65:v>=97&&v<=122?0xD5+v-97:0;}b[o+s.length]=0xFF;}
+function writeGba(b,o,s){for(let i=0;i<s.length;i++){let v=s.charCodeAt(i);b[o+i]=v>=65&&v<=90?0xBB+v-65:v>=97&&v<=122?0xD5+v-97:v>=48&&v<=57?0xA1+v-48:0;}b[o+s.length]=0xFF;}
 function baseRom(){
   let b=new Uint8Array(1024*1024);
   b.fill(255);b[0xB2]=0x96;
@@ -42,6 +42,18 @@ function baseRom(){
   }
   return b;
 }
+
+// Verify that a ROM which replaces the first three Kanto starters can
+// still reveal its Fakémon without depending on Bulbasaur name anchors.
+const replaced=baseRom();
+writeGba(replaced,0x10000+1*200+48,'Copperhawk');
+writeGba(replaced,0x10000+2*200+48,'Mistwing');
+writeGba(replaced,0x10000+3*200+48,'Ironfang');
+const replacedScan=R.importRom(replaced);
+assert.strictEqual(replacedScan.data.species['1'].name,'Copperhawk');
+assert.strictEqual(replacedScan.data.species['2'].name,'Mistwing');
+assert.strictEqual(replacedScan.counts.species,28);
+assert(replacedScan.warnings.some(w=>w.includes('nonstandard SpeciesInfo')));
 
 // A non-indexed Emerald-family ROM must recover additional species, alternate
 // expansion item IDs, and validated compiled wild encounters when available.
