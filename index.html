@@ -4482,7 +4482,11 @@ async function handleGbaRomFile(file){
     var romBytes=await file.arrayBuffer();
     var result=await BriskRomImporter.importRomAsync(romBytes);
     if(!result.romFingerprint&&BriskRomImporter.sha256Hex){
-      var digest=await BriskRomImporter.sha256Hex(new Uint8Array(romBytes));
+      // Indexed and non-indexed copies of the same compiled game share this
+      // live-byte fingerprint. Ignore only verified trailing 0xFF padding.
+      var gameBytes=new Uint8Array(romBytes),liveSize=gameBytes.length;
+      while(liveSize>0xC0&&gameBytes[liveSize-1]===0xFF)liveSize--;
+      var digest=await BriskRomImporter.sha256Hex(gameBytes.subarray(0,liveSize));
       if(digest)result.romFingerprint='sha256:'+digest;
     }
     if(!result.counts.species&&!result.counts.trainers&&!result.counts.routes)
