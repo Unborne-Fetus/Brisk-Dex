@@ -34,7 +34,7 @@ check(html.includes('validateSaveForWrite'),'Round-trip save validation is missi
 check(html.includes('id="compat-launch"'),'ROM-first launch dialog is missing');
 check(html.includes('id="launch-rom-file"'),'Required ROM selector is missing');
 check(html.includes('id="launch-save-file"'),'Optional save selector is missing');
-check(html.includes('id="launch-enter"'),'Enter Brisk Dex launch action is missing');
+check(html.includes('id="launch-enter"'),'Enter Adapt Dex launch action is missing');
 check(html.includes('openCompatLaunchSession'),'ROM-first session loading is missing');
 for(const removed of ['tab-competitive','tab-online','tab-trading','competitive-tab-panel','online-tab-panel','trading-tab-panel']){
   check(!html.includes('id="'+removed+'"'),'Removed compatibility screen still exists: '+removed);

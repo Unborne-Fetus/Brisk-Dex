@@ -438,12 +438,6 @@ footer.foot{ text-align:center; color:var(--muted-2); font-size:11.5px; margin-t
   .dex-sprite-card img{width:112px;height:112px;max-width:100%;object-fit:contain;image-rendering:pixelated;background:transparent;display:block;margin:0 auto 6px;}
   .dex-sprite-card strong{font-size:12px;color:var(--muted);}
   .dex-sprite-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0;}
-  .changes-tools{display:flex;gap:10px;margin-bottom:14px;}
-  .changes-tools input{width:100%;}
-  .changes-grid{display:grid;gap:12px;}
-  .change-group{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 16px;content-visibility:auto;contain-intrinsic-size:200px;}
-  .change-group h3{margin:0 0 10px;font-size:16px;}
-  .change-group ul{margin:0;padding-left:20px;display:grid;gap:7px;color:var(--text);}
   .list-more{width:calc(100% - 12px);margin:8px 6px 12px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);color:var(--text);cursor:pointer;}
   @media (max-width:760px){.dex-sprite-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.dex-sprite-card img{width:96px;height:96px;}}
 
@@ -725,7 +719,6 @@ header.top{border-bottom-color:#a17b0d;}
     <button id="tab-items" role="tab" aria-selected="false" aria-controls="items-tab-panel">Items</button>
     <button id="tab-bag" role="tab" aria-selected="false" aria-controls="bag-tab-panel">Bag</button>
     <button id="tab-guide" role="tab" aria-selected="false" aria-controls="guide-tab-panel">Guide</button>
-    <button id="tab-changes" role="tab" aria-selected="false" aria-controls="changes-tab-panel">Changes</button>
   </nav>
 
   <div id="save-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-save">
@@ -781,7 +774,7 @@ header.top{border-bottom-color:#a17b0d;}
 
   <section id="routes-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-routes" style="display:none;">
     <div class="section-heading"><h3>Route Encounters</h3><span class="count" id="route-count"></span></div>
-    <p class="route-intro">Browse wild encounters, stationary Pok&eacute;mon, and gifts across Brisk Emerald. Wild slot odds are relative to the selected method; the listed encounter rate is the chance of an encounter per check.</p>
+    <p class="route-intro">Browse wild encounters, stationary Pokémon, and gifts in the selected game. Wild slot odds are relative to the selected method; the listed encounter rate is the chance of an encounter per check.</p>
     <div class="route-tools">
       <input id="route-search" type="search" placeholder="Search locations, Pok&eacute;mon, or type…" aria-label="Search route encounters by location, Pokémon, or type">
       <select id="route-kind" aria-label="Filter route or area">
@@ -819,7 +812,7 @@ header.top{border-bottom-color:#a17b0d;}
 
   <section id="dex-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-dex" style="display:none;">
     <div class="section-heading"><h3>Brisk Pok&eacute;dex</h3><span class="count" id="dex-count"></span></div>
-    <p class="route-intro">Species information is read from Brisk Emerald's extracted game data. No National Pok&eacute;dex database is used for species stats, abilities, evolutions, or locations.</p>
+    <p class="route-intro">Species information is recovered from the selected ROM or its matching reference index; missing fields are not filled from unrelated games.</p>
     <div class="dex-tools">
       <input id="dex-search" type="search" placeholder="Search Pok&eacute;mon, type, or ability…" aria-label="Search the Brisk Pokédex">
       <select id="dex-type" aria-label="Filter Pokédex by type">
@@ -845,7 +838,7 @@ header.top{border-bottom-color:#a17b0d;}
 
   <section id="trainers-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-trainers" style="display:none;">
     <div class="section-heading"><h3>Trainer Teams</h3><span class="count" id="trainer-count"></span></div>
-    <p class="route-intro">Browse the teams defined in Brisk Emerald's <code>src/data/trainers.party</code>. This is hack data, not a vanilla Emerald trainer database.</p>
+    <p class="route-intro">Browse trainer teams extracted from the selected game when its ROM data or source index provides them.</p>
     <div class="trainer-tools">
       <input id="trainer-search" type="search" placeholder="Search trainer, class, Pok&eacute;mon, move, ability, or item…" aria-label="Search Brisk trainer teams">
       <select id="trainer-class" aria-label="Filter trainers by class"><option value="all">All classes</option></select>
@@ -867,42 +860,42 @@ header.top{border-bottom-color:#a17b0d;}
 
   <section id="moves-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-moves" style="display:none;">
     <div class="section-heading"><h3>Moves</h3><span class="count" id="move-count"></span></div>
-    <p class="route-intro">Move data and learnability come directly from Brisk Emerald's move and Pokémon tables.</p>
+    <p class="route-intro">Moves and learnability come from the selected game's available tables.</p>
     <div class="reference-tools">
-      <input id="move-search" type="search" placeholder="Search move, description, type, effect, or Pokémon…" aria-label="Search Brisk Emerald moves">
+      <input id="move-search" type="search" placeholder="Search move, description, type, effect, or Pokémon…" aria-label="Search game moves">
       <select id="move-type" aria-label="Filter moves by type"><option value="all">All types</option></select>
       <select id="move-category" aria-label="Filter moves by category"><option value="all">All categories</option><option value="Physical">Physical</option><option value="Special">Special</option><option value="Status">Status</option></select>
     </div>
     <div class="reference-layout">
-      <aside class="reference-list" id="move-list" aria-label="Brisk Emerald moves"></aside>
+      <aside class="reference-list" id="move-list" aria-label="Game moves"></aside>
       <div class="reference-detail" id="move-detail" aria-live="polite"></div>
     </div>
   </section>
 
   <section id="abilities-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-abilities" style="display:none;">
     <div class="section-heading"><h3>Abilities</h3><span class="count" id="ability-count"></span></div>
-    <p class="route-intro">Ability descriptions, behavior flags, and Pokémon users come directly from Brisk Emerald.</p>
+    <p class="route-intro">Ability descriptions and Pokémon users are displayed when available in the selected game data.</p>
     <div class="reference-tools">
-      <input id="ability-search" type="search" placeholder="Search ability, description, constant, or Pokémon…" aria-label="Search Brisk Emerald abilities">
+      <input id="ability-search" type="search" placeholder="Search ability, description, constant, or Pokémon…" aria-label="Search game abilities">
     </div>
     <div class="reference-layout">
-      <aside class="reference-list" id="ability-list" aria-label="Brisk Emerald abilities"></aside>
+      <aside class="reference-list" id="ability-list" aria-label="Game abilities"></aside>
       <div class="reference-detail" id="ability-detail" aria-live="polite"></div>
     </div>
   </section>
 
   <section id="items-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-items" style="display:none;">
     <div class="section-heading"><h3>Items</h3><span class="count" id="item-count"></span></div>
-    <p class="route-intro">Descriptions and obtain locations are extracted from Brisk Emerald's own item tables, maps, shops, hidden items, and reward scripts.</p>
+    <p class="route-intro">Item descriptions and obtain locations come from the selected game's recoverable data.</p>
     <div class="item-tools">
-      <input id="item-search" type="search" placeholder="Search item name, #ID, description, or location…" aria-label="Search Brisk Emerald items">
-      <select id="item-order" aria-label="Sort Brisk Emerald items">
+      <input id="item-search" type="search" placeholder="Search item name, #ID, description, or location…" aria-label="Search game items">
+      <select id="item-order" aria-label="Sort Game items">
         <option value="alphabetical">Alphabetical</option>
         <option value="numeric">Item #</option>
       </select>
     </div>
     <div class="item-layout">
-      <aside class="item-list" id="item-list" aria-label="Brisk Emerald items"></aside>
+      <aside class="item-list" id="item-list" aria-label="Game items"></aside>
       <div class="item-detail" id="item-detail" aria-live="polite"></div>
     </div>
   </section>
@@ -968,19 +961,19 @@ header.top{border-bottom-color:#a17b0d;}
   <section id="guide-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-guide" style="display:none;">
     <div class="guide-hero">
       <h2>Adapt Dex Player Guide</h2>
-      <p>Everything you need to use Adapt Dex with Pok&eacute;mon Brisk Emerald. Open a section below whenever you need help &mdash; no developer knowledge required.</p>
+      <p>Everything you need to use Adapt Dex with supported Generation 1–3 Pokémon ROM hacks. Open a section below whenever you need help &mdash; no developer knowledge required.</p>
     </div>
     <div class="guide-grid">
       <details class="guide-card" open>
         <summary>Getting Started</summary>
         <div class="guide-body">
           <ol>
-            <li>Open Adapt Dex and choose <strong>Load .sav / .srm file</strong>.</li>
-            <li>Select your Pok&eacute;mon Brisk Emerald save file.</li>
-            <li>Adapt Dex reads the save locally and fills in your trainer, party, boxes, and Pok&eacute;dex information.</li>
+            <li>Choose a local Generation 1–3 ROM, or paste a supported public GitHub link.</li>
+            <li>Optionally open the matching .sav or .srm file; no save is needed to browse game references.</li>
+            <li>Adapt Dex displays recoverable game data and supported save information. Unverified saves stay read-only.</li>
             <li>Use the tabs across the top to browse encounters, Pok&eacute;mon, trainers, moves, abilities, items, and other features.</li>
           </ol>
-          <div class="guide-tip">Adapt Dex uses Brisk Emerald data rather than assuming the original Emerald or standard National Pok&eacute;dex data.</div>
+          <div class="guide-tip">Adapt Dex prioritizes data from the selected game over unrelated Pokémon databases.</div>
         </div>
       </details>
 
@@ -991,7 +984,7 @@ header.top{border-bottom-color:#a17b0d;}
           <ul>
             <li><strong>.sav</strong> and <strong>.srm</strong> are supported save-file extensions.</li>
             <li>The app checks the save structure before displaying editable data.</li>
-            <li>Your last-used save reopens automatically. If an automatic save fails, the app displays the error.</li>
+            <li>Choose a ROM each session; browser edits need to be exported as save copies.</li>
           </ul>
           <div class="guide-warning">Keep a backup of an important save before making large edits.</div>
         </div>
@@ -1000,12 +993,12 @@ header.top{border-bottom-color:#a17b0d;}
       <details class="guide-card">
         <summary>Pok&eacute;mon &amp; PC Boxes</summary>
         <div class="guide-body">
-          <p>The first tab displays your party and Brisk Emerald PC boxes. Select a Pok&eacute;mon to view its information and available editing options.</p>
+          <p>With a supported save, the first tab displays the party and PC boxes. Select a Pok&eacute;mon to view its information and available editing options.</p>
           <ul>
             <li>Pok&eacute;mon can be dragged between supported storage tiles.</li>
-            <li>Brisk Emerald saves can use the expanded 20-box layout.</li>
+            <li>Some hacks use different numbers or layouts of PC boxes.</li>
             <li>Shiny Pok&eacute;mon are visually marked.</li>
-            <li>Species, moves, forms, abilities, and types are interpreted using Brisk Emerald's data.</li>
+            <li>Species, moves, forms, abilities, and types use the chosen game's data.</li>
           </ul>
         </div>
       </details>
@@ -1026,7 +1019,7 @@ header.top{border-bottom-color:#a17b0d;}
       <details class="guide-card">
         <summary>Brisk Pok&eacute;dex</summary>
         <div class="guide-body">
-          <p>The Pok&eacute;dex combines Brisk Emerald species information with progress read from your save.</p>
+          <p>The Pokédex combines selected-game Pokémon information with supported save progress.</p>
           <ul>
             <li><strong>None:</strong> no Pok&eacute;dex progress is currently recorded.</li>
             <li><strong>Seen:</strong> the Pok&eacute;mon has been seen.</li>
@@ -1038,25 +1031,11 @@ header.top{border-bottom-color:#a17b0d;}
         </div>
       </details>
 
-      <details class="guide-card">
-        <summary>Current Brisk Emerald Progression</summary>
-        <div class="guide-body">
-          <p>Brisk Emerald's current gym progression level caps are:</p>
-          <p><strong>25 → 35 → 45 → 50 → 55 → 65 → 75 → 100</strong></p>
-          <ul>
-            <li>The current level cap is also shown in Brisk Emerald's pause menu.</li>
-            <li>Overworld Pok&eacute; Ball catches are restricted to Pok&eacute;mon at or below your current progression cap.</li>
-            <li>If every wild Pok&eacute;mon on the current route is above your cap, the game reports that the route is too high level.</li>
-            <li>The battle Bag shows catch chance beside the Pok&eacute; Ball pocket and rounds the displayed percentage to the nearest whole number.</li>
-          </ul>
-          <div class="guide-tip">These values reflect the current Brisk Emerald build and can be updated again as progression is rebalanced.</div>
-        </div>
-      </details>
 
       <details class="guide-card">
         <summary>Route Encounters &amp; Locations</summary>
         <div class="guide-body">
-          <p>Route Encounters shows where Pok&eacute;mon can be found in the current Brisk Emerald data.</p>
+          <p>Route Encounters shows locations extracted from the selected game.</p>
           <ul>
             <li>Filter by walking, surfing, fishing rods, Rock Smash, static encounters, or gifts.</li>
             <li>Search by location, Pok&eacute;mon, or type.</li>
@@ -1070,7 +1049,7 @@ header.top{border-bottom-color:#a17b0d;}
       <details class="guide-card">
         <summary>Trainer Teams</summary>
         <div class="guide-body">
-          <p>Trainer Teams lets you look up opponents before or after battling them in Brisk Emerald.</p>
+          <p>Trainer Teams lists recoverable opponents from the selected game.</p>
           <ul>
             <li>Search by trainer, class, Pok&eacute;mon, move, ability, item, or location.</li>
             <li>Each Pok&eacute;mon shows the information specific to that trainer's actual team member.</li>
@@ -1082,11 +1061,11 @@ header.top{border-bottom-color:#a17b0d;}
       <details class="guide-card">
         <summary>Moves, Abilities &amp; Items</summary>
         <div class="guide-body">
-          <p>These tabs are reference dexes built from Brisk Emerald itself.</p>
+          <p>These tabs display recovered reference data for the selected game.</p>
           <ul>
             <li><strong>Moves:</strong> descriptions, type, category, battle data, and Pok&eacute;mon that can learn them.</li>
             <li><strong>Abilities:</strong> descriptions and Pok&eacute;mon that can have each ability.</li>
-            <li><strong>Items:</strong> descriptions, locations, and the <strong>#ID</strong> used by Brisk Emerald's debug item selection.</li>
+            <li><strong>Items:</strong> descriptions, locations, and the <strong>#ID</strong> used in the imported game.</li>
           </ul>
         </div>
       </details>
@@ -1112,23 +1091,14 @@ header.top{border-bottom-color:#a17b0d;}
       <details class="guide-card">
         <summary>FAQ &amp; Troubleshooting</summary>
         <div class="guide-body guide-faq">
-          <p><strong>Why does Adapt Dex disagree with a normal Pok&eacute;dex website?</strong><br>Brisk Emerald changes Pok&eacute;mon, trainers, encounters, moves, abilities, items, and other mechanics, so Adapt Dex prioritizes Brisk Emerald's own extracted data.</p>
+          <p><strong>Why does Adapt Dex disagree with a normal Pok&eacute;dex website?</strong><br>ROM hacks can alter Pokémon, trainers, encounters, moves, abilities and items, so Adapt Dex prioritizes the selected game.</p>
           <p><strong>Why is my save not loading?</strong><br>Make sure you selected the actual emulator/game save file rather than a save state, ROM, ZIP, or unrelated file.</p>
           <p><strong>Why did an edit not appear in game?</strong><br>Make sure you saved the changes from Adapt Dex and then loaded the resulting save in your emulator or game.</p>
-          <p><strong>Why is a sprite, cry, description, or location missing?</strong><br>The current Brisk data bundle may not contain that asset or field yet. Updating Adapt Dex and its Brisk Emerald reference data may resolve it.</p>
+          <p><strong>Why is a sprite, cry, description, or location missing?</strong><br>The selected ROM may use custom or unsupported data structures. A matching source index can improve coverage.</p>
           <p><strong>Does External Storage belong to my Emerald save?</strong><br>No. It is Adapt Dex storage kept separately from an individual game save.</p>
         </div>
       </details>
     </div>
-  </section>
-
-  <section id="changes-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-changes" style="display:none;">
-    <div class="section-heading"><h3>Brisk Emerald Changes</h3><span class="count" id="change-count"></span></div>
-    <p class="route-intro">A categorized reference for Brisk-specific changes plus the enabled pokeemerald-expansion feature set that Brisk is built on.</p>
-    <div class="changes-tools">
-      <input id="change-search" type="search" placeholder="Search mechanics, encounters, quality of life, trainers…" aria-label="Search Brisk Emerald changes">
-    </div>
-    <div class="changes-grid" id="changes-grid"></div>
   </section>
 
   <footer class="foot">Adapt Dex &middot; Generation 1–3 ROM compatibility &middot; Files processed locally</footer>
@@ -1730,33 +1700,6 @@ var ABILITY_DETAILS = {};
 var selectedAbilityReferenceId = null;
 var MOVE_LEARNERS_INDEX = null;
 var ABILITY_USERS_INDEX = null;
-var CHANGE_DATA = [];
-var CURRENT_BRISK_CHANGES = [
-  {category:"Brisk-specific · Progression & Quality of Life",changes:[
-    "Gym progression level caps are currently 25, 35, 45, 50, 55, 65, 75 and 100.",
-    "The current progression level cap is displayed in Brisk Emerald's pause menu.",
-    "Overworld Poké Ball catches are limited to wild Pokémon at or below the current progression level cap; routes entirely above the cap report that the route is too high level."
-  ]},
-  {category:"Brisk-specific · Pokédex & Catching",changes:[
-    "The battle Bag displays catch chance beside the Poké Ball pocket and rounds the shown percentage to the nearest whole number.",
-    "Field-use catching is restricted to supported Poké Balls rather than every ball item."
-  ]},
-  {category:"Brisk-specific · Static legendary encounters",changes:[
-    "Repeatable static legendary and mythical encounters remain available after a knockout, escape, teleport, or player loss and disappear permanently only after being caught.",
-    "The Route Encounters and Pokédex location views include the new static legendary placements and the older Brisk statics standardized to the same caught-only behavior."
-  ]}
-];
-function mergeCurrentBriskChanges(groups){
-  var out=(Array.isArray(groups)?groups:[]).map(function(group){
-    return {category:group.category,changes:Array.isArray(group.changes)?group.changes.slice():[]};
-  });
-  CURRENT_BRISK_CHANGES.forEach(function(current){
-    var group=out.find(function(row){return row.category===current.category;});
-    if(!group){group={category:current.category,changes:[]};out.push(group);}
-    current.changes.forEach(function(change){if(!group.changes.includes(change)) group.changes.push(change);});
-  });
-  return out;
-}
 var BAG_ITEMS = {};
 var BAG_ORDER = [];
 var ITEM_STORAGE = {};
@@ -1850,10 +1793,8 @@ async function loadBundledGameData(){
       movePP:data.movePP || {}, moveDetails:data.moveDetails || {},
       items:data.items || {}, abilities:data.abilities || {}, abilityDetails:data.abilityDetails || {},
       itemDetails:data.itemDetails || {},
-      mapCatalog:Array.isArray(data.mapCatalog)?data.mapCatalog:[],
-      changes:Array.isArray(data.changes) ? data.changes : []
+      mapCatalog:Array.isArray(data.mapCatalog)?data.mapCatalog:[]
     };
-    CHANGE_DATA = mergeCurrentBriskChanges(BUNDLED_DATA.changes);
     ITEM_DETAILS = Object.assign({}, BUNDLED_DATA.itemDetails || {}, USER_DATA.itemDetails || {});
     normalizeBundledReferenceData();
     MOVE_DETAILS = Object.assign({}, BUNDLED_DATA.moveDetails || {}, USER_DATA.moveDetails || {});
@@ -1868,7 +1809,7 @@ async function loadBundledGameData(){
     if (IS_ANDROID || IS_IOS) document.body.classList.add('android-lite');
     renderCurrentReferenceTab();
   }catch(err){
-    showError('Could not load Brisk Emerald data bundled with Adapt Dex: ' + err.message);
+    showError('Could not load Adapt Dex reference data: ' + err.message);
   }
 }
 
@@ -2253,7 +2194,7 @@ async function restoreLastSave(){
 }
 async function exportSaveChangesToFile(){
  if(!currentSave)return false;
- var fname=(currentSave.trainer.name||'brisk-emerald').toLowerCase().replace(/[^a-z0-9]/g,'')||'brisk-emerald',extension=currentSave.fileExtension==='srm'?'srm':'sav';
+ var fname=(currentSave.trainer.name||'pokemon-save').toLowerCase().replace(/[^a-z0-9]/g,'')||'pokemon-save',extension=currentSave.fileExtension==='srm'?'srm':'sav';
  if((IS_ANDROID||IS_IOS)&&MOBILE_API){try{await MOBILE_API.saveBytes(currentSave._internal.rawBytes,fname+'.'+extension,'application/octet-stream');return true;}catch(err){showError('Could not export save: '+err.message);return false;}}
  var blob=new Blob([currentSave._internal.rawBytes],{type:'application/octet-stream'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=fname+'.'+extension;document.body.appendChild(link);link.click();link.remove();setTimeout(function(){URL.revokeObjectURL(url);},1000);return true;
 }
@@ -2732,7 +2673,7 @@ function openModal(mon, loc){
   if (loc && loc.type === 'storage'){
     var actionRow2 = el('div', {style:'margin-top:20px; padding-top:16px; border-top:1px solid var(--line-soft);'});
     if (!currentSave){
-      actionRow2.appendChild(el('div', {class:'notice-banner', text:'Load a Brisk Emerald save file to transfer this Pokémon into the game.'}));
+      actionRow2.appendChild(el('div', {class:'notice-banner', text:'Load a compatible save file to transfer this Pokémon into the game.'}));
     }else if (pendingWithdrawals[loc.storageId] === saveSessionId){
       actionRow2.appendChild(el('div', {class:'notice-banner', text:'Also in the current save. The archive copy is retained until you remove it from External Storage.'}));
     }else{
@@ -2902,7 +2843,7 @@ async function exportExternalStorage(){
   if (storageLoadError){ showError('External storage could not be loaded. Import a backup archive before exporting.'); return; }
   var payload = {format:'briskdex-storage', version:1, exportedAt:new Date().toISOString(), pokemon:externalStorage};
   var text = JSON.stringify(payload, null, 2);
-  var fileName = 'briskdex-storage-' + new Date().toISOString().slice(0,10) + '.json';
+  var fileName = 'adapt-dex-storage-' + new Date().toISOString().slice(0,10) + '.json';
   if (IS_ANDROID && window.briskAndroidAPI){
     try{
       await window.briskAndroidAPI.saveText(text, fileName, 'application/json');
@@ -3088,7 +3029,7 @@ function renderRouteEncounters(){
     : 'No encounter data loaded';
   list.innerHTML = '';
   if (!filtered.length){
-    list.appendChild(el('div', {class:'route-empty', text: locationData.length ? 'No locations match these filters.' : 'Load Brisk Emerald game data to view route encounters.'}));
+    list.appendChild(el('div', {class:'route-empty', text: locationData.length ? 'No locations match these filters.' : 'Load game data to view route encounters.'}));
     detail.innerHTML = '';
     return;
   }
@@ -3410,7 +3351,7 @@ function renderPokedex(){
   list.innerHTML = '';
   detail.innerHTML = '';
   if (!ids.length){
-    list.appendChild(el('div', {class:'route-empty', text:Object.keys(allSpecies).length ? 'No Brisk species match these filters.' : 'No Brisk Emerald species data is loaded.'}));
+    list.appendChild(el('div', {class:'route-empty', text:Object.keys(allSpecies).length ? 'No Pokémon match these filters.' : 'No Pokémon species data is loaded.'}));
     return;
   }
   if (!ids.includes(String(selectedDexSpeciesId))) selectedDexSpeciesId = Number(ids[0]);
@@ -3718,7 +3659,7 @@ function renderPokedexDetail(allSpecies, id, detail){
   grid.appendChild(dexEntryCard);
 
   var locations=el('section',{class:'dex-card full'});
-  locations.appendChild(el('h4',{text:'Locations in Brisk Emerald'}));
+  locations.appendChild(el('h4',{text:'Locations in the selected game'}));
   var locationRows=dexLocationsForSpecies(Number(id));
   if (!locationRows.length) locations.appendChild(el('div',{class:'dex-muted',text:'No wild, stationary, or gift location is present in the currently loaded Brisk encounter data.'}));
   else{
@@ -4331,32 +4272,6 @@ function renderBag(){
   };
 }
 
-function renderChanges(){
-  var root=document.getElementById('changes-grid');
-  if(!root) return;
-  var q=(document.getElementById('change-search').value||'').trim().toLowerCase();
-  root.innerHTML='';
-  var groups=(CHANGE_DATA||[]).map(function(group){
-    var changes=(group.changes||[]).filter(function(change){
-      return !q || (String(group.category||'')+' '+String(change||'')).toLowerCase().includes(q);
-    });
-    return {category:group.category,changes:changes};
-  }).filter(function(group){return group.changes.length;});
-  var total=groups.reduce(function(sum,g){return sum+g.changes.length;},0);
-  document.getElementById('change-count').textContent=total+' changes / features';
-  if(!groups.length){root.appendChild(el('div',{class:'route-empty',text:(CHANGE_DATA||[]).length?'No changes match this search.':'No change catalog is loaded.'}));return;}
-  var fragment=document.createDocumentFragment();
-  groups.forEach(function(group){
-    var section=el('section',{class:'change-group'});
-    section.appendChild(el('h3',{text:group.category}));
-    var ul=document.createElement('ul');
-    group.changes.forEach(function(change){ul.appendChild(el('li',{text:change}));});
-    section.appendChild(ul);
-    fragment.appendChild(section);
-  });
-  root.appendChild(fragment);
-}
-
 function renderCurrentReferenceTab(){
   if(currentMainTab==='routes') renderRouteEncounters();
   else if(currentMainTab==='dex') renderPokedex();
@@ -4365,7 +4280,6 @@ function renderCurrentReferenceTab(){
   else if(currentMainTab==='abilities') renderAbilities();
   else if(currentMainTab==='items') renderItems();
   else if(currentMainTab==='bag') renderBag();
-  else if(currentMainTab==='changes') renderChanges();
 }
 
 function setMainTab(tabName){
@@ -4378,12 +4292,11 @@ function setMainTab(tabName){
   var items = tabName === 'items';
   var bag = tabName === 'bag';
   var guide = tabName === 'guide';
-  var changes = tabName === 'changes';
   var settings = tabName==='settings';
   document.getElementById('settings-tab-panel').style.display=settings?'block':'none';
   document.getElementById('tab-settings').classList.toggle('active',settings);
   document.getElementById('tab-settings').setAttribute('aria-selected',String(settings));
-  var save = !settings && !routes && !dex && !trainers && !moves && !abilities && !items && !bag && !guide && !changes;
+  var save = !settings && !routes && !dex && !trainers && !moves && !abilities && !items && !bag && !guide;
   document.getElementById('save-tab-panel').style.display = save ? 'block' : 'none';
   document.getElementById('routes-tab-panel').style.display = routes ? 'block' : 'none';
   document.getElementById('dex-tab-panel').style.display = dex ? 'block' : 'none';
@@ -4393,7 +4306,6 @@ function setMainTab(tabName){
   document.getElementById('items-tab-panel').style.display = items ? 'block' : 'none';
   document.getElementById('bag-tab-panel').style.display = bag ? 'block' : 'none';
   document.getElementById('guide-tab-panel').style.display = guide ? 'block' : 'none';
-  document.getElementById('changes-tab-panel').style.display = changes ? 'block' : 'none';
   document.getElementById('tab-save').classList.toggle('active', save);
   document.getElementById('tab-save').setAttribute('aria-selected', String(save));
   document.getElementById('tab-routes').classList.toggle('active', routes);
@@ -4412,8 +4324,6 @@ function setMainTab(tabName){
   document.getElementById('tab-bag').setAttribute('aria-selected', String(bag));
   document.getElementById('tab-guide').classList.toggle('active', guide);
   document.getElementById('tab-guide').setAttribute('aria-selected', String(guide));
-  document.getElementById('tab-changes').classList.toggle('active', changes);
-  document.getElementById('tab-changes').setAttribute('aria-selected', String(changes));
   renderCurrentReferenceTab();
 }
 
@@ -4542,7 +4452,6 @@ function applyGameDataPack(parsed,skipPersist){
   ABILITY_DETAILS=Object.assign({},BUNDLED_DATA.abilityDetails||{},USER_DATA.abilityDetails||{});
   if(Array.isArray(parsed.routeEncounters))ROUTE_DATA=parsed.routeEncounters;
   if(Array.isArray(parsed.mapCatalog))BUNDLED_DATA.mapCatalog=parsed.mapCatalog;
-  if(Array.isArray(parsed.changes))CHANGE_DATA=parsed.changes;
   if(Array.isArray(parsed.trainerTeams))TRAINER_DATA=parsed.trainerTeams;
   MOVE_LEARNERS_INDEX=null;ABILITY_USERS_INDEX=null;rebuildNameData();refreshBoxLevels();saveNameDataToStorage();updateDataStatus();renderCurrentReferenceTab();
   if(currentSave)renderAll();
@@ -4556,13 +4465,11 @@ function applyRomReferenceData(data){
     movePP:data.movePP||{}, moveDetails:data.moveDetails||{},
     items:data.items||{}, abilities:data.abilities||{},
     itemDetails:data.itemDetails||{}, abilityDetails:data.abilityDetails||{},
-    mapCatalog:Array.isArray(data.mapCatalog)?data.mapCatalog:[],
-    changes:Array.isArray(data.changes)?data.changes:[]
+    mapCatalog:Array.isArray(data.mapCatalog)?data.mapCatalog:[]
   };
   ITEM_DETAILS=Object.assign({},data.itemDetails||{});
   MOVE_DETAILS=Object.assign({},data.moveDetails||{});
   ABILITY_DETAILS=Object.assign({},data.abilityDetails||{});
-  CHANGE_DATA=BUNDLED_DATA.changes;
   TRAINER_DATA=Array.isArray(data.trainerTeams)?data.trainerTeams:[];
   ROUTE_DATA=Array.isArray(data.routeEncounters)?data.routeEncounters:[];
   if(Number.isInteger(data.shinyOdds)&&data.shinyOdds>0)GAME_SHINY_ODDS=data.shinyOdds;
@@ -4691,7 +4598,6 @@ var renderMovesDebounced=debounce(renderMoves,120);
 var renderAbilitiesDebounced=debounce(renderAbilities,120);
 var renderTrainerTeamsDebounced=debounce(renderTrainerTeams,120);
 var renderRouteEncountersDebounced=debounce(renderRouteEncounters,120);
-var renderChangesDebounced=debounce(renderChanges,120);
 
 /* ============================================================
    Wiring
@@ -4705,7 +4611,6 @@ document.getElementById('tab-abilities').addEventListener('click', function(){ s
 document.getElementById('tab-items').addEventListener('click', function(){ setMainTab('items'); });
 document.getElementById('tab-bag').addEventListener('click', function(){ setMainTab('bag'); });
 document.getElementById('tab-guide').addEventListener('click', function(){ setMainTab('guide'); });
-document.getElementById('tab-changes').addEventListener('click', function(){ setMainTab('changes'); });
 document.getElementById('move-search').addEventListener('input', renderMovesDebounced);
 document.getElementById('move-type').addEventListener('change', renderMoves);
 document.getElementById('move-category').addEventListener('change', renderMoves);
@@ -4727,7 +4632,6 @@ document.getElementById('map-catalog-search').addEventListener('input',renderMap
 document.getElementById('route-kind').addEventListener('change', renderRouteEncounters);
 document.getElementById('route-order').addEventListener('change', renderRouteEncounters);
 document.getElementById('encounter-method').addEventListener('change', renderRouteEncounters);
-document.getElementById('change-search').addEventListener('input', renderChangesDebounced);
 document.getElementById('btn-load-sav').addEventListener('click', function(){
   if (IS_ELECTRON) handleSavFromElectron();
   else if (IS_ANDROID && MOBILE_API && MOBILE_API.openSaveFile) handleSavFromAndroid();
@@ -4869,7 +4773,7 @@ function writeSaveBag(items){
 var uiSettings={language:'en',theme:'system',zoom:'1',emeraldProfile:'auto'};
 try{Object.assign(uiSettings,JSON.parse(localStorage.getItem('briskdex_settings')||'{}'));}catch(e){}
 try{if(localStorage.getItem('briskdex_emerald_profile'))uiSettings.emeraldProfile=localStorage.getItem('briskdex_emerald_profile');}catch(e){}
-var uiTabNames=['settings','save','routes','dex','trainers','moves','abilities','items','bag','guide','changes'];
+var uiTabNames=['settings','save','routes','dex','trainers','moves','abilities','items','bag','guide'];
 var uiEnglish=uiTabNames.map(function(n){return document.getElementById('tab-'+n).textContent;});
 function applyUISettings(){
   document.documentElement.lang=uiSettings.language;
@@ -4917,7 +4821,7 @@ var gameDataReady=loadBundledGameData().then(function(){
 });
 storageReady = loadExternalStorage();
 // A ROM selection is required at each launch; never silently reopen a different save.
-// restoreLastSave() is intentionally not called from compat-branch startup.
+// restoreLastSave() is intentionally not called from Adapt Dex startup.
 
 
 /* ============================================================

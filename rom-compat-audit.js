@@ -47,7 +47,6 @@ function coverage(rom){
       if(byType[id].state==='indexed'&&byType[id].count<species)byType[id].state='partial';
     });
   }
-  record('changes','Custom game changes',Array.isArray(data.changes),Array.isArray(data.changes)?data.changes.length:0,indexed?'source-indexed changes':'unavailable','Procedural features cannot be guaranteed by scanning.');
   var recovered=Object.values(byType).filter(x=>x.state!=='unavailable').length;
   var fullyIndexed=Object.values(byType).filter(x=>x.state==='indexed').length;
   return {game:(rom&&rom.details&&rom.details.title)||'Unknown ROM',gameCode:(rom&&rom.details&&rom.details.gameCode)||'',
