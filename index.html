@@ -1713,6 +1713,7 @@ function mergeCurrentBriskChanges(groups){
 var BAG_ITEMS = {};
 var BAG_ORDER = [];
 var ITEM_STORAGE = {};
+var ITEM_STORAGE_META = {};
 var BAG_CATEGORY = 'all';
 var currentMainTab = 'save';
 var ROM_ACTIVE_DATA = null;
@@ -4109,15 +4110,22 @@ function loadBagFromStorage(){
     var storageRaw=localStorage.getItem('briskdex_external_item_storage');
     ITEM_STORAGE=storageRaw?JSON.parse(storageRaw):{};
     if(!ITEM_STORAGE || Array.isArray(ITEM_STORAGE) || typeof ITEM_STORAGE!=='object') ITEM_STORAGE={};
+    // Metadata is optional so existing stored item quantities remain compatible.
+    try{
+      var originRaw=localStorage.getItem('briskdex_external_item_provenance_v1');
+      ITEM_STORAGE_META=originRaw?JSON.parse(originRaw):{};
+      if(!ITEM_STORAGE_META||Array.isArray(ITEM_STORAGE_META)||typeof ITEM_STORAGE_META!=='object')ITEM_STORAGE_META={};
+    }catch(e){ITEM_STORAGE_META={};}
     Object.keys(BAG_ITEMS).forEach(function(id){if(!BAG_ORDER.includes(String(id)))BAG_ORDER.push(String(id));});
     BAG_ORDER=BAG_ORDER.filter(function(id){return Object.prototype.hasOwnProperty.call(BAG_ITEMS,String(id));});
-  }catch(e){ BAG_ITEMS={}; BAG_ORDER=[]; ITEM_STORAGE={}; }
+  }catch(e){ BAG_ITEMS={}; BAG_ORDER=[]; ITEM_STORAGE={}; ITEM_STORAGE_META={}; }
 }
 function saveBagToStorage(){
   try{
     localStorage.setItem('briskdex_unlimited_bag',JSON.stringify(BAG_ITEMS));
     localStorage.setItem('briskdex_unlimited_bag_order',JSON.stringify(BAG_ORDER));
     localStorage.setItem('briskdex_external_item_storage',JSON.stringify(ITEM_STORAGE));
+    localStorage.setItem('briskdex_external_item_provenance_v1',JSON.stringify(ITEM_STORAGE_META));
   }catch(e){showError('Could not save item storage on this device: '+e.message);}
 }
 function bagItemData(id){
@@ -4155,6 +4163,12 @@ function moveItemStack(id,from,to,requestedQty){
   if(!currentSave){showError('Load a save before transferring items.');return;}
   var source=from==='external'?ITEM_STORAGE:BAG_ITEMS;
   var target=to==='external'?ITEM_STORAGE:BAG_ITEMS;
+  var currentFingerprint=currentRomReport&&currentRomReport.romFingerprint||'';
+  var knownOrigin=ITEM_STORAGE_META[id]||null;
+  if(knownOrigin&&knownOrigin.romFingerprint&&currentFingerprint&&knownOrigin.romFingerprint!==currentFingerprint){
+    showError('These external items were stored from another ROM. Item #'+id+' may mean something different in this game, so this transfer is blocked.');
+    return;
+  }
   var available=Math.floor(Number(source[id])||0);
   if(requestedQty==null){openItemTransferDialog(id,from,to,available);return;}
   var qty=Number(requestedQty);
@@ -4167,6 +4181,9 @@ function moveItemStack(id,from,to,requestedQty){
   source[id]=available-qty;if(!source[id])delete source[id];
   if(to==='bag'&&!BAG_ORDER.includes(id)) BAG_ORDER.push(id);
   if(from==='bag'&&!source[id]) BAG_ORDER=BAG_ORDER.filter(function(x){return String(x)!==id;});
+  if(to==='external'&&!knownOrigin)
+    ITEM_STORAGE_META[id]={romFingerprint:currentFingerprint,name:bagItemData(id).name||itemName(Number(id))};
+  if(from==='external'&&!ITEM_STORAGE[id])delete ITEM_STORAGE_META[id];
   saveBagToStorage();renderBag();
 }
 function reorderBagItem(sourceId,targetId){
@@ -4178,14 +4195,19 @@ function reorderBagItem(sourceId,targetId){
   renderBag();
 }
 function makeStoredItemCard(id,qty,source){
-  var item=bagItemData(id), row=el('article',{class:'bag-entry',draggable:bagItemCategory(id)==='key'?'false':'true'}), info=el('div',{class:'bag-entry-info'});
+  var origin=source==='external'?ITEM_STORAGE_META[String(id)]:null;
+  var foreign=!!(origin&&origin.romFingerprint&&currentRomReport&&currentRomReport.romFingerprint&&
+    origin.romFingerprint!==currentRomReport.romFingerprint);
+  var item=foreign?{name:origin.name||('Item #'+id),icon:null}:bagItemData(id),
+      row=el('article',{class:'bag-entry',draggable:bagItemCategory(id)==='key'?'false':'true'}),
+      info=el('div',{class:'bag-entry-info'});
   if(item.icon){
     var shell=el('span',{class:'asset-icon-shell'});
     var icon=el('img',{src:item.icon,alt:'',style:'width:54px;height:54px;'});icon.loading='lazy';icon.decoding='async';icon.addEventListener('error',function(){shell.style.display='none';});icon.addEventListener('load',function(){shell.style.display='';});shell.appendChild(icon);info.appendChild(shell);
   }
   var txt=el('div',{class:'bag-entry-text'});
   txt.appendChild(el('strong',{text:item.name||itemName(Number(id))}));
-  txt.appendChild(el('small',{text:'#'+Number(id)}));info.appendChild(txt);row.appendChild(info);
+  txt.appendChild(el('small',{text:'#'+Number(id)+(foreign?' · other ROM':source==='external'&&!origin?' · origin unknown':'')}));info.appendChild(txt);row.appendChild(info);
   row.appendChild(el('div',{class:'bag-entry-qty',text:'× '+Number(qty).toLocaleString()}));
   if(bagItemCategory(id)!=='key'){var move=el('button',{text:'Move'});move.addEventListener('click',function(){moveItemStack(id,source,source==='bag'?'external':'bag');});row.appendChild(move);}else row.appendChild(el('small',{text:'Key item · stays in the game'}));
   row.addEventListener('dragstart',function(e){
@@ -4216,7 +4238,7 @@ function renderBag(){
   if(!list||!external||!drop) return;
   var q=(document.getElementById('bag-search').value||'').trim().toLowerCase();
   var order=(document.getElementById('bag-order')||{}).value||'custom';
-  var allIds=Object.keys(BAG_ITEMS).filter(function(id){return Number(BAG_ITEMS[id])>0;});
+  var allIds=(currentSave?Object.keys(BAG_ITEMS):[]).filter(function(id){return Number(BAG_ITEMS[id])>0;});
   allIds.forEach(function(id){if(!BAG_ORDER.includes(String(id)))BAG_ORDER.push(String(id));});
   var ids=allIds.filter(function(id){
     var item=bagItemData(id);
