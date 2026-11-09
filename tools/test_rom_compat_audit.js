@@ -43,4 +43,20 @@ assert.strictEqual(Audit.inspectSave(partial,save(999)).writeSafe,false);
 const trusted=save(999);trusted.profile.confidence='explicit';
 assert.strictEqual(Audit.inspectSave(partial,trusted).writeSafe,true,'Explicit trusted profile should remain available for an incomplete ROM');
 assert.strictEqual(Audit.inspectSave(full,null).status,'no-save');
+const remembered=new Map();
+const local={getItem:k=>remembered.has(k)?remembered.get(k):null,
+             setItem:(k,v)=>remembered.set(k,v),removeItem:k=>remembered.delete(k)};
+const linkedSave=save(1200);
+linkedSave.trainer={name:'TESTER',publicId:42,secretId:900};
+const originalRom=rom(true);originalRom.romFingerprint='sha256:'+'a'.repeat(64);
+const switchedRom=rom(true);switchedRom.romFingerprint='sha256:'+'b'.repeat(64);
+assert.strictEqual(Audit.pairingStatus(originalRom,linkedSave,local).status,'new');
+assert.strictEqual(Audit.rememberPairing(originalRom,linkedSave,local).status,'new');
+assert.strictEqual(Audit.pairingStatus(originalRom,linkedSave,local).status,'known');
+assert.strictEqual(Audit.inspectSave(switchedRom,linkedSave,local).status,'incompatible',
+  'Reusing a trainer save with a different ROM fingerprint must be blocked');
+assert.strictEqual(Audit.inspectSave(switchedRom,linkedSave,local).writeSafe,false);
+assert.strictEqual(Audit.forgetPairing(linkedSave,local),true);
+assert.strictEqual(Audit.pairingStatus(switchedRom,linkedSave,local).status,'new');
+
 console.log('ROM coverage and conservative save mismatch tests passed');
