@@ -2797,16 +2797,19 @@ function renderStoragePanel(){
       var entryProfile=(window.EmeraldCompat&&EmeraldCompat.profileForId(entry.profileId||'brisk-emerald'))||window.ACTIVE_EMERALD_PROFILE;
       var mon=decodePokemon(raw80,false,entryProfile);
       if (!mon || mon.empty) return;
-      var searchable = [mon.nickname, speciesName(mon.species), mon.level, mon.nature,
-        itemName(mon.heldItem), entry.sourceTrainer, entry.sourceId,
+      var storedName=entry.sourceSpeciesName||speciesName(mon.species);
+      var searchable = [mon.nickname, storedName, mon.level, mon.nature,
+        itemName(mon.heldItem), entry.sourceTrainer, entry.sourceId,entry.sourceRomTitle,
         mon.moves.map(moveName).join(' ')].join(' ').toLocaleLowerCase();
       if (!query || searchable.indexOf(query) !== -1) visible.push({entry:entry, mon:mon});
     }catch(e){ /* keep malformed legacy records out of the visible grid */ }
   });
   visible.sort(function(a,b){
-    if (storageSort === 'name') return speciesName(a.mon.species).localeCompare(speciesName(b.mon.species));
-    if (storageSort === 'level') return b.mon.level - a.mon.level || speciesName(a.mon.species).localeCompare(speciesName(b.mon.species));
-    if (storageSort === 'shiny') return Number(b.mon.isShiny) - Number(a.mon.isShiny) || speciesName(a.mon.species).localeCompare(speciesName(b.mon.species));
+    var aName=a.entry.sourceSpeciesName||speciesName(a.mon.species);
+    var bName=b.entry.sourceSpeciesName||speciesName(b.mon.species);
+    if (storageSort === 'name') return aName.localeCompare(bName);
+    if (storageSort === 'level') return b.mon.level - a.mon.level || aName.localeCompare(bName);
+    if (storageSort === 'shiny') return Number(b.mon.isShiny) - Number(a.mon.isShiny) || aName.localeCompare(bName);
     return (b.entry.depositedAt || 0) - (a.entry.depositedAt || 0);
   });
   if (visible.length === 0){
@@ -4254,9 +4257,12 @@ function renderBag(){
   ids.forEach(function(id){list.appendChild(makeStoredItemCard(id,BAG_ITEMS[id],'bag'));});
 
   var externalIds=Object.keys(ITEM_STORAGE).filter(function(id){return Number(ITEM_STORAGE[id])>0;}).filter(function(id){
-    var item=bagItemData(id);
-    return !q || [item.name,item.constant,item.description,id,'#'+id].filter(Boolean).join(' ').toLowerCase().includes(q);
-  }).sort(function(a,b){return String(bagItemData(a).name||'').localeCompare(String(bagItemData(b).name||''));});
+    var item=bagItemData(id),origin=ITEM_STORAGE_META[id]||{};
+    return !q || [item.name,origin.name,item.constant,item.description,id,'#'+id].filter(Boolean).join(' ').toLowerCase().includes(q);
+  }).sort(function(a,b){
+    return String((ITEM_STORAGE_META[a]||{}).name||bagItemData(a).name||'').localeCompare(
+      String((ITEM_STORAGE_META[b]||{}).name||bagItemData(b).name||''));
+  });
   if(!externalIds.length) external.appendChild(el('div',{class:'route-empty',text:'External Item Storage is empty.'}));
   externalIds.forEach(function(id){external.appendChild(makeStoredItemCard(id,ITEM_STORAGE[id],'external'));});
 
