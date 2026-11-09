@@ -53,6 +53,8 @@ function scanHeader(b){
         saveBlock1Size:saveBlock1,saveBlock2Size:saveBlock2,
         partyCountOffset:partyCount,partyOffset:partyOffset,
         playerNameOffset:u32(b,base+160),playerGenderOffset:u32(b,base+164),
+        trainerIdOffset:u32(b,base+156),pokedexOffset:u32(b,base+88),
+        flagsOffset:u32(b,base+80),varsOffset:u32(b,base+84),
         seenOffset:u32(b,base+92),
         bagCounts:[b[base+228],b[base+229],b[base+230],b[base+231],b[base+232]],
         pcItemsOffset:u32(b,base+236)
