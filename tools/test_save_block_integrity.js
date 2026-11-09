@@ -16,6 +16,9 @@ const context={
   u16:(v,o)=>v.getUint16(o,true),
   u32:(v,o)=>v.getUint32(o,true)
 };
+// The extracted browser code references both window.EmeraldCompat and its
+// global alias. Mirror browser globals in this isolated Node VM test.
+context.EmeraldCompat=context.window.EmeraldCompat;
 vm.createContext(context);
 vm.runInContext(functions,context);
 const bytes=new Uint8Array(128*1024),dv=new DataView(bytes.buffer);
