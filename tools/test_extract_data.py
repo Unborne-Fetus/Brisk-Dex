@@ -81,6 +81,31 @@ def run():
         assert [slot["chance"] for slot in grass["slots"]] == [70.0, 30.0], "Generic encounter rates should not inherit Brisk-only uniform odds"
         # Re-run without a JSON wild table: scripts and map definitions must
         # continue to be recognized rather than losing all custom places.
+        trainer_dir = root / "src/data"
+        trainer_dir.mkdir(parents=True, exist_ok=True)
+        (trainer_dir / "trainer_parties.h").write_text("""
+static const struct TrainerMonItemCustomMoves sParty_Custom[] = {
+    { .iv = 31, .lvl = 44, .species = SPECIES_COPPERHAWK,
+      .heldItem = ITEM_METEOR_LENS, .moves = { MOVE_POUND, MOVE_ROCK_SLIDE } },
+};
+""", encoding="utf-8")
+        (trainer_dir / "trainers.h").write_text("""
+const struct Trainer gTrainers[] = {
+    [TRAINER_CUSTOM_LEADER] = {
+        .trainerName = _("ASTER"),
+        .trainerClass = TRAINER_CLASS_LEADER,
+        .partySize = ARRAY_COUNT(sParty_Custom),
+        .party = {.ItemCustomMoves = sParty_Custom},
+    },
+};
+""", encoding="utf-8")
+        trainers = extractor.extract_trainer_teams(str(root))
+        leader = next(t for t in trainers if t["constant"] == "TRAINER_CUSTOM_LEADER")
+        assert leader["name"] == "ASTER" and leader["class"] == "Leader", "C trainer metadata not recovered"
+        assert leader["party"][0]["species"] == "Copperhawk", "Custom trainer Pokémon missing"
+        assert leader["party"][0]["fields"]["Level"] == "44", "Custom trainer level not recovered"
+        assert leader["party"][0]["item"] == "Meteor Lens", "Held item not recovered"
+        assert "Rock Slide" in leader["party"][0]["moves"], "Custom trainer move not recovered"
         out_file.unlink()
         scripted = extractor.extract_route_encounters(str(root), species)
         assert any(x["id"] == "MAP_CUSTOM_ISLAND" for x in scripted), "Script-only map not recovered"
