@@ -87,6 +87,17 @@ assert.strictEqual(customScan.counts.routes,9);
 assert.strictEqual(customScan.data.routeEncounters[0].mapGroup,2);
 assert(customScan.data.routeEncounters.some(a=>a.methods.some(m=>m.slots.some(slot=>slot.species===customSpecies))));
 assert(!customScan.complete,'Unindexed custom ROM must not claim complete coverage');
+// Distinct, non-contiguous compiled encounter tables can represent new regions.
+const secondTable=0x78000;
+for(let map=0;map<7;map++){
+  const row=secondTable+map*20;
+  custom[row]=4;custom[row+1]=map+1;custom[row+2]=custom[row+3]=0;
+  put32(custom,row+4,0x08000000+wildInfo);
+  for(let f=8;f<20;f++)custom[row+f]=0;
+}
+const expandedScan=R.importRom(custom);
+assert.strictEqual(expandedScan.counts.routes,16,'Separated custom region encounter headers must be included');
+assert(expandedScan.data.routeEncounters.some(a=>a.mapGroup===4&&a.mapNumber===7));
 
 // Some expansion forks (including time-of-day variants) encode four sets of
 // land/water/rock/fishing/hidden pointers per map, with up to 24 land slots.
@@ -133,7 +144,7 @@ assert.strictEqual(plain.counts.trainers,0);
 assert.strictEqual(plain.complete,false);
 assert(plain.warnings.some(s=>s.includes('Trainer teams')));
 
-const packed={format:'briskdex-rom-v1',assets:{icons:{'1':'data:image/png;base64,aGVsbG8='},shinyIcons:{'1':'data:image/png;base64,aGVsbG8='}},data:{
+const packed={format:'briskdex-rom-v1',compatibility:{profile:{id:'rom-custom',name:'ROM custom save',writePolicy:'readonly'}},assets:{icons:{'1':'data:image/png;base64,aGVsbG8='},shinyIcons:{'1':'data:image/png;base64,aGVsbG8='}},data:{
   species:{'1':{name:'Custommon',types:['Water']}},
   moves:{'1':'Tackle'},items:{'1':'Poké Ball'},abilities:{'1':'Sturdy'},
   itemDetails:{'1':{name:'Poké Ball'}},moveDetails:{'1':{name:'Tackle'}},abilityDetails:{'1':{name:'Sturdy'}},
@@ -155,6 +166,7 @@ assert.strictEqual(loaded.counts.trainers,1);
 assert.strictEqual(loaded.counts.routes,1);
 assert.strictEqual(loaded.counts.maps,1);
 assert.strictEqual(loaded.data.mapCatalog[0].name,'Custom Island');
+assert.strictEqual(loaded.saveProfile.id,'rom-custom','Source-indexed ROM profile should survive import');
 assert.strictEqual(loaded.data.species['1'].name,'Custommon');
 assert.strictEqual(loaded.iconUrls['1'],'data:image/png;base64,aGVsbG8=');
 assert.strictEqual(loaded.shinyIconUrls['1'],'data:image/png;base64,aGVsbG8=');

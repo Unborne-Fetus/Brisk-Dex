@@ -41,7 +41,8 @@ def collect_icons(folder):
 ART_FIELDS = ("frontSprite", "backSprite", "frontShinySprite", "backShinySprite",
               "frontAnimation", "backAnimation", "frontShinyAnimation", "backShinyAnimation", "cry")
 ART_MIME = {".png": "image/png", ".gif": "image/gif",
-            ".wav": "audio/wav", ".ogg": "audio/ogg", ".mp3": "audio/mpeg"}
+            ".wav": "audio/wav", ".ogg": "audio/ogg", ".mp3": "audio/mpeg",
+            ".aif": "audio/aiff", ".aiff": "audio/aiff"}
 
 def portable_art(data, source_dir):
     """Embed only exported, local, bounded source artwork; reject path traversal."""
@@ -69,7 +70,7 @@ def portable_art(data, source_dir):
             asset_count += 1
     return asset_count
 
-def index_from_exports(data_path, trainer_path, icons_dir, with_art=False):
+def index_from_exports(data_path, trainer_path, icons_dir, with_art=False, save_profile=None):
     data = read_json(data_path)
     trainers = read_json(trainer_path)
     if not isinstance(data, dict):
@@ -96,13 +97,22 @@ def index_from_exports(data_path, trainer_path, icons_dir, with_art=False):
                     if isinstance(species.get(field), str) and not species[field].startswith("data:"):
                         species.pop(field, None)
     icons, shiny = collect_icons(icons_dir)
-    return {
+    index = {
         "format": "briskdex-rom-v1",
         "meta": {"artCount": art_count},
         "indexVersion": 2,
         "data": payload,
         "assets": {"icons": icons, "shinyIcons": shiny},
     }
+    if save_profile:
+        config = read_json(save_profile)
+        profile = config.get("profile", config) if isinstance(config, dict) else None
+        if not isinstance(profile, dict) or not profile.get("id") or not profile.get("name"):
+            raise ValueError("Source save profile requires id and name")
+        if profile.get("writePolicy") == "full" and not profile.get("fingerprints"):
+            raise ValueError("Writable indexed profiles require strong save fingerprints")
+        index["compatibility"] = {"profile": profile}
+    return index
 
 def pack(index):
     encoded = json.dumps(index, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
@@ -171,10 +181,11 @@ def main():
     parser.add_argument("--icons", type=pathlib.Path, default=pathlib.Path("brisk-dex-icons"))
     parser.add_argument("--no-icons", action="store_true", help="Reduce size by omitting icons")
     parser.add_argument("--with-art", action="store_true", help="Include source-exported front/back/shiny sprites, animations, and cries")
+    parser.add_argument("--save-profile", type=pathlib.Path, help="Source-authored Emerald save profile JSON (never inferred from ROM names)")
     args = parser.parse_args()
     if args.gba.resolve() == args.output.resolve():
         parser.error("The output must be separate; the original ROM will not be overwritten.")
-    index = index_from_exports(args.data, args.trainers, None if args.no_icons else args.icons, args.with_art)
+    index = index_from_exports(args.data, args.trainers, None if args.no_icons else args.icons, args.with_art, args.save_profile)
     rom = args.gba.read_bytes()
     live = len(rom)
     while live > 0xC0 and rom[live - 1] == 0xFF:

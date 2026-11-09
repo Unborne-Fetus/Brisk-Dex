@@ -21,6 +21,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import struct
 import sys
 import zlib
@@ -1619,6 +1620,8 @@ def main():
 
     # ---- icons ----
     gfx_dir = os.path.join(repo, "graphics", "pokemon")
+    by_sprite = {}
+    by_icon = {}
     icons_out = "brisk-dex-icons"
     if os.path.isdir(gfx_dir):
         os.makedirs(icons_out, exist_ok=True)
@@ -1627,13 +1630,14 @@ def main():
                 os.remove(os.path.join(icons_out, filename))
         found = 0
         shiny_found = 0
-        by_sprite = {}
         for root, _, files in os.walk(gfx_dir):
-            if "icon.png" not in files:
+            if not set(files).intersection({"icon.png", "front.png", "back.png", "anim_front.png", "anim_back.png"}):
                 continue
             rel = os.path.relpath(root, gfx_dir)
             sprite_key = re.sub(r'[_-]', '', rel.replace(os.sep, '')).lower()
             by_sprite[sprite_key] = root
+            if "icon.png" in files:
+                by_icon[sprite_key] = root
             # Some species use a shortened form name in .iconSprite while
             # their directory spells the same form with a suffix such as
             # "_percent" (for example Zygarde10 -> zygarde/10_percent).
@@ -1641,21 +1645,27 @@ def main():
             short_form_key = re.sub(r'[_-]', '', short_form_rel.replace(os.sep, '')).lower()
             if short_form_key != sprite_key:
                 by_sprite.setdefault(short_form_key, root)
+                if "icon.png" in files:
+                    by_icon.setdefault(short_form_key, root)
             if sprite_key == 'zygarde':
                 by_sprite.setdefault('zygarde50', root)
+                if "icon.png" in files:
+                    by_icon.setdefault('zygarde50', root)
 
         for sid, species in out_species.items():
             sprite_name = species.get("iconSprite") or species.get("constant", "").replace("_", "").title()
             sprite_key = re.sub(r'[_-]', '', sprite_name).lower()
-            folder = by_sprite.get(sprite_key)
+            folder = by_icon.get(sprite_key)
             if not folder:
                 parts = re.findall(r'[A-Z]?[a-z0-9]+|[A-Z]+(?=[A-Z]|$)', sprite_name)
                 while len(parts) > 1 and not folder:
                     parts.pop()
-                    folder = by_sprite.get(''.join(parts).lower())
+                    folder = by_icon.get(''.join(parts).lower())
             if not folder:
                 continue
             icon_path = os.path.join(folder, "icon.png")
+            if not os.path.isfile(icon_path):
+                continue
             shutil.copyfile(icon_path, os.path.join(icons_out, sid + ".png"))
             shiny_path = os.path.join(folder, "icon_shiny.png")
             if os.path.isfile(shiny_path):
@@ -1830,11 +1840,13 @@ def main():
             os.remove(os.path.join(cries_out, filename))
     if os.path.isdir(cries_source):
         available_cries = {}
-        for filename in os.listdir(cries_source):
-            stem, ext = os.path.splitext(filename)
-            if ext.lower() not in (".wav", ".aif", ".mp3", ".ogg"):
-                continue
-            available_cries[re.sub(r"[^a-z0-9]", "", stem.lower())] = filename
+        for root, _, files in os.walk(cries_source):
+            for filename in sorted(files):
+                stem, ext = os.path.splitext(filename)
+                if ext.lower() not in (".wav", ".aif", ".aiff", ".mp3", ".ogg"):
+                    continue
+                key = re.sub(r"[^a-z0-9]", "", stem.lower())
+                available_cries.setdefault(key, os.path.relpath(os.path.join(root, filename), cries_source))
         for sid, species in out_species.items():
             candidates = [
                 species.get("constant", ""),
@@ -1855,7 +1867,22 @@ def main():
             if source_name:
                 ext = os.path.splitext(source_name)[1].lower()
                 target = sid + ext
-                shutil.copyfile(os.path.join(cries_source, source_name), os.path.join(cries_out, target))
+                source_path = os.path.join(cries_source, source_name)
+                # Chromium/Android cannot reliably play AIFF. Prefer a WAV
+                # conversion when FFmpeg is installed; otherwise retain the
+                # original rather than silently discarding a custom cry.
+                if ext in (".aif", ".aiff") and shutil.which("ffmpeg"):
+                    wav_target = sid + ".wav"
+                    try:
+                        subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", "-y",
+                                        "-i", source_path, os.path.join(cries_out, wav_target)],
+                                       check=True, timeout=20, stdout=subprocess.DEVNULL,
+                                       stderr=subprocess.PIPE)
+                        target = wav_target
+                    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                        pass
+                if target == sid + ext:
+                    shutil.copyfile(source_path, os.path.join(cries_out, target))
                 species["cry"] = cries_out + "/" + target
 
     # Export every trainer battle portrait referenced by trainers.party.

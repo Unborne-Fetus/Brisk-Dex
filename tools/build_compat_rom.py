@@ -27,6 +27,8 @@ def run():
     parser.add_argument("--no-art", action="store_true",
                         help="Omit battle sprites, shiny artwork and cries to reduce index size")
     parser.add_argument("--no-icons", action="store_true", help="Omit Pokémon icons")
+    parser.add_argument("--save-profile", type=pathlib.Path,
+                        help="Verified game-specific Emerald save profile JSON; defaults to source/briskdex-compat-profile.json when present")
     args=parser.parse_args()
     rom=args.rom.expanduser().resolve()
     source=args.source.expanduser().resolve()
@@ -57,6 +59,12 @@ def run():
             argv.append("--with-art")
         if args.no_icons:
             argv.append("--no-icons")
+        save_profile=(args.save_profile.expanduser().resolve() if args.save_profile
+                      else source/"briskdex-compat-profile.json")
+        if args.save_profile and not save_profile.is_file():
+            parser.error("The requested game-specific save profile JSON does not exist")
+        if save_profile.is_file():
+            argv.extend(["--save-profile",str(save_profile)])
         try:
             subprocess.run(argv,cwd=work,check=True)
         except subprocess.CalledProcessError:

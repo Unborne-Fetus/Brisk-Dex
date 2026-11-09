@@ -281,6 +281,26 @@ function inferProfileFromRom(rom){
   return profile;
 }
 
+function indexedRomSaveProfile(rom,bytes){
+  if(!rom||rom.source!=='embedded-manifest'||!rom.integrity||
+      rom.integrity.status!=='verified'||!rom.saveProfile)return null;
+  var raw=rom.saveProfile,profile;
+  try{profile=normalizeProfile(raw);}catch(e){return null;}
+  var rules=Array.isArray(profile.fingerprints)?profile.fingerprints:[];
+  if(!rules.length||!fingerprintMatches(profile,bytes,{romFingerprint:rom.romFingerprint}))return null;
+  // A generated default layout is NOT sufficient to authorize writes.
+  // Require a complete author-supplied layout plus independent hack markers.
+  var hasLayout=!!(raw.save&&raw.pokemon&&raw.pc&&raw.bag&&raw.dex&&
+    raw.idLimits&&raw.idNamespaces&&Number.isInteger(raw.save.partyOffset)&&
+    Number.isInteger(raw.pc.boxCount)&&Array.isArray(raw.bag.pockets)&&
+    Number.isInteger(raw.pokemon.speciesMask));
+  var fixedMarkers=rules.filter(function(rule){return rule.type==='u16'||rule.type==='u32';});
+  var distinctOffsets=new Set(fixedMarkers.map(function(rule){return Number(rule.offset);}));
+  var strong=rules.some(function(rule){return rule.type==='pc-extension';})||distinctOffsets.size>=2;
+  var safe=hasLayout&&strong&&profile.writePolicy==='full';
+  return runtimeProfile(profile,'indexed-rom',safe,safe?'':(
+    'The indexed ROM profile matched, but it does not declare a complete save layout and strong hack-specific fingerprints. Editing remains read-only.'));
+}
 function detectProfile(context){
   context=context||{};
   var bytes=context.bytes instanceof Uint8Array?context.bytes:new Uint8Array(context.bytes||0);
@@ -295,6 +315,8 @@ function detectProfile(context){
       return runtimeProfile(all[i],'exact',all[i].writePolicy==='full','');
   }
   if(context.rom){
+    var indexed=indexedRomSaveProfile(context.rom,bytes);
+    if(indexed)return indexed;
     var inferred=inferProfileFromRom(context.rom);
     if(inferred)return runtimeProfile(inferred,'inferred-rom',false,
       'This save layout was inferred from a ROM, but the file cannot be verified as belonging to that exact game. Import a matching trusted profile before editing.');

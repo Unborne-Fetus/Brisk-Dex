@@ -451,7 +451,7 @@ function scanWildEncounters(b,speciesLimit,warnings){
     cache.set(at,row);
     return row;
   }
-  var best=[],bestStart=-1;
+  var best=[],bestStart=-1,verifiedRuns=[];
   // Quickly prefilter aligned structs. For each promising row, require a long
   // consecutive run of independently validated wild-mon pointers and slots.
   for(var at=0;at+160<=limit;at+=4){
@@ -468,12 +468,24 @@ function scanWildEncounters(b,speciesLimit,warnings){
       keys.add(key);rows.push(row);
     }
     if(rows.length>best.length){best=rows;bestStart=at;}
+    if(rows.length>=6)verifiedRuns.push({start:at,rows:rows});
     if(rows.length>1)at+=20*(rows.length-1);
   }
   // A handful of plausible structs can occur by coincidence; avoid claiming
   // real encounters until enough independent map records agree.
   if(best.length<6)return scanTimedWildEncounters(b,speciesLimit,warnings);
-  var areas=best.map(function(row){
+  // Hacks may append additional encounter-header runs for added regions or
+  // difficulty modes. The former longest-run-only scan missed those maps.
+  // Deduplicate by the actual compiled map group/number, not a guessed name.
+  verifiedRuns.sort(function(a,b){return b.rows.length-a.rows.length;});
+  var merged=[],seenMaps=new Set();
+  verifiedRuns.forEach(function(run){
+    run.rows.forEach(function(row){
+      var key=row.mapGroup+':'+row.mapNumber;
+      if(!seenMaps.has(key)&&merged.length<2048){seenMaps.add(key);merged.push(row);}
+    });
+  });
+  var areas=merged.map(function(row){
     return {
       id:'ROM_MAP_GROUP_'+row.mapGroup+'_MAP_'+row.mapNumber,
       name:'Map group '+row.mapGroup+' · map '+row.mapNumber,
@@ -482,9 +494,9 @@ function scanWildEncounters(b,speciesLimit,warnings){
       methods:row.methods
     };
   });
-  warnings.push('Recovered '+areas.length+' compiled wild-encounter maps at ROM offset 0x'+bestStart.toString(16)+'. These have verified species and levels but only map group/number IDs; route names, custom slot counts and maps with no wild encounters require a source-matched ROM index.');
+  warnings.push('Recovered '+areas.length+' compiled wild-encounter maps across '+verifiedRuns.length+' validated table run(s), first at ROM offset 0x'+bestStart.toString(16)+'. These have verified species and levels but only map group/number IDs; route names, custom slot counts and maps with no wild encounters require a source-matched ROM index.');
   warnings.push('Unindexed wild encounter slot percentages are unknown and intentionally not estimated.');
-  return {areas:areas,count:best.length};
+  return {areas:areas,count:areas.length};
 }
 
 function basicDetails(b){
@@ -502,7 +514,7 @@ function cleanIndexedArt(data){
       var value=entry[field];
       if(value==null)return;
       if(typeof value!=='string'||value.length>1500000||
-        !/^data:(?:image\/(?:png|gif)|audio\/(?:wav|ogg|mpeg));base64,[A-Za-z0-9+/=]+$/i.test(value))
+        !/^data:(?:image\/(?:png|gif)|audio\/(?:wav|ogg|mpeg|aiff));base64,[A-Za-z0-9+/=]+$/i.test(value))
         delete entry[field];
     });
   });
@@ -520,6 +532,9 @@ function importRom(value,options){
   var b=bytesOf(value),details=basicDetails(b),warnings=[],header=scanHeader(b),rhh=scanRhh(b);
   var embedded=(options&&options.manifest)||parseEmbedded(b),layout=(options&&options.layout)||(embedded&&embedded.layout)||{};
   var data=embedded?normalizedManifest(embedded):{},source=embedded?'embedded-manifest':'rom-tables';
+  var indexedSaveProfile=embedded&&embedded.compatibility&&embedded.compatibility.profile;
+  if(!indexedSaveProfile||typeof indexedSaveProfile!=='object'||Array.isArray(indexedSaveProfile))
+    indexedSaveProfile=null;
   var speciesLayout=layout.speciesInfo||null,count=Number(layout.speciesCount)||(rhh&&rhh.species)||(header&&header.pokedexCount+1)||387;
   if(!data.species){
     if(!speciesLayout&&header&&header.speciesInfo!=null){
@@ -603,7 +618,7 @@ function importRom(value,options){
   var isComplete=!!embedded&&!missingIndexFields.length;
   if(embedded&&missingIndexFields.length)
     warnings.push('This ROM has an incomplete reference index: '+missingIndexFields.join(', ')+'. Missing fields are not verified.');
-  return {details:details,header:header,rhh:rhh,data:data,icons:icons,iconUrls:urls,shinyIconUrls:shinyUrls,counts:counts,source:source,warnings:warnings,complete:isComplete,missingIndexFields:missingIndexFields};
+  return {details:details,header:header,rhh:rhh,data:data,icons:icons,iconUrls:urls,shinyIconUrls:shinyUrls,counts:counts,source:source,warnings:warnings,complete:isComplete,missingIndexFields:missingIndexFields,saveProfile:indexedSaveProfile};
 }
 // A CRC verifies transport integrity. A SHA-256 digest additionally binds the
 // source-exported metadata to the exact live compiled ROM that was indexed.

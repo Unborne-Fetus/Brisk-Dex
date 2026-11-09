@@ -63,4 +63,34 @@ const profile=EmeraldCompat.detectProfile({bytes:new Uint8Array(128*1024),rom:ro
 assert(profile.confidence==='inferred-rom','Unknown save should use ROM-inferred read-only profile');
 assert(profile.writeSafe===false,'Unknown save should not automatically become writable');
 
+// An indexed ROM can authorize a fully declared, strongly fingerprinted
+// game-specific save format without a manual dropdown selection.
+const indexedBytes=new Uint8Array(128*1024);
+indexedBytes[0x40]=0x25;indexedBytes[0x41]=0x12;
+indexedBytes[0x44]=0x98;indexedBytes[0x45]=0x76;
+const indexedProfile=Object.assign({},vanilla,{
+  id:'indexed-custom',name:'Indexed Custom Emerald',
+  fingerprints:[{type:'u16',offset:0x40,value:0x1225},{type:'u16',offset:0x44,value:0x7698}],
+  save:Object.assign({},vanilla.save),
+  pokemon:Object.assign({},vanilla.pokemon),
+  pc:Object.assign({},vanilla.pc),
+  bag:Object.assign({},vanilla.bag),
+  dex:Object.assign({},vanilla.dex),
+  idLimits:Object.assign({},vanilla.idLimits),
+  idNamespaces:Object.assign({},vanilla.idNamespaces)
+});
+const linkedRom=Object.assign({},rom,{source:'embedded-manifest',
+  integrity:{status:'verified'},saveProfile:indexedProfile});
+const matched=EmeraldCompat.detectProfile({bytes:indexedBytes,rom:linkedRom});
+assert(matched.confidence==='indexed-rom'&&matched.writeSafe,'A verified ROM with strong unique save markers and complete layout should auto-select writable profile');
+const changedBytes=indexedBytes.slice();changedBytes[0x44]^=1;
+assert(EmeraldCompat.detectProfile({bytes:changedBytes,rom:linkedRom}).writeSafe===false,
+  'Mismatched save markers must not enable editing');
+const unsignedRom=Object.assign({},linkedRom,{integrity:{status:'legacy'}});
+assert(EmeraldCompat.detectProfile({bytes:indexedBytes,rom:unsignedRom}).writeSafe===false,
+  'A ROM index without a verified SHA-256 must not auto-enable editing');
+const weakRom=Object.assign({},linkedRom,{saveProfile:Object.assign({},indexedProfile,{
+  fingerprints:[{type:'file-size',value:indexedBytes.length}]})});
+assert(EmeraldCompat.detectProfile({bytes:indexedBytes,rom:weakRom}).writeSafe===false,
+  'File size alone must not make an unfamiliar save writable');
 console.log('Emerald compatibility tests passed');
