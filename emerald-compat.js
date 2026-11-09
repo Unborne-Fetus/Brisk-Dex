@@ -246,7 +246,27 @@ function inferProfileFromRom(rom){
   var count=Number(rhh.species)||Number(hdr.pokedexCount)||0;
   var expanded=count>420||Number(rhh.moves)>355;
   var profile=deepClone(expanded?BUILTINS['pokeemerald-expansion-generic']:BUILTINS.emerald);
-  var title=String(rom.details.title||hdr.name||'Emerald-family ROM').slice(0,60);
+  var family=String(rom.details.gameFamily||'').toLowerCase();
+  if(!family||family==='unknown-gen3'){
+    var rawCode=String(rom.details.gameCode||'').toUpperCase();
+    family=/^BPR/.test(rawCode)?'firered':/^BPG/.test(rawCode)?'leafgreen':
+      /^AXV/.test(rawCode)?'ruby':/^AXP/.test(rawCode)?'sapphire':'emerald';
+  }
+  // These five games share sector IDs, but the contents of SaveBlock1 and
+  // SaveBlock2 do NOT have interchangeable layouts.
+  if(['firered','leafgreen','ruby','sapphire'].includes(family)){
+    profile.save.checksumSizes=Object.assign({},DEFAULT_CHECKSUM_SIZES,
+      family==='ruby'||family==='sapphire'?{0:0x890,4:0xC40}:{0:0xF24,4:0xEE8});
+    profile.dex={kind:'unknown',flagBytes:0};
+    profile.bag={pockets:[],quantityEncrypted:true,maxStack:999};
+    profile.save.encryptionKeyOffset=0xAC;
+    if(family==='firered'||family==='leafgreen'){
+      profile.save.partyCountOffset=0x34;
+      profile.save.partyOffset=0x38;
+      profile.save.moneyOffset=0x290;
+    }
+  }
+  var title=String(rom.details.title||hdr.name||'Generation III ROM').slice(0,60);
   var gameCode=String(rom.details.gameCode||'').replace(/[^a-z0-9]/gi,'').slice(0,4).toLowerCase();
   profile.id='detected-rom-'+(gameCode||'unknown');
   profile.name='Inferred: '+title;
@@ -273,8 +293,9 @@ function inferProfileFromRom(rom){
   // ROM header offsets do not establish custom box packing, pocket placement,
   // encryption masks or Pokédex flag semantics. Keep unknown saves read-only.
   profile.inferredFields=hdr.saveLayout?[
-    'partyCountOffset','partyOffset','trainerOffsets','speciesLimit','expansionFamily'
-  ]:['speciesLimit','expansionFamily'];
+    'partyCountOffset','partyOffset','trainerOffsets','speciesLimit','expansionFamily','gameFamily'
+  ]:['speciesLimit','expansionFamily','gameFamily'];
+  profile.gameFamily=family;
   profile.romGameCode=rom.details.gameCode||'';
   profile.inferredFromRom=true;
 

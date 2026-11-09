@@ -23,8 +23,12 @@ function gbaString(b,o,n){if(o==null||o<0||o+n>b.length)return '';var s='';for(v
 function encodeGba(s){var out=[];for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);out.push(c>=65&&c<=90?0xBB+c-65:c>=97&&c<=122?0xD5+c-97:c>=48&&c<=57?0xA1+c-48:0);}return out;}
 function findBytes(b,pattern,from,to){outer:for(var i=from;i+pattern.length<=to;i++){for(var j=0;j<pattern.length;j++)if(b[i+j]!==pattern[j])continue outer;return i;}return -1;}
 function scanHeader(b){
-  var needle=[112,111,107,101,109,111,110,32,101,109,101,114,97,108,100,32,118,101,114,115,105,111,110],pos=0;
+  var needle=[112,111,107,101,109,111,110,32],pos=0;
   while((pos=findBytes(b,needle,pos,Math.min(b.length,1024*1024)))>=0){
+    // GFRomHeader is shared by multiple Gen III families. Never search only
+    // for Emerald's internal description: it would skip FRLG and Ruby/Sapphire.
+    var banner=text(b,pos,32);
+    if(!/^pokemon\s+(?:emerald|ruby|sapphire|fire\s?red|leaf\s?green)\s+version/i.test(banner)){pos++;continue;}
     var base=pos-8;
     if(base<0||u32(b,base)>25||offset(b,u32(b,base+188),8)==null){pos++;continue;}
     // This layout follows the public GFRomHeader in pokeemerald-expansion.
@@ -501,7 +505,11 @@ function scanWildEncounters(b,speciesLimit,warnings){
 
 function basicDetails(b){
   if(b.length<0xC0||b[0xB2]!==0x96)throw new Error('This is not a recognizable Game Boy Advance ROM (invalid header).');
-  return {title:text(b,0xA0,12),gameCode:text(b,0xAC,4),maker:text(b,0xB0,2),size:b.length,version:b[0xBC]};
+  var code=text(b,0xAC,4).toUpperCase(),family=/^BPR/.test(code)?'firered':
+    /^BPG/.test(code)?'leafgreen':/^AXV/.test(code)?'ruby':
+    /^AXP/.test(code)?'sapphire':/^BPE/.test(code)?'emerald':'unknown-gen3';
+  return {title:text(b,0xA0,12),gameCode:text(b,0xAC,4),maker:text(b,0xB0,2),
+    size:b.length,version:b[0xBC],generation:3,platform:'Game Boy Advance',gameFamily:family};
 }
 function cleanIndexedArt(data){
   var fields=['frontSprite','backSprite','frontShinySprite','backShinySprite',

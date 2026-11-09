@@ -93,4 +93,16 @@ const weakRom=Object.assign({},linkedRom,{saveProfile:Object.assign({},indexedPr
   fingerprints:[{type:'file-size',value:indexedBytes.length}]})});
 assert(EmeraldCompat.detectProfile({bytes:indexedBytes,rom:weakRom}).writeSafe===false,
   'File size alone must not make an unfamiliar save writable');
-console.log('Emerald compatibility tests passed');
+const frlgRom={details:{title:'FireRed hack',gameCode:'BPRE',gameFamily:'firered'},
+  header:{saveLayout:{partyCountOffset:0x34,partyOffset:0x38}}};
+const frlgInferred=EmeraldCompat.inferProfileFromRom(frlgRom);
+assert(frlgInferred.gameFamily==='firered','FRLG family not recognized');
+assert(frlgInferred.save.partyCountOffset===0x34&&frlgInferred.save.partyOffset===0x38,'FRLG party offsets incorrect');
+assert(frlgInferred.save.checksumSizes[0]===0xF24&&frlgInferred.save.checksumSizes[4]===0xEE8,'FRLG section sizes incorrect');
+assert(frlgInferred.writePolicy==='readonly','FRLG save inference must not enable writes');
+assert(frlgInferred.bag.pockets.length===0,'FRLG should not inherit Emerald bag layout');
+const rubyRom={details:{title:'Ruby hack',gameCode:'AXVE',gameFamily:'ruby'},header:{}};
+const rubyInferred=EmeraldCompat.inferProfileFromRom(rubyRom);
+assert(rubyInferred.save.checksumSizes[0]===0x890&&rubyInferred.save.checksumSizes[4]===0xC40,'Ruby section sizes incorrect');
+assert(rubyInferred.writePolicy==='readonly','Ruby layout must stay read-only');
+console.log('Emerald/RS/FRLG compatibility tests passed');
