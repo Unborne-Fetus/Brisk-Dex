@@ -22,13 +22,25 @@ Players installing a packaged app do not need Node.js or npm.
 
 | Platform | Package | Notes |
 | --- | --- | --- |
+| Web | Browser app | Runs from GitHub Pages; choose ROM/save files locally. |
 | Windows | EXE installer | Run the installer, then launch Adapt Dex. |
 | Android | APK | Transfer it to your device and install it. Android may ask you to allow installation from that source. |
 | iOS | Unsigned IPA | Requires signing before installation; it is not a ready-to-install App Store package. |
 | Linux | AppImage or DEB | Available through the separate Linux build workflow. |
 | macOS | DMG | Build locally on a Mac using the commands below. |
 
-Download packages from a successful run in the repository's [Actions tab](https://github.com/Unborne-Fetus/Brisk-Dex/actions). The combined workflow provides **Brisk-Dex-Windows**, **Brisk-Dex-Android**, and **Brisk-Dex-iOS-Unsigned** artifacts. Extract the downloaded ZIP to get the installer.
+Download packages from a successful [Adapt Dex release workflow](https://github.com/Unborne-Fetus/Brisk-Dex/actions/workflows/release-adapt.yml). It builds Windows, Android, Linux, macOS and unsigned iOS packages. Extract the downloaded ZIP to get the installer.
+
+### Web version
+
+Adapt Dex Web is a static browser build from the `adapt-dex` branch. After a successful [web deployment workflow](https://github.com/Unborne-Fetus/Brisk-Dex/actions/workflows/deploy-adapt-web.yml) and Pages setup, it is served at [Adapt Dex Web](https://unborne-fetus.github.io/Brisk-Dex/).
+
+- Select a local `.gb`, `.gbc` or `.gba` ROM, then optionally a `.sav` or `.srm`. The site does not host or upload your game or save files.
+- Save editing is enabled only for verified layouts; browser changes must be **exported as a save copy** to be used by your emulator. Recovery snapshots use browser storage, which can be cleared. Back up your originals.
+- External Pokémon storage is stored in your browser and can be exported separately. Incognito sessions may discard it.
+- For offline hosting or deployment elsewhere, download the **Adapt-Dex-Web-Site** artifact from the successful workflow and serve its contents as static files.
+- If GitHub Pages publishing is blocked, set **Settings → Pages → Build and deployment → Source: GitHub Actions**. A repository owner may also need to allow `adapt-dex` to deploy to the `github-pages` environment.
+- Local preview: run `npm run web:build`, then `python -m http.server --directory web-dist 8000` and open `http://localhost:8000`.
 
 ### First launch (adapt-dex)
 

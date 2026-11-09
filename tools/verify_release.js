@@ -23,6 +23,9 @@ check(packaged.has('classic-rom-import.js'),'Electron package does not include c
 check(packaged.has('compatibility/**/*'),'Electron package does not include compatibility packs/docs');
 
 const html=read('index.html');
+check(pkg.productName==='Adapt Dex','Adapt Dex build branding is missing');
+check(html.includes('<title>Adapt Dex</title>'),'Adapt Dex page title is missing');
+check(html.includes('--accent:#ffd22b;'),'Adapt Dex yellow theme token is missing');
 check(html.includes('<script src="emerald-compat.js"></script>'),'index.html does not load emerald-compat.js');
 check(html.includes('setting-emerald-profile'),'Compatibility profile UI is missing');
 check(html.includes('assertSaveWritable'),'Save write safety guard is missing');

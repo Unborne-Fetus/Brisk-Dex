@@ -1,9 +1,9 @@
-name: Release Gate - Compat Branch
+name: Release Gate - Adapt Dex
 
 on:
   workflow_dispatch:
   push:
-    branches: [compat-branch]
+    branches: [adapt-dex]
 
 jobs:
   compat-tests:
@@ -48,7 +48,7 @@ jobs:
       - run: npm run dist:win
       - uses: actions/upload-artifact@v4
         with:
-          name: Brisk-Dex-Compat-Windows
+          name: Adapt-Dex-Windows
           path: dist/*.exe
           if-no-files-found: error
 
@@ -76,11 +76,11 @@ jobs:
           chmod +x android/gradlew
           cd android
           ./gradlew assembleDebug
-      - run: cp android/app/build/outputs/apk/debug/app-debug.apk Brisk-Dex-Compat-Android.apk
+      - run: cp android/app/build/outputs/apk/debug/app-debug.apk Adapt-Dex-Android.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: Brisk-Dex-Compat-Android
-          path: Brisk-Dex-Compat-Android.apk
+          name: Adapt-Dex-Android
+          path: Adapt-Dex-Android.apk
           if-no-files-found: error
 
   linux:
@@ -97,7 +97,7 @@ jobs:
       - run: npm run dist:linux
       - uses: actions/upload-artifact@v4
         with:
-          name: Brisk-Dex-Compat-Linux
+          name: Adapt-Dex-Linux
           path: |
             dist/*.AppImage
             dist/*.deb
@@ -136,12 +136,12 @@ jobs:
       - name: Package unsigned IPA
         run: |
           mkdir -p Payload
-          cp -R build-ios/Build/Products/Release-iphoneos/App.app Payload/BriskDex.app
-          zip -qry Brisk-Dex-Compat-iOS-Unsigned.ipa Payload
+          cp -R build-ios/Build/Products/Release-iphoneos/App.app Payload/AdaptDex.app
+          zip -qry Adapt-Dex-iOS-Unsigned.ipa Payload
       - uses: actions/upload-artifact@v4
         with:
-          name: Brisk-Dex-Compat-Apple
+          name: Adapt-Dex-Apple
           path: |
             dist/*.dmg
-            Brisk-Dex-Compat-iOS-Unsigned.ipa
+            Adapt-Dex-iOS-Unsigned.ipa
           if-no-files-found: error
