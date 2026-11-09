@@ -1,6 +1,6 @@
 # Brisk Dex
 
-Brisk Dex is a companion app for [Pokémon Brisk Emerald](https://github.com/Unborne-Fetus/Pokemon-Brisk-Emerald). Browse the game's reference data, manage Pokémon and items across saves, and battle another player using Pokémon from your collection.
+Brisk Dex is a companion app for [Pokémon Brisk Emerald](https://github.com/Unborne-Fetus/Pokemon-Brisk-Emerald). Browse the game's reference data, manage Pokémon and items across compatible Emerald-family saves.
 
 Species, forms, stats, moves, abilities, items, encounters, and trainer teams come from Brisk Emerald's source. Brisk changes many things from the official games, so its bundled data is the reference used by this app.
 
@@ -37,7 +37,7 @@ Download packages from a successful run in the repository's [Actions tab](https:
 3. Brisk Dex imports verified ROM data locally and opens the Pokédex, moves, abilities, trainers and encounters where recognized. Without a save, you can browse the ROM but player party, storage and progress aren't available.
 4. If a save is included, Brisk Dex displays its party and boxes and follows the chosen save profile's write-safety rules. Use **Change game** to return to the chooser (this reloads the app).
 
-Normal ROMs may expose only some tables; a source-indexed ROM exposes the full supported reference dataset. Importing a ROM does not prove that an unknown save belongs to it, nor does it enable unsafe writes.
+Normal ROMs may expose only some tables; a source-indexed ROM carries more game-specific data. SHA-256 ROM verification and remembered save associations catch accidental mismatches, but an unknown save's origin cannot be proven from its structure alone. Edits still require a trusted profile.
 
 The compatibility app asks for a ROM every time it launches and does not silently reopen an earlier save. Bundled reference assets remain available for Brisk-specific tools, but the selected ROM replaces the displayed game reference data for the session.
 
@@ -145,6 +145,17 @@ The browser interface is `index.html`. Serve the complete app folder through a l
 | Save changes are not in the emulator | On browser/iOS fallback, export the updated save and replace the emulator's copy. Also check that the emulator did not overwrite it. |
 | Some translated text stays English | Connect to the internet; uncached translations depend on service availability and limits. |
 
+## Build a compatible indexed ROM
+
+For a compiled Emerald-based `.gba` and its matching source checkout:
+
+```sh
+python tools/build_compat_rom.py --rom /path/to/game.gba --source /path/to/source --output /path/to/game-indexed.gba
+```
+
+This can include custom regions, Fakémon, items, trainers, maps, icons, shiny battle sprites and cries. Use `--no-art` if the art collection exceeds the ROM index budget. The original ROM remains untouched.
+
+**External Pokémon storage and external item storage are retained.** They are independent of the removed trading, online battles and competitive systems. Keep archive backups when switching devices or clearing app data. Depositing or withdrawing Pokémon into a save still requires a trusted matching compatibility profile.
 ## Updating Brisk reference data
 
 For contributors changing the ROM's data, run the extractor from the Brisk Dex folder against a Brisk Emerald checkout:
