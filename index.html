@@ -1364,6 +1364,8 @@ function recordObservedRomPair(save){
 }
 
 function parseSav(arrayBuffer){
+  if(currentRomReport&&currentRomReport.details&&currentRomReport.details.generation<3)
+    throw new Error('Generation 1–2 SRAM is not an Emerald save. It can be inspected read-only but not parsed by the Gen III editor.');
   var bytes=new Uint8Array(arrayBuffer),override=selectedEmeraldProfileOverride();
   var briskProbeProfile=window.EmeraldCompat?EmeraldCompat.profileForId('brisk-emerald'):null;
   var briskProbe=briskProbeProfile?readStorageExtension(bytes,briskProbeProfile):{present:false};
@@ -4374,11 +4376,31 @@ function setMainTab(tabName){
 /* ============================================================
    File loading
    ============================================================ */
+function inspectClassicSaveFile(raw){
+  if(!currentRomReport||!currentRomReport.details||currentRomReport.details.generation>=3)
+    throw new Error('No Generation 1–2 ROM is selected.');
+  var info=BriskClassicImporter.inspectSave(raw,currentRomReport);
+  currentSave=null;
+  window.ACTIVE_EMERALD_PROFILE=null;
+  dirty=false;
+  document.getElementById('empty-state').style.display='block';
+  document.getElementById('app-content').style.display='none';
+  document.getElementById('empty-state').querySelector('h2').textContent='Classic save inspected (read-only)';
+  document.getElementById('empty-state').querySelector('p').textContent=info.reason;
+  var status=document.getElementById('compat-profile-status');
+  if(status)status.textContent='Generation '+info.generation+' SRAM · '+info.bytes+' bytes · Read-only · '+info.reason;
+  showNotice('Classic SRAM inspected; no changes were made. '+info.reason);
+  return info;
+}
 function handleSavFile(file){
   clearError();
   var reader = new FileReader();
   reader.onload = function(e){
     try{
+      if(currentRomReport&&currentRomReport.details&&currentRomReport.details.generation<3){
+        inspectClassicSaveFile(e.target.result);
+        return;
+      }
       var save = parseSav(e.target.result);
       var extMatch = String(file && file.name || '').match(/\.(sav|srm)$/i);
       save.fileExtension = extMatch ? extMatch[1].toLowerCase() : 'sav';
@@ -4406,6 +4428,10 @@ async function handleSavFromAndroid(){
     var result = await MOBILE_API.openSaveFile();
     if (!result || !result.data) return;
     var bytes = base64ToBytes(result.data);
+    if(currentRomReport&&currentRomReport.details&&currentRomReport.details.generation<3){
+      inspectClassicSaveFile(bytes.buffer);
+      return;
+    }
     var save = parseSav(bytes.buffer);
     var extMatch = String(result.name || '').match(/\.(sav|srm)$/i);
     save.fileExtension = extMatch ? extMatch[1].toLowerCase() : 'sav';
@@ -4432,7 +4458,12 @@ async function handleSavFromElectron(){
     await gameDataReady;
     var result = await window.briskDexAPI.openSavDialog();
     if (!result) return; // user cancelled
-    var save = parseSav(result.buffer.buffer ? result.buffer.buffer : result.buffer);
+    var buffer=launchSaveBuffer(result.buffer);
+    if(currentRomReport&&currentRomReport.details&&currentRomReport.details.generation<3){
+      inspectClassicSaveFile(buffer);
+      return;
+    }
+    var save = parseSav(buffer);
     save.filePath = result.filePath;
     var extMatch = String(result.filePath || '').match(/\.(sav|srm)$/i);
     save.fileExtension = extMatch ? extMatch[1].toLowerCase() : 'sav';
@@ -4529,7 +4560,8 @@ async function handleGbaRomFile(file){
     if(!window.BriskRomImporter||!window.BriskClassicImporter)throw new Error('Generation 1–3 ROM readers are missing from this build.');
     if(file.size<0x150||file.size>128*1024*1024)throw new Error('Select a valid Gen 1–3 ROM under 128 MB.');
     var romBytes=await file.arrayBuffer(),gameBytes=new Uint8Array(romBytes);
-    var isGba=gameBytes.length>=0xC0&&gameBytes[0xB2]===0x96;
+    var isClassicExtension=/\.(gb|gbc)$/i.test(file.name||'');
+    var isGba=!isClassicExtension&&gameBytes.length>=0xC0&&gameBytes[0xB2]===0x96;
     var result=isGba?await BriskRomImporter.importRomAsync(romBytes):
       BriskClassicImporter.importRom(romBytes,{filename:file.name});
     if(!result.romFingerprint&&BriskRomImporter.sha256Hex){
@@ -4914,13 +4946,7 @@ async function openCompatLaunchSession(){
     if(compatLaunchSave&&classicSelected){
       launchStatus('Inspecting Gen '+result.details.generation+' save without modifying it…');
       var classicRaw=compatLaunchSave.file?await compatLaunchSave.file.arrayBuffer():compatLaunchSave.data;
-      classicInspection=BriskClassicImporter.inspectSave(launchSaveBuffer(classicRaw),result);
-      currentSave=null;
-      window.ACTIVE_EMERALD_PROFILE=null;
-      var classicInfo=document.getElementById('compat-profile-status');
-      if(classicInfo)classicInfo.textContent='Generation '+result.details.generation+' SRAM · Read-only · '+classicInspection.reason;
-      document.getElementById('empty-state').querySelector('h2').textContent='Classic save inspected (read-only)';
-      document.getElementById('empty-state').querySelector('p').textContent=classicInspection.reason;
+      classicInspection=inspectClassicSaveFile(launchSaveBuffer(classicRaw));
     }else if(compatLaunchSave){
       launchStatus('Reading the selected save…');
       var raw=compatLaunchSave.file?await compatLaunchSave.file.arrayBuffer():compatLaunchSave.data;
