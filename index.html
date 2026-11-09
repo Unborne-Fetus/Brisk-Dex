@@ -612,6 +612,13 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
 .launch-file-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .launch-file-name{display:block;margin-top:10px;color:#b6d6cd;font-size:12px;overflow-wrap:anywhere}
 .launch-file-name[data-selected="true"]{color:#ffe06b}
+.launch-github-hint{display:block;color:#d1d1d1;font-size:12px;margin:0 0 9px;line-height:1.45}
+.launch-github-controls{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap}
+.launch-github-controls input{flex:1 1 260px;min-width:0;padding:10px 12px;min-height:44px;border:1px solid #6b5c25;border-radius:8px;background:#0b0b0b;color:#fff;font:inherit}
+.launch-github-controls input:focus-visible{outline:2px solid #ffe06b;outline-offset:2px}
+.launch-github-controls button{flex:0 0 auto;justify-content:center}
+.launch-github-controls+.launch-github-hint{margin-top:10px}
+@media(max-width:480px){.launch-github-controls button{flex:1 1 100%}}
 .launch-file-actions button{padding:9px 13px}
 #launch-enter{width:100%;justify-content:center;padding:14px 18px;margin-top:6px;font-size:15px}
 #launch-enter:disabled{opacity:.48;cursor:not-allowed}
@@ -656,6 +663,15 @@ header.top{border-bottom-color:#a17b0d;}
       <div class="launch-file-actions"><button type="button" id="launch-choose-rom">Choose game ROM</button></div>
       <span class="launch-file-name" id="launch-rom-name" aria-live="polite">No ROM selected</span>
       <input type="file" id="launch-rom-file" accept=".gb,.gbc,.gba,.bin,application/octet-stream" aria-label="Choose a Generation 1–3 ROM">
+    </div>
+    <div class="launch-field github-url-entry">
+      <div class="launch-field-head"><strong>Or use a GitHub link</strong><small>Public repositories and files</small></div>
+      <label class="launch-github-hint" for="launch-github-url">Paste a GitHub repository, direct .gb/.gbc/.gba ROM link, or compatible JSON reference index.</label>
+      <div class="launch-github-controls">
+        <input id="launch-github-url" type="url" inputmode="url" placeholder="https://github.com/owner/repository" autocomplete="url" aria-label="Public GitHub repository or ROM file URL">
+        <button type="button" id="launch-load-github">Load GitHub link</button>
+      </div>
+      <small class="launch-github-hint">Source-only repositories need an Adapt Dex data index. GitHub files are downloaded to your device for local inspection; source indexes do not authorize save editing.</small>
     </div>
     <div class="launch-field">
       <div class="launch-field-head"><strong>Save file</strong><small>Optional · .sav / .srm</small></div>
@@ -1390,6 +1406,8 @@ function recordObservedRomPair(save){
 }
 
 function parseSav(arrayBuffer){
+  if(currentRomReport&&currentRomReport.source==='github-reference-index')
+    throw new Error('A GitHub reference index does not identify a matching game ROM. Choose the actual ROM before loading a save.');
   if(currentRomReport&&currentRomReport.details&&currentRomReport.details.generation<3)
     throw new Error('Generation 1–2 SRAM is not an Emerald save. It can be inspected read-only but not parsed by the Gen III editor.');
   var bytes=new Uint8Array(arrayBuffer),override=selectedEmeraldProfileOverride();
@@ -4558,10 +4576,10 @@ function renderRomImportReport(result){
   if(!node)return;
   node.innerHTML='';
   var d=result.details,c=result.counts;
-  node.appendChild(el('div',{style:'font-weight:bold;margin-bottom:6px;',text:'ROM: '+(d.title||'Unknown')+' ('+(d.gameCode||'no code')+') · '+(result.complete?'Full index':'Partial extraction')}));
+  node.appendChild(el('div',{style:'font-weight:bold;margin-bottom:6px;',text:(result.source==='github-reference-index'?'GitHub reference: ':'ROM: ')+(d.title||'Unknown')+' ('+(d.gameCode||'no code')+') · '+(result.complete?'Full index':'Partial extraction')}));
   node.appendChild(el('div',{text:'Imported '+c.species+' species, '+c.icons+' icons, '+c.trainers+' trainer teams, '+c.routes+' encounter areas, '+(c.maps||0)+' maps, '+c.moves+' moves, '+c.items+' items and '+c.abilities+' abilities.'}));
   var classic=!!(result.details&&result.details.generation&&result.details.generation<3);
-  node.appendChild(el('div',{text:'Source: '+(result.source==='embedded-manifest'?'validated embedded ROM index':classic?'GB/GBC cartridge inspection':'recoverable ROM tables')+' · '+(classic?'Generation '+result.details.generation+' / '+result.details.platform:result.rhh?'Expansion '+result.rhh.version:'Generation 3 GBA')}));
+  node.appendChild(el('div',{text:'Source: '+(result.source==='embedded-manifest'?'validated embedded ROM index':result.source==='github-reference-index'?'public GitHub data index (read-only)':classic?'GB/GBC cartridge inspection':'recoverable ROM tables')+' · '+(classic?'Generation '+result.details.generation+' / '+result.details.platform:result.rhh?'Expansion '+result.rhh.version:'Generation 3 GBA')}));
   if(result.integrity)node.appendChild(el('div',{text:'ROM index identity: '+result.integrity.status+(result.integrity.reason?' — '+result.integrity.reason:'')}));
   if(result.romFingerprint)node.appendChild(el('div',{text:'ROM SHA-256 fingerprint: '+result.romFingerprint.slice(7,23)+'…'}));
   if(window.BriskRomAudit){
@@ -4575,7 +4593,7 @@ function renderRomImportReport(result){
     });
     node.appendChild(details);
   }
-  if(result.source!=='embedded-manifest')node.appendChild(el('div',{style:'margin-top:6px;',text:classic?'Gen 1–2 ROMs use different species IDs, compressed artwork, maps and save formats. A validated source-matched pack is needed for complete custom data; save editing is disabled.':'Added species, items, moves and abilities are included only when their ROM tables can be validated. Unindexed encounter maps may show group/number IDs; full custom routes, map names, trainer teams and special encounters require a source-matched index.'}));
+  if(result.source!=='embedded-manifest')node.appendChild(el('div',{style:'margin-top:6px;',text:result.source==='github-reference-index'?'This source index is for reference browsing only. Select the matching ROM to inspect or edit its save.':classic?'Gen 1–2 ROMs use different species IDs, compressed artwork, maps and save formats. A validated source-matched pack is needed for complete custom data; save editing is disabled.':'Added species, items, moves and abilities are included only when their ROM tables can be validated. Unindexed encounter maps may show group/number IDs; full custom routes, map names, trainer teams and special encounters require a source-matched index.'}));
   (result.warnings||[]).forEach(function(w){node.appendChild(el('div',{style:'margin-top:5px;',text:'Note: '+w}));});
 }
 async function handleGbaRomFile(file){
@@ -4906,6 +4924,7 @@ storageReady = loadExternalStorage();
    ROM-first launch: required game, optional save
    ============================================================ */
 var compatLaunchRom=null;
+var compatLaunchGithubIndex=null;
 var compatLaunchSave=null;
 var compatLaunchBusy=false;
 var compatLaunchDialog=document.getElementById('compat-launch');
@@ -4919,18 +4938,45 @@ function launchStatus(message,isError){
 function updateCompatLaunchChoices(){
   var romLabel=document.getElementById('launch-rom-name');
   var saveLabel=document.getElementById('launch-save-name');
-  romLabel.textContent=compatLaunchRom?compatLaunchRom.name:'No ROM selected';
-  romLabel.dataset.selected=compatLaunchRom?'true':'false';
+  romLabel.textContent=compatLaunchRom?compatLaunchRom.name:compatLaunchGithubIndex?'GitHub reference: '+compatLaunchGithubIndex.name:'No ROM selected';
+  romLabel.dataset.selected=(compatLaunchRom||compatLaunchGithubIndex)?'true':'false';
   saveLabel.textContent=compatLaunchSave?compatLaunchSave.name:'No save — browse the game without one';
   saveLabel.dataset.selected=compatLaunchSave?'true':'false';
   document.getElementById('launch-clear-save').hidden=!compatLaunchSave;
-  compatLaunchEnter.disabled=compatLaunchBusy||!compatLaunchRom;
+  compatLaunchEnter.disabled=compatLaunchBusy||!(compatLaunchRom||compatLaunchGithubIndex);
 }
 function launchSaveBuffer(input){
   if(input instanceof ArrayBuffer)return input;
   if(ArrayBuffer.isView(input))return input.buffer.slice(input.byteOffset,input.byteOffset+input.byteLength);
   if(input&&input.type==='Buffer'&&Array.isArray(input.data))return new Uint8Array(input.data).buffer;
   throw new Error('The selected save could not be read.');
+}
+async function loadCompatGithubLink(){
+  if(compatLaunchBusy)return;
+  var value=document.getElementById('launch-github-url').value.trim();
+  if(!value){launchStatus('Paste a public GitHub repository or ROM/index link.',true);return;}
+  if(!window.AdaptGitHubSource){launchStatus('GitHub importer is missing from this build.',true);return;}
+  compatLaunchBusy=true;
+  updateCompatLaunchChoices();
+  launchStatus('Checking the public GitHub link and downloading supported game data…');
+  try{
+    var source=await AdaptGitHubSource.resolve(value);
+    if(source.kind==='rom'){
+      compatLaunchRom={name:source.name,size:source.bytes.byteLength,
+        arrayBuffer:function(){return Promise.resolve(source.bytes.slice().buffer);}};
+      compatLaunchGithubIndex=null;
+      launchStatus('GitHub ROM downloaded. You may attach its save or enter Adapt Dex.');
+    }else{
+      compatLaunchRom=null;
+      compatLaunchGithubIndex=source;
+      launchStatus('GitHub reference data loaded. Browsing is available, but save editing requires the matching ROM.');
+    }
+  }catch(err){
+    launchStatus('GitHub import failed: '+(err&&err.message||String(err)),true);
+  }finally{
+    compatLaunchBusy=false;
+    updateCompatLaunchChoices();
+  }
 }
 async function openCompatLaunchSave(){
   if(compatLaunchBusy)return;
@@ -4956,13 +5002,28 @@ async function openCompatLaunchSave(){
 }
 async function openCompatLaunchSession(){
   if(compatLaunchBusy)return;
-  if(!compatLaunchRom){launchStatus('Choose a Generation 1–3 ROM first.',true);return;}
+  if(!compatLaunchRom&&!compatLaunchGithubIndex){launchStatus('Choose a Generation 1–3 ROM or import a GitHub link first.',true);return;}
+  if(compatLaunchGithubIndex&&compatLaunchSave){
+    launchStatus('A GitHub source index cannot verify this save. Choose the matching .gb/.gbc/.gba ROM instead.',true);return;
+  }
   compatLaunchBusy=true;
   updateCompatLaunchChoices();
   launchStatus('Reading the ROM and extracting supported game data…');
   try{
-    var result=await handleGbaRomFile(compatLaunchRom);
-    if(!result)throw new Error('Could not import game data from this ROM. Check the report under Settings or try a source-indexed ROM.');
+    var result;
+    if(compatLaunchGithubIndex){
+      await gameDataReady;
+      result=AdaptGitHubSource.referenceResult(compatLaunchGithubIndex);
+      applyRomReferenceData(result.data);
+      SPECIES_ICONS={};
+      SPECIES_SHINY_ICONS={};
+      currentRomReport=result;
+      renderRomImportReport(result);
+      renderCurrentReferenceTab();
+    }else{
+      result=await handleGbaRomFile(compatLaunchRom);
+    }
+    if(!result)throw new Error('Could not import game data. Check the report under Settings or try a source-indexed ROM.');
     // A profile chosen for an earlier ROM must not silently apply to this game.
     uiSettings.emeraldProfile='auto';
     try{localStorage.setItem('briskdex_emerald_profile','auto');localStorage.setItem('briskdex_settings',JSON.stringify(uiSettings));}catch(e){}
@@ -4994,7 +5055,7 @@ async function openCompatLaunchSession(){
       currentSave=null;
       window.ACTIVE_EMERALD_PROFILE=null;
       document.getElementById('empty-state').querySelector('h2').textContent='No save loaded';
-      document.getElementById('empty-state').querySelector('p').textContent='You can explore this ROM without a save. To inspect party, boxes, and progress, load its .sav or .srm later.';
+      document.getElementById('empty-state').querySelector('p').textContent=compatLaunchGithubIndex?'This GitHub source index supports reference browsing only. Select its matching ROM to inspect or edit a save.':'You can explore this ROM without a save. To inspect party, boxes, and progress, load its .sav or .srm later.';
     }
     if(currentSave&&currentSave.romAudit){
       var a=currentSave.romAudit;
@@ -5003,13 +5064,13 @@ async function openCompatLaunchSession(){
 
     }
     var counts=result.counts||{};
-    document.querySelector('.brand p').textContent=(result.details.title||compatLaunchRom.name)+' · '+(result.complete?'Full':'Partial')+' ROM data';
+    document.querySelector('.brand p').textContent=(result.details.title||compatLaunchRom&&compatLaunchRom.name||'GitHub index')+' · '+(compatLaunchGithubIndex?'GitHub reference only':result.complete?'Full':'Partial')+' game data';
     // Let reference tabs and their filters refresh from this game's data.
     ['dex-search','move-search','ability-search','item-search','trainer-search','route-search','map-catalog-search'].forEach(function(id){var field=document.getElementById(id);if(field)field.value='';});
     ['dex-type','dex-status','move-type','move-category','trainer-class','trainer-size','route-kind','route-order','encounter-method'].forEach(function(id){var field=document.getElementById(id);if(field&&field.options&&field.options.length)field.selectedIndex=0;});
     document.getElementById('btn-change-game').hidden=false;
     var importSummary=document.getElementById('compat-import-summary');
-    importSummary.textContent=(result.details.title||compatLaunchRom.name)+' · '+(counts.species||0)+' Pokémon · '+(counts.moves||0)+' moves · '+(counts.abilities||0)+' abilities · '+(counts.items||0)+' items · '+(counts.trainers||0)+' trainers · '+(counts.routes||0)+' encounter areas · '+(counts.maps||0)+' maps — '+(result.complete?'Full indexed ROM data':'Partial ROM extraction; see Settings for missing fields')+(classicInspection?' · Classic save '+classicInspection.bytes+' bytes, read-only':'');
+    importSummary.textContent=(result.details.title||compatLaunchRom&&compatLaunchRom.name||'GitHub reference')+' · '+(counts.species||0)+' Pokémon · '+(counts.moves||0)+' moves · '+(counts.abilities||0)+' abilities · '+(counts.items||0)+' items · '+(counts.trainers||0)+' trainers · '+(counts.routes||0)+' encounter areas · '+(counts.maps||0)+' maps — '+(result.complete?'Full indexed ROM data':'Partial ROM extraction; see Settings for missing fields')+(classicInspection?' · Classic save '+classicInspection.bytes+' bytes, read-only':'')+(compatLaunchGithubIndex?' · GitHub data only: a matching ROM is needed for save viewing/editing':'');
     importSummary.hidden=false;
     compatLaunchDialog.hidden=true;
     document.querySelector('.wrap').inert=false;
@@ -5017,7 +5078,7 @@ async function openCompatLaunchSession(){
     launchStatus('Game loaded.');
     if(currentSave&&currentSave.romAudit&&currentSave.romAudit.conflicts.length)
       showError('ROM/save mismatch — editing blocked: '+currentSave.romAudit.conflicts.slice(0,3).join('; '));
-    else showNotice('Loaded '+(result.details.title||compatLaunchRom.name)+' — '+(counts.species||0)+' Pokémon, '+(counts.moves||0)+' moves, '+(counts.trainers||0)+' trainer teams. '+(result.complete?'Complete indexed data.':'Some data may be unavailable for this ROM.'));
+    else showNotice('Loaded '+(result.details.title||compatLaunchRom&&compatLaunchRom.name||'GitHub data')+' — '+(counts.species||0)+' Pokémon, '+(counts.moves||0)+' moves, '+(counts.trainers||0)+' trainer teams. '+(result.complete?'Complete indexed data.':'Some data may be unavailable for this ROM.'));
   }catch(err){
     launchStatus(err&&err.message?err.message:String(err),true);
   }finally{
@@ -5029,9 +5090,13 @@ document.querySelector('.wrap').inert=true;
 document.getElementById('launch-choose-rom').addEventListener('click',function(){if(!compatLaunchBusy)document.getElementById('launch-rom-file').click();});
 document.getElementById('launch-rom-file').addEventListener('change',function(e){
   var file=e.target.files&&e.target.files[0];
-  if(file){compatLaunchRom=file;launchStatus('ROM selected. You can add a save, or enter without one.');}
+  if(file){compatLaunchRom=file;compatLaunchGithubIndex=null;launchStatus('ROM selected. You can add a save, or enter without one.');}
   updateCompatLaunchChoices();
   e.target.value='';
+});
+document.getElementById('launch-load-github').addEventListener('click',loadCompatGithubLink);
+document.getElementById('launch-github-url').addEventListener('keydown',function(e){
+  if(e.key==='Enter'){e.preventDefault();e.stopPropagation();loadCompatGithubLink();}
 });
 document.getElementById('launch-choose-save').addEventListener('click',openCompatLaunchSave);
 document.getElementById('launch-save-file').addEventListener('change',function(e){
@@ -5047,7 +5112,7 @@ document.getElementById('launch-clear-save').addEventListener('click',function()
 });
 compatLaunchForm.addEventListener('submit',function(e){e.preventDefault();openCompatLaunchSession();});
 compatLaunchForm.addEventListener('keydown',function(e){
-  if(e.key==='Enter'&&!e.repeat&&compatLaunchRom){e.preventDefault();openCompatLaunchSession();}
+  if(e.key==='Enter'&&!e.repeat&&(compatLaunchRom||compatLaunchGithubIndex)){e.preventDefault();openCompatLaunchSession();}
 });
 document.getElementById('btn-clear-rom-pair').addEventListener('click',function(){
   if(!currentSave){showNotice('Load a save before clearing its remembered ROM association.');return;}
