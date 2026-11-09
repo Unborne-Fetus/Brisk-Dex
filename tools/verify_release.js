@@ -10,7 +10,7 @@ function check(condition,message){if(!condition)fail(message);}
 const pkg=json('package.json');
 const requiredRoot=[
   'index.html','main.js','preload.js','asset-loader.js','localization.js',
-  'emerald-compat.js','gba-rom-import.js','classic-rom-import.js','rom-compat-audit.js','brisk-dex-data.json','brisk-dex-trainer-teams.json',
+  'emerald-compat.js','gba-rom-import.js','classic-rom-import.js','github-rom-source.js','rom-compat-audit.js','brisk-dex-data.json','brisk-dex-trainer-teams.json',
   'brisk-dex-icon-manifest.json','compatibility/README.md',
   'compatibility/emerald-compat-profile.schema.json','compatibility/example-expansion-pack.json'
 ];
@@ -20,6 +20,7 @@ const packaged=new Set(pkg.build&&pkg.build.files||[]);
 check(packaged.has('emerald-compat.js'),'Electron package does not include emerald-compat.js');
 check(packaged.has('gba-rom-import.js'),'Electron package does not include gba-rom-import.js');
 check(packaged.has('classic-rom-import.js'),'Electron package does not include classic-rom-import.js');
+check(packaged.has('github-rom-source.js'),'Electron package does not include the GitHub ROM link importer');
 check(packaged.has('compatibility/**/*'),'Electron package does not include compatibility packs/docs');
 
 const html=read('index.html');
@@ -56,6 +57,10 @@ check(!/^[^\n]*restoreLastSave\(\);\s*$/m.test(html),'Compat launch must not aut
 
 check(html.includes('<script src="gba-rom-import.js"></script>'),'index.html does not load gba-rom-import.js');
 check(html.includes('<script src="classic-rom-import.js"></script>'),'index.html does not load the GB/GBC importer');
+check(html.includes('<script src="github-rom-source.js"></script>'),'index.html does not load the GitHub link importer');
+check(html.includes('id="launch-github-url"'),'GitHub URL input is missing');
+check(html.includes('id="launch-load-github"'),'GitHub link load action is missing');
+new Function(read('github-rom-source.js'));
 new Function(read('classic-rom-import.js'));
 new Function(read('gba-rom-import.js'));
 check(html.includes('<script src="rom-compat-audit.js"></script>'),'ROM audit module not loaded');
@@ -78,6 +83,7 @@ const prep=read('tools/prepare_android.mjs');
 check(prep.includes("'emerald-compat.js'"),'Mobile bundle does not copy emerald-compat.js');
 check(prep.includes("'gba-rom-import.js'"),'Mobile bundle does not copy gba-rom-import.js');
 check(prep.includes("'classic-rom-import.js'"),'Mobile bundle does not copy classic-rom-import.js');
+check(prep.includes("'github-rom-source.js'"),'Mobile bundle does not copy GitHub link importer');
 check(prep.includes("'compatibility'"),'Mobile bundle does not copy compatibility directory');
 
 if(process.argv.includes('--mobile')){
@@ -85,6 +91,7 @@ if(process.argv.includes('--mobile')){
   exists('www/emerald-compat.js');
   exists('www/gba-rom-import.js');
   exists('www/classic-rom-import.js');
+  exists('www/github-rom-source.js');
   exists('www/rom-compat-audit.js');
   exists('www/compatibility/emerald-compat-profile.schema.json');
   const mobileHtml=read('www/index.html');

@@ -8,7 +8,7 @@ await fs.mkdir(dest,{recursive:true});
 const files=[
   'index.html','asset-loader.js','localization.js',
   'emerald-compat.js','gba-rom-import.js','classic-rom-import.js',
-  'rom-compat-audit.js','brisk-dex-data.json','brisk-dex-trainer-teams.json'
+  'rom-compat-audit.js','github-rom-source.js','brisk-dex-data.json','brisk-dex-trainer-teams.json'
 ];
 for(const name of files)await fs.copyFile(path.join(root,name),path.join(dest,name));
 const dirs=[

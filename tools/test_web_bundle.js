@@ -14,7 +14,7 @@ assert(!html.includes('<script src="android-bridge.js"></script>'),'Android nati
 for(const match of html.matchAll(/<script\s+src="([^"]+)"/g)){
   assert(exists(match[1]),'Browser script is missing: '+match[1]);
 }
-for(const name of ['gba-rom-import.js','classic-rom-import.js','emerald-compat.js','rom-compat-audit.js']){
+for(const name of ['gba-rom-import.js','classic-rom-import.js','github-rom-source.js','emerald-compat.js','rom-compat-audit.js']){
   assert(exists(name),'ROM/save importer is missing: '+name);
   new Function(read(name));
 }

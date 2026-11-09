@@ -24,7 +24,7 @@
     "ios:add": "npm run ios:prepare && npx cap add ios",
     "ios:sync": "npm run ios:prepare && npx cap sync ios",
     "ios:build": "npm run ios:prepare && npx cap sync ios",
-    "compat:test": "node tools/test_classic_rom_import.js && node tools/test_emerald_compat.js && node tools/test_gba_rom_import.js && node tools/test_rom_fingerprint.js && node tools/test_rom_compat_audit.js && node tools/test_save_block_integrity.js",
+    "compat:test": "node tools/test_github_rom_source.js && node tools/test_classic_rom_import.js && node tools/test_emerald_compat.js && node tools/test_gba_rom_import.js && node tools/test_rom_fingerprint.js && node tools/test_rom_compat_audit.js && node tools/test_save_block_integrity.js",
     "rom:index": "node tools/embed_rom_index.js",
     "release:test": "npm run compat:test && npm run release:verify",
     "release:verify": "node tools/verify_release.js",
@@ -60,6 +60,7 @@
       "emerald-compat.js",
       "gba-rom-import.js",
       "classic-rom-import.js",
+      "github-rom-source.js",
       "compatibility/**/*",
       "rom-compat-audit.js"
     ],
