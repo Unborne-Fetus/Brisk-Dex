@@ -145,3 +145,25 @@ jobs:
             dist/*.dmg
             Adapt-Dex-iOS-Unsigned.ipa
           if-no-files-found: error
+
+  retire-compat-branch:
+    name: Retire old compat-branch after migration
+    needs: [compat-tests, package-audit]
+    if: github.ref == 'refs/heads/adapt-dex'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Remove obsolete compat-branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/compat-branch" >/dev/null 2>&1; then
+            if gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/compat-branch"; then
+              echo "Migrated compat-branch to adapt-dex."
+            else
+              echo "::warning::Unable to delete compat-branch; manual cleanup may be required."
+            fi
+          else
+            echo "Old compat-branch no longer exists."
+          fi

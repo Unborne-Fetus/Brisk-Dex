@@ -39,7 +39,7 @@ Adapt Dex Web is a static browser build from the `adapt-dex` branch. After a suc
 - Save editing is enabled only for verified layouts; browser changes must be **exported as a save copy** to be used by your emulator. Recovery snapshots use browser storage, which can be cleared. Back up your originals.
 - External Pokémon storage is stored in your browser and can be exported separately. Incognito sessions may discard it.
 - For offline hosting or deployment elsewhere, download the **Adapt-Dex-Web-Site** artifact from the successful workflow and serve its contents as static files.
-- If GitHub Pages publishing is blocked, set **Settings → Pages → Build and deployment → Source: GitHub Actions**. A repository owner may also need to allow `adapt-dex` to deploy to the `github-pages` environment.
+- If GitHub Pages publishing is blocked, set **Settings → Pages → Build and deployment → Source: GitHub Actions**. A repository owner may also need to allow `adapt-dex` to deploy to the `adapt-dex-pages` environment.
 - Local preview: run `npm run web:build`, then `python -m http.server --directory web-dist 8000` and open `http://localhost:8000`.
 
 ### First launch (adapt-dex)

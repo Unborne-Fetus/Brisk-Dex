@@ -46,11 +46,13 @@ jobs:
     needs: build
     runs-on: ubuntu-24.04
     environment:
-      name: github-pages
+      name: adapt-dex-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - name: Publish website
         id: deployment
         uses: actions/deploy-pages@v4
