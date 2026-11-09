@@ -39,9 +39,46 @@ function coverage(rom){
     indexed:indexed,byType:byType,recoveredCategories:recovered,indexedCategories:fullyIndexed,
     notes:(rom&&rom.warnings||[]).slice()};
 }
-function inspectSave(rom,save){
+// Remember a user's previously opened ROM/save association. This detects
+// accidental cross-hack reloads but is NOT a cryptographic proof that the
+// original pair was correct: Emerald save files don't contain a ROM SHA-256.
+function saveIdentity(save){
+  var t=save&&save.trainer;
+  if(!t||!Number.isInteger(Number(t.publicId))||!Number.isInteger(Number(t.secretId))||
+      !String(t.name||'').trim())return '';
+  var src=String(t.name).normalize('NFKC').trim().toUpperCase()+
+    '|'+Number(t.publicId)+'|'+Number(t.secretId);
+  var a=2166136261,b=5381;
+  for(var i=0;i<src.length;i++){var n=src.charCodeAt(i);a=Math.imul(a^n,16777619)>>>0;b=(Math.imul(b,33)+n)>>>0;}
+  return 'briskdex_pair_v1_'+a.toString(16).padStart(8,'0')+b.toString(16).padStart(8,'0');
+}
+function pairingStatus(rom,save,storage){
+  var key=saveIdentity(save),fingerprint=rom&&rom.romFingerprint;
+  if(!storage||!key||!/^(sha256:)[0-9a-f]{64}$/i.test(fingerprint||''))
+    return {status:'unavailable',reason:'No durable local ROM identity available.'};
+  var previous;
+  try{previous=storage.getItem(key);}catch(e){return {status:'unavailable',reason:'Local pairing records are not accessible.'};}
+  if(!previous)return {status:'new',key:key,romFingerprint:fingerprint};
+  if(previous!==fingerprint)return {status:'changed',key:key,romFingerprint:fingerprint,previous:previous,
+    reason:'This trainer save was previously opened with a different ROM. Confirm the new game version and reset the association before editing.'};
+  return {status:'known',key:key,romFingerprint:fingerprint};
+}
+function rememberPairing(rom,save,storage){
+  var state=pairingStatus(rom,save,storage);
+  if(state.status==='new')try{storage.setItem(state.key,state.romFingerprint);}catch(e){}
+  return state;
+}
+function forgetPairing(save,storage){
+  var key=saveIdentity(save);
+  if(!key||!storage)return false;
+  try{storage.removeItem(key);return true;}catch(e){return false;}
+}
+
+function inspectSave(rom,save,storage){
   if(!save)return {status:'no-save',writeSafe:false,headline:'No save selected',warnings:[],conflicts:[],checked:0};
   var findings=[],conflicts=[],checked=0;
+  var pairing=pairingStatus(rom,save,storage);
+  if(pairing.status==='changed')conflicts.push(pairing.reason);
   var complete=!!(rom&&rom.complete),data=rom&&rom.data||{};
   var knownSpecies=keySet(data.species),knownMoves=keySet(data.moves),knownItems=keySet(data.items);
   var members=(save.party||[]).slice();
@@ -68,17 +105,19 @@ function inspectSave(rom,save){
   if(!complete)findings.push('ROM data is partial; unmatched custom IDs cannot be checked reliably.');
   if(!complete&&save.profile&&save.profile.confidence!=='explicit')findings.push('Automatic save writes are disabled until the game layout is verified or a trusted profile is selected.');
   if(!checked)findings.push('No occupied Pokémon records found to compare.');
+  if(pairing.status==='known')findings.push('This save is linked locally to the same ROM fingerprint as a previous session.');
   findings.push('A Gen III save generally lacks a trustworthy hash of its source ROM; matching IDs alone cannot prove exact game identity.');
   var unique=Array.from(new Set(conflicts)).slice(0,12),bad=unique.length>0;
   return {status:bad?'incompatible':checked&&complete?'plausible':'unverified',
     writeSafe:!bad&&!!(save.profile&&save.profile.writeSafe)&&(!!(complete&&checked>0)||!!(save.profile&&save.profile.confidence==='explicit')),
     headline:bad?'Potentially wrong ROM or save profile':checked&&complete?'Structurally consistent, identity unverified':'ROM/save identity unverified',
-    checked:checked,conflicts:unique,warnings:findings,
+    checked:checked,conflicts:unique,warnings:findings,pairing:pairing.status,
     profile:save.profile&&save.profile.name||'Unknown save format'};
 }
 function summary(rom,save){
   var c=coverage(rom),match=inspectSave(rom,save);
   return {coverage:c,match:match,warningCount:c.notes.length+match.conflicts.length};
 }
-return {coverage:coverage,inspectSave:inspectSave,summary:summary};
+return {coverage:coverage,inspectSave:inspectSave,summary:summary,
+  pairingStatus:pairingStatus,rememberPairing:rememberPairing,forgetPairing:forgetPairing,saveIdentity:saveIdentity};
 });
