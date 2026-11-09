@@ -1453,10 +1453,18 @@ function parseSav(arrayBuffer){
 }
 
 function parseTrainer(v0, s0, profile){
-  var nameBytes = s0.subarray(0x0000, 0x0007);
-  var name = decodeGen3String(nameBytes);
-  var gender = u8(v0, 0x0008);
-  var idFull = u32(v0, 0x000A);
+  var cfg=profile&&profile.trainer||{},
+      nameOffset=Number.isInteger(cfg.nameOffset)?cfg.nameOffset:0x0000,
+      nameLength=Number.isInteger(cfg.nameLength)?cfg.nameLength:7,
+      genderOffset=Number.isInteger(cfg.genderOffset)?cfg.genderOffset:0x0008,
+      idOffset=Number.isInteger(cfg.idOffset)?cfg.idOffset:0x000A;
+  if(nameOffset<0||nameOffset+nameLength>s0.length||
+      genderOffset<0||genderOffset+1>s0.length||idOffset<0||idOffset+4>s0.length)
+    throw new Error('Trainer fields exceed the selected save profile layout.');
+  var nameBytes=s0.subarray(nameOffset,nameOffset+nameLength);
+  var name=decodeGen3String(nameBytes);
+  var gender=u8(v0,genderOffset);
+  var idFull=u32(v0,idOffset);
   var publicId = idFull & 0xFFFF;
   var secretId = (idFull >>> 16) & 0xFFFF;
   var hours = u16(v0, 0x000E);
