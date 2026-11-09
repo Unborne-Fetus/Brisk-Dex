@@ -132,6 +132,50 @@ function findSpeciesLayout(b,base,count){
     if(valid>=16)return {stride:stride,nameOffset:nameOffset,confidence:'high',sample:valid};
   }return null;
 }
+// Not every hack preserves the first three Kanto starters. When the public GF
+// ROM header supplies a trusted SpeciesInfo pointer, independently score
+// candidate compiled structure layouts using name terminators, base stats,
+// types, and unique species names rather than assuming Bulbasaur is present.
+function inferSpeciesLayoutFromStructure(b,base,count){
+  if(base==null||base<0||base>=b.length||count<12)return null;
+  var sample=Math.min(24,count-1),candidates=[],maxOffset=192;
+  for(var stride=96;stride<=704;stride+=4){
+    if(base+sample*stride+16>b.length)continue;
+    for(var nameOffset=12;nameOffset<=Math.min(stride-14,maxOffset);nameOffset+=4){
+      var valid=0,totalChars=0,names=new Set(),nonPokemon=0;
+      for(var id=1;id<=sample;id++){
+        var p=base+id*stride;
+        var statsOk=true;
+        for(var stat=0;stat<6;stat++)if(b[p+stat]===0||b[p+stat]===255){statsOk=false;break;}
+        if(!statsOk||b[p+6]>18||b[p+7]>18)continue;
+        var raw=p+nameOffset,length=0,unknown=0,terminated=false;
+        for(var j=0;j<14;j++){
+          var c=b[raw+j];
+          if(c===0xFF){terminated=true;break;}
+          if(c===0||(!gbaChar(c)&&c!==0x00)){unknown++;break;}
+          length++;
+        }
+        if(!terminated||unknown||length<3||length>13)continue;
+        var nm=gbaString(b,raw,14);
+        if(!/^[A-Za-zÀ-ÿ0-9 .'-]{3,13}$/.test(nm))continue;
+        valid++;totalChars+=nm.length;names.add(nm.toLowerCase());
+        if(nm.indexOf('????')>=0)nonPokemon++;
+      }
+      // Never trust tiny coincidental runs of decoded text.
+      if(valid<Math.max(9,Math.floor(sample*.75))||names.size<Math.floor(valid*.9)||nonPokemon)continue;
+      candidates.push({stride:stride,nameOffset:nameOffset,valid:valid,
+        score:valid*100+names.size*20+totalChars,confidence:'structure-validated'});
+    }
+  }
+  if(!candidates.length)return null;
+  candidates.sort(function(a,b){return b.score-a.score||a.nameOffset-b.nameOffset||a.stride-b.stride;});
+  var best=candidates[0];
+  // If competing *different strides* appear equally plausible, the ROM
+  // header alone isn't enough to identify a safe structure.
+  if(candidates.some(function(c){return c.stride!==best.stride&&c.score>=best.score-8;}))return null;
+  return {stride:best.stride,nameOffset:best.nameOffset,confidence:best.confidence,sample:best.valid};
+}
+
 function extractSpecies(b,layout,count,limit,warnings){
   var out={},root=layout.base==null?null:asOffset(b,layout.base,1),stride=Number(layout.stride),nameOffset=Number(layout.nameOffset);
   if(root==null||!Number.isInteger(stride)||stride<12||stride>2048||!Number.isInteger(nameOffset)||nameOffset<0||nameOffset+12>stride)return out;
@@ -480,7 +524,12 @@ function importRom(value,options){
   if(!data.species){
     if(!speciesLayout&&header&&header.speciesInfo!=null){
       var candidate=findSpeciesLayout(b,header.speciesInfo,count);
-      if(candidate)speciesLayout=Object.assign({base:header.speciesInfo},candidate);
+      if(!candidate)candidate=inferSpeciesLayoutFromStructure(b,header.speciesInfo,count);
+      if(candidate){
+        speciesLayout=Object.assign({base:header.speciesInfo},candidate);
+        if(candidate.confidence==='structure-validated')
+          warnings.push('Recognized a nonstandard SpeciesInfo structure using '+candidate.sample+' independent species records. Form/evolution details still require a source index.');
+      }
     }
     if(speciesLayout)data.species=extractSpecies(b,speciesLayout,count,count,warnings);
     if((!data.species||!Object.keys(data.species).length)&&header&&header.speciesNames!=null){
@@ -611,5 +660,5 @@ async function importRomAsync(value,options){
   else imported.warnings.push(integrity.reason||'Indexed ROM source identity could not be verified.');
   return imported;
 }
-return {scanTimedWildEncounters:scanTimedWildEncounters,scanWildEncounters:scanWildEncounters,importRomAsync:importRomAsync,verifyIndexedSource:verifyIndexedSource,sha256Hex:sha256Hex,importRom:importRom,readIcon:readIcon,tilesToRgba:tilesToRgba,lz77:lz77,crc32:crc32,gbaString:gbaString,scanHeader:scanHeader,scanRhh:scanRhh,parseEmbedded:parseEmbedded,MAGIC:MAGIC};
+return {scanTimedWildEncounters:scanTimedWildEncounters,scanWildEncounters:scanWildEncounters,importRomAsync:importRomAsync,verifyIndexedSource:verifyIndexedSource,sha256Hex:sha256Hex,importRom:importRom,readIcon:readIcon,tilesToRgba:tilesToRgba,lz77:lz77,crc32:crc32,gbaString:gbaString,scanHeader:scanHeader,scanRhh:scanRhh,inferSpeciesLayoutFromStructure:inferSpeciesLayoutFromStructure,parseEmbedded:parseEmbedded,MAGIC:MAGIC};
 });
