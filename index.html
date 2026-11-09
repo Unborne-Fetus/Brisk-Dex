@@ -653,14 +653,14 @@ header.top{border-bottom-color:#a17b0d;}
     <h1 id="launch-title">Choose your Pokémon game</h1>
     <p>Select a Generation 1–3 Pokémon ROM (.gb, .gbc or .gba), then optionally its save. Press <strong>Enter Adapt Dex</strong> to inspect any identifiable game data.</p>
     <div class="launch-field">
-      <div class="launch-field-head"><strong>Game ROM</strong><small>Required · .gb / .gbc / .gba</small></div>
+      <div class="launch-field-head"><strong>Game ROM</strong><small>.gb / .gbc / .gba, or a GitHub index</small></div>
       <div class="launch-file-actions"><button type="button" id="launch-choose-rom">Choose game ROM</button></div>
       <span class="launch-file-name" id="launch-rom-name" aria-live="polite">No ROM selected</span>
       <input type="file" id="launch-rom-file" accept=".gb,.gbc,.gba,.bin,application/octet-stream" aria-label="Choose a Generation 1–3 ROM">
     </div>
     <div class="launch-field github-url-entry">
       <div class="launch-field-head"><strong>Or use a GitHub link</strong><small>Public repositories and files</small></div>
-      <label class="launch-github-hint" for="launch-github-url">Paste a GitHub repository, direct .gb/.gbc/.gba ROM link, or compatible JSON reference index.</label>
+      <label class="launch-github-hint" for="launch-github-url">Paste a GitHub repository, published ROM release, direct .gb/.gbc/.gba file, or compatible JSON reference index.</label>
       <div class="launch-github-controls">
         <input id="launch-github-url" type="url" inputmode="url" placeholder="https://github.com/owner/repository" autocomplete="url" aria-label="Public GitHub repository or ROM file URL">
         <button type="button" id="launch-load-github">Load GitHub link</button>
@@ -3048,7 +3048,7 @@ function renderRouteEncounters(){
   var selected = filtered.find(function(area){ return area.id === selectedRouteId; });
   detail.innerHTML = '';
   detail.appendChild(el('h2', {text:selected.name}));
-  detail.appendChild(el('div', {class:'route-subtitle', text:(isRouteArea(selected) ? 'Route' : 'Area') + ' · '+(currentRomReport?'Imported ROM':'Brisk Emerald')+' wild encounters'}));
+  detail.appendChild(el('div', {class:'route-subtitle', text:(isRouteArea(selected) ? 'Route' : 'Area') + ' · '+(currentRomReport?'Imported ROM':'selected game')+' wild encounters'}));
   selected.methods.filter(function(method){ return matchesEncounterMethod(method, methodFilter); }).forEach(function(method){
     var card = el('section', {class:'encounter-card'});
     var heading = el('div', {class:'encounter-heading'});

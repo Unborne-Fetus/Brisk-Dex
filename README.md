@@ -35,7 +35,10 @@ Download packages from a successful [Adapt Dex release workflow](https://github.
 
 Adapt Dex Web is a static browser build from the `adapt-dex` branch. After a successful [web deployment workflow](https://github.com/Unborne-Fetus/Brisk-Dex/actions/workflows/deploy-adapt-web.yml) and Pages setup, it is served at [Adapt Dex Web](https://unborne-fetus.github.io/Brisk-Dex/).
 
-- Select a local `.gb`, `.gbc` or `.gba` ROM, then optionally a `.sav` or `.srm`. The site does not host or upload your game or save files.
+- Select a local `.gb`, `.gbc` or `.gba` ROM, or paste a public GitHub repository URL, raw ROM file, release download URL, or compatible Adapt Dex JSON index.
+- When loading a GitHub repository, Adapt Dex checks for a compatible reference index and then for a single compiled ROM in its latest release. Source-only or patch-only repositories cannot automatically be converted into a game in the browser.
+- ROM files downloaded from GitHub are inspected locally. Some GitHub release downloads may be blocked by browser CORS; download the file separately and select it locally if so. Adapt Dex does not upload ROMs or saves to its website.
+- A GitHub reference index alone cannot be used to inspect or edit a save; choose the matching game ROM for save handling.
 - Save editing is enabled only for verified layouts; browser changes must be **exported as a save copy** to be used by your emulator. Recovery snapshots use browser storage, which can be cleared. Back up your originals.
 - External Pokémon storage is stored in your browser and can be exported separately. Incognito sessions may discard it.
 - For offline hosting or deployment elsewhere, download the **Adapt-Dex-Web-Site** artifact from the successful workflow and serve its contents as static files.

@@ -126,7 +126,33 @@ async function resolve(urlText,options){
           owner:parsed.owner,repo:parsed.repo,data:contents.data,assets:contents.assets};
       }catch(e){errors.push(String(e.message||e));}
     }
-    throw Error('This repository does not publish a compatible Adapt Dex data index. Link directly to a public .gb/.gbc/.gba ROM or build/export a reference index from the hack source.');
+    // Some hack developers publish an already-built game in GitHub Releases.
+    // ROM and data-index assets are not equivalent to a source-only project.
+    var releaseUrl=api+'/releases/latest';
+    var latest;
+    try{
+      var releasesResponse=await fetcher(releaseUrl,{headers:{Accept:'application/vnd.github+json'}});
+      if(releasesResponse.ok)latest=await releasesResponse.json();
+    }catch(e){}
+    var assets=latest&&Array.isArray(latest.assets)?latest.assets:[];
+    var romAssets=assets.filter(function(asset){
+      return asset&&ROM_EXT.test(asset.name||'')&&asset.size>=0&&asset.size<=ROM_LIMIT
+        &&typeof asset.browser_download_url==='string';
+    });
+    if(romAssets.length===1){
+      var item=romAssets[0],downloadLink=parse(item.browser_download_url);
+      if(downloadLink.kind==='rom'&&downloadLink.owner===parsed.owner&&downloadLink.repo===parsed.repo){
+        try{
+          var romBytes=await download(downloadLink.url,fetcher,ROM_LIMIT);
+          if(romBytes.length<0x150)throw Error('The file is too small to be a ROM.');
+          return {kind:'rom',name:item.name,sourceUrl:downloadLink.url,bytes:romBytes};
+        }catch(err){
+          throw Error('A ROM was found in GitHub Releases but the browser could not download it. Download the release file and choose it locally. Details: '+String(err.message||err));
+        }
+      }
+    }
+    if(romAssets.length>1)throw Error('This repository has multiple ROM release files. Paste the direct link to the version you want.');
+    throw Error('This repository has no compatible Adapt Dex data index or single downloadable ROM release. If it contains only source or a patch, build/patch the game and select the resulting .gb, .gbc or .gba file.');
   }
   var limit=parsed.kind==='rom'?ROM_LIMIT:JSON_LIMIT;
   var bytes=await download(parsed.url,fetcher,limit);

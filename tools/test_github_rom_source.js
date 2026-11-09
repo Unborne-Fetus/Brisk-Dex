@@ -25,6 +25,11 @@ const urls={
  'https://raw.githubusercontent.com/Trainer/CustomHack/main/test.gba':mock(rom),
  'https://raw.githubusercontent.com/Trainer/CustomHack/main/evil.json':mock('invalid')
 };
+urls['https://api.github.com/repos/Trainer/ReleasedHack']=mock({default_branch:'main'});
+urls['https://api.github.com/repos/Trainer/ReleasedHack/releases/latest']=mock({assets:[
+  {name:'ReleasedHack.gba',size:rom.length,browser_download_url:'https://github.com/Trainer/ReleasedHack/releases/download/v1/ReleasedHack.gba'}
+]});
+urls['https://github.com/Trainer/ReleasedHack/releases/download/v1/ReleasedHack.gba']=mock(rom);
 const fetcher=async(url)=>urls[url]||mock({},404);
 (async()=>{
  const repo=await Github.resolve('https://github.com/Trainer/CustomHack',{fetch:fetcher});
@@ -35,6 +40,10 @@ const fetcher=async(url)=>urls[url]||mock({},404);
  assert.equal(result.complete,false);
  assert.equal(result.counts.species,1);
  assert.equal(result.saveSupport,'no-rom-no-edit');
+ const release=await Github.resolve('https://github.com/Trainer/ReleasedHack',{fetch:fetcher});
+ assert.equal(release.kind,'rom');
+ assert.equal(release.name,'ReleasedHack.gba');
+ assert.equal(release.bytes.length,rom.length);
  const direct=await Github.resolve('https://github.com/Trainer/CustomHack/blob/main/test.gba',{fetch:fetcher});
  assert.equal(direct.kind,'rom');
  assert.equal(direct.bytes.length,rom.length);
