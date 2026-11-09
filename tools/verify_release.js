@@ -40,6 +40,10 @@ for(const removedName of ['function renderCompetitiveSets(','function renderOnli
 check(!packaged.has('battle-server.js'),'The removed online battle relay must not be packaged');
 check(!pkg.scripts['battle-server'],'The removed battle relay must not be a release script');
 check(html.includes('rom-compat-audit.js'),'The ROM/save audit is missing from app scripts');
+check(html.includes('recordObservedRomPair'),'ROM/save pairing persistence is missing');
+check(html.includes('id="btn-clear-rom-pair"'),'ROM/save pairing reset is missing');
+check(read('gba-rom-import.js').includes('verifyIndexedSource'),'Indexed ROM integrity check is missing');
+check(read('tools/embed_rom_index.py').includes('portable_art'),'Python indexer must embed portable Fakemon art and cries');
 check(html.includes('auditAndBindSave'),'ROM save mismatch write protection is missing');
 
 check(html.includes('await handleGbaRomFile(compatLaunchRom)'),'Launch must load selected ROM before opening the app');
