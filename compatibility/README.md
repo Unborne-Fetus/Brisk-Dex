@@ -6,7 +6,7 @@ On every app launch, select a locally stored `.gba` ROM, optionally select its `
 
 When a ROM lacks reliably extractable data, the chooser remains open and displays an actionable import error. Partial ROM scans list their unavailable fields. For an extensive game-specific dataset, generate a source-matched ROM index as described in [ROM_IMPORT.md](ROM_IMPORT.md). A ROM import never grants write permission to a save whose layout cannot be established.
 
-The `compat-branch` build is Emerald-only. It supports vanilla Emerald directly and can load additional Emerald-derived save layouts through JSON compatibility packs.
+The `compat-branch` targets Generation 1–3 ROM hacks: GB/GBC Gen 1–2 cartridges open using the classic ROM scanner; Gen 3 GBA uses the GBA extractor. The editable save implementation remains Emerald-family Gen 3; GB/GBC SRAM is inspected read-only, and no save writes are authorized without a verified game-specific layout. Gen 3 non-Emerald variations also require a matching profile before writes.
 
 A compatibility pack can contain one `profile`, an array of `profiles`, and optional `data` / `gameData` used by the Pokédex, Move Dex, Item Dex, Ability Dex, encounter tables, and trainer data.
 

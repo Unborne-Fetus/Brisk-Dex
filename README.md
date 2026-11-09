@@ -6,7 +6,7 @@ Species, forms, stats, moves, abilities, items, encounters, and trainer teams co
 
 ## Features
 
-**Compatibility edition:** competitive sets, online battles, trading and the relay service are not included. This branch focuses on ROM inspection and safe save management.
+**Compatibility edition (Generation 1–3):** competitive sets, online battles, trading and the relay service are not included. The app imports GB/GBC and GBA cartridges, but the save editor remains Generation 3 only. Unfamiliar GB/GBC saves are inspected read-only and never interpreted as Emerald saves.
 
 - **Pokédex:** search Pokémon and forms, inspect stats and evolutions, look up encounters, view sprites, and play cries. Track None, Seen, Caught, and Shiny status from a save, with manual overrides.
 - **Reference tabs:** browse moves, abilities, items, locations, and trainer teams.
@@ -32,12 +32,12 @@ Download packages from a successful run in the repository's [Actions tab](https:
 
 ### First launch (compat-branch)
 
-1. Open Brisk Dex. The initial screen asks for a **Game ROM (.gba)** and an **optional save (.sav or .srm)**.
+1. Open Brisk Dex. The initial screen asks for a **Game ROM (.gb, .gbc or .gba)** and an **optional save (.sav or .srm)**.
 2. Choose a ROM. Optionally choose the save that belongs to the same game, then press **Enter Brisk Dex**.
 3. Brisk Dex imports verified ROM data locally and opens the Pokédex, moves, abilities, trainers and encounters where recognized. Without a save, you can browse the ROM but player party, storage and progress aren't available.
 4. If a save is included, Brisk Dex displays its party and boxes and follows the chosen save profile's write-safety rules. Use **Change game** to return to the chooser (this reloads the app).
 
-Normal ROMs may expose only some tables; a source-indexed ROM carries more game-specific data. SHA-256 ROM verification and remembered save associations catch accidental mismatches, but an unknown save's origin cannot be proven from its structure alone. Edits still require a trusted profile.
+Ordinary GB/GBC cartridges can expose verified name tables, while maps, trainers, sprite compression and synthesized cries generally require source-matched reference data. Gen 1 uses internal species numbering; do not assume National Pokédex IDs. The Emerald-based Gen 3 extractor can expose more tables. Normal ROMs may expose only some tables; a source-indexed GBA ROM carries more game-specific data. SHA-256 ROM verification and remembered save associations catch accidental mismatches, but an unknown save's origin cannot be proven from its structure alone. Edits still require a trusted profile.
 
 The compatibility app asks for a ROM every time it launches and does not silently reopen an earlier save. Bundled reference assets remain available for Brisk-specific tools, but the selected ROM replaces the displayed game reference data for the session.
 
