@@ -9,6 +9,7 @@ No external network access or Python dependencies are required.
 import argparse
 import base64
 import json
+import hashlib
 import pathlib
 import struct
 import zlib
@@ -36,7 +37,39 @@ def collect_icons(folder):
             (shiny if is_shiny else icons)[number] = "data:image/png;base64," + base64.b64encode(content).decode("ascii")
     return icons, shiny
 
-def index_from_exports(data_path, trainer_path, icons_dir):
+
+ART_FIELDS = ("frontSprite", "backSprite", "frontShinySprite", "backShinySprite",
+              "frontAnimation", "backAnimation", "frontShinyAnimation", "backShinyAnimation", "cry")
+ART_MIME = {".png": "image/png", ".gif": "image/gif",
+            ".wav": "audio/wav", ".ogg": "audio/ogg", ".mp3": "audio/mpeg"}
+
+def portable_art(data, source_dir):
+    """Embed only exported, local, bounded source artwork; reject path traversal."""
+    asset_count = 0
+    root = source_dir.resolve()
+    for species in data["species"].values():
+        if not isinstance(species, dict):
+            continue
+        for field in ART_FIELDS:
+            original = species.get(field)
+            if not isinstance(original, str):
+                continue
+            if original.startswith("data:"):
+                continue
+            safe = (original.startswith(("brisk-dex-sprites/", "brisk-dex-cries/"))
+                    and ".." not in pathlib.PurePosixPath(original).parts)
+            file = (root / original).resolve() if safe else None
+            if not file or not file.is_relative_to(root) or file.suffix.lower() not in ART_MIME or not file.is_file():
+                species.pop(field, None)
+                continue
+            if file.stat().st_size > 1024 * 1024:
+                raise ValueError("Artwork exceeds 1 MiB per-file limit: " + original)
+            species[field] = ("data:" + ART_MIME[file.suffix.lower()] + ";base64,"
+                              + base64.b64encode(file.read_bytes()).decode("ascii"))
+            asset_count += 1
+    return asset_count
+
+def index_from_exports(data_path, trainer_path, icons_dir, with_art=False):
     data = read_json(data_path)
     trainers = read_json(trainer_path)
     if not isinstance(data, dict):
@@ -54,9 +87,18 @@ def index_from_exports(data_path, trainer_path, icons_dir):
         raise ValueError("Missing routeEncounters: regenerate the source wild encounter export")
     payload = dict(data)
     payload["trainerTeams"] = trainers
+    art_count = portable_art(payload, data_path.parent) if with_art else 0
+    # A clean index must not reference another computer's asset paths.
+    if not with_art:
+        for species in payload["species"].values():
+            if isinstance(species, dict):
+                for field in ART_FIELDS:
+                    if isinstance(species.get(field), str) and not species[field].startswith("data:"):
+                        species.pop(field, None)
     icons, shiny = collect_icons(icons_dir)
     return {
         "format": "briskdex-rom-v1",
+        "meta": {"artCount": art_count},
         "indexVersion": 2,
         "data": payload,
         "assets": {"icons": icons, "shinyIcons": shiny},
@@ -64,6 +106,8 @@ def index_from_exports(data_path, trainer_path, icons_dir):
 
 def pack(index):
     encoded = json.dumps(index, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    if len(encoded) > 48 * 1024 * 1024:
+        raise ValueError("Reference index exceeds 48 MiB uncompressed")
     compressed = zlib.compress(encoded, level=9)
     if len(compressed) > MAX_PACK:
         raise ValueError("Compressed index exceeds 12 MiB")
@@ -126,11 +170,19 @@ def main():
     parser.add_argument("--trainers", type=pathlib.Path, default=pathlib.Path("brisk-dex-trainer-teams.json"))
     parser.add_argument("--icons", type=pathlib.Path, default=pathlib.Path("brisk-dex-icons"))
     parser.add_argument("--no-icons", action="store_true", help="Reduce size by omitting icons")
+    parser.add_argument("--with-art", action="store_true", help="Include source-exported front/back/shiny sprites, animations, and cries")
     args = parser.parse_args()
     if args.gba.resolve() == args.output.resolve():
         parser.error("The output must be separate; the original ROM will not be overwritten.")
-    index = index_from_exports(args.data, args.trainers, None if args.no_icons else args.icons)
+    index = index_from_exports(args.data, args.trainers, None if args.no_icons else args.icons, args.with_art)
     rom = args.gba.read_bytes()
+    live = len(rom)
+    while live > 0xC0 and rom[live - 1] == 0xFF:
+        live -= 1
+    index['meta']['sourceFingerprint'] = {
+        'algorithm': 'sha256', 'liveRomLength': live,
+        'sha256': hashlib.sha256(rom[:live]).hexdigest(),
+    }
     full, at = install(rom, pack(index))
     verify(full, index)
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -143,7 +195,8 @@ def main():
           "| maps:", len(data.get("mapCatalog", [])),
           "| items:", len(data.get("items", {})),
           "| icons:", len(index["assets"]["icons"]),
-          "| shiny icons:", len(index["assets"]["shinyIcons"]))
+          "| shiny icons:", len(index["assets"]["shinyIcons"]),
+          "| embedded art/cry files:", index["meta"]["artCount"])
     print("Original ROM unchanged. Use indexed .gba in Brisk Dex ROM importer.")
 
 if __name__ == "__main__":
