@@ -2035,6 +2035,7 @@ function markDirty(){assertSaveWritable(currentSave);dirty=true;saveRevision++;u
 function clearDirty(){ dirty = false; updateDirtyBanner(); }
 
 async function depositFromBox(boxIndex, slotIndex){
+  assertSaveWritable(currentSave);
   var mon = currentSave.boxes[boxIndex][slotIndex];
   if (!mon || mon.empty) return;
   await addToStorage(mon);
@@ -2047,22 +2048,27 @@ async function depositFromBox(boxIndex, slotIndex){
 }
 
 async function depositFromParty(partyIndex){
+  assertSaveWritable(currentSave);
   var mon = currentSave.party[partyIndex];
   if (!mon) return;
   if (currentSave.party.length <= 1) throw new Error('Keep at least one Pokémon in your party.');
   await addToStorage(mon);
-  var oldSize = currentSave.party.length;
-  var newParty = currentSave.party.slice();
-  newParty.splice(partyIndex, 1);
-  for (var i=0;i<newParty.length;i++){
-    writePartyBytes(currentSave, 0x0238 + i*100, newParty[i].rawRecord);
-  }
-  for (var j=newParty.length; j<oldSize; j++){
-    writePartyBytes(currentSave, 0x0238 + j*100, new Uint8Array(100));
-  }
-  var view1 = currentSave._internal.sectionView[1];
-  var dv1 = new DataView(view1.buffer, view1.byteOffset, view1.length);
-  dv1.setUint8(0x0234, newParty.length);
+  var config=profileSaveConfig(currentSave.profile);
+  var partyStart=Number(config.partyOffset==null?0x0238:config.partyOffset),
+      countOffset=Number(config.partyCountOffset==null?0x0234:config.partyCountOffset),
+      recordLength=Number(config.partyRecordSize)||100;
+  var view1=currentSave._internal.sectionView[1];
+  if(partyStart<0||countOffset<0||partyStart+recordLength*6>view1.length||countOffset>=view1.length)
+    throw new Error('Party offsets are outside the selected save profile.');
+  var oldSize=currentSave.party.length;
+  var newParty=currentSave.party.slice();
+  newParty.splice(partyIndex,1);
+  for(var i=0;i<newParty.length;i++)
+    writePartyBytes(currentSave,partyStart+i*recordLength,newParty[i].rawRecord.subarray(0,recordLength));
+  for(var j=newParty.length;j<oldSize;j++)
+    writePartyBytes(currentSave,partyStart+j*recordLength,new Uint8Array(recordLength));
+  var dv1=new DataView(view1.buffer,view1.byteOffset,view1.length);
+  dv1.setUint8(countOffset,newParty.length);
   recomputeChecksum(currentSave, 1);
   currentSave.party = newParty;
   markDirty();
