@@ -4448,11 +4448,13 @@ function renderRomImportReport(result){
   node.appendChild(el('div',{style:'font-weight:bold;margin-bottom:6px;',text:'ROM: '+(d.title||'Unknown')+' ('+(d.gameCode||'no code')+') · '+(result.complete?'Full index':'Partial extraction')}));
   node.appendChild(el('div',{text:'Imported '+c.species+' species, '+c.icons+' icons, '+c.trainers+' trainer teams, '+c.routes+' encounter areas, '+(c.maps||0)+' maps, '+c.moves+' moves, '+c.items+' items and '+c.abilities+' abilities.'}));
   node.appendChild(el('div',{text:'Source: '+(result.source==='embedded-manifest'?'validated embedded ROM index':'recoverable ROM tables')+' · '+(result.rhh?'Expansion '+result.rhh.version:'GBA / Emerald family')}));
+  if(result.integrity)node.appendChild(el('div',{text:'ROM index identity: '+result.integrity.status+(result.integrity.reason?' — '+result.integrity.reason:'')}));
+  if(result.romFingerprint)node.appendChild(el('div',{text:'ROM SHA-256 fingerprint: '+result.romFingerprint.slice(7,23)+'…'}));
   if(window.BriskRomAudit){
     var report=BriskRomAudit.coverage(result);
     var details=document.createElement('details');
     details.style.marginTop='10px';
-    details.appendChild(el('summary',{text:'Data coverage: '+report.recoveredCategories+'/10 categories detected — view details'}));
+    details.appendChild(el('summary',{text:'Data coverage: '+report.recoveredCategories+'/'+Object.keys(report.byType).length+' categories detected — view details'}));
     Object.keys(report.byType).forEach(function(id){
       var entry=report.byType[id];
       details.appendChild(el('div',{style:'margin:5px 0;',text:entry.label+': '+entry.state+' ('+entry.count+') — '+entry.notes}));
