@@ -642,6 +642,91 @@ def extract_reference_locations(repo):
 
     return trainer_locations, item_locations
 
+def extract_c_trainer_teams(repo):
+    """Conservatively read classic pokeemerald C trainer definitions.
+
+    Missing fields stay empty; a parsed trainer name alone is never
+    represented as a complete party. This supplements .party-based forks.
+    """
+    source = find_source(repo, "src/data/trainers.h", "src/data/trainers.c")
+    parties = find_source(repo, "src/data/trainer_parties.h", "src/data/trainer_parties.c")
+    if not source:
+        return []
+    source = strip_comments(source)
+    parties = strip_comments(parties)
+
+    def brace_body(text, at):
+        depth = 0
+        quote = None
+        escape = False
+        for pos in range(at, len(text)):
+            c = text[pos]
+            if quote:
+                if escape:
+                    escape = False
+                elif c == "\\":
+                    escape = True
+                elif c == quote:
+                    quote = None
+                continue
+            if c in ('"', "'"):
+                quote = c
+            elif c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0:
+                    return text[at+1:pos]
+        return None
+
+    party_defs = {}
+    for m in re.finditer(r'\b(sParty_[A-Za-z0-9_]+)\s*\[[^\]]*\]\s*=\s*\{', parties):
+        body = brace_body(parties, m.end()-1)
+        if body is None:
+            continue
+        mons = []
+        for item in re.finditer(r'\{', body):
+            block = brace_body(body, item.start())
+            if not block:
+                continue
+            species = re.search(r'\.species\s*=\s*SPECIES_([A-Za-z0-9_]+)', block)
+            if not species:
+                continue
+            level = re.search(r'\.(?:lvl|level)\s*=\s*(\d+)', block)
+            held = re.search(r'\.(?:heldItem|item)\s*=\s*ITEM_([A-Za-z0-9_]+)', block)
+            moves = re.findall(r'\bMOVE_([A-Za-z0-9_]+)', block)
+            mons.append({
+                "species": species.group(1).replace("_", " ").title(),
+                "nickname": None,
+                "gender": None,
+                "item": held.group(1).replace("_", " ").title() if held else None,
+                "moves": [name.replace("_", " ").title() for name in moves],
+                "fields": {"Level": level.group(1)} if level else {}
+            })
+        party_defs[m.group(1)] = mons
+
+    trainers = []
+    for m in re.finditer(r'\[\s*(TRAINER_[A-Za-z0-9_]+)\s*\]\s*=\s*\{', source):
+        body = brace_body(source, m.end()-1)
+        if body is None:
+            continue
+        name = re.search(r'\.trainerName\s*=\s*(?:_\s*\(\s*)?"([^"]+)"', body)
+        tclass = re.search(r'\.trainerClass\s*=\s*TRAINER_CLASS_([A-Za-z0-9_]+)', body)
+        party = re.search(r'\bsParty_[A-Za-z0-9_]+\b', body)
+        parsed = party_defs.get(party.group(0), []) if party else []
+        if not parsed and not name:
+            continue
+        trainers.append({
+            "constant": m.group(1),
+            "name": name.group(1) if name else m.group(1).replace("TRAINER_", "").replace("_", " ").title(),
+            "class": tclass.group(1).replace("_", " ").title() if tclass else "Pkmn Trainer",
+            "pic": "", "gender": "", "music": "", "items": "", "battleType": "",
+            "ai": "", "mugshot": "", "startingStatus": "", "multiParty": "",
+            "party": parsed
+        })
+    return trainers
+
+
 def extract_trainer_teams(repo):
     """Parse Brisk Emerald's trainers.party into JSON-friendly trainer/team records."""
     path = next((candidate for candidate in (
@@ -650,7 +735,7 @@ def extract_trainer_teams(repo):
         os.path.join(repo, "src/data/trainers/trainer_parties.party"),
     ) if os.path.isfile(candidate)), None)
     if not path:
-        return []
+        return extract_c_trainer_teams(repo)
 
     text = open(path, encoding="utf-8").read()
     # Remove C comments; preserve line breaks so trainer blocks remain readable.
