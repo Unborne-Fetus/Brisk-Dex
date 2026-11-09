@@ -4,7 +4,7 @@
   root.BriskRomImporter=api;
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
 'use strict';
-var MAGIC='BDXROM1!', MAGIC_V2='BDXROM2!', MAX_PACK=24*1024*1024, MAX_SPECIES=4096;
+var MAGIC='BDXROM1!', MAGIC_V2='BDXROM2!', MAX_PACK=48*1024*1024, MAX_SPECIES=4096;
 function bytesOf(value){
   if(value instanceof Uint8Array)return value;
   if(value instanceof ArrayBuffer)return new Uint8Array(value);
@@ -445,11 +445,29 @@ function basicDetails(b){
   if(b.length<0xC0||b[0xB2]!==0x96)throw new Error('This is not a recognizable Game Boy Advance ROM (invalid header).');
   return {title:text(b,0xA0,12),gameCode:text(b,0xAC,4),maker:text(b,0xB0,2),size:b.length,version:b[0xBC]};
 }
+function cleanIndexedArt(data){
+  var fields=['frontSprite','backSprite','frontShinySprite','backShinySprite',
+    'frontAnimation','backAnimation','frontShinyAnimation','backShinyAnimation','cry'];
+  if(!data||!data.species||typeof data.species!=='object')return;
+  Object.keys(data.species).forEach(function(id){
+    var entry=data.species[id];
+    if(!entry||typeof entry!=='object')return;
+    fields.forEach(function(field){
+      var value=entry[field];
+      if(value==null)return;
+      if(typeof value!=='string'||value.length>1500000||
+        !/^data:(?:image\/(?:png|gif)|audio\/(?:wav|ogg|mpeg));base64,[A-Za-z0-9+/=]+$/i.test(value))
+        delete entry[field];
+    });
+  });
+}
+
 function normalizedManifest(manifest){
   var d=manifest.data||{},o={};
   ['species','moves','items','abilities','itemDetails','moveDetails','abilityDetails','movePP'].forEach(function(k){if(d[k]&&typeof d[k]==='object'&&!Array.isArray(d[k]))o[k]=d[k];});
   ['routeEncounters','trainerTeams','changes','mapCatalog'].forEach(function(k){if(Array.isArray(d[k]))o[k]=d[k];});
   if(Number.isInteger(d.shinyOdds)&&d.shinyOdds>0)o.shinyOdds=d.shinyOdds;
+  cleanIndexedArt(o);
   return o;
 }
 function importRom(value,options){
@@ -578,9 +596,9 @@ async function importRomAsync(value,options){
     var stream=new Blob([packed]).stream().pipeThrough(new DecompressionStream('deflate'));
     inflated=new Uint8Array(await new Response(stream).arrayBuffer());
   }else if(typeof require==='function'){
-    inflated=bytesOf(require('zlib').inflateSync(Buffer.from(packed)));
+    inflated=bytesOf(require('zlib').inflateSync(Buffer.from(packed),{maxOutputLength:MAX_PACK}));
   }else throw new Error('This device cannot decode compressed ROM indexes.');
-  if(inflated.length>MAX_PACK)throw new Error('ROM index exceeds the 12 MB data limit.');
+  if(inflated.length>MAX_PACK)throw new Error('ROM index exceeds the 48 MiB decoded-data limit.');
   var raw=typeof TextDecoder!=='undefined'?new TextDecoder('utf-8',{fatal:true}).decode(inflated):Buffer.from(inflated).toString('utf8');
   var manifest=JSON.parse(raw);
   if(!manifest||manifest.format!=='briskdex-rom-v1'||!manifest.data)throw new Error('Invalid compressed ROM index.');
