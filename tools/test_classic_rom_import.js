@@ -29,7 +29,7 @@ function writeTable(b,at,stride,entries){
 }
 const g2=base('POKEMON CRYSTAL',0x80);
 writeTable(g2,0x8000,11,['BULBASAUR','IVYSAUR','VENUSAUR','CHARMANDER',
-  ...Array.from({length:247},(_,i)=>'CREATURE'+String(i).padStart(3,'0'))]);
+  ...Array.from({length:247},(_,i)=>'MON'+String(i).padStart(3,'0'))]);
 const crystal=C.importRom(g2,{filename:'test.gbc'});
 assert.strictEqual(crystal.details.generation,2);
 assert.strictEqual(crystal.data.species[1].name,'BULBASAUR');

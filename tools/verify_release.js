@@ -48,7 +48,7 @@ check(read('tools/embed_rom_index.py').includes('portable_art'),'Python indexer 
 check(html.includes('auditAndBindSave'),'ROM save mismatch write protection is missing');
 
 check(html.includes('await handleGbaRomFile(compatLaunchRom)'),'Launch must load selected ROM before opening the app');
-check(html.includes("compatLaunchSave?'save':'dex'"),'ROM-only launch must open the Pokedex');
+check(html.includes("setMainTab(currentSave?'save':'dex')"),'ROM-only or classic SRAM inspection must open the Pokedex');
 check(!/^[^\n]*restoreLastSave\(\);\s*$/m.test(html),'Compat launch must not automatically restore a previously opened save');
 
 check(html.includes('<script src="gba-rom-import.js"></script>'),'index.html does not load gba-rom-import.js');
