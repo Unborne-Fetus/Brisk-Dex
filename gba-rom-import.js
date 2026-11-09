@@ -536,6 +536,32 @@ function importRom(value,options){
     warnings.push('This ROM has an incomplete reference index: '+missingIndexFields.join(', ')+'. Missing fields are not verified.');
   return {details:details,header:header,rhh:rhh,data:data,icons:icons,iconUrls:urls,shinyIconUrls:shinyUrls,counts:counts,source:source,warnings:warnings,complete:isComplete,missingIndexFields:missingIndexFields};
 }
+// A CRC verifies transport integrity. A SHA-256 digest additionally binds the
+// source-exported metadata to the exact live compiled ROM that was indexed.
+async function sha256Hex(bytes){
+  var source=bytesOf(bytes),cryptoApi=typeof globalThis!=='undefined'?globalThis.crypto:null;
+  if(cryptoApi&&cryptoApi.subtle&&cryptoApi.subtle.digest){
+    var digest=new Uint8Array(await cryptoApi.subtle.digest('SHA-256',source));
+    return Array.from(digest).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+  }
+  if(typeof require==='function'&&typeof Buffer!=='undefined'){
+    return require('crypto').createHash('sha256').update(Buffer.from(source)).digest('hex');
+  }
+  return null;
+}
+async function verifyIndexedSource(b,manifest){
+  var fp=manifest&&manifest.meta&&manifest.meta.sourceFingerprint;
+  if(!fp)return {status:'legacy',reason:'This indexed ROM does not include a source fingerprint; the metadata cannot be bound to the game binary.'};
+  if(fp.algorithm!=='sha256'||!Number.isInteger(fp.liveRomLength)||fp.liveRomLength<0xC0||
+    fp.liveRomLength>b.length||!/^[0-9a-f]{64}$/i.test(fp.sha256||''))
+    throw new Error('The indexed ROM has an invalid source fingerprint.');
+  var observed=await sha256Hex(b.subarray(0,fp.liveRomLength));
+  if(!observed)return {status:'unsupported',reason:'SHA-256 is not available on this device, so ROM/index identity remains unverified.'};
+  if(observed.toLowerCase()!==fp.sha256.toLowerCase())
+    throw new Error('The indexed reference data belongs to a different ROM build (source SHA-256 mismatch).');
+  return {status:'verified',sha256:observed,liveRomLength:fp.liveRomLength};
+}
+
 async function importRomAsync(value,options){
   var b=bytesOf(value),pat=[66,68,88,82,79,77,90,33],found=-1;
   for(var i=b.length-pat.length;i>=Math.max(0,b.length-16*1024*1024);i--){
@@ -558,7 +584,12 @@ async function importRomAsync(value,options){
   var raw=typeof TextDecoder!=='undefined'?new TextDecoder('utf-8',{fatal:true}).decode(inflated):Buffer.from(inflated).toString('utf8');
   var manifest=JSON.parse(raw);
   if(!manifest||manifest.format!=='briskdex-rom-v1'||!manifest.data)throw new Error('Invalid compressed ROM index.');
-  return importRom(b,Object.assign({},options||{},{manifest:manifest}));
+  var integrity=await verifyIndexedSource(b,manifest);
+  var imported=importRom(b,Object.assign({},options||{},{manifest:manifest}));
+  imported.integrity=integrity;
+  if(integrity.status==='verified')imported.romFingerprint='sha256:'+integrity.sha256;
+  else imported.warnings.push(integrity.reason||'Indexed ROM source identity could not be verified.');
+  return imported;
 }
-return {scanTimedWildEncounters:scanTimedWildEncounters,scanWildEncounters:scanWildEncounters,importRomAsync:importRomAsync,importRom:importRom,readIcon:readIcon,tilesToRgba:tilesToRgba,lz77:lz77,crc32:crc32,gbaString:gbaString,scanHeader:scanHeader,scanRhh:scanRhh,parseEmbedded:parseEmbedded,MAGIC:MAGIC};
+return {scanTimedWildEncounters:scanTimedWildEncounters,scanWildEncounters:scanWildEncounters,importRomAsync:importRomAsync,verifyIndexedSource:verifyIndexedSource,sha256Hex:sha256Hex,importRom:importRom,readIcon:readIcon,tilesToRgba:tilesToRgba,lz77:lz77,crc32:crc32,gbaString:gbaString,scanHeader:scanHeader,scanRhh:scanRhh,parseEmbedded:parseEmbedded,MAGIC:MAGIC};
 });
