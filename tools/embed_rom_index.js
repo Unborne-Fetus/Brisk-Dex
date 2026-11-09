@@ -3,9 +3,9 @@
 // Embed a compact, checksum-verified reference index in unused/padded GBA ROM
 // space. The original ROM is never changed. Run this only with source-derived
 // data generated from the SAME game revision as the compiled ROM.
-const fs=require('fs'),path=require('path'),zlib=require('zlib');
+const fs=require('fs'),path=require('path'),zlib=require('zlib'),crypto=require('crypto');
 const {crc32}=require('../gba-rom-import.js');
-const MAGIC=Buffer.from('BDXROMZ!','ascii'),MAX_GBA=32*1024*1024,MAX_INDEX=12*1024*1024;
+const MAGIC=Buffer.from('BDXROMZ!','ascii'),MAX_GBA=32*1024*1024,MAX_INDEX=48*1024*1024;
 function usage(){
   console.error('Usage: node tools/embed_rom_index.js game.gba [game-indexed.gba] [--with-art] [--no-icons]');
   process.exit(2);
@@ -64,17 +64,20 @@ function main(){
       dest[match[1]]='data:image/png;base64,'+fs.readFileSync(path.join(iconsDir,name)).toString('base64');
     }
   }
+  let liveRomLength=original.length;
+  while(liveRomLength>0xC0&&original[liveRomLength-1]===0xFF)liveRomLength--;
+  const sourceFingerprint={algorithm:'sha256',liveRomLength,sha256:crypto.createHash('sha256').update(original.subarray(0,liveRomLength)).digest('hex')};
   const manifest={assets,format:'briskdex-rom-v1',meta:{
+    sourceFingerprint,
     source:'Brisk Dex source-derived data at ROM build time',
     warning:'The index is valid only if the data extraction and ROM build used the same game revision.'
   },data};
   const raw=Buffer.from(JSON.stringify(manifest),'utf8');
-  if(raw.length>MAX_INDEX)throw Error('Reference index exceeds 12 MiB uncompressed limit.');
+  if(raw.length>MAX_INDEX)throw Error('Reference index exceeds 48 MiB uncompressed limit.');
   const zipped=zlib.deflateSync(raw,{level:9});
-  if(zipped.length>MAX_INDEX)throw Error('Compressed reference index is too large.');
+  if(zipped.length>12*1024*1024)throw Error('Compressed reference index exceeds 12 MiB. Use --no-icons or remove oversized artwork.');
   const footprint=zipped.length+16;
-  let padStart=original.length;
-  while(padStart>0xC0&&original[padStart-1]===0xFF)padStart--;
+  const padStart=liveRomLength;
   let length=original.length;
   if(length-padStart<footprint){
     length=1;
