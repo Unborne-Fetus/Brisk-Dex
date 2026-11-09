@@ -20,7 +20,7 @@ function createWindow(){
     height: 820,
     minWidth: 720,
     minHeight: 560,
-    backgroundColor: '#0b0b0c',
+    backgroundColor: '#090909',
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -61,7 +61,7 @@ async function writeFileAtomically(filePath, data){
 /* ---- Open a .sav or .srm file via native dialog, return its path + raw bytes ---- */
 ipcMain.handle('open-sav', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
-    title: 'Open a Brisk Emerald save file',
+    title: 'Open a Generation 1–3 save file',
     filters: [{ name: 'Game Boy Advance Save', extensions: ['sav', 'srm'] }],
     properties: ['openFile']
   });

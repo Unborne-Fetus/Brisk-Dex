@@ -1,8 +1,8 @@
 {
-  "name": "brisk-dex",
-  "productName": "Brisk Dex",
+  "name": "adapt-dex",
+  "productName": "Adapt Dex",
   "version": "1.0.0",
-  "description": "Companion app for Pokémon Brisk Emerald with profile-based Pokémon Emerald save compatibility",
+  "description": "Adapt Dex: Generation 1–3 Pokémon ROM hack reference browser and save companion",
   "main": "main.js",
   "author": {
     "name": "Brisk Emerald",
@@ -27,7 +27,9 @@
     "compat:test": "node tools/test_classic_rom_import.js && node tools/test_emerald_compat.js && node tools/test_gba_rom_import.js && node tools/test_rom_fingerprint.js && node tools/test_rom_compat_audit.js && node tools/test_save_block_integrity.js",
     "rom:index": "node tools/embed_rom_index.js",
     "release:test": "npm run compat:test && npm run release:verify",
-    "release:verify": "node tools/verify_release.js"
+    "release:verify": "node tools/verify_release.js",
+    "web:build": "node tools/prepare_web.mjs",
+    "web:verify": "node tools/test_web_bundle.js"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.0.0",
@@ -37,7 +39,7 @@
   },
   "build": {
     "appId": "com.briskemerald.briskdex",
-    "productName": "Brisk Dex",
+    "productName": "Adapt Dex",
     "files": [
       "main.js",
       "preload.js",

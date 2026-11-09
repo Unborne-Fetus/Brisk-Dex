@@ -1,12 +1,12 @@
 {
   "appId": "com.briskemerald.briskdex",
-  "appName": "Brisk Dex",
+  "appName": "Adapt Dex",
   "webDir": "www",
   "android": {
-    "backgroundColor": "#0b0b0c"
+    "backgroundColor": "#090909"
   },
   "ios": {
-    "backgroundColor": "#0b0b0c",
+    "backgroundColor": "#090909",
     "contentInset": "automatic"
   }
 }

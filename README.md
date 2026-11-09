@@ -1,8 +1,8 @@
-# Brisk Dex
+# Adapt Dex
 
-Brisk Dex is a companion app for [Pokémon Brisk Emerald](https://github.com/Unborne-Fetus/Pokemon-Brisk-Emerald). Browse the game's reference data, manage Pokémon and items across compatible Emerald-family saves.
+Adapt Dex is a Generation 1–3 Pokémon ROM-hack companion for Game Boy, Game Boy Color and Game Boy Advance games. Choose a local ROM (and optionally a save) to browse available Pokémon, moves, maps and other game data. Adapt Dex does not include game ROMs.
 
-Species, forms, stats, moves, abilities, items, encounters, and trainer teams come from Brisk Emerald's source. Brisk changes many things from the official games, so its bundled data is the reference used by this app.
+Reference information comes from verified ROM tables or an optional source-matched index. Brisk Emerald's exported artwork and metadata are bundled as a reference for that game; Adapt Dex keeps selected ROM data isolated from other hacks.
 
 ## Features
 
@@ -22,7 +22,7 @@ Players installing a packaged app do not need Node.js or npm.
 
 | Platform | Package | Notes |
 | --- | --- | --- |
-| Windows | EXE installer | Run the installer, then launch Brisk Dex. |
+| Windows | EXE installer | Run the installer, then launch Adapt Dex. |
 | Android | APK | Transfer it to your device and install it. Android may ask you to allow installation from that source. |
 | iOS | Unsigned IPA | Requires signing before installation; it is not a ready-to-install App Store package. |
 | Linux | AppImage or DEB | Available through the separate Linux build workflow. |
@@ -30,12 +30,12 @@ Players installing a packaged app do not need Node.js or npm.
 
 Download packages from a successful run in the repository's [Actions tab](https://github.com/Unborne-Fetus/Brisk-Dex/actions). The combined workflow provides **Brisk-Dex-Windows**, **Brisk-Dex-Android**, and **Brisk-Dex-iOS-Unsigned** artifacts. Extract the downloaded ZIP to get the installer.
 
-### First launch (compat-branch)
+### First launch (adapt-dex)
 
-1. Open Brisk Dex. The initial screen asks for a **Game ROM (.gb, .gbc or .gba)** and an **optional save (.sav or .srm)**.
-2. Choose a ROM. Optionally choose the save that belongs to the same game, then press **Enter Brisk Dex**.
-3. Brisk Dex imports verified ROM data locally and opens the Pokédex, moves, abilities, trainers and encounters where recognized. Without a save, you can browse the ROM but player party, storage and progress aren't available.
-4. If a save is included, Brisk Dex displays its party and boxes and follows the chosen save profile's write-safety rules. Use **Change game** to return to the chooser (this reloads the app).
+1. Open Adapt Dex. The initial screen asks for a **Game ROM (.gb, .gbc or .gba)** and an **optional save (.sav or .srm)**.
+2. Choose a ROM. Optionally choose the save that belongs to the same game, then press **Enter Adapt Dex**.
+3. Adapt Dex imports verified ROM data locally and opens the Pokédex, moves, abilities, trainers and encounters where recognized. Without a save, you can browse the ROM but player party, storage and progress aren't available.
+4. If a save is included, Adapt Dex displays its party and boxes and follows the chosen save profile's write-safety rules. Use **Change game** to return to the chooser (this reloads the app).
 
 Ordinary GB/GBC cartridges can expose verified name tables, while maps, trainers, sprite compression and synthesized cries generally require source-matched reference data. Gen 1 uses internal species numbering; do not assume National Pokédex IDs. The Emerald-based Gen 3 extractor can expose more tables. Normal ROMs may expose only some tables; a source-indexed GBA ROM carries more game-specific data. SHA-256 ROM verification and remembered save associations catch accidental mismatches, but an unknown save's origin cannot be proven from its structure alone. Edits still require a trusted profile.
 
@@ -86,7 +86,7 @@ This path requires Node.js, Java 21, and the Android SDK.
 
 Double-click `build-all.bat`.
 
-It builds every target from the same clean committed `compat-branch` revision:
+It builds every target from the same clean committed `adapt-dex` revision:
 
 1. Windows EXE and Android APK on the Windows PC.
 2. Linux AppImage and DEB through WSL.
@@ -158,7 +158,7 @@ This can include custom regions, Fakémon, items, trainers, maps, icons, shiny b
 **External Pokémon storage and external item storage are retained.** They are independent of the removed trading, online battles and competitive systems. Keep archive backups when switching devices or clearing app data. Depositing or withdrawing Pokémon into a save still requires a trusted matching compatibility profile.
 ## Updating Brisk reference data
 
-For contributors changing the ROM's data, run the extractor from the Brisk Dex folder against a Brisk Emerald checkout:
+For contributors changing the ROM's data, run the extractor from the Adapt Dex folder against a Brisk Emerald checkout:
 
 ```bash
 python3 -m pip install Pillow
@@ -172,7 +172,7 @@ Commit the regenerated data and graphics, then rebuild the app. The extractor re
 There are two Windows entry points:
 
 - `build.bat` builds the **Windows installer (.exe)** and **Android APK (.apk)** into `dist/`.
-- `build-all.bat` builds **Windows, Android, Linux, macOS, and iOS** from the same committed `compat-branch` source.
+- `build-all.bat` builds **Windows, Android, Linux, macOS, and iOS** from the same committed `adapt-dex` source.
 
 `build-all.bat` uses WSL for the Linux AppImage/DEB and an SSH-accessible Mac for the macOS DMG and unsigned iOS IPA. Configure the Mac once with:
 
@@ -186,11 +186,11 @@ All completed artifacts are copied into `dist/`.
 
 ## GBA ROM importer
 
-On `compat-branch`, open **Settings → Import game from .gba ROM**. This imports reference data locally without touching your save. The importer recovers ROM headers, recognizable Pokémon names/stats and icons where layouts permit. For a complete dataset (including trainer teams, Fakémon, new routes, items and normal/shiny icons), embed a source-matched index in a new `.gba` with `npm run rom:index -- game.gba`; see [ROM import instructions](compatibility/ROM_IMPORT.md). Unsupported fields are reported, not guessed.
+On `adapt-dex`, open **Settings → Import game from .gba ROM**. This imports reference data locally without touching your save. The importer recovers ROM headers, recognizable Pokémon names/stats and icons where layouts permit. For a complete dataset (including trainer teams, Fakémon, new routes, items and normal/shiny icons), embed a source-matched index in a new `.gba` with `npm run rom:index -- game.gba`; see [ROM import instructions](compatibility/ROM_IMPORT.md). Unsupported fields are reported, not guessed.
 
 ## Emerald compatibility build
 
-The `compat-branch` release adds profile-based support for standard Pokémon Emerald saves and Emerald-derived ROM hacks while preserving Brisk Emerald's expanded format.
+The `adapt-dex` release adds profile-based support for standard Pokémon Emerald saves and Emerald-derived ROM hacks while preserving Brisk Emerald's expanded format.
 
 - Unknown Emerald-derived saves open read-only unless a trusted profile is selected.
 - Compatibility packs can define save offsets, checksums, PC layouts, Bag layouts, Pokédex storage, Pokémon field encoding, ID maps, and fingerprints.
@@ -208,18 +208,18 @@ node tools/verify_release.js --mobile
 
 ## License and credits
 
-Brisk Dex's original source code is licensed under the **PolyForm Noncommercial License 1.0.0**. Study, modification, and redistribution are permitted for noncommercial purposes under its terms. Commercial use, including selling copies or derivative versions, is not permitted. See [LICENSE](LICENSE) for the complete terms.
+Adapt Dex's original source code is licensed under the **PolyForm Noncommercial License 1.0.0**. Study, modification, and redistribution are permitted for noncommercial purposes under its terms. Commercial use, including selling copies or derivative versions, is not permitted. See [LICENSE](LICENSE) for the complete terms.
 
 ### Project, game-data, and engine credits
 
-- **Pokémon Brisk Emerald** supplies Brisk Dex's species, form, move, ability, item, encounter, trainer, sprite, cry, and save-format reference data.
+- **Pokémon Brisk Emerald** supplies Adapt Dex's species, form, move, ability, item, encounter, trainer, sprite, cry, and save-format reference data.
 - **ROM Hacking Hideout / pokeemerald-expansion contributors** created and maintain the engine Brisk Emerald is built on. Brisk Emerald currently tracks the 1.17.x expansion line.
 - **pret / pokeemerald contributors** created the Pokémon Emerald decompilation that pokeemerald-expansion and Brisk Emerald ultimately build from.
 - The many additional programmers, researchers, data contributors, artists, testers, and documentation writers credited by Brisk Emerald and pokeemerald-expansion remain credited for the systems and material inherited through those projects. See Brisk Emerald's `CREDITS.md` for the full upstream contributor list.
 
 ### Imported art and resource credits
 
-Some graphics displayed by Brisk Dex are extracted from Brisk Emerald, so the original creators of those resources are also part of Brisk Dex's credit chain.
+Some graphics displayed by Adapt Dex are extracted from Brisk Emerald, so the original creators of those resources are also part of Adapt Dex's credit chain.
 
 - **Team Aqua's Asset Repo** and its contributors for imported community resources used by Brisk Emerald.
 - **PurrfectDoodle (Eva)**, **RavePossum**, **Ruki**, and **LeoB (leob0505)** for battle-background work and related source material used in Brisk Emerald.
@@ -229,11 +229,11 @@ Some graphics displayed by Brisk Dex are extracted from Brisk Emerald, so the or
 - **Oomer** for plant and decoration resources.
 - **yoshord** for Secret Base furniture resources.
 - **Horo** (commissioned by Paccy), **Kasen**, **spilledpizza**, **TheWiggliestJiggliest**, **RichardPT**, **robloxmaster376**, **The Spriters Resource**, and **The Radiant Quartz / Prismatic Platinum team** for visiting-Champion overworld sprite material credited in Brisk Emerald.
-- Additional tileset and asset authors are preserved in Brisk Emerald under `resources/team_aqua` and its `CREDITS.md`; those per-pack credits and permissions still apply when their work appears in Brisk Dex.
+- Additional tileset and asset authors are preserved in Brisk Emerald under `resources/team_aqua` and its `CREDITS.md`; those per-pack credits and permissions still apply when their work appears in Adapt Dex.
 
 ### App, build, and service credits
 
-Brisk Dex is built with open-source tooling and services maintained by their respective creators and communities:
+Adapt Dex is built with open-source tooling and services maintained by their respective creators and communities:
 
 - **Electron** for the desktop application runtime.
 - **electron-builder** for desktop packaging.
@@ -245,10 +245,10 @@ Brisk Dex is built with open-source tooling and services maintained by their res
 
 ### Pokémon ownership
 
-Pokémon names, characters, graphics, game data, trademarks, and other official third-party material remain the property of **Nintendo, Creatures Inc., and GAME FREAK inc.** and are not licensed by this notice. Brisk Dex is a non-commercial fan project and is not affiliated with or endorsed by those companies.
+Pokémon names, characters, graphics, game data, trademarks, and other official third-party material remain the property of **Nintendo, Creatures Inc., and GAME FREAK inc.** and are not licensed by this notice. Adapt Dex is a non-commercial fan project and is not affiliated with or endorsed by those companies.
 
 ### Development assistance
 
-Brisk Dex was originally made with Claude-assisted coding, with subsequent development and fixes assisted by OpenAI Codex/ChatGPT.
+Adapt Dex was originally made with Claude-assisted coding, with subsequent development and fixes assisted by OpenAI Codex/ChatGPT.
 
 If a third-party system, asset pack, or contributor has been unintentionally omitted, that credit should be added rather than removed from the original source material.
