@@ -2007,7 +2007,10 @@ async function addToStorage(mon){
     depositedAt: Date.now(),
     sourceTrainer: currentSave.trainer.name,
     sourceId: currentSave.trainer.publicId,
-    profileId: currentSave.profileId || 'brisk-emerald'
+    profileId: currentSave.profileId || 'brisk-emerald',
+    sourceRomFingerprint:currentRomReport&&currentRomReport.romFingerprint||'',
+    sourceRomTitle:currentRomReport&&currentRomReport.details&&currentRomReport.details.title||'',
+    sourceSpeciesName:speciesName(mon.species)
   };
   externalStorage.push(entry);
   try{ await persistExternalStorage(); }
@@ -2083,6 +2086,11 @@ function withdrawToSlot(storageId, boxIndex, slotIndex){
   if (idx === -1) return false;
   if (pendingWithdrawals[storageId] === saveSessionId){ showError('This Pokémon is already queued for the current save.'); return false; }
   var entry=externalStorage[idx],entryProfileId=entry.profileId||'brisk-emerald',saveProfileId=currentSave.profileId||'emerald';
+  if(entry.sourceRomFingerprint&&currentRomReport&&currentRomReport.romFingerprint&&
+     entry.sourceRomFingerprint!==currentRomReport.romFingerprint&&entryProfileId===saveProfileId){
+    showError('This stored Pokémon came from a different ROM build. Matching save-profile names do not guarantee compatible Pokémon IDs. Keep it in external storage until a verified conversion profile is available.');
+    return false;
+  }
   var raw80=base64ToBytes(entry.raw80);
   if(entryProfileId!==saveProfileId){
     try{
@@ -2807,21 +2815,26 @@ function renderStoragePanel(){
   visible.forEach(function(row){
     var entry = row.entry;
     var mon = row.mon;
-    // storage cards open in 'storage' context and have no HP bar (box-form data)
+    // Preserve origin labels when browsing storage from a different ROM.
+    var originName=entry.sourceSpeciesName||speciesName(mon.species);
+    var foreignRom=!!(entry.sourceRomFingerprint&&currentRomReport&&currentRomReport.romFingerprint&&
+      entry.sourceRomFingerprint!==currentRomReport.romFingerprint);
     var queued = pendingWithdrawals[entry.id] === saveSessionId;
     var freshCard = el('div', {class:'mon-card' + (queued ? ' pending-transfer' : '') + (mon.isShiny ? ' shiny' : '')});
     freshCard.appendChild(el('div', {class:'row1'}, [
-      makeIconEl(mon, 'card-icon'),
+      foreignRom?el('div',{class:'card-icon',text:'?' }):makeIconEl(mon, 'card-icon'),
       el('div', {style:'flex:1;'}, [
-        el('div', {class:'name', text: mon.nickname || speciesName(mon.species)}),
-        el('div', {class:'species', text: speciesName(mon.species) + (mon.isShiny ? ' ★' : '')})
+        el('div', {class:'name', text: mon.nickname || originName}),
+        el('div', {class:'species', text: originName + (mon.isShiny ? ' ★' : '')})
       ]),
       el('div', {class:'lvl', text:'Lv' + mon.level})
     ]));
-    var types = applyTypeStyle(freshCard, mon.species);
+    var types = foreignRom?[]:applyTypeStyle(freshCard, mon.species);
     var typePills = makeTypePills(types);
     if (typePills) freshCard.appendChild(typePills);
-    freshCard.appendChild(el('div', {class:'moves-mini', text:queued ? 'Also in current save · archive copy retained' : 'From ' + entry.sourceTrainer + ' · ' + new Date(entry.depositedAt).toLocaleDateString()}));
+    freshCard.appendChild(el('div', {class:'moves-mini', text:foreignRom?
+      'Stored from another ROM'+(entry.sourceRomTitle?' · '+entry.sourceRomTitle:'')+' · source IDs preserved':
+      queued?'Also in current save · archive copy retained':'From ' + entry.sourceTrainer + ' · ' + new Date(entry.depositedAt).toLocaleDateString()}));
     wireStoragePokemonDrag(freshCard, entry.id);
     freshCard.addEventListener('click', function(){ if (Date.now()-lastPokemonDropAt > 800) openModal(mon, {type:'storage', storageId: entry.id}); });
     grid.appendChild(freshCard);
