@@ -32,6 +32,21 @@ function coverage(rom){
     if(normalIcons<species&&byType.icons.state==='indexed')byType.icons.state='partial';
     if(shinies<species&&byType.shiny.state==='indexed')byType.shiny.state='partial';
   }
+  var speciesEntries=Object.values(data.species||{}).filter(function(v){return v&&typeof v==='object';});
+  var battleSprites=speciesEntries.filter(function(v){return !!v.frontSprite&&!!v.backSprite;}).length;
+  var shinySprites=speciesEntries.filter(function(v){return !!v.frontShinySprite&&!!v.backShinySprite;}).length;
+  var cries=speciesEntries.filter(function(v){return !!v.cry;}).length;
+  record('battleSprites','Front/back battle sprites',battleSprites>0,battleSprites,indexed?'portable source-indexed artwork':'unavailable',
+    'Full coverage requires front and back art for each supported species.');
+  record('shinySprites','Shiny battle sprites',shinySprites>0,shinySprites,indexed?'portable source-indexed artwork':'unavailable',
+    'Only true shiny artwork is counted, not recolored normal icons.');
+  record('cries','Pokémon cries',cries>0,cries,indexed?'portable source-indexed audio':'unavailable',
+    'Custom cries must be included in the ROM index.');
+  if(species>0&&indexed){
+    ['battleSprites','shinySprites','cries'].forEach(function(id){
+      if(byType[id].state==='indexed'&&byType[id].count<species)byType[id].state='partial';
+    });
+  }
   record('changes','Custom game changes',Array.isArray(data.changes),Array.isArray(data.changes)?data.changes.length:0,indexed?'source-indexed changes':'unavailable','Procedural features cannot be guaranteed by scanning.');
   var recovered=Object.values(byType).filter(x=>x.state!=='unavailable').length;
   var fullyIndexed=Object.values(byType).filter(x=>x.state==='indexed').length;
