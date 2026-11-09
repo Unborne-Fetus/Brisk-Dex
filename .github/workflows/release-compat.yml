@@ -18,6 +18,7 @@ jobs:
       - run: npm ci
       - run: npm run compat:test
       - run: python3 tools/test_extract_data.py
+      - run: python3 tools/test_indexed_art.py
 
   package-audit:
     name: Desktop and mobile packaging audit
