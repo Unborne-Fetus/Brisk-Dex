@@ -696,9 +696,22 @@ async function importRomAsync(value,options){
   if(!size||size>MAX_PACK||start<0)throw new Error('Compressed ROM index has an invalid size.');
   if(crc32(b,start,found-8)!==expected)throw new Error('Compressed ROM index has a checksum mismatch.');
   var packed=b.slice(start,found-8),inflated;
-  if(typeof DecompressionStream!=='undefined'){
+  if(typeof DecompressionStream!=='undefined'&&typeof Blob!=='undefined'){
     var stream=new Blob([packed]).stream().pipeThrough(new DecompressionStream('deflate'));
-    inflated=new Uint8Array(await new Response(stream).arrayBuffer());
+    var reader=stream.getReader(),chunks=[],total=0;
+    while(true){
+      var part=await reader.read();
+      if(part.done)break;
+      total+=part.value.byteLength;
+      if(total>MAX_PACK){
+        await reader.cancel();
+        throw new Error('ROM index exceeds the 48 MiB decoded-data limit.');
+      }
+      chunks.push(part.value);
+    }
+    inflated=new Uint8Array(total);
+    var position=0;
+    chunks.forEach(function(chunk){inflated.set(chunk,position);position+=chunk.byteLength;});
   }else if(typeof require==='function'){
     inflated=bytesOf(require('zlib').inflateSync(Buffer.from(packed),{maxOutputLength:MAX_PACK}));
   }else throw new Error('This device cannot decode compressed ROM indexes.');
