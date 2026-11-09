@@ -880,6 +880,7 @@ html[dir="rtl"] :is(.dex-entry,.item-entry,.reference-entry,.route-location){tex
         <button type="button" class="primary" id="btn-import-gba-rom">Import game from .gba ROM</button>
         <button type="button" class="ghost" id="btn-reset-rom-data">Choose another ROM</button>
         <button type="button" class="ghost" id="btn-import-compat-profile">Import compatibility pack</button>
+        <button type="button" class="ghost" id="btn-clear-rom-pair">Clear remembered ROM/save pairing</button>
         <button type="button" class="ghost" id="btn-import-game-data">Import game-data pack</button>
         <button type="button" class="ghost" id="btn-export-original-backup">Export untouched backup</button>
       </div>
@@ -1341,7 +1342,7 @@ function base64ToBytes(b64){
 
 function auditAndBindSave(save){
   if(!save||!currentRomReport||!window.BriskRomAudit)return save;
-  var audit=BriskRomAudit.inspectSave(currentRomReport,save);
+  var audit=BriskRomAudit.inspectSave(currentRomReport,save,localStorage);
   save.romAudit=audit;
   if(!audit.writeSafe){
     // A full matching source index or an explicitly trusted profile is needed
@@ -1353,6 +1354,12 @@ function auditAndBindSave(save){
   }
   if(window.EmeraldCompat)save.compatibility=EmeraldCompat.compatibilityReport(save.profile);
   return save;
+}
+
+function recordObservedRomPair(save){
+  if(!save||!save.romAudit||save.romAudit.status==='incompatible'||
+     !currentRomReport||!window.BriskRomAudit)return;
+  BriskRomAudit.rememberPairing(currentRomReport,save,localStorage);
 }
 
 function parseSav(arrayBuffer){
@@ -4320,6 +4327,7 @@ function handleSavFile(file){
       var extMatch = String(file && file.name || '').match(/\.(sav|srm)$/i);
       save.fileExtension = extMatch ? extMatch[1].toLowerCase() : 'sav';
       currentSave = save;
+      recordObservedRomPair(save);
       storeSnapshot(save).catch(function(e){showError('Could not remember this save: '+e.message);});
       loadDexStatusOverrides(save);
       saveSessionId = genId();
@@ -4347,6 +4355,7 @@ async function handleSavFromAndroid(){
     save.fileExtension = extMatch ? extMatch[1].toLowerCase() : 'sav';
     save.uri=result.uri||null;
     currentSave = save;
+    recordObservedRomPair(save);
     await storeSnapshot(save);
     loadDexStatusOverrides(save);
     saveSessionId = genId();
@@ -4372,6 +4381,7 @@ async function handleSavFromElectron(){
     var extMatch = String(result.filePath || '').match(/\.(sav|srm)$/i);
     save.fileExtension = extMatch ? extMatch[1].toLowerCase() : 'sav';
     currentSave = save;
+    recordObservedRomPair(save);
     await storeSnapshot(save);
     loadDexStatusOverrides(save);
     saveSessionId = genId();
@@ -4459,7 +4469,12 @@ async function handleGbaRomFile(file){
     await gameDataReady;
     if(!window.BriskRomImporter)throw new Error('ROM reader is not available in this build.');
     if(file.size<0xC0||file.size>128*1024*1024)throw new Error('Select a valid GBA ROM under 128 MB.');
-    var result=await BriskRomImporter.importRomAsync(await file.arrayBuffer());
+    var romBytes=await file.arrayBuffer();
+    var result=await BriskRomImporter.importRomAsync(romBytes);
+    if(!result.romFingerprint&&BriskRomImporter.sha256Hex){
+      var digest=await BriskRomImporter.sha256Hex(new Uint8Array(romBytes));
+      if(digest)result.romFingerprint='sha256:'+digest;
+    }
     if(!result.counts.species&&!result.counts.trainers&&!result.counts.routes)
       throw new Error('No trustworthy Pokémon tables were identified in this ROM. A ROM index is needed for this hack.');
     // Clear stale Brisk trainer/encounter tables when the selected ROM lacks them.
@@ -4837,6 +4852,7 @@ async function openCompatLaunchSession(){
       save.filePath=compatLaunchSave.filePath||null;
       save.uri=compatLaunchSave.uri||null;
       currentSave=save;
+      recordObservedRomPair(save);
       await storeSnapshot(save);
       loadDexStatusOverrides(save);
       saveSessionId=genId();
@@ -4903,6 +4919,14 @@ document.getElementById('launch-clear-save').addEventListener('click',function()
 compatLaunchForm.addEventListener('submit',function(e){e.preventDefault();openCompatLaunchSession();});
 compatLaunchForm.addEventListener('keydown',function(e){
   if(e.key==='Enter'&&!e.repeat&&compatLaunchRom){e.preventDefault();openCompatLaunchSession();}
+});
+document.getElementById('btn-clear-rom-pair').addEventListener('click',function(){
+  if(!currentSave){showNotice('Load a save before clearing its remembered ROM association.');return;}
+  if(!window.BriskRomAudit)return;
+  if(!window.confirm('Clear the locally remembered ROM for this trainer save? This does not enable unsafe edits; please reselect the matching ROM and save afterward.'))return;
+  var success=BriskRomAudit.forgetPairing(currentSave,localStorage);
+  if(success)showNotice('Remembered ROM association cleared. Reopen the ROM and save to establish a new pairing.');
+  else showError('Could not clear the remembered ROM association.');
 });
 document.getElementById('btn-change-game').addEventListener('click',function(){
   if(dirty&&!window.confirm('Unsaved Pokémon changes will be lost. Choose a different game?'))return;
