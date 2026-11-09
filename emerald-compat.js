@@ -262,9 +262,22 @@ function inferProfileFromRom(rom){
     profile.save.partyCountOffset=layout.partyCountOffset;
   if(Number.isInteger(layout.partyOffset)&&layout.partyOffset>=0&&layout.partyOffset+600<=3968)
     profile.save.partyOffset=layout.partyOffset;
+  if(!profile.trainer)profile.trainer={};
+  var trainerOffsets={playerNameOffset:'nameOffset',playerGenderOffset:'genderOffset',trainerIdOffset:'idOffset'};
+  Object.keys(trainerOffsets).forEach(function(field){
+    var value=layout[field];
+    if(Number.isInteger(value)&&value>=0&&value+4<=3968)
+      profile.trainer[trainerOffsets[field]]=value;
+  });
+  if(layout.playerNameOffset!=null)profile.trainer.nameLength=7;
+  // ROM header offsets do not establish custom box packing, pocket placement,
+  // encryption masks or Pokédex flag semantics. Keep unknown saves read-only.
+  profile.inferredFields=hdr.saveLayout?[
+    'partyCountOffset','partyOffset','trainerOffsets','speciesLimit','expansionFamily'
+  ]:['speciesLimit','expansionFamily'];
   profile.romGameCode=rom.details.gameCode||'';
   profile.inferredFromRom=true;
-  profile.inferredFields=hdr.saveLayout?['partyCountOffset','partyOffset','speciesLimit','expansionFamily']:['speciesLimit','expansionFamily'];
+
   return profile;
 }
 
