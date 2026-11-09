@@ -3,6 +3,14 @@ const assert=require('assert');
 const crypto=require('crypto');
 const R=require('../gba-rom-import.js');
 async function run(){
+  assert.strictEqual(R.portableSha256(new Uint8Array(0)),
+    'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+  assert.strictEqual(R.portableSha256(new Uint8Array([97,98,99])),
+    'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+  const megabyte=Buffer.alloc(1024*1024,0xAB);
+  assert.strictEqual(R.portableSha256(megabyte),
+    crypto.createHash('sha256').update(megabyte).digest('hex'));
+
   const rom=new Uint8Array(8192).fill(0xFF);
   rom[0xB2]=0x96;rom[0xA0]=66;rom[0xA1]=68;rom[0x200]=17;
   const live=0x201;
