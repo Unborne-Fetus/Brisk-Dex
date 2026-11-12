@@ -20,10 +20,16 @@ on:
       - "brisk-dex-trainer-pics/**"
       - "brisk-dex-items/**"
       - "tools/prepare_android.mjs"
+      - "tools/set_android_version.mjs"
+      - "android/**"
+      - "android-native/**"
+      - "test/android/**"
       - ".github/workflows/build-android.yml"
 
 jobs:
   build:
+    outputs:
+      channel_signing: ${{ steps.signing.outputs.channel_signing }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -61,7 +67,46 @@ jobs:
       - name: Sync Capacitor plugins and assets
         run: npx cap sync android
 
-      - name: Build debug APK
+      - name: Assign a forward-only Android version
+        run: node tools/set_android_version.mjs "$GITHUB_RUN_NUMBER"
+
+      - name: Configure matching update-channel signer when supplied
+        id: signing
+        shell: bash
+        env:
+          BRISK_ANDROID_KEYSTORE_BASE64: ${{ secrets.BRISK_ANDROID_KEYSTORE_BASE64 }}
+          BRISK_ANDROID_STORE_PASSWORD: ${{ secrets.BRISK_ANDROID_STORE_PASSWORD }}
+          BRISK_ANDROID_KEY_PASSWORD: ${{ secrets.BRISK_ANDROID_KEY_PASSWORD }}
+          BRISK_ANDROID_KEY_ALIAS: ${{ secrets.BRISK_ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          if [ -z "$BRISK_ANDROID_KEYSTORE_BASE64" ]; then
+            echo "channel_signing=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No stable Android signer configured; publish preview only, never the in-app channel."
+            exit 0
+          fi
+          if [ -z "$BRISK_ANDROID_STORE_PASSWORD" ] || [ -z "$BRISK_ANDROID_KEY_PASSWORD" ] || [ -z "$BRISK_ANDROID_KEY_ALIAS" ]; then
+            echo "::error::Android signing secrets are incomplete; refusing to build an unverified channel update."
+            exit 1
+          fi
+          mkdir -p android/.secure
+          printf '%s' "$BRISK_ANDROID_KEYSTORE_BASE64" | base64 --decode > android/.secure/channel.jks
+          chmod 600 android/.secure/channel.jks
+          cat >> android/app/build.gradle <<'GRADLE'
+
+          // CI only: use the already trusted Android update-channel certificate.
+          android.signingConfigs.debug.storeFile = file("../.secure/channel.jks")
+          android.signingConfigs.debug.storePassword = System.getenv("BRISK_ANDROID_STORE_PASSWORD")
+          android.signingConfigs.debug.keyAlias = System.getenv("BRISK_ANDROID_KEY_ALIAS")
+          android.signingConfigs.debug.keyPassword = System.getenv("BRISK_ANDROID_KEY_PASSWORD")
+          GRADLE
+          echo "channel_signing=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build Android APK
+        env:
+          BRISK_ANDROID_STORE_PASSWORD: ${{ secrets.BRISK_ANDROID_STORE_PASSWORD }}
+          BRISK_ANDROID_KEY_PASSWORD: ${{ secrets.BRISK_ANDROID_KEY_PASSWORD }}
+          BRISK_ANDROID_KEY_ALIAS: ${{ secrets.BRISK_ANDROID_KEY_ALIAS }}
         run: |
           chmod +x android/gradlew
           cd android
@@ -70,11 +115,28 @@ jobs:
       - name: Rename APK
         run: cp android/app/build/outputs/apk/debug/app-debug.apk Brisk-Dex-Android.apk
 
-      - name: Upload APK
+      - name: Generate integrity-checked update manifest
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          apk = Path("Brisk-Dex-Android.apk")
+          data = json.loads(Path("android-build-version.json").read_text())
+          with apk.open("rb") as stream:
+              data["sha256"] = hashlib.file_digest(stream, "sha256").hexdigest()
+          data["bytes"] = apk.stat().st_size
+          Path("android-update.json").write_text(json.dumps(data, indent=2) + "\n")
+          print(f"APK {data['versionName']} (code {data['versionCode']}), {data['bytes']} bytes")
+          PY
+
+      - name: Upload APK and verified manifest
         uses: actions/upload-artifact@v6
         with:
           name: Brisk-Dex-Android
-          path: Brisk-Dex-Android.apk
+          path: |
+            Brisk-Dex-Android.apk
+            android-update.json
           if-no-files-found: error
 
   publish-preview:
@@ -102,5 +164,68 @@ jobs:
           gh release create "$tag" release/Brisk-Dex-Android.apk \
             --target "$GITHUB_SHA" \
             --title "Brisk Dex Android preview ${GITHUB_RUN_NUMBER} (crash-fix testing)" \
-            --notes "Automated Android APK from a successful CI build, revision ${GITHUB_SHA}. Includes tests for native trainer script handling. PREVIEW: the native game still requires device testing for follower battles, May's post-battle script, and Rock Slide. This is a debug-signed APK; its signing certificate may differ from older builds, so in-place installation is not guaranteed. Back up your game save before changing APKs. The existing android-updates channel is unchanged." \
+            --notes "Automated Android APK from a successful CI build, revision ${GITHUB_SHA}. Includes tests for native trainer script handling. PREVIEW: the native game still requires device testing for follower battles, May's post-battle script, and Rock Slide. This is a preview APK. In-app updates are published separately only when CI has the matching trusted signing key and confirms a newer version. In-place installation of previews may fail due to certificate differences. Back up your saved games before reinstalling." \
             --prerelease
+
+  publish-channel:
+    name: Publish only compatible in-app update
+    needs: build
+    if: github.ref == 'refs/heads/main' && needs.build.outputs.channel_signing == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: brisk-dex-android-update-channel
+      cancel-in-progress: false
+    steps:
+      - name: Download built APK and integrity manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: Brisk-Dex-Android
+          path: release
+      - name: Verify new APK matches installed update-channel signature and increases version code
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p previous
+          gh release download android-updates --pattern Brisk-Dex-Android.apk --dir previous
+          old=previous/Brisk-Dex-Android.apk
+          new=release/Brisk-Dex-Android.apk
+          test -s "$old" && test -s "$new" && test -s release/android-update.json
+          sdk_tools="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}/build-tools"
+          apksigner="$(find "$sdk_tools" -type f -name apksigner | sort -V | tail -n 1)"
+          aapt="$(find "$sdk_tools" -type f -name aapt | sort -V | tail -n 1)"
+          test -n "$apksigner" && test -n "$aapt"
+          old_cert="$("$apksigner" verify --print-certs "$old" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
+          new_cert="$("$apksigner" verify --print-certs "$new" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
+          if [ -z "$old_cert" ] || [ "$old_cert" != "$new_cert" ]; then
+            echo "::error::APK certificate differs from existing android-updates APK. Not publishing an update that would fail in-place installation."
+            exit 1
+          fi
+          old_code="$("$aapt" dump badging "$old" | sed -n "s/.*versionCode='\([0-9]*\)'.*/\1/p" | head -n 1)"
+          new_code="$("$aapt" dump badging "$new" | sed -n "s/.*versionCode='\([0-9]*\)'.*/\1/p" | head -n 1)"
+          if [ -z "$old_code" ] || [ -z "$new_code" ] || [ "$new_code" -le "$old_code" ]; then
+            echo "::error::APK versionCode must exceed the currently published Android update."
+            exit 1
+          fi
+          python3 - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          apk = Path("release/Brisk-Dex-Android.apk")
+          manifest = json.loads(Path("release/android-update.json").read_text())
+          assert manifest["bytes"] == apk.stat().st_size
+          with apk.open("rb") as src:
+              assert manifest["sha256"] == hashlib.file_digest(src, "sha256").hexdigest()
+          print("Manifest hash and APK size verified")
+          PY
+      - name: Update trusted Android channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh release upload android-updates release/Brisk-Dex-Android.apk --clobber
+          gh release upload android-updates release/android-update.json --clobber
