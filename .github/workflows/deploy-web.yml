@@ -42,10 +42,20 @@ jobs:
         with:
           node-version: '22'
       - name: Build standalone web edition
-        run: node tools/build_web.mjs
+        run: |
+          node tools/build_web.mjs
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('web-dist/index.html')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('<title>Pokemon Brisk Emerald</title>', '<title>Brisk Dex</title>')
+          s = s.replace('<title>Adapt Dex</title>', '<title>Brisk Dex</title>')
+          p.write_text(s, encoding='utf-8')
+          PY
       - name: Check generated site
         run: |
           test -s web-dist/index.html
+          grep -q '<title>Brisk Dex</title>' web-dist/index.html
           test -s web-dist/brisk-dex-data.json
           test -s web-dist/brisk-dex-trainer-flags.json
           test -s web-dist/brisk-dex-icon-manifest.json
