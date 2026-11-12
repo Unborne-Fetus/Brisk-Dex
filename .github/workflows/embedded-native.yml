@@ -54,6 +54,7 @@ jobs:
       - run: python3 tools/test_native_compat.py
       - run: python3 tools/test_native_pe.py
       - run: python3 tools/test_prepare_brisk_native.py
+      - run: python3 tools/test_expand_native_encounters.py
       - run: python3 -m unittest discover -s test/android -p 'test_native_*.py' -v
       - run: bash -n tools/build-native-expansion.sh tools/setup-native-deps.sh
       - run: bash tools/test_wsl_line_endings.sh
