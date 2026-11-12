@@ -63,6 +63,12 @@ typedef union __attribute__((packed)) {
 } TrainerBattleParameter;
 #define PLATFORM_NATIVE 1
 """ + patcher.HELPER + r"""
+static void assert_native_pointer_near_wire(const void *wire, const void *pointer, uint32_t low) {
+  uintptr_t actual=(uintptr_t)pointer, origin=(uintptr_t)wire;
+  assert((uint32_t)actual==low);
+  assert(actual>UINT32_MAX);
+  assert(actual>=origin ? actual-origin<0x80000000ull : origin-actual<0x80000000ull);
+}
 int main(void) {
   const u8 wire[40] = {
      0xb5, 7, 0x14, 0x02,      /* flags; local A; trainer 532 */
@@ -85,14 +91,14 @@ int main(void) {
   assert(t.params.playMusicA==1 && t.params.playMusicB==0);
   assert(t.params.continueScript==1 && t.params.facePlayer==1);
   assert(t.params.earlyRival==0 && t.params.skipFlagCheck==1);
-  assert((uintptr_t)t.params.introTextA==0x40302010u);
-  assert((uintptr_t)t.params.defeatTextA==0x41312111u);
-  assert((uintptr_t)t.params.battleScriptRetAddrA==0x42322212u);
-  assert((uintptr_t)t.params.introTextB==0x43332313u);
-  assert((uintptr_t)t.params.defeatTextB==0x44342414u);
-  assert((uintptr_t)t.params.battleScriptRetAddrB==0x45352515u);
-  assert((uintptr_t)t.params.victoryText==0x46362616u);
-  assert((uintptr_t)t.params.cannotBattleText==0x47372717u);
+  assert_native_pointer_near_wire(wire, t.params.introTextA, 0x40302010u);
+  assert_native_pointer_near_wire(wire, t.params.defeatTextA, 0x41312111u);
+  assert_native_pointer_near_wire(wire, t.params.battleScriptRetAddrA, 0x42322212u);
+  assert_native_pointer_near_wire(wire, t.params.introTextB, 0x43332313u);
+  assert_native_pointer_near_wire(wire, t.params.defeatTextB, 0x44342414u);
+  assert_native_pointer_near_wire(wire, t.params.battleScriptRetAddrB, 0x45352515u);
+  assert_native_pointer_near_wire(wire, t.params.victoryText, 0x46362616u);
+  assert_native_pointer_near_wire(wire, t.params.cannotBattleText, 0x47372717u);
   assert(t.params.rivalBattleFlags==0xe1);
   return 0;
 }
