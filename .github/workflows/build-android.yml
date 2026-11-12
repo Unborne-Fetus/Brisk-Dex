@@ -76,3 +76,31 @@ jobs:
           name: Brisk-Dex-Android
           path: Brisk-Dex-Android.apk
           if-no-files-found: error
+
+  publish-preview:
+    name: Publish validated Android preview APK
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download successful Android APK
+        uses: actions/download-artifact@v4
+        with:
+          name: Brisk-Dex-Android
+          path: release
+      - name: Publish APK as a GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s release/Brisk-Dex-Android.apk
+          tag="android-preview-${GITHUB_RUN_NUMBER}"
+          gh release create "$tag" release/Brisk-Dex-Android.apk \
+            --target "$GITHUB_SHA" \
+            --title "Brisk Dex Android preview ${GITHUB_RUN_NUMBER} (crash-fix testing)" \
+            --notes "Automated Android APK from a successful CI build, revision ${GITHUB_SHA}. Includes tests for native trainer script handling. PREVIEW: the native game still requires device testing for follower battles, May's post-battle script, and Rock Slide. This is a debug-signed APK; its signing certificate may differ from older builds, so in-place installation is not guaranteed. Back up your game save before changing APKs. The existing android-updates channel is unchanged." \
+            --prerelease
