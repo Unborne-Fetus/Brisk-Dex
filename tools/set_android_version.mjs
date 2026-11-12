@@ -5,7 +5,9 @@ import path from 'node:path';
 const run=Number(process.argv[2]);
 if(!Number.isSafeInteger(run)||run<1||run>1000000)
   throw new Error('Expected a positive GitHub Android workflow run number.');
-const code=100000+run;
+// Keep update-channel APK versions above the historical 1.3.x series.
+// Android versionCode must stay below Google Play's 2,100,000,000 maximum.
+const code=200000000+run;
 const root=process.cwd();
 const config=JSON.parse(await fs.readFile(path.join(root,'package.json'),'utf8'));
 const base=String(config.version||'1.0.0');
