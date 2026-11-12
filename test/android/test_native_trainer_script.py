@@ -43,6 +43,7 @@ class NativeTrainerScript(unittest.TestCase):
         # added to the game and check the 40-byte GBA wire layout.
         c_source = r"""
 #include <stdint.h>
+#include <stddef.h>
 #include <assert.h>
 typedef uint8_t u8;
 typedef uint16_t u16;
@@ -108,7 +109,8 @@ int main(void) {
             src=root/"test.c"
             binary=root/"test.exe"
             src.write_text(c_source)
-            subprocess.run(["cc","-std=gnu17","-Wall","-Wextra","-Werror",str(src),"-o",str(binary)],capture_output=True,text=True,check=True)
+            compiled=subprocess.run(["cc","-std=gnu17","-Wall","-Wextra","-Werror",str(src),"-o",str(binary)],capture_output=True,text=True)
+            self.assertEqual(compiled.returncode,0,compiled.stdout+compiled.stderr)
             subprocess.run([str(binary)],capture_output=True,text=True,check=True,timeout=10)
 
 if __name__=="__main__":
