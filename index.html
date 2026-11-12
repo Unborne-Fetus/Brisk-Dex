@@ -1063,6 +1063,10 @@ body.native-game-immersive #native-game-screen{box-sizing:border-box!important;w
         <option value="level">Level</option>
         <option value="shiny">Shiny first</option>
       </select>
+      <button class="ghost" id="btn-storage-prev-box">Previous box</button>
+      <span id="storage-box-label" aria-live="polite">Box 1</span>
+      <button class="ghost" id="btn-storage-next-box">Next box</button>
+      <button class="ghost" id="btn-storage-jump-box">Go to box…</button>
       <button class="ghost" id="btn-export-storage">Export archive</button>
       <button class="ghost" id="btn-import-storage">Import archive</button>
       <input type="file" id="file-storage" accept=".json,application/json">
@@ -2960,6 +2964,20 @@ if (IS_ANDROID || IS_IOS){
    withdrawing one back into a box is a byte-perfect round trip.
    ============================================================ */
 var externalStorage = [];
+var storageBoxIndex = 0;
+var EXTERNAL_BOX_SLOTS = 30; // Grows on demand, unlike the 20-box GBA save format.
+function externalBoxNumber(entry){ return Number.isSafeInteger(entry.boxIndex) && entry.boxIndex >= 0 ? entry.boxIndex : 0; }
+function externalBoxOccupancy(box){ return externalStorage.reduce(function(n,entry){ return n + (externalBoxNumber(entry) === box ? 1 : 0); },0); }
+function normalizeExternalBoxes(entries){
+  // Preserve legacy 80-byte records and spread old flat archives into 30-slot boxes.
+  var occupied = Object.create(null);
+  return entries.map(function(entry){
+    var box = externalBoxNumber(entry);
+    while ((occupied[box] || 0) >= EXTERNAL_BOX_SLOTS) box++;
+    occupied[box] = (occupied[box] || 0) + 1;
+    return Object.assign({}, entry, {boxIndex:box});
+  });
+}
 var dirty = false;
 var storageQuery = '';
 var storageSort = 'recent';
@@ -2976,13 +2994,13 @@ async function loadExternalStorage(){
       var loaded = await window.briskDexAPI.loadStorage();
       if (!Array.isArray(loaded)) throw new Error('The storage file does not contain a Pokémon list.');
       if (loaded.some(function(entry){ return !validStorageEntry(entry); })) throw new Error('The storage file contains an invalid Pokémon record.');
-      externalStorage = loaded;
+      externalStorage = normalizeExternalBoxes(loaded);
     } else {
       var raw = localStorage.getItem('briskdex_external_storage');
       var parsed = raw ? JSON.parse(raw) : [];
       if (!Array.isArray(parsed)) throw new Error('Browser storage does not contain a Pokémon list.');
       if (parsed.some(function(entry){ return !validStorageEntry(entry); })) throw new Error('Browser storage contains an invalid Pokémon record.');
-      externalStorage = parsed;
+      externalStorage = normalizeExternalBoxes(parsed);
     }
     storageLoadError = null;
   }catch(err){
@@ -3009,15 +3027,18 @@ async function addToStorage(mon){
   await storageReady;
   assertStorageReadable();
   var raw80 = mon.rawRecord.length >= 80 ? mon.rawRecord.subarray(0,80) : mon.rawRecord;
+  var box = storageBoxIndex;
+  while (externalBoxOccupancy(box) >= EXTERNAL_BOX_SLOTS) box++;
   var entry = {
     id: genId(),
+    boxIndex: box,
     raw80: bytesToBase64(raw80),
     depositedAt: Date.now(),
     sourceTrainer: currentSave.trainer.name,
     sourceId: currentSave.trainer.publicId
   };
   externalStorage.push(entry);
-  try{ await persistExternalStorage(); }
+  try{ await persistExternalStorage(); storageBoxIndex = box; }
   catch(err){
     externalStorage = externalStorage.filter(function(item){ return item.id !== entry.id; });
     throw err;
@@ -3784,7 +3805,10 @@ function openSlotPicker(storageId){
 function renderStoragePanel(){
   var grid = document.getElementById('storage-grid');
   grid.innerHTML = '';
-  document.getElementById('storage-count').textContent = storageLoadError ? 'unavailable' : externalStorage.length + ' stored';
+  document.getElementById('storage-count').textContent = storageLoadError ? 'unavailable' : externalStorage.length + ' stored in expandable boxes';
+  document.getElementById('storage-box-label').textContent = 'Box ' + (storageBoxIndex + 1) + ' (' + externalBoxOccupancy(storageBoxIndex) + '/30)';
+  document.getElementById('btn-storage-prev-box').disabled = storageBoxIndex === 0;
+  document.getElementById('btn-storage-next-box').disabled = storageBoxIndex >= Number.MAX_SAFE_INTEGER - 1;
   if (storageLoadError){
     grid.appendChild(el('div', {class:'error-banner', text:'External storage could not be read, so the app has blocked changes to protect the archive. Import a valid backup archive to recover it. Details: ' + storageLoadError}));
     return;
@@ -3796,6 +3820,7 @@ function renderStoragePanel(){
   var query = storageQuery.trim().toLocaleLowerCase();
   var visible = [];
   externalStorage.forEach(function(entry){
+    if (externalBoxNumber(entry) !== storageBoxIndex) return;
     try{
       var raw80 = base64ToBytes(entry.raw80);
       if (raw80.length !== 80) return;
@@ -3814,7 +3839,7 @@ function renderStoragePanel(){
     return (b.entry.depositedAt || 0) - (a.entry.depositedAt || 0);
   });
   if (visible.length === 0){
-    grid.appendChild(el('div', {class:'notice-banner', text:'No stored Pokémon match that search.'}));
+    grid.appendChild(el('div', {class:'notice-banner', text:'This box is empty or no stored Pokémon match that search. Use Next box to open another one.'}));
     return;
   }
   visible.forEach(function(row){
@@ -3836,6 +3861,22 @@ function renderStoragePanel(){
     if (typePills) freshCard.appendChild(typePills);
     freshCard.appendChild(el('div', {class:'moves-mini', text:queued ? 'Also in current save · archive copy retained' : 'From ' + entry.sourceTrainer + ' · ' + new Date(entry.depositedAt).toLocaleDateString()}));
     wireStoragePokemonDrag(freshCard, entry.id);
+    var moveBox = el('button', {class:'ghost', text:'Move to another box'});
+    moveBox.addEventListener('click', async function(event){
+      event.stopPropagation();
+      var answer = window.prompt('Move to external box number (1 or higher):', String(storageBoxIndex + 1));
+      if (answer === null) return;
+      var boxNumber = Number(answer);
+      if (!Number.isSafeInteger(boxNumber) || boxNumber < 1){ showError('Enter a positive whole box number.'); return; }
+      var target = boxNumber - 1;
+      if (target === externalBoxNumber(entry)) return;
+      if (externalBoxOccupancy(target) >= EXTERNAL_BOX_SLOTS){ showError('That external box already contains 30 Pokémon.'); return; }
+      var oldBox = entry.boxIndex;
+      entry.boxIndex = target;
+      try{ await persistExternalStorage(); storageBoxIndex = target; renderStoragePanel(); }
+      catch(err){ entry.boxIndex = oldBox; showError('Could not move Pokémon: ' + err.message); }
+    });
+    freshCard.appendChild(moveBox);
     freshCard.addEventListener('click', function(){ if (Date.now()-lastPokemonDropAt > 800) openModal(mon, {type:'storage', storageId: entry.id}); });
     grid.appendChild(freshCard);
   });
@@ -3888,7 +3929,7 @@ function importExternalStorageFile(file){
       });
       var previous = externalStorage;
       var previousError = storageLoadError;
-      externalStorage = recovering ? valid : previous.concat(valid);
+      externalStorage = normalizeExternalBoxes(recovering ? valid : previous.concat(valid));
       if (recovering) storageLoadError = null;
       try{ await persistExternalStorage(); }
       catch(err){ externalStorage = previous; storageLoadError = previousError; throw err; }
@@ -7211,6 +7252,15 @@ document.getElementById('storage-search').addEventListener('input', function(e){
 document.getElementById('storage-sort').addEventListener('change', function(e){
   storageSort = e.target.value;
   renderStoragePanel();
+});
+document.getElementById('btn-storage-prev-box').addEventListener('click', function(){ if (storageBoxIndex > 0){ storageBoxIndex--; renderStoragePanel(); } });
+document.getElementById('btn-storage-next-box').addEventListener('click', function(){ if (storageBoxIndex < Number.MAX_SAFE_INTEGER - 1){ storageBoxIndex++; renderStoragePanel(); } });
+document.getElementById('btn-storage-jump-box').addEventListener('click', function(){
+  var text = window.prompt('Go to external box number:', String(storageBoxIndex + 1));
+  if (text === null) return;
+  var number = Number(text);
+  if (!Number.isSafeInteger(number) || number < 1){ showError('Enter a positive whole box number.'); return; }
+  storageBoxIndex = number - 1; renderStoragePanel();
 });
 document.getElementById('btn-export-storage').addEventListener('click', exportExternalStorage);
 document.getElementById('btn-import-storage').addEventListener('click', function(){
