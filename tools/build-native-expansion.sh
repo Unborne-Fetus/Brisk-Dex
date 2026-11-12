@@ -54,6 +54,9 @@ if [ "$profile" = brisk ]; then
     fetch_source https://github.com/rh-hideout/pokeemerald-expansion.git "$base_pin"
   fi
   python3 "$root/tools/prepare_brisk_native.py" "$checkout"
+  # Extra wild slots are native-only. Keep the original GBA encounter data intact.
+  python3 "$root/tools/test_expand_native_encounters.py"
+  python3 "$root/tools/expand_native_encounters.py" "$checkout"
   python3 "$root/tools/patch_native_vblank.py" "$checkout"
   python3 "$root/tools/patch_native_trainer_script.py" "$checkout"
   # Fail the build when source events/maps diverge from the pinned Brisk game.
