@@ -59,6 +59,8 @@ jobs:
           java-version: "21"
       - name: Install dependencies
         run: npm ci
+      - name: Test Android native trainer-script decoding and safety guards
+        run: python3 -m unittest discover -s test/android -p 'test_native_*.py' -v
       - name: Prepare web bundle
         run: npm run android:prepare
       - name: Reuse checked-in Android project
