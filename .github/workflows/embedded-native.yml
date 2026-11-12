@@ -10,6 +10,7 @@ on:
     paths:
       - 'tools/**'
       - 'test/desktop/**'
+      - 'test/android/**'
       - 'native-*.js'
       - 'index.html'
       - 'package.json'
