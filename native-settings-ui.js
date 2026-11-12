@@ -36,12 +36,14 @@ document.getElementById('native-game-diagnostics').onclick=async()=>{
   }catch(error){status.textContent='Unable to export diagnostics: '+error.message;}
 };
 const updateMessage=document.getElementById('native-update-status');
+const androidAPKUpdate=!!window.briskMobileAPI?.isAndroid;
+if(androidAPKUpdate)document.getElementById('native-update-apply').textContent='Install downloaded APK';
 async function refreshUpdateStatus(){
   if(!window.briskDexAPI?.updateStatus){for(const id of ['native-auto-updates','native-update-check'])document.getElementById(id).disabled=true;return;}
-  try{const status=await window.briskDexAPI.updateStatus();document.getElementById('native-auto-updates').checked=status.automatic;document.getElementById('native-update-apply').disabled=!status.pending;document.getElementById('native-update-rollback').disabled=!status.canRollback;updateMessage.textContent=status.pending?'Update '+status.pending+' is downloaded. It will install automatically next time you open the app. Save your game before closing.':'Installed version: '+status.current+(status.busy?' · Downloading update…':'');}catch(error){updateMessage.textContent=error.message;}
+  try{const status=await window.briskDexAPI.updateStatus();document.getElementById('native-auto-updates').checked=status.automatic;document.getElementById('native-update-apply').disabled=!status.pending;document.getElementById('native-update-rollback').disabled=!status.canRollback;updateMessage.textContent=status.pending?(androidAPKUpdate?'APK '+status.pending+' is downloaded. Save and stop your game, then tap Install downloaded APK and approve Android\'s installation prompt.':'Update '+status.pending+' is downloaded. Save your game before applying the update.'):'Installed version: '+status.current+(status.busy?' · Downloading update…':'');}catch(error){updateMessage.textContent=error.message;}
 }
 document.getElementById('native-update-check').onclick=async()=>{const button=document.getElementById('native-update-check');button.disabled=true;updateMessage.textContent='Checking and downloading updates…';try{const result=await window.briskDexAPI.checkForUpdates();await refreshUpdateStatus();updateMessage.textContent=result.message;}catch(error){updateMessage.textContent=error.message;}finally{button.disabled=false;}};
 document.getElementById('native-auto-updates').onchange=event=>window.briskDexAPI?.automaticUpdates(event.target.checked).catch(error=>{updateMessage.textContent=error.message;});
-for(const action of ['apply','rollback'])document.getElementById('native-update-'+action).onclick=async()=>{try{const result=await window.briskDexAPI[action==='apply'?'applyUpdate':'rollbackUpdate']();if(!result.ok)updateMessage.textContent=result.message;}catch(error){updateMessage.textContent=error.message;}};
+for(const action of ['apply','rollback'])document.getElementById('native-update-'+action).onclick=async()=>{try{const result=await window.briskDexAPI[action==='apply'?'applyUpdate':'rollbackUpdate']();if(result?.message)updateMessage.textContent=result.message;}catch(error){updateMessage.textContent=error.message;}};
 refreshUpdateStatus();setInterval(()=>{if(nativeUI.tab==='game'&&document.getElementById('native-game-settings').open)refreshUpdateStatus();},10000);
 window.briskDexAPI?.appReady?.().catch(console.warn);
