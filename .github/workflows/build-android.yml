@@ -48,8 +48,10 @@ jobs:
       - name: Prepare Brisk Dex web bundle
         run: npm run android:prepare
 
-      - name: Create Android project
-        run: npx cap add android
+      - name: Reuse checked-in Android project
+        run: | 
+          test -f android/app/build.gradle
+          test -f android/gradlew
 
       - name: Patch native Android file picker
         run: node tools/patch_android.mjs
