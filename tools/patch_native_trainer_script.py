@@ -41,7 +41,24 @@ static u32 NativeTrainerReadU32(const u8 *src)
 }
 static u8 *NativeTrainerReadPointer(const u8 *src)
 {
-    return (u8 *)(uintptr_t)NativeTrainerReadU32(src);
+    const uintptr_t low = (uintptr_t)NativeTrainerReadU32(src);
+    if (low == 0)
+        return NULL;
+    // Trainer event bytecode stores only the low 32 bits of a pointer.
+    // Android loads its 64-bit shared object at a randomized high address:
+    // the plain low-word cast loses those bits and breaks the rival's
+    // post-battle script continuation. The script and its pointers are
+    // linked into the same image, so recover the nearby address.
+    const uintptr_t origin = (uintptr_t)src;
+    const uintptr_t segment = origin & ~((uintptr_t)UINT32_MAX);
+    uintptr_t value = segment | low;
+    const uintptr_t halfRange = ((uintptr_t)UINT32_MAX + 1u) / 2u;
+    const uintptr_t fullRange = (uintptr_t)UINT32_MAX + 1u;
+    if (value > origin && value - origin > halfRange)
+        value -= fullRange;
+    else if (origin > value && origin - value > halfRange)
+        value += fullRange;
+    return (u8 *)value;
 }
 static TrainerBattleParameter NativeDecodeTrainerBattleParameter(const u8 *src)
 {
