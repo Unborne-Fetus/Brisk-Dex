@@ -761,6 +761,7 @@ def extract_trainer_teams(repo, relative_path="src/data/trainers.party"):
 
         trainers.append({
             "constant": constant,
+            "region": "Kanto" if constant.startswith(("TRAINER_BRISK_KANTO_", "TRAINER_XIPHOS_")) else "Hoenn",
             "name": meta.get("Name", ""),
             "class": meta.get("Class", "Pkmn Trainer"),
             "pic": meta.get("Pic", ""),
