@@ -58,7 +58,7 @@ test('In-app Android updates do not mislabel newer preview builds as fully curre
   assert.match(java,/No newer compatible signed game update is published/);
   assert.match(java,/Preview APKs can be missing libbriskgame\.so/);
   assert.doesNotMatch(java,/You already have the latest published Android APK/);
-  assert.match(java,/android-update\.json"\)/);
+  assert.match(java,/ASSET_PREFIX\+"android-update\.json"/);
   assert.doesNotMatch(java,/android-update\.json\?t=/);
   assert.match(java,/Cache-Control/);
 });
@@ -68,6 +68,6 @@ test('NDK Android platform entry point is not silently remapped to SDL_main',()=
   assert.match(compiler,/SDL_MAIN_HANDLED=1/);
   assert.match(compiler,/main=brisk_android_game_main/);
   const archive=read('tools/build_android_game_archive.sh');
-  assert.match(archive,/Actual entry-point symbols/);
+  assert.match(archive,/Actual ARM64 entry-point symbols/);
   assert.match(archive,/native-symbols\.txt/);
 });
