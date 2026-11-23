@@ -34,6 +34,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Verify Capacitor Java toolchain
+        run: |
+          java -version
+          javac -version
+          test "$(javac -version 2>&1 | cut -d' ' -f2 | cut -d. -f1)" = 21
       - name: Install the original asset compilers and AArch64 assembler
         run: |
           sudo apt-get update
