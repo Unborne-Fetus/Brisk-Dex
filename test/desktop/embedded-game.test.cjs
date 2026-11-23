@@ -106,3 +106,13 @@ test('native decoder delivers a completed frame followed by diagnostic text',()=
  assert.equal(frames.length,1);
  assert.equal(frames[0].readUInt16LE(),7);
 });
+
+
+test('late native frames cannot crash Electron when its renderer is being destroyed',()=>{
+ const game=new EmbeddedNativeGame({
+  webContents:{isDestroyed:()=>false,send(){throw new Error('render frame destroyed');}},
+  resources:'/unavailable',userData:'/unavailable',platform:'win32'
+ });
+ assert.doesNotThrow(()=>game.send('native-game-frame',Buffer.alloc(PIXELS)));
+ assert.match(game.lastIpcError,/render frame destroyed/);
+});
