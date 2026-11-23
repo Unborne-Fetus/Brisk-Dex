@@ -28,6 +28,16 @@ async function embeddedStatus({platform=process.platform,resources=process.resou
   if(!checked.ok)return {status:'not-installed',message:'The integrated native engine was not included in this build. Rebuild Pokemon Brisk Emerald with the native source integration enabled.'};
   const info=await engineInfo(executable);
   if(info.error)return {status:'invalid-build',message:info.error};
+  // Validate game-data and native-game revision parity when a packaged release
+  // or a private local build includes the source revision manifest. A stale
+  // helper EXE must never silently open saves as if it were today's Brisk.
+  try{
+    const expected=(await fs.readFile(path.join(resources,'brisk-emerald-data-revision.txt'),'utf8')).trim();
+    if(!/^[a-f0-9]{40}$/.test(expected)||info.profile!=='brisk'||info.briskCommit!==expected)
+      return {status:'invalid-build',message:'The integrated game does not match the current Brisk Emerald source. Rebuild the native engine before playing.'};
+  }catch(error){
+    if(error.code!=='ENOENT')return {status:'invalid-build',message:'Could not validate the native game source revision: '+error.message};
+  }
   return {status:'ready',...info,message:info.profile==='brisk'?'Integrated Brisk Emerald is ready.':'Integrated expansion engine is ready.'};
 }
 class PacketDecoder{
