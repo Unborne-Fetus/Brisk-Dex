@@ -137,7 +137,7 @@ def apply(source_dir: Path) -> None:
                 before = '#include "constants/moves.h"'
                 if current.count(before) != 1:
                     raise RuntimeError("Cannot locate Brisk text-character include anchor")
-                current = current.replace(before, before + '\\n#include "constants/characters.h"')
+                current = current.replace(before, before + '\n#include "constants/characters.h"')
         if current != names.read_text():
             names.write_text(current)
     print("Applied native compiler and PE layout compatibility (validation remains enabled)")
