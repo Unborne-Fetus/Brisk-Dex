@@ -38,6 +38,16 @@ document.getElementById('native-game-diagnostics').onclick=async()=>{
 const updateMessage=document.getElementById('native-update-status');
 const androidAPKUpdate=!!window.briskMobileAPI?.isAndroid;
 if(androidAPKUpdate)document.getElementById('native-update-apply').textContent='Install downloaded APK';
+const apkReleasesButton=document.getElementById('native-update-download');
+if(apkReleasesButton&&androidAPKUpdate){
+  apkReleasesButton.hidden=false;
+  apkReleasesButton.onclick=async()=>{
+    try{
+      const result=await window.briskDexAPI.openAndroidDownloads();
+      if(result?.message)updateMessage.textContent=result.message;
+    }catch(error){updateMessage.textContent=error.message;}
+  };
+}
 async function refreshUpdateStatus(){
   if(!window.briskDexAPI?.updateStatus){for(const id of ['native-auto-updates','native-update-check'])document.getElementById(id).disabled=true;return;}
   try{const status=await window.briskDexAPI.updateStatus();document.getElementById('native-auto-updates').checked=status.automatic;document.getElementById('native-update-apply').disabled=!status.pending;document.getElementById('native-update-rollback').disabled=!status.canRollback;updateMessage.textContent=status.pending?(androidAPKUpdate?'APK '+status.pending+' is downloaded. Save and stop your game, then tap Install downloaded APK and approve Android\'s installation prompt.':'Update '+status.pending+' is downloaded. Save your game before applying the update.'):'Installed version: '+status.current+(status.busy?' · Downloading update…':'');}catch(error){updateMessage.textContent=error.message;}
