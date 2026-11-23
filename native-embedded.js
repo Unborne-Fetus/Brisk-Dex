@@ -60,7 +60,14 @@ class EmbeddedNativeGame{
     this.diagnosticReason=null;this.diagnosticTimer=null;this.engineCommit=null;
   }
   send(event,payload){
-    if(this.webContents&&!this.webContents.isDestroyed())this.webContents.send(event,payload);
+    // The renderer can be destroyed between the status check and IPC send.
+    // A late frame/diagnostic must not terminate Electron's main process.
+    try{
+      if(this.webContents&&!this.webContents.isDestroyed())this.webContents.send(event,payload);
+    }catch(error){
+      // Closing, navigating, or crashing the game tab may invalidate IPC.
+      this.lastIpcError=error.message;
+    }
   }
   noteFrame(frame){
     this.lastFrameTime=Date.now();this.frameCount++;
