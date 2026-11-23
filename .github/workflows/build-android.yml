@@ -38,6 +38,7 @@ jobs:
   build:
     outputs:
       channel_signing: ${{ steps.signing.outputs.channel_signing }}
+      game_integrated: ${{ steps.game.outputs.game_integrated }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -64,6 +65,8 @@ jobs:
 
       - name: Test Android native trainer-script decoding and safety guards
         run: python3 -m unittest discover -s test/android -p 'test_native_*.py' -v
+      - name: Verify Android native bridge, saves, and lifecycle tests
+        run: node --test test/android/*.test.cjs
       - name: Prepare Brisk Dex web bundle
         run: npm run android:prepare
 
@@ -156,6 +159,21 @@ jobs:
           print(f"APK {data['versionName']} (code {data['versionCode']}), {data['bytes']} bytes")
           PY
 
+      - name: Inspect native APK contents and exact game-source identity
+        id: game
+        shell: bash
+        run: |
+          pin="$(python3 -c 'import json;print(json.load(open("tools/brisk-native-source.json"))["brisk_commit"])')"
+          python3 tools/inspect_android_apk.py Brisk-Dex-Android.apk --expected-commit "$pin" --output android-game-status.json
+          python3 - <<'PY'
+          import json,os
+          with open('android-game-status.json') as src:
+              report=json.load(src)
+          print('Native game integrated:', report['game_integrated'])
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+              out.write('game_integrated='+str(report['game_integrated']).lower()+'\n')
+          PY
+
       - name: Upload APK and verified manifest
         uses: actions/upload-artifact@v6
         with:
@@ -163,6 +181,7 @@ jobs:
           path: |
             Brisk-Dex-Android.apk
             android-update.json
+            android-game-status.json
           if-no-files-found: error
 
   publish-preview:
@@ -187,16 +206,16 @@ jobs:
           set -euo pipefail
           test -s release/Brisk-Dex-Android.apk
           tag="android-preview-${GITHUB_RUN_NUMBER}"
-          gh release create "$tag" release/Brisk-Dex-Android.apk \
+          gh release create "$tag" release/Brisk-Dex-Android.apk release/android-game-status.json \
             --target "$GITHUB_SHA" \
             --title "Brisk Dex Android preview ${GITHUB_RUN_NUMBER} (crash-fix testing)" \
-            --notes "Automated Android APK from a successful CI build, revision ${GITHUB_SHA}. Includes tests for native trainer script handling. PREVIEW: the native game still requires device testing for follower battles, May's post-battle script, and Rock Slide. This is a preview APK. In-app updates are published separately only when CI has the matching trusted signing key and confirms a newer version. In-place installation of previews may fail due to certificate differences. Back up your saved games before reinstalling." \
+            --notes "Automated Android APK from a successful CI build, revision ${GITHUB_SHA}. Includes tests for native trainer script handling. PREVIEW: the native game still requires device testing for follower battles, May's post-battle script, and Rock Slide. Check the included android-game-status.json to see whether full native gameplay is present; standard previews are transport-only. This is a preview APK. In-app updates are published separately only when CI has the matching trusted signing key and confirms a newer version. In-place installation of previews may fail due to certificate differences. Back up your saved games before reinstalling." \
             --prerelease
 
   publish-channel:
     name: Publish only compatible in-app update
     needs: build
-    if: github.ref == 'refs/heads/main' && needs.build.outputs.channel_signing == 'true'
+    if: github.ref == 'refs/heads/main' && needs.build.outputs.channel_signing == 'true' && needs.build.outputs.game_integrated == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
