@@ -26,6 +26,11 @@ jobs:
     timeout-minutes: 100
     steps:
       - uses: actions/checkout@v4
+      - name: Validate Android build scripts before installing toolchains
+        run: |
+          bash -n tools/build_android_game_archive.sh
+          bash -n tools/package_android_full_game.sh
+          bash -n tools/prepare_android_native_source.sh
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
