@@ -106,6 +106,18 @@ jobs:
           mkdir -p android/.secure
           printf '%s' "$BRISK_ANDROID_KEYSTORE_BASE64" | base64 --decode > android/.secure/channel.jks
           chmod 600 android/.secure/channel.jks
+          # An APK can update the existing installation only when it uses the
+          # exact trusted signing key. Refuse accidental certificate rotation.
+          expected="$(tr -d '[:space:]' < tools/android-channel-cert.sha256)"
+          actual="$(keytool -list -v -keystore android/.secure/channel.jks \
+            -storepass "$BRISK_ANDROID_STORE_PASSWORD" \
+            -alias "$BRISK_ANDROID_KEY_ALIAS" |
+            sed -n 's/^[[:space:]]*SHA256: //p' | head -n 1 |
+            tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          if [ -z "$actual" ] || [ "$actual" != "$expected" ]; then
+            echo "::error::Signing key differs from existing android-updates installation. Keep the original certificate or use a safe save-backup/reinstall migration."
+            exit 1
+          fi
           cat >> android/app/build.gradle <<'GRADLE'
 
           // CI only: use the already trusted Android update-channel certificate.
@@ -143,6 +155,23 @@ jobs:
 
       - name: Rename APK
         run: cp android/app/build/outputs/apk/debug/app-debug.apk Brisk-Dex-Android.apk
+
+      - name: Verify resulting APK signer matches the existing channel
+        if: steps.signing.outputs.channel_signing == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_tools="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}/build-tools"
+          apksigner="$(find "$sdk_tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$apksigner"
+          expected="$(tr -d '[:space:]' < tools/android-channel-cert.sha256)"
+          actual="$("$apksigner" verify --print-certs Brisk-Dex-Android.apk |
+            sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1 |
+            tr '[:upper:]' '[:lower:]')"
+          if [ -z "$actual" ] || [ "$actual" != "$expected" ]; then
+            echo "::error::Built APK is not signed by the established Android update certificate."
+            exit 1
+          fi
 
       - name: Generate integrity-checked update manifest
         shell: bash
