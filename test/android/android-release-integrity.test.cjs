@@ -17,6 +17,9 @@ test('TLS certificate chain errors have an actionable secure fallback, not a tru
   assert.match(java,/sameSignature\(old,target\)/);
   assert.match(java,/hex\(digestFile\(file\)\)\.equals\(hash\)/);
   assert.doesNotMatch(java,/(?:ALLOW_ALL_HOSTNAME_VERIFIER|setDefaultHostnameVerifier|setDefaultSSLSocketFactory|TrustAllCertificates)/);
+  assert.match(read('.github/workflows/build-android.yml'),/android-channel-cert\\.sha256/);
+  assert.match(read('.github/workflows/build-android.yml'),/Signing key differs from existing android-updates installation/);
+  assert.match(read('tools/android-channel-cert.sha256').trim(),/^[0-9a-f]{64}$/);
   const api=read('android-native/src/mobile-app-updates.js');
   assert.match(api,/openAndroidDownloads\(\)/);
   assert.match(api,/updater\.openDownloadPage\(\)/);
