@@ -761,6 +761,7 @@ def extract_trainer_teams(repo, relative_path="src/data/trainers.party"):
 
         trainers.append({
             "constant": constant,
+            "region": "Kanto" if constant.startswith(("TRAINER_BRISK_KANTO_", "TRAINER_XIPHOS_")) else "Hoenn",
             "name": meta.get("Name", ""),
             "class": meta.get("Class", "Pkmn Trainer"),
             "pic": meta.get("Pic", ""),
@@ -804,7 +805,7 @@ def extract_complete_trainer_teams(repo):
                 "items": variant.get("items", ""),
                 "battleType": variant.get("battleType", "")
             }
-            trainer["region"] = "Kanto" if constant.startswith("TRAINER_BRISK_KANTO_") else "Hoenn"
+            trainer["region"] = "Kanto" if constant.startswith(("TRAINER_BRISK_KANTO_", "TRAINER_XIPHOS_")) else "Hoenn"
             if mode == "Normal":
                 trainer["party"] = variant["party"]
                 for field in ("name", "class", "pic", "gender", "battleType"):
@@ -1161,7 +1162,7 @@ def extract_trainer_defeat_flags(repo):
     ids = {m.group(1): int(m.group(2)) for m in
            re.finditer(r"^\s*#define\s+(TRAINER_[A-Z0-9_]+)\s+(\d+)\b", hoenn, re.M)}
     ids.update({m.group(1): kanto_start + int(m.group(2)) for m in
-                re.finditer(r"^\s*#define\s+(TRAINER_BRISK_KANTO_[A-Z0-9_]+)\s+\(\s*BRISK_KANTO_TRAINER_BASE\s*\+\s*(\d+)\s*\)", kanto, re.M)})
+                re.finditer(r"^\s*#define\s+(TRAINER_[A-Z0-9_]+)\s+\(\s*BRISK_KANTO_TRAINER_BASE\s*\+\s*(\d+)\s*\)", kanto, re.M)})
     if len(ids) < 1000:
         raise ValueError("Only %d trainer flag IDs extracted; expected Hoenn and Kanto" % len(ids))
     # See GetTrainerDefeatFlag(), SaveBlock1.flags, SaveBlock3.kantoTrainerFlags.

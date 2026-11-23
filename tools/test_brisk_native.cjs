@@ -10,10 +10,10 @@ const executable=process.env.BRISK_NATIVE_EXECUTABLE||path.join(root,'native-gam
 const work=fs.mkdtempSync(path.join(os.tmpdir(),'brisk-playthrough-'));
 const output=path.join(work,'out');fs.mkdirSync(output);
 const smoke=path.join(source,'tests','smoke');
-const profileGate=`wait-until task_first=Task_SelectBriskSaveSlot max 2000
-expect native_heap_bytes=16777216
-press A
-wait-until task_first=Task_HandleMainMenuInput max 1000`;
+// Brisk Dex owns two save slots outside the game; the native title goes
+// straight to its ordinary Continue/New Game menu.
+const profileGate=`wait-until task_first=Task_HandleMainMenuInput max 1000
+expect native_heap_bytes=16777216`;
 let start=fs.readFileSync(path.join(smoke,'opening_start.replay'),'utf8');
 start=start.replace('wait-until task_first=Task_HandleMainMenuInput max 600',profileGate);
 // Native Brisk reads the computer clock automatically; unlike the cartridge
@@ -67,33 +67,10 @@ press B
 `+replay.slice(battleStart);
 
 replay+=`
-expect brisk_profile=0
-expect brisk_slot0_used=1
-expect brisk_slot1_used=0
-# Check the other profile remains empty, then return to the original save.
-restart
-wait-until task_first=Task_TitleScreenPhase3 max 30000
-press START
-wait-until task_first=Task_SelectBriskSaveSlot max 2000
-press DOWN
-press A
-wait-until task_first=Task_HandleMainMenuInput max 1000
-expect brisk_profile=1
-expect brisk_slot0_used=1
-expect brisk_slot1_used=0
-dump 28_second_profile_empty
-press B
-wait-until task_first=Task_TitleScreenPhase3 max 30000
-press START
-wait-until task_first=Task_SelectBriskSaveSlot max 2000
-press A
-wait-until task_first=Task_HandleMainMenuInput max 1000
-press A
-wait-until callback2=CB2_Overworld max 2000
-wait 20
-expect brisk_profile=0
-expect party0_species=252
+# The first cold reload has already been verified by opening.replay.
+# Profile switching belongs to Brisk Dex, not to the ROM title menu.
 expect player_name=Ab
+expect party0_species=252
 expect save_counter=1
 dump 29_profile0_restored
 `;
@@ -132,11 +109,11 @@ child.once('exit',(code,signal)=>{
   const final=fs.readFileSync(path.join(output,'29_profile0_restored.txt'),'utf8');
   const facts=Object.fromEntries(final.split('\n').map(line=>line.split('=')));
   for(const key of ['brisk_species_count','brisk_trainer_count'])assert.ok(Number(facts[key])>1000,key+' unexpectedly small');
-  console.log('Brisk opening, first battle, in-game save, cold reload, and profile isolation passed.');
+  console.log('Brisk opening, first battle, in-game save, and cold reload passed.');
   console.log(final.split('\n').filter(l=>/^(native_heap|brisk_|party0_|player_name|map_name|save_counter)/.test(l)).join('\n'));
   const save=fs.readFileSync(path.join(work,'brisk.sav'));
   assert.equal(save.readUInt32LE(16),0x42524b31,'Brisk save uses its own layout identifier');
-  assert.equal(save.length,131072+28,'Two compact profiles use the native flash container');
+  assert.equal(save.length,131072+28,'Native game uses the established flash container');
   fs.rmSync(work,{recursive:true,force:true});
  }catch(error){fs.cpSync(output,path.join(root,'native-diagnostics'),{recursive:true});console.error(error.message);console.error('Replay diagnostics:',work);for(const name of fs.readdirSync(output).filter(n=>n.endsWith('.txt')).sort().slice(-3)){console.error(name+'\n'+fs.readFileSync(path.join(output,name),'utf8'));}process.exitCode=1;}
 });
