@@ -206,13 +206,6 @@ public class SaveFilePickerPlugin extends Plugin {
                 }
             }
 
-            InputStream input = getContext().getContentResolver().openInputStream(uri);
-            if (input == null) {
-                call.reject("The selected file could not be opened.");
-                return;
-            }
-
-            input.close();
             byte[] bytes = readSaveDocument(uri);
             JSObject ret = new JSObject();
             ret.put("uri", uri.toString());
