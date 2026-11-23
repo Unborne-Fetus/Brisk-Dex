@@ -303,3 +303,10 @@ jobs:
           set -euo pipefail
           gh release upload android-updates release/Brisk-Dex-Android.apk --clobber
           gh release upload android-updates release/android-update.json --clobber
+          # Mirror only the verified signed-channel metadata, never a preview,
+          # to a different official HTTPS hostname for trust-chain failover.
+          previous_sha="$(gh api "repos/$GH_REPO/contents/docs/android-update.json" --jq '.sha')"
+          payload="$(base64 -w0 < release/android-update.json)"
+          gh api -X PUT "repos/$GH_REPO/contents/docs/android-update.json" \
+            -f message='Update verified signed Android channel metadata' \
+            -f sha="$previous_sha" -f content="$payload" >/dev/null
