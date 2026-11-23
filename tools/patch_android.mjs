@@ -44,18 +44,32 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @CapacitorPlugin(name = "SaveFilePicker")
 public class SaveFilePickerPlugin extends Plugin {
+    // Avoid retaining arbitrarily large user-selected files in a WebView
+    // or on the JNI/Java heap. Actual GBA saves are far smaller than 1 MiB.
+    private static final int MAX_SAVE_BYTES = 1024 * 1024;
+
+    private byte[] readSaveDocument(Uri uri) throws Exception {
+        try (InputStream input = getContext().getContentResolver().openInputStream(uri);
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            if (input == null) throw new Exception("Could not read save file");
+            byte[] buffer = new byte[16384];
+            int count;
+            while ((count = input.read(buffer)) != -1) {
+                if (count > MAX_SAVE_BYTES - output.size())
+                    throw new Exception("Selected file is too large for a GBA save");
+                output.write(buffer, 0, count);
+            }
+            return output.toByteArray();
+        }
+    }
+
     @PluginMethod
     public void readSaveFile(PluginCall call) {
         try {
             Uri uri = Uri.parse(call.getString("uri"));
-            ByteArrayOutputStream output = new ByteArrayOutputStream();
-            try (InputStream input = getContext().getContentResolver().openInputStream(uri)) {
-                if (input == null) throw new Exception("Could not read save file");
-                byte[] buffer = new byte[16384]; int count;
-                while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
-            }
+            byte[] bytes = readSaveDocument(uri);
             JSObject result = new JSObject();
-            result.put("data", Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP));
+            result.put("data", Base64.encodeToString(bytes, Base64.NO_WRAP));
             call.resolve(result);
         } catch (Exception error) {call.reject("Could not reopen save: " + error.getMessage());}
     }
@@ -63,8 +77,12 @@ public class SaveFilePickerPlugin extends Plugin {
     public void writeSaveFile(PluginCall call) {
         try {
             Uri uri = Uri.parse(call.getString("uri"));
-            byte[] data = Base64.decode(call.getString("data"), Base64.DEFAULT);
-            if (data.length < 114688) throw new Exception("Save file is incomplete");
+            String encoded = call.getString("data");
+            if (encoded == null || encoded.length() > ((MAX_SAVE_BYTES + 2) / 3) * 4 + 8)
+                throw new Exception("Save file is too large or missing");
+            byte[] data = Base64.decode(encoded, Base64.DEFAULT);
+            if (data.length < 114688 || data.length > MAX_SAVE_BYTES)
+                throw new Exception("Save file has an invalid size");
             // Keep a recovery copy before changing the document.
             try (InputStream input = getContext().getContentResolver().openInputStream(uri);
                  OutputStream backup = new java.io.FileOutputStream(new java.io.File(getContext().getFilesDir(), "briskdex-save.backup.sav"))) {
@@ -194,15 +212,8 @@ public class SaveFilePickerPlugin extends Plugin {
                 return;
             }
 
-            ByteArrayOutputStream output = new ByteArrayOutputStream();
-            byte[] buffer = new byte[16384];
-            int read;
-            while ((read = input.read(buffer)) != -1) {
-                output.write(buffer, 0, read);
-            }
             input.close();
-
-            byte[] bytes = output.toByteArray();
+            byte[] bytes = readSaveDocument(uri);
             JSObject ret = new JSObject();
             ret.put("uri", uri.toString());
             ret.put("name", name);
