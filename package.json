@@ -55,6 +55,7 @@
       "main.js",
       "preload.js",
       "index.html",
+      "brisk-emerald-data-revision.txt",
       "brisk-dex-data.json",
       "brisk-dex-trainer-teams.json",
       "brisk-dex-trainer-flags.json",
@@ -119,6 +120,10 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "brisk-emerald-data-revision.txt",
+        "to": "brisk-emerald-data-revision.txt"
       }
     ]
   },
