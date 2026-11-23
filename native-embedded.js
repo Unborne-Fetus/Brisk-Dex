@@ -137,6 +137,11 @@ class EmbeddedNativeGame{
     });
     child.stdout.on('data',part=>{if(this.child===child)decoder.push(part);});
     child.stderr.on('data',part=>{this.errorTail=(this.errorTail+part.toString('utf8')).slice(-1500);});
+    // An unhandled error event on a child stdio stream would otherwise
+    // terminate the entire Electron main process.
+    for(const stream of [child.stdout,child.stderr]){
+      stream.on('error',error=>{if(this.child===child)this.recordDiagnostic('Native game stream error',{error:error.message});});
+    }
     this.diagnosticTimer=setInterval(()=>{
       if(this.child===child&&!this.options.paused&&this.lastFrameTime&&Date.now()-this.lastFrameTime>12000)
         this.recordDiagnostic('Game stopped producing video frames for more than 12 seconds');
@@ -187,10 +192,31 @@ class EmbeddedNativeGame{
     this.input(0);
     const child=this.child;
     this.stopping=new Promise(resolve=>{
-      const timer=setTimeout(()=>{child.kill('SIGKILL');},5000);
+      let settled=false,forceTimer;
+      const finish=result=>{
+        if(settled)return;
+        settled=true;
+        clearTimeout(timer);clearTimeout(forceTimer);
+        child.removeListener('exit',onExit);
+        child.removeListener('error',onError);
+        resolve(result);
+      };
+      const onExit=()=>finish({ok:true});
+      const onError=error=>finish({ok:false,error:'Native process stop failed: '+error.message});
+      child.once('exit',onExit);
+      child.once('error',onError);
+      const timer=setTimeout(()=>{
+        try{
+          child.kill('SIGKILL');
+          // Do not report success or unblock save transfers if the OS never
+          // acknowledges process exit, even after a forceful kill.
+          forceTimer=setTimeout(()=>finish({ok:false,error:'Native game did not exit after forceful shutdown.'}),2000);
+          forceTimer.unref?.();
+        }catch(error){finish({ok:false,error:'Unable to force-stop native game: '+error.message});}
+      },5000);
       timer.unref?.();
-      child.once('exit',()=>{clearTimeout(timer);resolve({ok:true});});
-      child.kill();
+      try{child.kill();}
+      catch(error){finish({ok:false,error:'Unable to stop native game: '+error.message});}
     });
     try{return await this.stopping;}finally{this.stopping=null;}
   }
