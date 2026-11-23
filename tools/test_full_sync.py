@@ -66,11 +66,14 @@ class SyncedContentTests(unittest.TestCase):
         self.assertEqual(flags["kantoTrainerBase"], 865)
         self.assertEqual(flags["kantoFlagsOffset"], 120)
         self.assertGreaterEqual(len(ids), 1488)
+        self.assertEqual(len(ids.values()), len(set(ids.values())), "Trainer flag IDs must not alias")
+        for suffix in ("FAIRY", "FIGHTING", "STEEL", "DRAGON"):
+            self.assertIn("TRAINER_XIPHOS_COMMANDER_" + suffix, ids)
         for name in self.trainers:
             with self.subTest(trainer=name):
                 self.assertIn(name, ids)
                 self.assertGreaterEqual(ids[name], 0)
-                self.assertLess(ids[name], 865 + 624)
+                self.assertLess(ids[name], flags["kantoTrainerBase"] + 960)
 
     def test_postgame_wild_encounters(self):
         areas = self.data["routeEncounters"]
@@ -107,7 +110,17 @@ class SyncedContentTests(unittest.TestCase):
         expected = set(SIGNATURE_OWNERS.values())
         signature_ids = set(self.data.get("signatureAbilityIds", []))
         self.assertEqual(len(expected), 22)
-        self.assertEqual(signature_ids, {details[name][0] for name in expected})
+        # Brisk adds signature abilities over time; the original 22 remain
+        # mandatory, but new source-backed abilities are not a sync failure.
+        self.assertGreaterEqual(len(signature_ids), len(expected))
+        self.assertEqual(len(signature_ids), len(self.data.get("signatureAbilityIds", [])))
+        self.assertTrue({details[name][0] for name in expected} <= signature_ids)
+        by_id = {value[0]: value[1] for value in details.values()}
+        for aid in signature_ids:
+            with self.subTest(ability_id=aid):
+                self.assertIn(aid, by_id)
+                self.assertTrue(by_id[aid]["name"])
+                self.assertTrue(by_id[aid]["description"])
         for species_name, ability_name in SIGNATURE_OWNERS.items():
             with self.subTest(species=species_name, ability=ability_name):
                 aid, ability = details[ability_name]
