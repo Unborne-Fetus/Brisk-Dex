@@ -20,6 +20,13 @@ test('TLS certificate chain errors have an actionable secure fallback, not a tru
   assert.match(read('.github/workflows/build-android.yml'),/android-channel-cert\.sha256/);
   assert.match(read('.github/workflows/build-android.yml'),/Signing key differs from existing android-updates installation/);
   assert.match(read('tools/android-channel-cert.sha256').trim(),/^[0-9a-f]{64}$/);
+  assert.match(java,/fetchManifest\(\)/);
+  assert.match(java,/raw\.githubusercontent\.com\/Unborne-Fetus\/Brisk-Dex\/main\/docs\/android-update\.json/);
+  const mirror=JSON.parse(read('docs/android-update.json'));
+  assert.equal(mirror.packageName,'com.briskemerald.briskdex');
+  assert.match(mirror.sha256,/^[0-9a-f]{64}$/);
+  assert.ok(mirror.versionCode>0&&mirror.bytes>10000);
+  assert.match(read('.github/workflows/build-android.yml'),/contents\/docs\/android-update\.json/);
   const api=read('android-native/src/mobile-app-updates.js');
   assert.match(api,/openAndroidDownloads\(\)/);
   assert.match(api,/updater\.openDownloadPage\(\)/);
