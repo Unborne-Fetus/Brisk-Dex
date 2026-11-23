@@ -34,10 +34,20 @@ jobs:
             libc6-dev-i386 libpng-dev libsdl2-dev binutils-aarch64-linux-gnu
       # GitHub Ubuntu images already contain the Android SDK; the deprecated
       # setup-android@v3 action tries to install the removed 'tools' package.
-      - name: Check preinstalled Android SDK manager
+      - name: Locate preinstalled Android SDK manager
         run: |
-          test -n "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
-          command -v sdkmanager
+          set -euo pipefail
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          test -d "$sdk"
+          sdkmanager=""
+          for candidate in "$sdk"/cmdline-tools/*/bin/sdkmanager "$sdk"/cmdline-tools/latest/bin/sdkmanager; do
+            if [ -x "$candidate" ]; then sdkmanager="$candidate"; break; fi
+          done
+          test -n "$sdkmanager"
+          echo "ANDROID_HOME=$sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$sdk" >> "$GITHUB_ENV"
+          echo "$(dirname "$sdkmanager")" >> "$GITHUB_PATH"
+          "$sdkmanager" --version
       - name: Install pinned Android NDK and CMake
         run: |
           yes | sdkmanager --licenses >/dev/null || true
