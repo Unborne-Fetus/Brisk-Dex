@@ -95,7 +95,10 @@ public class BriskAppUpdaterPlugin extends Plugin {
         if(!url.startsWith("https://"))throw new Exception("Update URL must use HTTPS");
         HttpURLConnection connection=(HttpURLConnection)new URL(url).openConnection();
         connection.setRequestProperty("User-Agent","Pokemon-Brisk-Emerald-Android-Updater");
-        connection.setRequestProperty("Accept","application/vnd.github+json");
+        // Release assets are byte streams, not GitHub REST API JSON.
+        connection.setRequestProperty("Accept",url.contains(".json")?"application/json":"application/octet-stream");
+        connection.setRequestProperty("Cache-Control","no-cache");
+        connection.setRequestProperty("Pragma","no-cache");
         connection.setUseCaches(false);
         connection.setConnectTimeout(15000);connection.setReadTimeout(30000);
         return connection;
@@ -194,7 +197,7 @@ public class BriskAppUpdaterPlugin extends Plugin {
             try{
                 long installedCode=code(installed());
                 // Direct download avoids the API hostname while preserving APK checks.
-                HttpURLConnection index=connect(ASSET_PREFIX+"android-update.json?t="+System.currentTimeMillis());
+                HttpURLConnection index=connect(ASSET_PREFIX+"android-update.json");
                 JSONObject meta;
                 try{
                     int response=index.getResponseCode();
@@ -209,8 +212,21 @@ public class BriskAppUpdaterPlugin extends Plugin {
                 if(!getContext().getPackageName().equals(meta.getString("packageName"))||
                    !shaFormat(checksum)||nextCode<1||bytes<10000||bytes>MAX_APK||
                    version.isEmpty())throw new Exception("Android release manifest is invalid");
-                if(nextCode<=installedCode){
-                    call.resolve(message(true,"You already have the latest published Android APK."));
+                if(nextCode<installedCode){
+                    // Preview builds use a higher version-code range than the
+                    // older, game-enabled signed channel. Never misreport a
+                    // newer transport-only preview as the latest playable app.
+                    JSObject result=message(false,
+                        "No newer compatible signed game update is published. The latest in-app game channel is "+
+                        version+" (code "+nextCode+"), but this installed build is newer (code "+
+                        installedCode+"). Preview APKs can be missing libbriskgame.so. Use Official APK releases to check options, and back up saves before changing installations.");
+                    result.put("channelVersion",version);
+                    result.put("channelBehind",true);
+                    call.resolve(result);
+                    return;
+                }
+                if(nextCode==installedCode){
+                    call.resolve(message(true,"You have the latest release on this signed in-app game update channel ("+version+")."));
                     return;
                 }
                 String url=ASSET_PREFIX+APK_NAME;
@@ -225,7 +241,7 @@ public class BriskAppUpdaterPlugin extends Plugin {
                 if(!folder().isDirectory()&&!folder().mkdirs())
                     throw new Exception("Cannot create the app update folder");
                 File temp=new File(folder(),"download.part.apk");
-                HttpURLConnection download=connect(url+"?t="+System.currentTimeMillis());
+                HttpURLConnection download=connect(url);
                 long total=0;
                 try{
                     if(download.getResponseCode()!=200)
