@@ -1,4 +1,7 @@
 name: Compile genuine Brisk Android game engine
+concurrency:
+  group: brisk-real-android-game-${{ github.ref }}
+  cancel-in-progress: true
 # This builds the pinned C game, not the JNI-only transport. No generated
 # game binaries are distributed while native gameplay remains unverified.
 on:
