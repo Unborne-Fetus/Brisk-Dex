@@ -1,0 +1,77 @@
+name: Compile genuine Brisk Android game engine
+concurrency:
+  group: brisk-real-android-game-${{ github.ref }}
+  cancel-in-progress: true
+# This builds the pinned C game, not the JNI-only transport. No generated
+# game binaries are distributed while native gameplay remains unverified.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'android-native/**'
+      - 'tools/build_android_game_archive.sh'
+      - 'tools/package_android_full_game.sh'
+      - 'tools/prepare_android_native_source.sh'
+      - 'tools/Makefile.android'
+      - 'tools/android_compile_source.py'
+      - 'tools/android_assemble.py'
+      - 'tools/patch-native-android.py'
+      - 'tools/brisk-native-source.json'
+      - '.github/workflows/android-native-engine.yml'
+permissions:
+  contents: read
+jobs:
+  compile-real-game:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install the original asset compilers and AArch64 assembler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential git python3 pkg-config curl clang gcc-multilib \
+            libc6-dev-i386 libpng-dev libsdl2-dev binutils-aarch64-linux-gnu
+      # GitHub Ubuntu images already contain the Android SDK; the deprecated
+      # setup-android@v3 action tries to install the removed 'tools' package.
+      - name: Locate preinstalled Android SDK manager
+        run: |
+          set -euo pipefail
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          test -d "$sdk"
+          sdkmanager=""
+          for candidate in "$sdk"/cmdline-tools/*/bin/sdkmanager "$sdk"/cmdline-tools/latest/bin/sdkmanager; do
+            if [ -x "$candidate" ]; then sdkmanager="$candidate"; break; fi
+          done
+          test -n "$sdkmanager"
+          echo "ANDROID_HOME=$sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$sdk" >> "$GITHUB_ENV"
+          echo "$(dirname "$sdkmanager")" >> "$GITHUB_PATH"
+          "$sdkmanager" --version
+      - name: Install pinned Android NDK and CMake
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager 'ndk;27.2.12479018' 'cmake;3.22.1'
+      - name: Checkout SDL2 2.30.12 for the real Android platform link
+        run: |
+          git clone --depth 1 --branch release-2.30.12 \
+            https://github.com/libsdl-org/SDL.git /tmp/brisk-android-sdl2
+      - name: Compile all pinned Brisk gameplay C/data into ARM64 archive
+        env:
+          BRISK_ANDROID_SDL2_SOURCE: /tmp/brisk-android-sdl2
+          BRISK_ANDROID_JOBS: '2'
+        run: bash tools/build_android_game_archive.sh
+      - name: Link the real game into an Android APK and verify the embedded library
+        env:
+          BRISK_ANDROID_SDL2_SOURCE: /tmp/brisk-android-sdl2
+          BRISK_ANDROID_GAME_ARCHIVE: ${{ github.workspace }}/native-src/brisk-emerald-native-android/build/android-arm64/libbrisk-game-arm64.a
+        run: bash tools/package_android_full_game.sh
+      - name: Show native library dependencies and game build attestation
+        run: |
+          cat android-game-status.json
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -E 'libbrisk(android|game)\\.so'
+      # Deliberately do not upload or publish game binaries until the Android
+      # game, saving, and asset redistribution rights have been validated.

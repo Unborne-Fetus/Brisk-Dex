@@ -29,6 +29,9 @@ export function installAndroidAppUpdates({Capacitor,registerPlugin}){
       if(result?.needsPermission)await updater.openInstallSettings();
       return result;
     },
+    async openAndroidDownloads(){
+      return await updater.openDownloadPage()||{ok:false,message:'Could not open official releases.'};
+    },
     async rollbackUpdate(){
       return {ok:false,message:'Android APK downgrades are not supported.'};
     }

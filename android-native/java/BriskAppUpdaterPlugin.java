@@ -28,6 +28,8 @@ import java.net.HttpURLConnection;
 import java.net.UnknownHostException;
 import java.net.SocketTimeoutException;
 import java.net.URL;
+import javax.net.ssl.SSLHandshakeException;
+import java.security.cert.CertPathValidatorException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Arrays;
@@ -47,6 +49,7 @@ public class BriskAppUpdaterPlugin extends Plugin {
     private static final String ASSET_PREFIX =
         "https://github.com/Unborne-Fetus/Brisk-Dex/releases/download/android-updates/";
     private static final String APK_NAME="Brisk-Dex-Android.apk";
+    private static final String RELEASE_PAGE="https://github.com/Unborne-Fetus/Brisk-Dex/releases";
     private static final long MAX_APK=180L*1024*1024;
     private final ExecutorService executor=Executors.newSingleThreadExecutor();
     private volatile boolean busy=false;
@@ -105,7 +108,27 @@ public class BriskAppUpdaterPlugin extends Plugin {
             return cap!=null&&cap.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
         }catch(Exception ignored){return true;}
     }
+    // Never disable HTTPS certificate validation to hide a TLS failure.
+    private static boolean hasChainValidationFailure(Throwable error) {
+        for (Throwable cause=error;cause!=null;cause=cause.getCause()) {
+            if (cause instanceof SSLHandshakeException
+                || cause instanceof CertPathValidatorException)
+                return true;
+            String detail=cause.getMessage();
+            if (detail!=null) {
+                String lower=detail.toLowerCase(Locale.ROOT);
+                if (lower.contains("chain validation failed")
+                    || lower.contains("trust anchor")
+                    || lower.contains("certification path"))
+                    return true;
+            }
+            if (cause==cause.getCause()) break;
+        }
+        return false;
+    }
     private String updateError(Exception error){
+        if(hasChainValidationFailure(error))
+            return "Secure HTTPS certificate chain validation failed. Turn on Android automatic date and time, then try trusted Wi-Fi or mobile data. If a VPN, proxy, Private DNS or filtered network intercepts HTTPS, use another trusted connection. Open the official GitHub releases page in your browser if downloads still fail. Certificate checks cannot be bypassed.";
         if(!hasInternetNetwork())
             return "No internet connection detected. Connect Wi-Fi or mobile data, then try Check updates again.";
         if(error instanceof UnknownHostException)
@@ -271,6 +294,19 @@ public class BriskAppUpdaterPlugin extends Plugin {
             Uri.parse("package:"+getContext().getPackageName()));
         getActivity().runOnUiThread(()->getActivity().startActivity(intent));
         call.resolve(message(true,"Enable installs for this app, then return and tap Install update."));
+    }
+    // Browser fallback uses the OS trust configuration and the official URL.
+    // It does NOT bypass the Android package signing certificate checks.
+    @PluginMethod
+    public void openDownloadPage(PluginCall call){
+        try{
+            Intent intent=new Intent(Intent.ACTION_VIEW,Uri.parse(RELEASE_PAGE));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+            call.resolve(message(true,"Opened official Brisk Dex releases. Back up saves before changing installations; preview APKs may use different signing certificates."));
+        }catch(Exception error){
+            call.resolve(message(false,"Could not open releases page: "+error.getMessage()));
+        }
     }
     @Override
     protected void handleOnDestroy(){
