@@ -89,10 +89,25 @@ public class BriskNativeGamePlugin extends Plugin {
                 JSObject result=new JSObject();result.put("ok",true);result.put("alreadyRunning",true);
                 call.resolve(result);return;
             }
-            File saveDir=new File(getContext().getFilesDir(),"native-brisk-emerald");
-            if(!saveDir.exists()&&!saveDir.mkdirs()){call.reject("Cannot create the private game save folder.");return;}
+            // Mark startup before accessing flash so a concurrent stop or
+            // save transfer cannot race the slot-recovery transaction.
             stopRequested=false;
             starting=true;
+            // Recover interrupted app-managed slot switches *before* the C
+            // engine opens its flash image. Without this, a process death in
+            // the middle of a slot change can launch the wrong profile.
+            BriskAndroidSaveSlots.Snapshot profiles =
+                BriskAndroidSaveSlots.list(getContext().getFilesDir());
+            if(profiles.migration!=null){
+                starting=false;
+                JSObject response=new JSObject();
+                response.put("ok",false);
+                response.put("error","Migrate the original compact game saves in Brisk Dex before starting.");
+                call.resolve(response);
+                return;
+            }
+            File saveDir=new File(getContext().getFilesDir(),"native-brisk-emerald");
+            if(!saveDir.exists()&&!saveDir.mkdirs()){starting=false;call.reject("Cannot create the private game save folder.");return;}
             executor.execute(()->{
                 int code=0;
                 String failure=null;

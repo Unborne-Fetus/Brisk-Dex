@@ -108,6 +108,38 @@ def apply(source_dir: Path) -> None:
             data = data.replace(include, include + '#include <stdlib.h>\n')
         if data != rtc.read_text():
             rtc.write_text(data)
+    # Brisk's Kanto rival labels are source-local strings inside a header.
+    # The GBA text macro is handled by the game preprocessor, but the host
+    # platform's inspect.c compiles that same header with an ordinary C
+    # compiler, where _("...") is not an array initializer.
+    # Use the game's own character constants (including 0xff EOS) rather
+    # than ASCII: a seemingly successful native build with ASCII bytes
+    # would show corrupt names in battles.
+    names = source_dir / "include" / "data.h"
+    if names.is_file():
+        current = names.read_text()
+        original_names = {
+            'static const u8 sKantoMayName[] = _("MAY");':
+                'static const u8 sKantoMayName[] = {CHAR_M, CHAR_A, CHAR_Y, EOS};',
+            'static const u8 sKantoBrendanName[] = _("BRENDAN");':
+                'static const u8 sKantoBrendanName[] = {CHAR_B, CHAR_R, CHAR_E, CHAR_N, CHAR_D, CHAR_A, CHAR_N, EOS};',
+            'static const u8 sKantoWallyName[] = _("WALLY");':
+                'static const u8 sKantoWallyName[] = {CHAR_W, CHAR_A, CHAR_L, CHAR_L, CHAR_Y, EOS};',
+        }
+        present = sum(old in current for old in original_names)
+        if present:
+            if present != len(original_names) or any(current.count(old) != 1 for old in original_names):
+                raise RuntimeError("Kanto rival name declarations changed; update native text port")
+            for old, new in original_names.items():
+                current = current.replace(old, new)
+        if any(new in current for new in original_names.values()):
+            if '#include "constants/characters.h"' not in current:
+                before = '#include "constants/moves.h"'
+                if current.count(before) != 1:
+                    raise RuntimeError("Cannot locate Brisk text-character include anchor")
+                current = current.replace(before, before + '\n#include "constants/characters.h"')
+        if current != names.read_text():
+            names.write_text(current)
     print("Applied native compiler and PE layout compatibility (validation remains enabled)")
 
 

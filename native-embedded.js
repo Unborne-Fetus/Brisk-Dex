@@ -28,6 +28,16 @@ async function embeddedStatus({platform=process.platform,resources=process.resou
   if(!checked.ok)return {status:'not-installed',message:'The integrated native engine was not included in this build. Rebuild Pokemon Brisk Emerald with the native source integration enabled.'};
   const info=await engineInfo(executable);
   if(info.error)return {status:'invalid-build',message:info.error};
+  // Validate game-data and native-game revision parity when a packaged release
+  // or a private local build includes the source revision manifest. A stale
+  // helper EXE must never silently open saves as if it were today's Brisk.
+  try{
+    const expected=(await fs.readFile(path.join(resources,'brisk-emerald-data-revision.txt'),'utf8')).trim();
+    if(!/^[a-f0-9]{40}$/.test(expected)||info.profile!=='brisk'||info.briskCommit!==expected)
+      return {status:'invalid-build',message:'The integrated game does not match the current Brisk Emerald source. Rebuild the native engine before playing.'};
+  }catch(error){
+    if(error.code!=='ENOENT')return {status:'invalid-build',message:'Could not validate the native game source revision: '+error.message};
+  }
   return {status:'ready',...info,message:info.profile==='brisk'?'Integrated Brisk Emerald is ready.':'Integrated expansion engine is ready.'};
 }
 class PacketDecoder{
@@ -137,6 +147,11 @@ class EmbeddedNativeGame{
     });
     child.stdout.on('data',part=>{if(this.child===child)decoder.push(part);});
     child.stderr.on('data',part=>{this.errorTail=(this.errorTail+part.toString('utf8')).slice(-1500);});
+    // An unhandled error event on a child stdio stream would otherwise
+    // terminate the entire Electron main process.
+    for(const stream of [child.stdout,child.stderr]){
+      stream.on('error',error=>{if(this.child===child)this.recordDiagnostic('Native game stream error',{error:error.message});});
+    }
     this.diagnosticTimer=setInterval(()=>{
       if(this.child===child&&!this.options.paused&&this.lastFrameTime&&Date.now()-this.lastFrameTime>12000)
         this.recordDiagnostic('Game stopped producing video frames for more than 12 seconds');
@@ -187,10 +202,31 @@ class EmbeddedNativeGame{
     this.input(0);
     const child=this.child;
     this.stopping=new Promise(resolve=>{
-      const timer=setTimeout(()=>{child.kill('SIGKILL');},5000);
+      let settled=false,forceTimer;
+      const finish=result=>{
+        if(settled)return;
+        settled=true;
+        clearTimeout(timer);clearTimeout(forceTimer);
+        child.removeListener('exit',onExit);
+        child.removeListener('error',onError);
+        resolve(result);
+      };
+      const onExit=()=>finish({ok:true});
+      const onError=error=>finish({ok:false,error:'Native process stop failed: '+error.message});
+      child.once('exit',onExit);
+      child.once('error',onError);
+      const timer=setTimeout(()=>{
+        try{
+          child.kill('SIGKILL');
+          // Do not report success or unblock save transfers if the OS never
+          // acknowledges process exit, even after a forceful kill.
+          forceTimer=setTimeout(()=>finish({ok:false,error:'Native game did not exit after forceful shutdown.'}),2000);
+          forceTimer.unref?.();
+        }catch(error){finish({ok:false,error:'Unable to force-stop native game: '+error.message});}
+      },5000);
       timer.unref?.();
-      child.once('exit',()=>{clearTimeout(timer);resolve({ok:true});});
-      child.kill();
+      try{child.kill();}
+      catch(error){finish({ok:false,error:'Unable to stop native game: '+error.message});}
     });
     try{return await this.stopping;}finally{this.stopping=null;}
   }

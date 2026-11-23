@@ -68,6 +68,42 @@ class CompatibilityPatchTests(unittest.TestCase):
             compat.apply(root)
             self.assertEqual(rtc.read_text(), first)
 
+    def test_kanto_rival_labels_port_as_gba_character_bytes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            platform = root / "platform"
+            platform.mkdir()
+            (platform / "bios_internal.c").write_text('#include <stdio.h>\n')
+            directory = root / "include"
+            directory.mkdir()
+            header = directory / "data.h"
+            header.write_text('#include "constants/moves.h"\n'
+                              'static const u8 sKantoMayName[] = _("MAY");\n'
+                              'static const u8 sKantoBrendanName[] = _("BRENDAN");\n'
+                              'static const u8 sKantoWallyName[] = _("WALLY");\n')
+            compat.apply(root)
+            first = header.read_bytes()
+            actual = first.decode()
+            self.assertIn('#include "constants/characters.h"', actual)
+            self.assertIn('{CHAR_M, CHAR_A, CHAR_Y, EOS}', actual)
+            self.assertIn('{CHAR_B, CHAR_R, CHAR_E, CHAR_N, CHAR_D, CHAR_A, CHAR_N, EOS}', actual)
+            self.assertIn('{CHAR_W, CHAR_A, CHAR_L, CHAR_L, CHAR_Y, EOS}', actual)
+            self.assertNotIn('_("MAY")', actual)
+            compat.apply(root)
+            self.assertEqual(header.read_bytes(), first)
+
+    def test_partial_rival_name_source_drift_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "platform").mkdir()
+            (root / "platform" / "bios_internal.c").write_text('#include <stdio.h>\n')
+            (root / "include").mkdir()
+            (root / "include" / "data.h").write_text(
+                '#include "constants/moves.h"\n'
+                'static const u8 sKantoMayName[] = _("MAY");\n')
+            with self.assertRaisesRegex(RuntimeError, "rival name declarations changed"):
+                compat.apply(root)
+
     def test_unexpected_source_checkout_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaisesRegex(RuntimeError, "platform sources not found"):

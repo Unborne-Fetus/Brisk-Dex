@@ -116,3 +116,54 @@ test('late native frames cannot crash Electron when its renderer is being destro
  assert.doesNotThrow(()=>game.send('native-game-frame',Buffer.alloc(PIXELS)));
  assert.match(game.lastIpcError,/render frame destroyed/);
 });
+
+
+test('failed OS termination returns a recoverable error instead of hanging the EXE',async t=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'brisk-native-stop-'));
+ t.after(()=>fs.rm(root,{recursive:true,force:true}));
+ const exe=bundledGamePath({platform:'win32',resources:root});
+ await fs.mkdir(path.dirname(exe),{recursive:true});
+ await fs.writeFile(exe,'mock');
+ await fs.writeFile(path.join(path.dirname(exe),'SDL2.dll'),'mock');
+ await fs.writeFile(path.join(path.dirname(exe),'build-info.json'),JSON.stringify({profile:'brisk'}));
+ let child;
+ const game=new EmbeddedNativeGame({
+   webContents:{isDestroyed:()=>true,send(){}},
+   resources:root,userData:root,platform:'win32',
+   spawnChild:()=>{
+     child=new EventEmitter();
+     child.stdout=new PassThrough();child.stderr=new PassThrough();child.stdin=new PassThrough();
+     child.kill=()=>{throw new Error('OS denied termination');};
+     process.nextTick(()=>child.emit('spawn'));
+     return child;
+   }
+ });
+ assert.equal((await game.start()).ok,true);
+ const result=await game.stop();
+ assert.equal(result.ok,false);
+ assert.match(result.error,/OS denied termination/);
+ child.emit('exit',0,null);
+});
+
+
+test('native gameplay refuses a stale or missing Brisk source revision',async t=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'brisk-native-revision-'));
+ t.after(()=>fs.rm(root,{recursive:true,force:true}));
+ const exe=bundledGamePath({platform:'win32',resources:root});
+ const gameDir=path.dirname(exe);
+ await fs.mkdir(gameDir,{recursive:true});
+ await fs.writeFile(exe,'mock');
+ await fs.writeFile(path.join(gameDir,'SDL2.dll'),'mock');
+ const revision='64408c0db30bd2e74e072f26d32a43b12c1be7ed';
+ await fs.writeFile(path.join(root,'brisk-emerald-data-revision.txt'),revision+'\n');
+ await fs.writeFile(path.join(gameDir,'build-info.json'),JSON.stringify({
+   profile:'brisk',brisk_commit:'6cf3130b263aae9a6a7d01199dd60954cb74172c'
+ }));
+ assert.equal((await embeddedStatus({platform:'win32',resources:root})).status,'invalid-build');
+ await fs.writeFile(path.join(gameDir,'build-info.json'),JSON.stringify({
+   profile:'brisk',brisk_commit:revision
+ }));
+ assert.equal((await embeddedStatus({platform:'win32',resources:root})).status,'ready');
+ await fs.writeFile(path.join(root,'brisk-emerald-data-revision.txt'),'not-a-commit\n');
+ assert.equal((await embeddedStatus({platform:'win32',resources:root})).status,'invalid-build');
+});

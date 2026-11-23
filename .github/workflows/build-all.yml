@@ -14,10 +14,53 @@ on:
     paths-ignore:
       - "README.md"
       - "LICENSE"
+  pull_request:
+    paths:
+      - ".github/workflows/build-all.yml"
+      - "tools/**"
+      - "test/android/**"
+      - "test/desktop/**"
+      - "android-native/**"
+      - "native-*.js"
 
 jobs:
+  native-windows:
+    name: Build matching Brisk Emerald engine for the EXE
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install native compiler and asset tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential git python3 pkg-config curl clang gcc-multilib libc6-dev-i386 libpng-dev libsdl2-dev gcc-mingw-w64-x86-64 binutils-mingw-w64-x86-64
+      - name: Compile the exact pinned Brisk Emerald source for Windows
+        env:
+          BRISK_NATIVE_PROFILE: brisk
+        run: bash tools/build-native-expansion.sh windows
+      - name: Validate source identity and Windows executable
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          pin = json.loads(Path('tools/brisk-native-source.json').read_text())
+          info = json.loads(Path('native-game/win32/build-info.json').read_text())
+          assert info['profile'] == 'brisk'
+          assert info['brisk_commit'] == pin['brisk_commit'], 'Staged game engine is stale'
+          assert info['save_layout_id'] == 0x42524b31, 'Unknown native save layout'
+          for name in ('pokeemerald-native.exe', 'SDL2.dll'):
+              assert (Path('native-game/win32') / name).is_file(), name
+          print('Matched native engine', info['brisk_commit'])
+          PY
+      - name: Check the actual Windows executable layout
+        run: python3 tools/test_native_pe.py native-game/win32/pokeemerald-native.exe native-src/brisk-emerald-native/platform/build_glue/check_pe_layout.py
+      # Game assets are deliberately not attached to a public Actions run.
+      # Use build-integrated.bat locally for private full-game installers.
+
   windows:
-    name: Windows installer
+    name: Windows companion installer (no game assets)
+    needs: native-windows
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
@@ -25,9 +68,13 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-      - name: Cache Gradle dependencies
-        uses: gradle/actions/setup-gradle@v4
-
+      - name: Verify public installer contains no proprietary game bundle
+        shell: pwsh
+        run: |
+          if (Test-Path 'native-game/win32/pokeemerald-native.exe') {
+            throw 'Public companion installer must not bundle native game assets'
+          }
+          Write-Host 'Companion-only installer; use build-integrated.bat for a local private game build.'
       - name: Install dependencies
         run: npm ci
       - name: Verify game and desktop regressions
@@ -43,7 +90,7 @@ jobs:
       - name: Upload Windows installer
         uses: actions/upload-artifact@v6
         with:
-          name: Pokemon-Brisk-Emerald-Windows
+          name: Brisk-Dex-Windows-Companion
           path: dist/*.exe
           if-no-files-found: error
 
@@ -60,10 +107,14 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      - name: Cache Gradle dependencies
+        uses: gradle/actions/setup-gradle@v4
       - name: Install dependencies
         run: npm ci
       - name: Test Android native trainer-script decoding and safety guards
         run: python3 -m unittest discover -s test/android -p 'test_native_*.py' -v
+      - name: Verify Android bridge, save recovery and mobile UI tests
+        run: node --test test/android/*.test.cjs
       - name: Prepare web bundle
         run: npm run android:prepare
       - name: Reuse checked-in Android project
