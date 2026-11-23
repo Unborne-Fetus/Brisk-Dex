@@ -42,3 +42,25 @@ test('Android full game build never substitutes JNI transport for real game bina
   assert.match(workflow,/bash tools\/build_android_game_archive\.sh/);
   assert.match(workflow,/bash tools\/package_android_full_game\.sh/);
 });
+
+test('In-app Android updates do not mislabel newer preview builds as fully current',()=>{
+  const java=read('android-native/java/BriskAppUpdaterPlugin.java');
+  assert.match(java,/if\(nextCode<installedCode\)/);
+  assert.match(java,/if\(nextCode==installedCode\)/);
+  assert.match(java,/channelBehind/);
+  assert.match(java,/No newer compatible signed game update is published/);
+  assert.match(java,/Preview APKs can be missing libbriskgame\.so/);
+  assert.doesNotMatch(java,/You already have the latest published Android APK/);
+  assert.match(java,/android-update\.json"\)/);
+  assert.doesNotMatch(java,/android-update\.json\?t=/);
+  assert.match(java,/Cache-Control/);
+});
+
+test('NDK Android platform entry point is not silently remapped to SDL_main',()=>{
+  const compiler=read('tools/android_compile_source.py');
+  assert.match(compiler,/SDL_MAIN_HANDLED=1/);
+  assert.match(compiler,/main=brisk_android_game_main/);
+  const archive=read('tools/build_android_game_archive.sh');
+  assert.match(archive,/Actual entry-point symbols/);
+  assert.match(archive,/native-symbols\.txt/);
+});
