@@ -53,20 +53,13 @@ jobs:
               assert (Path('native-game/win32') / name).is_file(), name
           print('Matched native engine', info['brisk_commit'])
           PY
-      - name: Transfer verified game engine and replay scripts to Windows
-        uses: actions/upload-artifact@v6
-        with:
-          name: matching-brisk-windows-game
-          path: |
-            native-game/win32/pokeemerald-native.exe
-            native-game/win32/SDL2.dll
-            native-game/win32/build-info.json
-            native-src/brisk-emerald-native/tests/smoke/**
-          if-no-files-found: error
-          retention-days: 1
+      - name: Check the actual Windows executable layout
+        run: python3 tools/test_native_pe.py native-game/win32/pokeemerald-native.exe native-src/brisk-emerald-native/platform/build_glue/check_pe_layout.py
+      # Game assets are deliberately not attached to a public Actions run.
+      # Use build-integrated.bat locally for private full-game installers.
 
   windows:
-    name: Windows installer
+    name: Windows companion installer (no game assets)
     needs: native-windows
     runs-on: windows-latest
     steps:
@@ -75,24 +68,13 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-      - name: Fetch exact-version native game for packaging
-        uses: actions/download-artifact@v4
-        with:
-          name: matching-brisk-windows-game
-          path: .
-      - name: Require native gameplay and smoke-test it on Windows
+      - name: Verify public installer contains no proprietary game bundle
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          $pin = Get-Content 'tools/brisk-native-source.json' -Raw | ConvertFrom-Json
-          $info = Get-Content 'native-game/win32/build-info.json' -Raw | ConvertFrom-Json
-          if ($info.profile -ne 'brisk' -or $info.brisk_commit -ne $pin.brisk_commit) {
-            throw 'Native Brisk Emerald game revision does not match this installer'
+          if (Test-Path 'native-game/win32/pokeemerald-native.exe') {
+            throw 'Public companion installer must not bundle native game assets'
           }
-          if (-not (Test-Path 'native-game/win32/pokeemerald-native.exe')) {
-            throw 'Missing actual Brisk Emerald game engine'
-          }
-          node tools/test_brisk_native.cjs windows
+          Write-Host 'Companion-only installer; use build-integrated.bat for a local private game build.'
       - name: Install dependencies
         run: npm ci
       - name: Verify game and desktop regressions
@@ -108,7 +90,7 @@ jobs:
       - name: Upload Windows installer
         uses: actions/upload-artifact@v6
         with:
-          name: Pokemon-Brisk-Emerald-Windows
+          name: Brisk-Dex-Windows-Companion
           path: dist/*.exe
           if-no-files-found: error
 
