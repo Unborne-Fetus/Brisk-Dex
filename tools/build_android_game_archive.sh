@@ -45,22 +45,12 @@ if [ ! -s "$archive" ]; then
 fi
 "$ar" t "$archive" >/dev/null
 "$nm" --defined-only "$archive" > "$checkout/build/android-arm64/native-symbols.txt"
-if ! grep -Eq ' [TW] brisk_android_game_main
-echo "Full Brisk ARM64 archive ready: $archive"
-echo "Set BRISK_ANDROID_GAME_ARCHIVE to that path before APK packaging."
- "$checkout/build/android-arm64/native-symbols.txt" ||
-   ! grep -Eq ' [TW] AgbMain
-echo "Full Brisk ARM64 archive ready: $archive"
-echo "Set BRISK_ANDROID_GAME_ARCHIVE to that path before APK packaging."
- "$checkout/build/android-arm64/native-symbols.txt"; then
-  echo "Archive is incomplete: expected entry points not both present." >&2
-  echo "Actual entry-point symbols from the ARM64 archive:" >&2
-  grep -E ' (main|SDL_main|brisk_android_game_main|AgbMain|AgbMainLoop)
-echo "Full Brisk ARM64 archive ready: $archive"
-echo "Set BRISK_ANDROID_GAME_ARCHIVE to that path before APK packaging."
- \
+if ! grep -Eq ' [TW] brisk_android_game_main$' "$checkout/build/android-arm64/native-symbols.txt" ||
+   ! grep -Eq ' [TW] AgbMain$' "$checkout/build/android-arm64/native-symbols.txt"; then
+  echo "Archive is incomplete: required entry points are missing." >&2
+  echo "Actual ARM64 entry-point symbols:" >&2
+  grep -E ' (main|SDL_main|brisk_android_game_main|AgbMain|AgbMainLoop)$' \
     "$checkout/build/android-arm64/native-symbols.txt" >&2 || true
-  echo "Game source may have been renamed by SDL2; no placeholder core will be packaged." >&2
   exit 1
 fi
 echo "Full Brisk ARM64 archive ready: $archive"
