@@ -34,9 +34,10 @@ test('Generated APK safely registers native plugins and a distinct installer pro
 
 test('Android restores the selected native save slot before launching the game',()=>{
   const java=read('android-native/java/BriskNativeGamePlugin.java');
+  const startup=java.indexOf('starting=true;',java.indexOf('public void start(PluginCall call)'));
   const recover=java.indexOf('BriskAndroidSaveSlots.list(getContext().getFilesDir())');
   const launch=java.indexOf('nativeRun(saveDir.getAbsolutePath())');
-  assert.ok(recover>=0&&launch>recover,'slot crash recovery must precede the game runtime');
+  assert.ok(startup>=0&&startup<recover&&launch>recover,'startup must guard the slot recovery and game runtime');
   assert.match(java,/if\(profiles\.migration!=null\)/);
   assert.match(java,/Migrate the original compact game saves/);
 });
