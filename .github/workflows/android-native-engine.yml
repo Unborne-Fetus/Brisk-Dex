@@ -32,7 +32,12 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             build-essential git python3 pkg-config curl clang gcc-multilib \
             libc6-dev-i386 libpng-dev libsdl2-dev binutils-aarch64-linux-gnu
-      - uses: android-actions/setup-android@v3
+      # GitHub Ubuntu images already contain the Android SDK; the deprecated
+      # setup-android@v3 action tries to install the removed 'tools' package.
+      - name: Check preinstalled Android SDK manager
+        run: |
+          test -n "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          command -v sdkmanager
       - name: Install pinned Android NDK and CMake
         run: |
           yes | sdkmanager --licenses >/dev/null || true
