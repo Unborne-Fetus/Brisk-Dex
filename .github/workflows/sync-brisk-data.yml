@@ -115,6 +115,9 @@ jobs:
             gh workflow run embedded-native.yml --ref main
             gh workflow run deploy-web.yml --ref main
             gh workflow run build-all.yml --ref main
+            # GITHUB_TOKEN pushes do not trigger the Android push workflow.
+            # Explicitly rebuild the APK whenever game data or the native pin changes.
+            gh workflow run build-android.yml --ref main
             gh workflow run build-linux.yml --ref main
             gh workflow run build-ios.yml --ref main
           fi
