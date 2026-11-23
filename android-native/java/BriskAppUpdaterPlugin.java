@@ -50,6 +50,11 @@ public class BriskAppUpdaterPlugin extends Plugin {
         "https://github.com/Unborne-Fetus/Brisk-Dex/releases/download/android-updates/";
     private static final String APK_NAME="Brisk-Dex-Android.apk";
     private static final String RELEASE_PAGE="https://github.com/Unborne-Fetus/Brisk-Dex/releases";
+    // Alternate official HTTPS hostname for networks that reject GitHub's
+    // release-asset TLS chain. This mirror is synchronized only after the
+    // signed channel has passed its APK signature and SHA-256 checks.
+    private static final String MANIFEST_MIRROR=
+        "https://raw.githubusercontent.com/Unborne-Fetus/Brisk-Dex/main/docs/android-update.json";
     private static final long MAX_APK=180L*1024*1024;
     private final ExecutorService executor=Executors.newSingleThreadExecutor();
     private volatile boolean busy=false;
@@ -95,7 +100,10 @@ public class BriskAppUpdaterPlugin extends Plugin {
         if(!url.startsWith("https://"))throw new Exception("Update URL must use HTTPS");
         HttpURLConnection connection=(HttpURLConnection)new URL(url).openConnection();
         connection.setRequestProperty("User-Agent","Pokemon-Brisk-Emerald-Android-Updater");
-        connection.setRequestProperty("Accept","application/vnd.github+json");
+        // Release assets are byte streams, not GitHub REST API JSON.
+        connection.setRequestProperty("Accept",url.contains(".json")?"application/json":"application/octet-stream");
+        connection.setRequestProperty("Cache-Control","no-cache");
+        connection.setRequestProperty("Pragma","no-cache");
         connection.setUseCaches(false);
         connection.setConnectTimeout(15000);connection.setReadTimeout(30000);
         return connection;
@@ -171,6 +179,23 @@ public class BriskAppUpdaterPlugin extends Plugin {
         if(!sameSignature(old,target))
             throw new Exception("Installed APK uses a different signing key. An in-place update would fail. Back up app data before any reinstall.");
     }
+    private JSONObject fetchManifest() throws Exception {
+        Exception firstFailure=null;
+        for(String url:new String[]{ASSET_PREFIX+"android-update.json",MANIFEST_MIRROR}){
+            HttpURLConnection connection=null;
+            try {
+                connection=connect(url);
+                if(connection.getResponseCode()==404)continue;
+                return new JSONObject(new String(read(connection,64*1024),StandardCharsets.UTF_8));
+            }catch(Exception failure){
+                if(firstFailure==null)firstFailure=failure;
+            }finally{
+                if(connection!=null)connection.disconnect();
+            }
+        }
+        if(firstFailure!=null)throw firstFailure;
+        return null;
+    }
     private String pendingVersion(){
         long expected=prefs().getLong("code",0);
         File candidate=apk();
@@ -193,24 +218,34 @@ public class BriskAppUpdaterPlugin extends Plugin {
         executor.execute(()->{
             try{
                 long installedCode=code(installed());
-                // Direct download avoids the API hostname while preserving APK checks.
-                HttpURLConnection index=connect(ASSET_PREFIX+"android-update.json?t="+System.currentTimeMillis());
-                JSONObject meta;
-                try{
-                    int response=index.getResponseCode();
-                    if(response==404){
-                        call.resolve(message(true,"No Android update has been published to the in-app channel yet."));
-                        return;
-                    }
-                    meta=new JSONObject(new String(read(index,64*1024),StandardCharsets.UTF_8));
-                }finally{index.disconnect();}
+                // Both endpoints use normal Android HTTPS certificate checks.
+                // The mirror is only metadata: the APK still requires the
+                // verified signed GitHub release and exact SHA-256 hash.
+                JSONObject meta=fetchManifest();
+                if(meta==null){
+                    call.resolve(message(true,"No signed Android update is published yet."));
+                    return;
+                }
                 long nextCode=meta.getLong("versionCode"),bytes=meta.getLong("bytes");
                 String checksum=meta.getString("sha256"),version=meta.getString("versionName");
                 if(!getContext().getPackageName().equals(meta.getString("packageName"))||
                    !shaFormat(checksum)||nextCode<1||bytes<10000||bytes>MAX_APK||
                    version.isEmpty())throw new Exception("Android release manifest is invalid");
-                if(nextCode<=installedCode){
-                    call.resolve(message(true,"You already have the latest published Android APK."));
+                if(nextCode<installedCode){
+                    // Preview builds use a higher version-code range than the
+                    // older, game-enabled signed channel. Never misreport a
+                    // newer transport-only preview as the latest playable app.
+                    JSObject result=message(false,
+                        "No newer compatible signed game update is published. The latest in-app game channel is "+
+                        version+" (code "+nextCode+"), but this installed build is newer (code "+
+                        installedCode+"). Preview APKs can be missing libbriskgame.so. Use Official APK releases to check options, and back up saves before changing installations.");
+                    result.put("channelVersion",version);
+                    result.put("channelBehind",true);
+                    call.resolve(result);
+                    return;
+                }
+                if(nextCode==installedCode){
+                    call.resolve(message(true,"You have the latest release on this signed in-app game update channel ("+version+")."));
                     return;
                 }
                 String url=ASSET_PREFIX+APK_NAME;
@@ -225,7 +260,7 @@ public class BriskAppUpdaterPlugin extends Plugin {
                 if(!folder().isDirectory()&&!folder().mkdirs())
                     throw new Exception("Cannot create the app update folder");
                 File temp=new File(folder(),"download.part.apk");
-                HttpURLConnection download=connect(url+"?t="+System.currentTimeMillis());
+                HttpURLConnection download=connect(url);
                 long total=0;
                 try{
                     if(download.getResponseCode()!=200)

@@ -20,6 +20,13 @@ test('TLS certificate chain errors have an actionable secure fallback, not a tru
   assert.match(read('.github/workflows/build-android.yml'),/android-channel-cert\.sha256/);
   assert.match(read('.github/workflows/build-android.yml'),/Signing key differs from existing android-updates installation/);
   assert.match(read('tools/android-channel-cert.sha256').trim(),/^[0-9a-f]{64}$/);
+  assert.match(java,/fetchManifest\(\)/);
+  assert.match(java,/raw\.githubusercontent\.com\/Unborne-Fetus\/Brisk-Dex\/main\/docs\/android-update\.json/);
+  const mirror=JSON.parse(read('docs/android-update.json'));
+  assert.equal(mirror.packageName,'com.briskemerald.briskdex');
+  assert.match(mirror.sha256,/^[0-9a-f]{64}$/);
+  assert.ok(mirror.versionCode>0&&mirror.bytes>10000);
+  assert.match(read('.github/workflows/build-android.yml'),/contents\/docs\/android-update\.json/);
   const api=read('android-native/src/mobile-app-updates.js');
   assert.match(api,/openAndroidDownloads\(\)/);
   assert.match(api,/updater\.openDownloadPage\(\)/);
@@ -41,4 +48,26 @@ test('Android full game build never substitutes JNI transport for real game bina
   const workflow=read('.github/workflows/android-native-engine.yml');
   assert.match(workflow,/bash tools\/build_android_game_archive\.sh/);
   assert.match(workflow,/bash tools\/package_android_full_game\.sh/);
+});
+
+test('In-app Android updates do not mislabel newer preview builds as fully current',()=>{
+  const java=read('android-native/java/BriskAppUpdaterPlugin.java');
+  assert.match(java,/if\(nextCode<installedCode\)/);
+  assert.match(java,/if\(nextCode==installedCode\)/);
+  assert.match(java,/channelBehind/);
+  assert.match(java,/No newer compatible signed game update is published/);
+  assert.match(java,/Preview APKs can be missing libbriskgame\.so/);
+  assert.doesNotMatch(java,/You already have the latest published Android APK/);
+  assert.match(java,/ASSET_PREFIX\+"android-update\.json"/);
+  assert.doesNotMatch(java,/android-update\.json\?t=/);
+  assert.match(java,/Cache-Control/);
+});
+
+test('NDK Android platform entry point is not silently remapped to SDL_main',()=>{
+  const compiler=read('tools/android_compile_source.py');
+  assert.match(compiler,/SDL_MAIN_HANDLED=1/);
+  assert.match(compiler,/main=brisk_android_game_main/);
+  const archive=read('tools/build_android_game_archive.sh');
+  assert.match(archive,/Actual ARM64 entry-point symbols/);
+  assert.match(archive,/native-symbols\.txt/);
 });

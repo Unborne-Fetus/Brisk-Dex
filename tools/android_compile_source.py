@@ -40,6 +40,9 @@ def main():
             parser.error("Platform sources require --sdl-include")
         compiler_args += [
             "-D_GNU_SOURCE", "-DMODERN=1", "-DEMERALD=1",
+            # SDL2 on Android replaces main with SDL_main unless explicitly
+            # disabled. The JNI game adapter calls brisk_android_game_main.
+            "-DSDL_MAIN_HANDLED=1",
             "-DPLATFORM_NATIVE=1", "-DBRISK_NATIVE=1", "-DBRISK_ANDROID=1",
             "-Iplatform", "-I" + str(args.sdl_include), "-iquote", ".",
             "-idirafter", "include",

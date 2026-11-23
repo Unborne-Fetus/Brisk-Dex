@@ -1,0 +1,10 @@
+{
+  "packageName": "com.briskemerald.briskdex",
+  "versionCode": 100020,
+  "versionName": "1.3.1.20",
+  "bytes": 116548299,
+  "sha256": "acf13f9fac60108bf88d5588b13501cb1f316229cf6266b88d00d4eff38e3b1e",
+  "commit": "f8869b5b25c99edecca58efe59cd65528f06301e",
+  "preview": true,
+  "gameIntegrated": true
+}

@@ -47,7 +47,10 @@ fi
 "$nm" --defined-only "$archive" > "$checkout/build/android-arm64/native-symbols.txt"
 if ! grep -Eq ' [TW] brisk_android_game_main$' "$checkout/build/android-arm64/native-symbols.txt" ||
    ! grep -Eq ' [TW] AgbMain$' "$checkout/build/android-arm64/native-symbols.txt"; then
-  echo "Archive is incomplete: native game main or AgbMain is missing" >&2
+  echo "Archive is incomplete: required entry points are missing." >&2
+  echo "Actual ARM64 entry-point symbols:" >&2
+  grep -E ' (main|SDL_main|brisk_android_game_main|AgbMain|AgbMainLoop)$' \
+    "$checkout/build/android-arm64/native-symbols.txt" >&2 || true
   exit 1
 fi
 echo "Full Brisk ARM64 archive ready: $archive"
