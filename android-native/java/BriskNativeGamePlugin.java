@@ -56,8 +56,14 @@ public class BriskNativeGamePlugin extends Plugin {
     private volatile boolean configuredMute=false;
 
     private String verify(){
-        return TRANSPORT_LOADED?nativeProbe(EXPECTED_BRISK_COMMIT):
-            "Android native bridge failed to load: "+TRANSPORT_ERROR;
+        if(!TRANSPORT_LOADED)
+            return "Android native bridge failed to load: "+TRANSPORT_ERROR;
+        try {
+            return nativeProbe(EXPECTED_BRISK_COMMIT);
+        } catch(LinkageError | RuntimeException failure) {
+            // A stale or partially installed JNI library must not crash the UI.
+            return "Android native bridge is incompatible: "+failure;
+        }
     }
     @PluginMethod
     public void status(PluginCall call){
@@ -66,10 +72,10 @@ public class BriskNativeGamePlugin extends Plugin {
             JSObject response=new JSObject();
             response.put("status",reason.isEmpty()?"ready":"not-installed");
             response.put("profile","brisk");
-            response.put("running",TRANSPORT_LOADED&&nativeRunning());
+            response.put("running",reason.isEmpty()&&nativeRunning());
             response.put("message",reason.isEmpty()?"Integrated Android Brisk Emerald engine is ready.":reason);
             call.resolve(response);
-        }catch(Exception problem){call.reject("Unable to inspect Android game: "+problem.getMessage());}
+        }catch(Exception | LinkageError problem){call.reject("Unable to inspect Android game: "+problem.getMessage());}
     }
     @PluginMethod
     public void start(PluginCall call){
@@ -89,13 +95,20 @@ public class BriskNativeGamePlugin extends Plugin {
             starting=true;
             executor.execute(()->{
                 int code=0;
+                String failure=null;
                 try{
                     if(!stopRequested)code=nativeRun(saveDir.getAbsolutePath());
-                }
-                finally{
+                }catch(RuntimeException | LinkageError problem){
+                    // An unavailable JNI entry point previously escaped the worker
+                    // thread and could terminate the entire Android app.
+                    code=-1;
+                    failure=problem.toString();
+                }finally{
                     starting=false;
                     JSObject state=new JSObject();state.put("running",false);
-                    state.put("message",code==0?"Game stopped.":"Android game engine exited with code "+code+".");
+                    state.put("message",failure!=null
+                        ?"Android game engine failed: "+failure
+                        :code==0?"Game stopped.":"Android game engine exited with code "+code+".");
                     notifyListeners("nativeState",state);
                 }
             });
@@ -104,20 +117,25 @@ public class BriskNativeGamePlugin extends Plugin {
             notifyListeners("nativeState",event);
             JSObject result=new JSObject();result.put("ok",true);
             call.resolve(result);
-        }catch(Exception problem){starting=false;call.reject("Unable to launch Brisk Emerald: "+problem.getMessage());}
+        }catch(Exception | LinkageError problem){starting=false;call.reject("Unable to launch Brisk Emerald: "+problem.getMessage());}
     }
     @PluginMethod
     public void stop(PluginCall call){
         stopRequested=true;
-        if(TRANSPORT_LOADED)nativeStop();
-        JSObject result=new JSObject();result.put("ok",true);call.resolve(result);
+        try{
+            if(TRANSPORT_LOADED)nativeStop();
+            JSObject result=new JSObject();result.put("ok",true);call.resolve(result);
+        }catch(LinkageError error){call.reject("Android game stop is unavailable: "+error);}
+
     }
     @PluginMethod
     public void keys(PluginCall call){
         Integer mask=call.getInt("mask");
         if(mask==null||mask<0||mask>1023){call.reject("Invalid ten-bit input mask.");return;}
-        if(TRANSPORT_LOADED)nativeKeys(mask);
-        call.resolve();
+        try{
+            if(TRANSPORT_LOADED)nativeKeys(mask);
+            call.resolve();
+        }catch(LinkageError error){call.reject("Android game controls are unavailable: "+error);}
     }
     @PluginMethod
     public void configure(PluginCall call){
@@ -130,16 +148,21 @@ public class BriskNativeGamePlugin extends Plugin {
         configuredSpeed=speed;
         configuredPaused=paused;
         configuredMute=mute;
-        int code=TRANSPORT_LOADED?nativeConfigure(speed,paused||backgrounded,mute||backgrounded):-1;
-        JSObject result=new JSObject();result.put("ok",code==0);
-        if(code!=0)result.put("error","Android native game engine is unavailable.");
-        call.resolve(result);
+        try{
+            int code=TRANSPORT_LOADED?nativeConfigure(speed,paused||backgrounded,mute||backgrounded):-1;
+            JSObject result=new JSObject();result.put("ok",code==0);
+            if(code!=0)result.put("error","Android native game engine is unavailable.");
+            call.resolve(result);
+        }catch(LinkageError error){call.reject("Android native game settings are unavailable: "+error);}
     }
     @PluginMethod
     public void frame(PluginCall call){
         Long since=call.getLong("since",0L);
         if(since==null||since<0){call.reject("Invalid frame cursor.");return;}
-        byte[] packet=TRANSPORT_LOADED?nativeFrame(since):null;
+        byte[] packet;
+        try{
+            packet=TRANSPORT_LOADED?nativeFrame(since):null;
+        }catch(LinkageError error){call.reject("Android game video bridge is unavailable: "+error);return;}
         JSObject result=new JSObject();
         if(packet!=null&&packet.length==76808){
             long sequence=0;
@@ -332,8 +355,10 @@ public class BriskNativeGamePlugin extends Plugin {
     protected void handleOnPause(){
         backgrounded=true;
         if(TRANSPORT_LOADED){
-            nativeKeys(0);
-            if(starting||nativeRunning())nativeConfigure(configuredSpeed,true,true);
+            try {
+                nativeKeys(0);
+                if(starting||nativeRunning())nativeConfigure(configuredSpeed,true,true);
+            } catch(LinkageError ignored) { /* Preserve Activity lifecycle on stale JNI. */ }
         }
         super.handleOnPause();
     }
@@ -342,14 +367,21 @@ public class BriskNativeGamePlugin extends Plugin {
     protected void handleOnResume(){
         super.handleOnResume();
         backgrounded=false;
-        if(TRANSPORT_LOADED&&(starting||nativeRunning()))
-            nativeConfigure(configuredSpeed,configuredPaused,configuredMute);
+        if(TRANSPORT_LOADED){
+            try {
+                if(starting||nativeRunning())
+                    nativeConfigure(configuredSpeed,configuredPaused,configuredMute);
+            } catch(LinkageError ignored) { /* Do not crash on Activity resume. */ }
+        }
     }
 
     @Override
     protected void handleOnDestroy(){
         stopRequested=true;
-        if(TRANSPORT_LOADED){nativeKeys(0);nativeStop();}
+        if(TRANSPORT_LOADED){
+            try{nativeKeys(0);nativeStop();}
+            catch(LinkageError ignored) { /* Teardown must be best effort. */ }
+        }
         executor.shutdown();
         super.handleOnDestroy();
     }
