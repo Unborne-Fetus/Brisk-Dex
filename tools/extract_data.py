@@ -805,7 +805,7 @@ def extract_complete_trainer_teams(repo):
                 "items": variant.get("items", ""),
                 "battleType": variant.get("battleType", "")
             }
-            trainer["region"] = "Kanto" if constant.startswith("TRAINER_BRISK_KANTO_") else "Hoenn"
+            trainer["region"] = "Kanto" if constant.startswith(("TRAINER_BRISK_KANTO_", "TRAINER_XIPHOS_")) else "Hoenn"
             if mode == "Normal":
                 trainer["party"] = variant["party"]
                 for field in ("name", "class", "pic", "gender", "battleType"):
