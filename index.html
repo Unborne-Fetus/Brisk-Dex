@@ -1142,12 +1142,13 @@ body.native-game-immersive #native-game-screen{box-sizing:border-box!important;w
 
   <section id="trainers-tab-panel" class="main-tab-panel" role="tabpanel" aria-labelledby="tab-trainers" style="display:none;">
     <div class="section-heading"><h3>Trainer Teams</h3><span class="count" id="trainer-count"></span></div>
-    <p class="route-intro">Browse source-backed Hoenn and postgame Kanto teams. Choose Easy, Normal, Hard or Kaizo to see each trainer's actual party, levels, items and moves.</p>
+    <p class="route-intro">Browse source-backed Hoenn and postgame Kanto teams. Choose Easy, Normal, Expert, Hard or Kaizo. Expert uses dynamic in-game substitutions: its preview shows the Normal base party until exact substitutions are available.</p>
     <div class="trainer-tools">
       <input id="trainer-search" type="search" placeholder="Search trainer, class, Pok&eacute;mon, move, ability, or item…" aria-label="Search Brisk trainer teams">
       <select id="trainer-mode" aria-label="Trainer difficulty">
         <option value="Easy">Easy</option>
         <option value="Normal" selected>Normal</option>
+        <option value="Expert">Expert (base preview)</option>
         <option value="Hard">Hard</option>
         <option value="Kaizo">Kaizo</option>
       </select>
@@ -4734,8 +4735,9 @@ function renderTrainerClassOptions(){
   select.value=Array.from(select.options).some(function(o){return o.value===prev;})?prev:'all';
 }
 function trainerSelectedMode(){var s=document.getElementById('trainer-mode');return s?s.value:'Normal';}
-function trainerParty(t){return (t.modeTeams&&t.modeTeams[trainerSelectedMode()])||t.party||[];}
-function trainerProfile(t){return (t.modeProfiles&&t.modeProfiles[trainerSelectedMode()])||t;}
+function trainerParty(t){var m=trainerSelectedMode();return (t.modeTeams&&(t.modeTeams[m]||(m==='Expert'&&t.modeTeams.Normal)))||t.party||[];}
+function trainerProfile(t){var m=trainerSelectedMode();return (t.modeProfiles&&(t.modeProfiles[m]||(m==='Expert'&&t.modeProfiles.Normal)))||t;}
+function trainerModeDescription(t){var m=trainerSelectedMode();return m==='Expert'&&!(t.modeTeams&&t.modeTeams.Expert)?'Expert: Normal base-party preview; substitutions happen in-game':(t.modeTeams?m+' difficulty':'Original team');}
 function trainerSearchText(t){
   var meta=trainerProfile(t);
   var parts=[t.name,t.class,t.region,meta.ai,meta.battleType,meta.items,t.pic];
@@ -4822,7 +4824,7 @@ function renderTrainerTeams(){
     t.class||'Pkmn Trainer',
     t.region||'Hoenn',
     briskTrainerDefeated(t)===true ? '✓ Previously defeated' : briskTrainerDefeated(t)===false ? 'Not defeated yet' : 'Load a save to check battle status',
-    t.modeTeams ? trainerSelectedMode()+' difficulty' : 'Original team',
+    trainerModeDescription(t),
     profile.battleType ? ((String(profile.battleType).toLowerCase()==='yes'||String(profile.battleType).toLowerCase()==='doubles')?'Double Battle':(String(profile.battleType).toLowerCase()==='no'?'Single Battle':profile.battleType)) : null,
     profile.ai ? 'AI: '+profile.ai : null,
     profile.items ? 'Trainer items: '+profile.items : null
