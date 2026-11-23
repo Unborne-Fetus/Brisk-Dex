@@ -50,6 +50,11 @@ public class BriskAppUpdaterPlugin extends Plugin {
         "https://github.com/Unborne-Fetus/Brisk-Dex/releases/download/android-updates/";
     private static final String APK_NAME="Brisk-Dex-Android.apk";
     private static final String RELEASE_PAGE="https://github.com/Unborne-Fetus/Brisk-Dex/releases";
+    // Alternate official HTTPS hostname for networks that reject GitHub's
+    // release-asset TLS chain. This mirror is synchronized only after the
+    // signed channel has passed its APK signature and SHA-256 checks.
+    private static final String MANIFEST_MIRROR=
+        "https://raw.githubusercontent.com/Unborne-Fetus/Brisk-Dex/main/docs/android-update.json";
     private static final long MAX_APK=180L*1024*1024;
     private final ExecutorService executor=Executors.newSingleThreadExecutor();
     private volatile boolean busy=false;
@@ -174,6 +179,23 @@ public class BriskAppUpdaterPlugin extends Plugin {
         if(!sameSignature(old,target))
             throw new Exception("Installed APK uses a different signing key. An in-place update would fail. Back up app data before any reinstall.");
     }
+    private JSONObject fetchManifest() throws Exception {
+        Exception firstFailure=null;
+        for(String url:new String[]{ASSET_PREFIX+"android-update.json",MANIFEST_MIRROR}){
+            HttpURLConnection connection=null;
+            try {
+                connection=connect(url);
+                if(connection.getResponseCode()==404)continue;
+                return new JSONObject(new String(read(connection,64*1024),StandardCharsets.UTF_8));
+            }catch(Exception failure){
+                if(firstFailure==null)firstFailure=failure;
+            }finally{
+                if(connection!=null)connection.disconnect();
+            }
+        }
+        if(firstFailure!=null)throw firstFailure;
+        return null;
+    }
     private String pendingVersion(){
         long expected=prefs().getLong("code",0);
         File candidate=apk();
@@ -196,17 +218,14 @@ public class BriskAppUpdaterPlugin extends Plugin {
         executor.execute(()->{
             try{
                 long installedCode=code(installed());
-                // Direct download avoids the API hostname while preserving APK checks.
-                HttpURLConnection index=connect(ASSET_PREFIX+"android-update.json");
-                JSONObject meta;
-                try{
-                    int response=index.getResponseCode();
-                    if(response==404){
-                        call.resolve(message(true,"No Android update has been published to the in-app channel yet."));
-                        return;
-                    }
-                    meta=new JSONObject(new String(read(index,64*1024),StandardCharsets.UTF_8));
-                }finally{index.disconnect();}
+                // Both endpoints use normal Android HTTPS certificate checks.
+                // The mirror is only metadata: the APK still requires the
+                // verified signed GitHub release and exact SHA-256 hash.
+                JSONObject meta=fetchManifest();
+                if(meta==null){
+                    call.resolve(message(true,"No signed Android update is published yet."));
+                    return;
+                }
                 long nextCode=meta.getLong("versionCode"),bytes=meta.getLong("bytes");
                 String checksum=meta.getString("sha256"),version=meta.getString("versionName");
                 if(!getContext().getPackageName().equals(meta.getString("packageName"))||
