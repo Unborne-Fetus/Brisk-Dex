@@ -52,7 +52,21 @@ fi
 node tools/patch_android.mjs
 npx cap sync android
 chmod +x android/gradlew
-(cd android && ./gradlew --no-daemon assembleDebug)
+# Maven Central can throttle a fresh CI runner. Retry dependency failures
+# without hiding compiler/linker errors or rebuilding the game archive.
+(
+  cd android
+  for attempt in 1 2 3 4; do
+    if ./gradlew --no-daemon assembleDebug --max-workers=2 2>&1 | tee gradle-full-game.log; then
+      exit 0
+    fi
+    if ! grep -Eiq '429|Too Many Requests|503 Service Unavailable|Read timed out|Connection reset' gradle-full-game.log; then
+      exit 1
+    fi
+    if [[ "$attempt" == 4 ]]; then exit 1; fi
+    sleep "$((attempt * 45))"
+  done
+)
 
 apk="android/app/build/outputs/apk/debug/app-debug.apk"
 pin="$(python3 -c 'import json;print(json.load(open("tools/brisk-native-source.json"))["brisk_commit"])')"
