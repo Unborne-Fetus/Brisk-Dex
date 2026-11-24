@@ -80,7 +80,7 @@ if(BRISK_NATIVE_ANDROID_ARCHIVE)
     "-Wl,-z,defs"
     "-Wl,--no-undefined"
     "-Wl,--no-allow-shlib-undefined"
-    "-Wl,--error-limit=100")
+    "-Wl,--error-limit=0")
   target_link_libraries(briskgame PRIVATE
     "-Wl,--whole-archive"
     "${BRISK_NATIVE_ANDROID_ARCHIVE}"
