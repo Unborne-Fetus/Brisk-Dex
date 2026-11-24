@@ -76,7 +76,10 @@ if(BRISK_NATIVE_ANDROID_ARCHIVE)
   # static archives with placeholders or missing gameplay fail the final
   # ELF link rather than generating an apparently playable APK.
   add_library(briskgame SHARED $<TARGET_OBJECTS:briskgameadapter>)
+  set(BRISK_RESET_LAYOUT "${CMAKE_CURRENT_SOURCE_DIR}/game-reset-android.ld")
+  set_property(TARGET briskgame APPEND PROPERTY LINK_DEPENDS "${BRISK_RESET_LAYOUT}")
   target_link_options(briskgame PRIVATE
+    "-Wl,-T,${BRISK_RESET_LAYOUT}"
     "-Wl,-z,defs"
     "-Wl,--no-undefined"
     "-Wl,--no-allow-shlib-undefined"

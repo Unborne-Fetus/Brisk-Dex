@@ -210,6 +210,49 @@ def normalize_absolute_constants(argv):
           f"across {len(changes)} assembly objects; retained one global definition per constant.")
 
 
+
+def mark_game_reset_sections(argv):
+    """Mark mutable game objects, not host/JNI/SDL state, for crt0 reset.
+
+    Archive members lose their source directory names; use section names
+    instead of the desktop linker's path-based object matching. Preserve
+    relocation-bearing const data in RELRO and keep section attributes.
+    """
+    parser = argparse.ArgumentParser(description=mark_game_reset_sections.__doc__)
+    parser.add_argument("--objcopy", required=True)
+    parser.add_argument("objects", nargs="+", type=Path)
+    args = parser.parse_args(argv)
+    count = 0
+    for obj in dict.fromkeys(args.objects):
+        data = obj.read_bytes()
+        if data[:6] != b"\x7fELF\x02\x01" or struct.unpack_from("<H", data, 18)[0] != 183:
+            raise ValueError(f"Expected little-endian AArch64 ELF: {obj}")
+        shoff = struct.unpack_from("<Q", data, 40)[0]
+        entsize, num_sections, names_index = struct.unpack_from("<HHH", data, 58)
+        sections = [struct.unpack_from("<IIQQQQIIQQ", data, shoff+i*entsize)
+                    for i in range(num_sections)]
+        names = sections[names_index]
+        command = [args.objcopy]
+        for sec in sections:
+            if sec[2] & 3 != 3 or sec[2] & 0x400:  # allocated writable, not TLS
+                continue
+            start = names[4] + sec[0]
+            name = data[start:data.index(0, start)].decode()
+            if name.startswith(".data.rel.ro"):
+                continue
+            if name == ".data" or name.startswith(".data."):
+                new_name = ".brisk_game_data" + name[len(".data"):]
+            elif name == ".bss" or name.startswith(".bss."):
+                new_name = ".brisk_game_bss" + name[len(".bss"):]
+            else:
+                continue
+            command += ["--rename-section", name + "=" + new_name]
+        if len(command) > 1:
+            subprocess.run(command + [str(obj)], check=True)
+            count += 1
+    print(f"Marked mutable game reset sections in {count} ARM64 objects.")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument("--compiler", required=True)
@@ -237,5 +280,7 @@ def main():
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--normalize-absolute-constants":
         normalize_absolute_constants(sys.argv[2:])
+    elif len(sys.argv) > 1 and sys.argv[1] == "--mark-game-reset-sections":
+        mark_game_reset_sections(sys.argv[2:])
     else:
         main()
