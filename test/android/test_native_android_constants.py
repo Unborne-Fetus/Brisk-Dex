@@ -62,5 +62,40 @@ class AbsoluteConstantTests(unittest.TestCase):
                 ["nm", "--format=posix", str(obj)], text=True))
 
 
+    def test_song_relative_jump_and_relro_pointer_table(self):
+        if not shutil.which("llvm-objcopy"):
+            self.skipTest("requires LLVM objcopy for AArch64")
+        song_dir = self.root / "sound" / "songs" / "midi"
+        song_dir.mkdir(parents=True)
+        song_src = song_dir / "song.s"
+        song_src.write_text('.section .rodata,"a",%progbits\n'
+                            '.global song_header\nsong_header:\n'
+                            '.xword voicegroup\n.xword song_body\n'
+                            'song_body:\n.byte 0xb2\n.word song_body\n')
+        voice_src = self.root / "voice.s"
+        voice_src.write_text(".data\n.global voicegroup\nvoicegroup: .xword 0\n")
+        song, voice = song_src.with_suffix(".o"), voice_src.with_suffix(".o")
+        for source, obj in ((song_src, song), (voice_src, voice)):
+            subprocess.run(["clang", "--target=aarch64-linux-gnu", "-c",
+                            str(source), "-o", str(obj)], check=True)
+        link = ["ld.lld", "-shared", "-z", "defs", str(song), str(voice),
+                "-o", str(self.root / "game.so")]
+        before = subprocess.run(link, capture_output=True, text=True)
+        self.assertNotEqual(before.returncode, 0)
+        self.assertIn("R_AARCH64_ABS32", before.stderr)
+        self.assertIn("R_AARCH64_ABS64", before.stderr)
+        result = self.normalize(song)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Converted 1 packed song jumps", result.stdout)
+        subprocess.run(link, check=True)
+        if shutil.which("readelf"):
+            dynamic = subprocess.check_output(
+                ["readelf", "-dW", str(self.root / "game.so")], text=True)
+            self.assertNotIn("TEXTREL", dynamic)
+            sections = subprocess.check_output(
+                ["readelf", "-SW", str(self.root / "game.so")], text=True)
+            self.assertIn(".data.rel.ro", sections)
+
+
 if __name__ == "__main__":
     unittest.main()
