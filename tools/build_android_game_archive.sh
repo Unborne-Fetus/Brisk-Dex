@@ -48,6 +48,14 @@ fi
 if ! grep -Eq ' [TW] brisk_android_game_main$' "$checkout/build/android-arm64/native-symbols.txt" ||
    ! grep -Eq ' [TW] AgbMain$' "$checkout/build/android-arm64/native-symbols.txt"; then
   echo "Archive is incomplete: native game main or AgbMain is missing" >&2
+  echo "Entry-point candidates in compiled archive:" >&2
+  grep -E '[[:space:]](SDL_main|main|AgbMain|brisk_android_game_main)
+  exit 1
+fi
+echo "Full Brisk ARM64 archive ready: $archive"
+echo "Set BRISK_ANDROID_GAME_ARCHIVE to that path before APK packaging."
+ "$checkout/build/android-arm64/native-symbols.txt" >&2 || true
+  "$nm" --defined-only "$checkout/build/android-arm64/platform/main.o" >&2 || true
   exit 1
 fi
 echo "Full Brisk ARM64 archive ready: $archive"
