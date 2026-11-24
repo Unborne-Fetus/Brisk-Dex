@@ -155,6 +155,30 @@ bool input_brisk_active(void) { return true; }
         text = replace_once(text, original, changed, "Android " + label + " tagged pointer table")
         table.write_text(text)
 
+    # The Android assembler turns song-local 4-byte absolute pointers into
+    # signed PC-relative offsets. Keep bytecode width and pattern stack intact.
+    path = platform / "m4a" / "m4a_commands.c"
+    text = path.read_text()
+    text = replace_once(text,
+        '    track->cmdPtr = (u8 *)(uintptr_t)target;',
+        '#ifdef BRISK_ANDROID\n'
+        '    track->cmdPtr = (u8 *)((uintptr_t)arg + (intptr_t)(int32_t)target);\n'
+        '#else\n'
+        '    track->cmdPtr = (u8 *)(uintptr_t)target;\n'
+        '#endif', "Android relative song jumps")
+    path.write_text(text)
+    # Synthesized cry scripts use the same jump opcode as static song data.
+    path = root / "src" / "m4a.c"
+    text = path.read_text()
+    text = replace_once(text,
+        '    gPokemonCrySongs[i].gotoTarget = (u32)&gPokemonCrySongs[i].cont;',
+        '#ifdef BRISK_ANDROID\n'
+        '    gPokemonCrySongs[i].gotoTarget = (u32)((uintptr_t)&gPokemonCrySongs[i].cont - (uintptr_t)&gPokemonCrySongs[i].gotoTarget);\n'
+        '#else\n'
+        '    gPokemonCrySongs[i].gotoTarget = (u32)&gPokemonCrySongs[i].cont;\n'
+        '#endif', "Android relative dynamic cry jumps")
+    path.write_text(text)
+
     print("Installed Brisk Android callbacks, ARM64 jumps and ASLR-safe 64-bit command-table tags.")
 
 if __name__ == "__main__":
