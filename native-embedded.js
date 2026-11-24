@@ -140,21 +140,22 @@ class EmbeddedNativeGame{
       });
     }catch(error){return {ok:false,error:'Unable to start embedded native engine: '+error.message};}
     this.child=child;
+    this.frameDeadlineBase=Date.now();
     // A child that exits while a key is being sent can close stdin between
     // writable checks; never let EPIPE crash the companion app.
     child.stdin.on('error',error=>{
-      this.send('native-game-state',{running:false,message:'Native input pipe closed: '+error.message});
+      if(this.child===child)this.recordDiagnostic('Native input pipe closed',{error:error.message});
     });
     child.stdout.on('data',part=>{if(this.child===child)decoder.push(part);});
-    child.stderr.on('data',part=>{this.errorTail=(this.errorTail+part.toString('utf8')).slice(-1500);});
+    child.stderr.on('data',part=>{if(this.child===child)this.errorTail=(this.errorTail+part.toString('utf8')).slice(-1500);});
     // An unhandled error event on a child stdio stream would otherwise
     // terminate the entire Electron main process.
     for(const stream of [child.stdout,child.stderr]){
       stream.on('error',error=>{if(this.child===child)this.recordDiagnostic('Native game stream error',{error:error.message});});
     }
     this.diagnosticTimer=setInterval(()=>{
-      if(this.child===child&&!this.options.paused&&this.lastFrameTime&&Date.now()-this.lastFrameTime>12000)
-        this.recordDiagnostic('Game stopped producing video frames for more than 12 seconds');
+      if(this.child===child&&!this.options.paused&&Date.now()-Math.max(this.lastFrameTime,this.frameDeadlineBase)>12000)
+        this.recordDiagnostic(this.frameCount?'Game stopped producing video frames for more than 12 seconds':'Game failed to produce its first video frame within 12 seconds');
     },2000);
     this.diagnosticTimer.unref?.();
     child.on('exit',(code,signal)=>{
@@ -183,6 +184,7 @@ class EmbeddedNativeGame{
   }
   configure(options){
     if(!options||![0,1,2,3,4].includes(options.speed)||typeof options.paused!=='boolean'||typeof options.mute!=='boolean')return {ok:false,error:'Invalid game settings.'};
+    if(this.options.paused&&!options.paused){this.frameDeadlineBase=Date.now();this.blackSince=0;this.blackFrames=0;}
     this.options={speed:options.speed,paused:options.paused,mute:options.mute};
     this.writeInput();
     return this.child&&this.protocol<2?{ok:false,error:'Rebuild the native engine once to enable speed, pause and audio controls.'}:{ok:true};
