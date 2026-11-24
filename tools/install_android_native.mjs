@@ -48,25 +48,28 @@ const source=process.env.BRISK_ANDROID_SDL2_SOURCE
   ?path.resolve(process.env.BRISK_ANDROID_SDL2_SOURCE):null;
 const library=process.env.BRISK_ANDROID_SDL2_LIBRARY
   ?path.resolve(process.env.BRISK_ANDROID_SDL2_LIBRARY):null;
+// Regenerate our own Gradle arguments on every invocation. A reused checkout
+// may have an archive from a different build machine or a stale CMake cache.
+gradle=gradle.replace(/^\s*ndk \{ abiFilters "arm64-v8a" \}\r?\n(?=\s*externalNativeBuild \{ cmake \{ arguments [^\n]*BRISK_NATIVE_ANDROID_ARCHIVE)/gm,'\n');
+gradle=gradle.replace(/^\s*externalNativeBuild \{ cmake \{ arguments [^\n]*BRISK_NATIVE_ANDROID_ARCHIVE[^\n]*\}\s*\}\r?\n/gm,'\n');
 if(archive){
   if(path.extname(archive)!=='.a'||!(await fs.stat(archive)).isFile())
     throw new Error('A complete Android ARM64 game archive is required');
   if(Boolean(source)===Boolean(library))
     throw new Error('Specify exactly one Android SDL2 dependency for the full game');
-  if(!gradle.includes('BRISK_NATIVE_ANDROID_ARCHIVE')){
-    const args=[
-      '-DBRISK_NATIVE_ANDROID_ARCHIVE='+archive,
-      source?'-DBRISK_ANDROID_SDL2_SOURCE='+source:'-DBRISK_ANDROID_SDL2_LIBRARY='+library
-    ].map(value=>JSON.stringify(value.replaceAll('\\','/'))).join(', ');
-    const marker=/defaultConfig\s*\{/;
-    if(!marker.test(gradle))throw new Error('Missing Android defaultConfig');
-    gradle=gradle.replace(marker,value=>value+
-      '\n        ndk { abiFilters "arm64-v8a" }'+
-      '\n        externalNativeBuild { cmake { arguments '+args+' } }');
-  }
 }else if(source||library){
   throw new Error('Android SDL2 was configured without the native Brisk game archive');
 }
+const args=[
+  '-DBRISK_NATIVE_ANDROID_ARCHIVE='+(archive||''),
+  '-DBRISK_ANDROID_SDL2_SOURCE='+(source||''),
+  '-DBRISK_ANDROID_SDL2_LIBRARY='+(library||'')
+].map(value=>JSON.stringify(value.replaceAll('\\','/'))).join(', ');
+const marker=/defaultConfig\s*\{/;
+if(!marker.test(gradle))throw new Error('Missing Android defaultConfig');
+gradle=gradle.replace(marker,value=>value+
+  (archive?'\n        ndk { abiFilters "arm64-v8a" }':'')+
+  '\n        externalNativeBuild { cmake { arguments '+args+' } }');
 await fs.writeFile(gradleFile,gradle);
 
 const manifestFile=path.join(root,'android','app','src','main','AndroidManifest.xml');
