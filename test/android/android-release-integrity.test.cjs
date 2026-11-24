@@ -42,3 +42,12 @@ test('Android full game build never substitutes JNI transport for real game bina
   assert.match(workflow,/bash tools\/build_android_game_archive\.sh/);
   assert.match(workflow,/bash tools\/package_android_full_game\.sh/);
 });
+
+// SDL's Android main wrapper must not override the native core entry symbol.
+test('Android JNI game entry opts out of SDLActivity main rewriting',()=>{
+  const compiler=read('tools/android_compile_source.py');
+  assert.match(compiler, /"-DSDL_MAIN_HANDLED=1", "-Dmain=brisk_android_game_main"/);
+  const workflow=read('.github/workflows/build-android.yml');
+  assert.match(workflow,/bash tools\/build_android_game_archive\.sh/);
+  assert.match(workflow,/inspect_android_apk\.py[^\n]+--require-game/);
+});
