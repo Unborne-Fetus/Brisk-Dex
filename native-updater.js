@@ -32,9 +32,12 @@ function unpack(bytes,manifest){
   if(bytes.length!==manifest.bytes||sha256(bytes)!==manifest.sha256)throw new Error('Update download checksum failed.');
   const payload=JSON.parse(gunzipSync(bytes,{maxOutputLength:MAX_EXPANDED}).toString('utf8'));
   if(payload.format!=='brisk-runtime'||payload.api!==1||payload.platform!==manifest.platform||payload.arch!==manifest.arch||!Array.isArray(payload.files)||payload.files.length>40000)throw new Error('Invalid runtime package.');
-  const seen=new Set(),files=[];let total=0;
+  const seen=new Set(),canonicalPaths=new Set(),files=[];let total=0;
   for(const item of payload.files){
     if(!item||!safePath(item.path)||seen.has(item.path)||!shaPattern.test(item.sha256)||typeof item.data!=='string'||![0o644,0o755].includes(item.mode))throw new Error('Unsafe update file.');
+    const canonical=manifest.platform==='win32'?item.path.toLowerCase():item.path;
+    if(canonicalPaths.has(canonical))throw new Error('Conflicting update file paths.');
+    canonicalPaths.add(canonical);
     const data=Buffer.from(item.data,'base64');total+=data.length;
     if(total>MAX_EXPANDED||data.toString('base64')!==item.data||sha256(data)!==item.sha256)throw new Error('An update file is damaged.');
     seen.add(item.path);files.push({...item,data});
@@ -84,7 +87,7 @@ class NativeUpdater{
   async activate(){
     if(this.busy)throw new Error('Wait for the update download to finish.');
     const state=await this.state();if(!state.pending)throw new Error('No downloaded update is ready.');
-    state.previous=state.current;state.current=state.pending;state.pending=null;state.unconfirmed=true;
+    state.previous=state.current;state.current=state.pending;state.pending=null;state.unconfirmed=true;state.launchAttempt=false;
     await atomic(path.join(this.root,'state.json'),JSON.stringify(state));
   }
   async prune(){
@@ -96,7 +99,7 @@ class NativeUpdater{
   async confirm(){const state=await this.state();if(state.unconfirmed||state.launchAttempt){state.unconfirmed=false;state.launchAttempt=false;await atomic(path.join(this.root,'state.json'),JSON.stringify(state));}await this.prune();}
   async rollback(){
     if(this.busy)throw new Error('Wait for the update download to finish.');
-    const state=await this.state();state.skippedSequence=Math.max(state.skippedSequence||0,state.current?.sequence||0);state.current=state.previous;state.previous=null;state.pending=null;state.unconfirmed=false;
+    const state=await this.state();state.skippedSequence=Math.max(state.skippedSequence||0,state.current?.sequence||0);state.current=state.previous;state.previous=null;state.pending=null;state.unconfirmed=false;state.launchAttempt=false;
     await atomic(path.join(this.root,'state.json'),JSON.stringify(state));
     await this.prune();
   }
