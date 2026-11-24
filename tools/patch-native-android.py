@@ -179,6 +179,92 @@ bool input_brisk_active(void) { return true; }
         '#endif', "Android relative dynamic cry jumps")
     path.write_text(text)
 
+    # A keysplit pointer lives in the four envelope bytes of ToneData plus
+    # four existing tail-padding bytes. Give the high half an explicit C
+    # field so struct assignment (ply_voice) copies the complete pointer.
+    path = root / "include" / "gba" / "m4a_internal.h"
+    text = path.read_text()
+    text = replace_once(text,
+        '    u8 release;\n};\n\n#define SOUND_CHANNEL_SF_START',
+        '    u8 release;\n#ifdef BRISK_ANDROID\n    u32 keysplitHigh;\n#endif\n};\n\n#define SOUND_CHANNEL_SF_START',
+        "Android keysplit high pointer word")
+    path.write_text(text)
+    path = root / "asm" / "macros" / "music_voice.inc"
+    text = path.read_text()
+    text = replace_once(text,
+        '	.4byte \\keysplit_table_pointer  @ read as attack..release, four bytes\n	.space 4  @ Padding',
+        '	.ifdef BRISK_ANDROID_ASM\n	.8byte \\keysplit_table_pointer\n	.else\n	.4byte \\keysplit_table_pointer  @ read as attack..release, four bytes\n	.space 4  @ Padding\n	.endif',
+        "Android full keysplit pointer")
+    path.write_text(text)
+    path = platform / "m4a" / "m4a_note.c"
+    text = path.read_text()
+    text = replace_once(text,
+        '    return (const u8 *)(uintptr_t)address;',
+        '#ifdef BRISK_ANDROID\n    return (const u8 *)((uintptr_t)address | ((uintptr_t)tone->keysplitHigh << 32));\n#else\n    return (const u8 *)(uintptr_t)address;\n#endif',
+        "Android keysplit pointer decoding")
+    path.write_text(text)
+
+    # Field-effect bytecode is not stored in saves or sent over link cable.
+    # Widen its packed pointer operands and read them byte-by-byte on ARM64.
+    path = root / "asm" / "macros" / "field_effect_script.inc"
+    text = path.read_text()
+    import re
+    text = re.sub(r'^(\s*)\.4byte (\\\w+)$',
+                  lambda m: m[1] + '.ifdef BRISK_ANDROID_ASM\n\t.8byte ' + m[2] +
+                  '\n\t.else\n\t.4byte ' + m[2] + '\n\t.endif', text, flags=re.M)
+    path.write_text(text)
+    path = root / "src" / "field_effect.c"
+    text = path.read_text()
+    text = replace_once(text,
+        'u32 FieldEffectScript_ReadWord(u8 **script)\n{\n    return (*script)[0]\n         + ((*script)[1] << 8)\n         + ((*script)[2] << 16)\n         + ((*script)[3] << 24);\n}',
+        '#ifdef BRISK_ANDROID\n#define FIELD_EFFECT_POINTER_BYTES 8\nstatic uintptr_t FieldEffectScript_ReadWord(u8 **script)\n{\n    uintptr_t value = 0;\n    for (unsigned i = 0; i < FIELD_EFFECT_POINTER_BYTES; i++)\n        value |= (uintptr_t)(*script)[i] << (8 * i);\n    return value;\n}\n#else\n#define FIELD_EFFECT_POINTER_BYTES 4\nu32 FieldEffectScript_ReadWord(u8 **script)\n{\n    return (*script)[0]\n         + ((*script)[1] << 8)\n         + ((*script)[2] << 16)\n         + ((*script)[3] << 24);\n}\n#endif',
+        "Android field effect pointer decoding")
+    start = text.index('void FieldEffectScript_LoadTiles(u8 **script)\n{')
+    end = text.index('void FieldEffectFreeGraphicsResources(', start)
+    part = text[start:end].replace('(*script) += 4;', '(*script) += FIELD_EFFECT_POINTER_BYTES;')
+    part = part.replace('    u32 ptr = FieldEffectScript_ReadWord(&script);\n    if (ptr == (u32)FldEff_TallGrass)',
+                        '    uintptr_t ptr = FieldEffectScript_ReadWord(&script);\n    if (ptr == (uintptr_t)FldEff_TallGrass)')
+    text = text[:start] + part + text[end:]
+    path.write_text(text)
+
+    # Specials are numeric indices, not 16-bit pointers. Define their values
+    # locally even in gift scripts, where the actual dispatch table is absent.
+    path = root / "data" / "specials.inc"
+    text = path.read_text()
+    text = replace_once(text, '.if ALLOCATE_SPECIAL_TABLE\n\t.global SPECIAL_\\ptr',
+        '.ifdef BRISK_ANDROID_ASM\n\t.set SPECIAL_\\ptr, __special__\n.endif\n.if ALLOCATE_SPECIAL_TABLE\n\t.global SPECIAL_\\ptr',
+        "Android local special indices")
+    path.write_text(text)
+
+    # Mystery Gift virtual addresses must survive copying scripts into saves.
+    # Encode offsets from a common origin, not from individual operands.
+    path = root / "data" / "mystery_gift.s"
+    text = path.read_text()
+    text = replace_once(text, '\t.section .rodata\n',
+        '\t.section .rodata\n#ifdef BRISK_ANDROID\nBriskGiftVirtualBase:\n#endif\n',
+        "Android gift virtual origin")
+    path.write_text(text)
+    path = root / "asm" / "macros" / "event.inc"
+    text = path.read_text()
+    def gift_virtual(match):
+        body = match.group(0)
+        return re.sub(r'^(\s*)\.4byte (\\\w+)$',
+                      lambda m: m[1] + '.ifdef BRISK_ANDROID_GIFT\n\t.4byte ' + m[2] +
+                      ' - BriskGiftVirtualBase\n\t.else\n\t.4byte ' + m[2] +
+                      '\n\t.endif', body, flags=re.M)
+    text = re.sub(r'(?m)^\s*\.macro (?:setvaddress|vgoto|vcall|vgoto_if|vcall_if|vmessage|vbuffermessage|vbufferstring)\b[^\n]*\n[\s\S]*?^\s*\.endm',
+                  gift_virtual, text)
+    path.write_text(text)
+    path = root / "data" / "mystery_gift.s"
+    text = path.read_text().replace('BriskGiftVirtualBase:', '\t.set BRISK_ANDROID_GIFT, 1\nBriskGiftVirtualBase:')
+    path.write_text(text)
+    path = root / "src" / "scrcmd.c"
+    text = path.read_text()
+    # Virtual address arithmetic must retain the entire host pointer.
+    text = text.replace('static EWRAM_DATA u32 sAddressOffset', 'static EWRAM_DATA uintptr_t sAddressOffset')
+    text = text.replace('u32 addr1 = (u32)ctx->scriptPtr - 1;', 'uintptr_t addr1 = (uintptr_t)ctx->scriptPtr - 1;')
+    path.write_text(text)
+
     print("Installed Brisk Android callbacks, ARM64 jumps and ASLR-safe 64-bit command-table tags.")
 
 if __name__ == "__main__":
