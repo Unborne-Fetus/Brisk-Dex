@@ -75,6 +75,9 @@ def resolve_conflicts(name, data):
         return None  # use Brisk's complete README below
     strategies = {
         '.gitignore': 'both', 'data/scripts/debug.inc': 'both',
+        # Reviewed: Brisk changes __APPLE__ guards to __linux__ in the test
+        # runner; native already uses __linux__ and adds ELF64 support.
+        'tools/mgba-rom-test-hydra/main.c': 'native',
         'src/battle_setup.c': 'native', 'src/m4a.c': 'brisk',
         'src/save.c': 'brisk', 'src/battle_util.c': 'stab',
         'src/data/abilities.h': 'abilities',
