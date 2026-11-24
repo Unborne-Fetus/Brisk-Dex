@@ -15,6 +15,8 @@ TEST := 0
 SANITIZE := 0
 ANDROID_CC ?= aarch64-linux-android26-clang
 ANDROID_AR ?= llvm-ar
+ANDROID_NM ?= $(patsubst %llvm-ar,%llvm-nm,$(ANDROID_AR))
+ANDROID_OBJCOPY ?= $(patsubst %llvm-ar,%llvm-objcopy,$(ANDROID_AR))
 SDL_INCLUDE ?= /tmp/brisk-sdl2/include
 OBJ_DIR ?= build/android-arm64
 TARGET_CC := $(ANDROID_CC)
@@ -76,6 +78,9 @@ android-port-pilot: $(OBJ_DIR)/src/main.o $(OBJ_DIR)/platform/gba_memmap.o \
 # Android platform object is compiled. If any fail, no library is emitted.
 android-game-archive: objects $(ANDROID_PLATFORM_OBJS)
 	@mkdir -p $(dir $(ANDROID_ARCHIVE))
+	python3 tools/android_assemble.py --normalize-absolute-constants \
+	    --nm $(ANDROID_NM) --objcopy $(ANDROID_OBJCOPY) $(DATA_ASM_OBJS) $(MID_OBJS)
+	$(RM) $(ANDROID_ARCHIVE)
 	$(ANDROID_AR) rcs $(ANDROID_ARCHIVE) $(OBJS) $(ANDROID_PLATFORM_OBJS)
 	@echo "Complete ARM64 game object archive: $(ANDROID_ARCHIVE)"
 	@echo "Must still pass the strict Android PIE shared-library link and gameplay tests."
