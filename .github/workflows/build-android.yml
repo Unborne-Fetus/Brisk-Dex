@@ -194,9 +194,14 @@ jobs:
           cd android
           set -o pipefail
           for attempt in 1 2 3; do
-            if ./gradlew assembleDebug --max-workers=2 2>&1 | tee gradle-ci.log; then
+            if ./gradlew assembleDebug --max-workers=2 > gradle-ci.log 2>&1; then
+              tail -n 80 gradle-ci.log
               exit 0
             fi
+            echo "::group::Gradle failure summary"
+            grep -Ei 'ld.lld: error:|undefined symbol|relocation|fatal error:|^FAILURE:|^\* What went wrong:|^> Task .*FAILED' gradle-ci.log | cut -c1-1500 | sort -u | head -n 300 || true
+            tail -n 80 gradle-ci.log | cut -c1-1500
+            echo "::endgroup::"
             if ! grep -Eiq '429|Too Many Requests|503 Service Unavailable|Read timed out' gradle-ci.log; then
               echo "::error::Gradle failed for a non-network reason; see the compiler log."
               exit 1
@@ -208,6 +213,15 @@ jobs:
             echo "::warning::Gradle dependency service throttled the build; retrying after a short backoff."
             sleep $((attempt * 30))
           done
+
+      - name: Upload Gradle failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: android-gradle-failure
+          path: android/gradle-ci.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Rename APK
         run: cp android/app/build/outputs/apk/debug/app-debug.apk Brisk-Dex-Android.apk
