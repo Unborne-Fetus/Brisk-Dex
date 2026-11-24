@@ -214,7 +214,7 @@ jobs:
           if-no-files-found: error
 
   publish-preview:
-    name: Publish validated Android preview APK
+    name: Publish clearly labeled Android companion preview
     needs: build
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
@@ -237,7 +237,7 @@ jobs:
           tag="android-preview-${GITHUB_RUN_NUMBER}"
           gh release create "$tag" release/Brisk-Dex-Android.apk release/android-game-status.json \
             --target "$GITHUB_SHA" \
-            --title "Brisk Dex Android preview ${GITHUB_RUN_NUMBER} (crash-fix testing)" \
+            --title "Brisk Dex Android companion preview ${GITHUB_RUN_NUMBER} (no native game)" \
             --notes "Automated Android APK from a successful CI build, revision ${GITHUB_SHA}. Includes tests for native trainer script handling. PREVIEW: the native game still requires device testing for follower battles, May's post-battle script, and Rock Slide. Check the included android-game-status.json to see whether full native gameplay is present; standard previews are transport-only. This is a preview APK. In-app updates are published separately only when CI has the matching trusted signing key and confirms a newer version. In-place installation of previews may fail due to certificate differences. Back up your saved games before reinstalling." \
             --prerelease
 
