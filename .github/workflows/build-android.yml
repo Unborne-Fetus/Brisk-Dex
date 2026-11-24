@@ -1,5 +1,5 @@
 # Latest Brisk Dex Android build - trainer/location cleanup
-name: Build Android APK
+name: Build integrated Android APK
 
 on:
   workflow_dispatch:
@@ -27,6 +27,10 @@ on:
       - "brisk-dex-sprites/**"
       - "brisk-dex-trainer-pics/**"
       - "brisk-dex-items/**"
+      - "tools/**android*"
+      - "tools/Makefile.android"
+      - "tools/brisk-native-source.json"
+      - "tools/prepare_brisk_native.py"
       - "tools/prepare_android.mjs"
       - "tools/set_android_version.mjs"
       - "android/**"
@@ -40,7 +44,7 @@ jobs:
       channel_signing: ${{ steps.signing.outputs.channel_signing }}
       game_integrated: ${{ steps.game.outputs.game_integrated }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 110
 
     steps:
       - name: Checkout
@@ -75,7 +79,39 @@ jobs:
           test -f android/app/build.gradle
           test -f android/gradlew
 
-      - name: Patch native Android file picker
+      - name: Install native compiler and asset tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential git python3 pkg-config curl clang gcc-multilib libc6-dev-i386 libpng-dev libsdl2-dev binutils-aarch64-linux-gnu
+
+      - name: Install pinned Android NDK and CMake
+        run: |
+          set -euo pipefail
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          test -d "$sdk"
+          sdkmanager=""
+          for candidate in "$sdk"/cmdline-tools/*/bin/sdkmanager; do
+            if [ -x "$candidate" ]; then sdkmanager="$candidate"; break; fi
+          done
+          test -n "$sdkmanager"
+          yes | "$sdkmanager" --licenses >/dev/null || true
+          "$sdkmanager" 'ndk;27.2.12479018' 'cmake;3.22.1'
+          echo "ANDROID_HOME=$sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$sdk" >> "$GITHUB_ENV"
+
+      - name: Checkout matching SDL2 and compile the real ARM64 game
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch release-2.30.12 https://github.com/libsdl-org/SDL.git "$RUNNER_TEMP/brisk-android-sdl2"
+          export BRISK_ANDROID_SDL2_SOURCE="$RUNNER_TEMP/brisk-android-sdl2"
+          export BRISK_ANDROID_JOBS=2
+          bash tools/build_android_game_archive.sh
+          archive="$GITHUB_WORKSPACE/native-src/brisk-emerald-native-android/build/android-arm64/libbrisk-game-arm64.a"
+          test -s "$archive"
+          echo "BRISK_ANDROID_GAME_ARCHIVE=$archive" >> "$GITHUB_ENV"
+          echo "BRISK_ANDROID_SDL2_SOURCE=$BRISK_ANDROID_SDL2_SOURCE" >> "$GITHUB_ENV"
+
+      - name: Patch native Android integration with the full game
         run: node tools/patch_android.mjs
 
       - name: Sync Capacitor plugins and assets
@@ -193,7 +229,7 @@ jobs:
         shell: bash
         run: |
           pin="$(python3 -c 'import json;print(json.load(open("tools/brisk-native-source.json"))["brisk_commit"])')"
-          python3 tools/inspect_android_apk.py Brisk-Dex-Android.apk --expected-commit "$pin" --output android-game-status.json
+          python3 tools/inspect_android_apk.py Brisk-Dex-Android.apk --expected-commit "$pin" --require-game --output android-game-status.json
           python3 - <<'PY'
           import json,os
           with open('android-game-status.json') as src:
@@ -203,7 +239,8 @@ jobs:
               out.write('game_integrated='+str(report['game_integrated']).lower()+'\n')
           PY
 
-      - name: Upload APK and verified manifest
+      - name: Upload APK and verified manifest (authorized redistribution only)
+        if: vars.BRISK_ANDROID_DISTRIBUTION_APPROVED == 'true'
         uses: actions/upload-artifact@v6
         with:
           name: Brisk-Dex-Android
@@ -214,9 +251,9 @@ jobs:
           if-no-files-found: error
 
   publish-preview:
-    name: Publish clearly labeled Android companion preview
+    name: Publish verified integrated Android preview
     needs: build
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && needs.build.outputs.game_integrated == 'true' && vars.BRISK_ANDROID_DISTRIBUTION_APPROVED == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -237,14 +274,14 @@ jobs:
           tag="android-preview-${GITHUB_RUN_NUMBER}"
           gh release create "$tag" release/Brisk-Dex-Android.apk release/android-game-status.json \
             --target "$GITHUB_SHA" \
-            --title "Brisk Dex Android companion preview ${GITHUB_RUN_NUMBER} (no native game)" \
-            --notes "Automated Android APK from a successful CI build, revision ${GITHUB_SHA}. Includes tests for native trainer script handling. PREVIEW: the native game still requires device testing for follower battles, May's post-battle script, and Rock Slide. Check the included android-game-status.json to see whether full native gameplay is present; standard previews are transport-only. This is a preview APK. In-app updates are published separately only when CI has the matching trusted signing key and confirms a newer version. In-place installation of previews may fail due to certificate differences. Back up your saved games before reinstalling." \
+            --title "Brisk Emerald integrated Android preview ${GITHUB_RUN_NUMBER}" \
+            --notes "Automated Android APK from a successful CI build, revision ${GITHUB_SHA}. Includes tests for native trainer script handling. PREVIEW: the native game still requires device testing for follower battles, May's post-battle script, and Rock Slide. The APK was verified to contain the real ARM64 game library. Runtime and save testing are still required. This is a preview APK. In-app updates are published separately only when CI has the matching trusted signing key and confirms a newer version. In-place installation of previews may fail due to certificate differences. Back up your saved games before reinstalling." \
             --prerelease
 
   publish-channel:
     name: Publish only compatible in-app update
     needs: build
-    if: github.ref == 'refs/heads/main' && needs.build.outputs.channel_signing == 'true' && needs.build.outputs.game_integrated == 'true'
+    if: github.ref == 'refs/heads/main' && needs.build.outputs.channel_signing == 'true' && needs.build.outputs.game_integrated == 'true' && vars.BRISK_ANDROID_DISTRIBUTION_APPROVED == 'true' && vars.BRISK_ANDROID_DEVICE_TESTS_APPROVED == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
