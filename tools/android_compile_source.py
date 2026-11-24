@@ -45,7 +45,9 @@ def main():
             "-idirafter", "include",
         ]
         if args.rename_main:
-            compiler_args.append("-Dmain=brisk_android_game_main")
+            # SDL_main.h otherwise redefines main to SDL_main on Android.
+            # This core is invoked by JNI, not SDLActivity.
+            compiler_args += ["-DSDL_MAIN_HANDLED=1", "-Dmain=brisk_android_game_main"]
     elif args.rename_main:
         parser.error("--rename-main is only valid with --platform")
     llvm = run(compiler_args + ["-x", "c", str(src), "-o", "-"]).decode("utf-8")
