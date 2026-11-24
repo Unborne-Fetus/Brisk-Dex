@@ -1,6 +1,10 @@
 # Latest Brisk Dex Android build - trainer/location cleanup
 name: Build integrated Android APK
 
+concurrency:
+  group: brisk-integrated-android-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
   push:
@@ -54,6 +58,7 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: "22"
+          cache: npm
 
       - name: Set up Java
         uses: actions/setup-java@v5
@@ -65,7 +70,22 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Install dependencies
-        run: npm ci
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if npm ci --prefer-offline --fetch-retries=4 2>&1 | tee npm-ci.log; then
+              exit 0
+            fi
+            if ! grep -Eiq 'ECONNRESET|ETIMEDOUT|EAI_AGAIN|E429|E503' npm-ci.log || [ "$attempt" = 3 ]; then
+              exit 1
+            fi
+            sleep "$((attempt * 20))"
+          done
+      - name: Verify native shell scripts before compiling
+        run: |
+          bash -n tools/build_android_game_archive.sh
+          bash -n tools/package_android_full_game.sh
 
       - name: Test Android native trainer-script decoding and safety guards
         run: python3 -m unittest discover -s test/android -p 'test_native_*.py' -v
