@@ -95,7 +95,7 @@ jobs:
           if-no-files-found: error
 
   android:
-    name: Android APK
+    name: Android companion APK (no native game)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -146,11 +146,11 @@ jobs:
             echo "::warning::Gradle dependency service throttled the build; retrying after a short backoff."
             sleep $((attempt * 30))
           done
-      - name: Rename APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk Pokemon-Brisk-Emerald-Android.apk
+      - name: Rename companion-only APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk Brisk-Dex-Android-Companion.apk
       - name: Upload APK
         uses: actions/upload-artifact@v6
         with:
-          name: Pokemon-Brisk-Emerald-Android
-          path: Pokemon-Brisk-Emerald-Android.apk
+          name: Brisk-Dex-Android-Companion
+          path: Brisk-Dex-Android-Companion.apk
           if-no-files-found: error
