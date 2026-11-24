@@ -2,6 +2,8 @@
 # Build the REAL pinned Brisk Emerald C source for Android ARM64.
 # Produces a full native .a; never creates a dummy libbriskgame.so.
 set -euo pipefail
+# Reject broken shell syntax before fetching sources or compiling assets.
+bash -n "$0"
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
 : "${sdk:?Set ANDROID_HOME or ANDROID_SDK_ROOT to an installed Android SDK}"
@@ -44,17 +46,13 @@ if [ ! -s "$archive" ]; then
   exit 1
 fi
 "$ar" t "$archive" >/dev/null
-"$nm" --defined-only "$archive" > "$checkout/build/android-arm64/native-symbols.txt"
-if ! grep -Eq ' [TW] brisk_android_game_main$' "$checkout/build/android-arm64/native-symbols.txt" ||
-   ! grep -Eq ' [TW] AgbMain$' "$checkout/build/android-arm64/native-symbols.txt"; then
+symbols="$checkout/build/android-arm64/native-symbols.txt"
+"$nm" --defined-only "$archive" > "$symbols"
+if ! grep -Eq ' [TW] brisk_android_game_main$' "$symbols" ||
+   ! grep -Eq ' [TW] AgbMain$' "$symbols"; then
   echo "Archive is incomplete: native game main or AgbMain is missing" >&2
   echo "Entry-point candidates in compiled archive:" >&2
-  grep -E '[[:space:]](SDL_main|main|AgbMain|brisk_android_game_main)
-  exit 1
-fi
-echo "Full Brisk ARM64 archive ready: $archive"
-echo "Set BRISK_ANDROID_GAME_ARCHIVE to that path before APK packaging."
- "$checkout/build/android-arm64/native-symbols.txt" >&2 || true
+  grep -E '[[:space:]](SDL_main|main|AgbMain|brisk_android_game_main)$' "$symbols" >&2 || true
   "$nm" --defined-only "$checkout/build/android-arm64/platform/main.o" >&2 || true
   exit 1
 fi
