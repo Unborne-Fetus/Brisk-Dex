@@ -265,7 +265,81 @@ bool input_brisk_active(void) { return true; }
     text = text.replace('u32 addr1 = (u32)ctx->scriptPtr - 1;', 'uintptr_t addr1 = (uintptr_t)ctx->scriptPtr - 1;')
     path.write_text(text)
 
-    print("Installed Brisk Android callbacks, ARM64 jumps and ASLR-safe 64-bit command-table tags.")
+
+    # The packed bytecode still occupies four bytes per operand. Only
+    # pointer consumers decode the tagged table indexes; ordinary words
+    # and virtual Mystery Gift offsets retain their numeric interpretation.
+    path = root / "include" / "global.h"
+    text = path.read_text()
+    anchor = "#define T1_READ_PTR(ptr) (u8 *) T1_READ_32(ptr)"
+    decoder = """#ifdef BRISK_ANDROID
+#include <stdint.h>
+extern const uintptr_t brisk_android_pointer_table[];
+extern const uintptr_t brisk_android_pointer_count;
+static inline uintptr_t BriskDecodePackedPointer(uint32_t word)
+{
+    if ((word & UINT32_C(0xf0000000)) == UINT32_C(0xf0000000))
+    {
+        uint32_t index = word & UINT32_C(0x0fffffff);
+        return index < brisk_android_pointer_count ? brisk_android_pointer_table[index] : 0;
+    }
+    return (uintptr_t)word;
+}
+#define BRISK_DECODE_PACKED_PTR(word) BriskDecodePackedPointer((uint32_t)(word))
+#else
+#define BRISK_DECODE_PACKED_PTR(word) (word)
+#endif
+#define T1_READ_PTR(ptr) (u8 *) BRISK_DECODE_PACKED_PTR(T1_READ_32(ptr))"""
+    text = replace_once(text, anchor, decoder, "Android packed script decoder")
+    text = replace_once(text, "#define T2_READ_PTR(ptr) (void *) T2_READ_32(ptr)",
+                        "#define T2_READ_PTR(ptr) (void *) BRISK_DECODE_PACKED_PTR(T2_READ_32(ptr))",
+                        "Android packed script pointer macro")
+    # Read the high byte as unsigned to avoid signed-shift UB for token tags.
+    text = text.replace("((ptr)[3] << 24)", "((u32)(ptr)[3] << 24)")
+    path.write_text(text)
+
+    path = root / "src" / "scrcmd.c"
+    text = path.read_text()
+    # Explicit casts are pointer operands. Do not change numeric ScriptReadWord
+    # calls or the saved-script virtual-address expressions.
+    text, casts = re.subn(
+        r"(\((?:(?:const\s+)?(?:u8|void)\s*\*|NativeFunc|bool8\s*\(\*\)\(void\))\))\s*ScriptReadWord\(ctx\)",
+        r"\1BRISK_DECODE_PACKED_PTR(ScriptReadWord(ctx))", text)
+    if casts < 20:
+        raise RuntimeError(f"Android event pointer reader mismatch ({casts})")
+    text = re.sub(r"(\((?:const\s+)?u8\s*\*\))ctx->data\[0\]",
+                  r"\1BRISK_DECODE_PACKED_PTR(ctx->data[0])", text)
+    path.write_text(text)
+
+    path = root / "src" / "battle_anim.c"
+    text = path.read_text()
+    text = text.replace("T2_READ_32(sBattleAnimScriptPtr)",
+                        "BRISK_DECODE_PACKED_PTR(T2_READ_32(sBattleAnimScriptPtr))")
+    path.write_text(text)
+
+    path = root / "src" / "battle_setup.c"
+    text = path.read_text()
+    text = replace_once(text,
+        "    const uintptr_t low = (uintptr_t)NativeTrainerReadU32(src);",
+        "#ifdef BRISK_ANDROID\n    return (u8 *)BRISK_DECODE_PACKED_PTR(NativeTrainerReadU32(src));\n#else\n"
+        "    const uintptr_t low = (uintptr_t)NativeTrainerReadU32(src);",
+        "Android trainer packed pointer")
+    text = replace_once(text, "    return (u8 *)value;\n}\nstatic TrainerBattleParameter NativeDecode",
+                        "    return (u8 *)value;\n#endif\n}\nstatic TrainerBattleParameter NativeDecode",
+                        "Android trainer pointer fallback")
+    path.write_text(text)
+
+    # Music player counts are numeric linker constants in the non-PIE port.
+    # An Android shared object must not derive these numbers from GOT pointers.
+    path = root / "include" / "gba" / "m4a_internal.h"
+    text = path.read_text()
+    text = replace_once(text, "#define NUM_MUSIC_PLAYERS ((u16)gNumMusicPlayers)\n#define MAX_LINES ((u32)gMaxLines)",
+        "#ifdef BRISK_ANDROID\n#define NUM_MUSIC_PLAYERS 4\n#define MAX_LINES 0\n#else\n"
+        "#define NUM_MUSIC_PLAYERS ((u16)gNumMusicPlayers)\n#define MAX_LINES ((u32)gMaxLines)\n#endif",
+        "Android music counts")
+    path.write_text(text)
+
+    print("Installed Brisk Android callbacks, ARM64 jumps and ASLR-safe packed script pointers.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)

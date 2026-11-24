@@ -80,6 +80,10 @@ if(BRISK_NATIVE_ANDROID_ARCHIVE)
     "-Wl,-z,defs"
     "-Wl,--no-undefined"
     "-Wl,--no-allow-shlib-undefined"
+    "-Wl,--defsym,PlatformAllocationSiteBase=__ehdr_start"
+    "-Wl,--defsym,gInitialMainCB2=CB2_InitCopyrightScreenAfterBootup"
+    "-Wl,--defsym,__rom_end=0x08000000"
+    "-Wl,--defsym,__iwram_end=0x03008000"
     "-Wl,--error-limit=0")
   target_link_libraries(briskgame PRIVATE
     "-Wl,--whole-archive"

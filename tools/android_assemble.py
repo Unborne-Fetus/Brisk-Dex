@@ -74,6 +74,91 @@ def relocate_assembly_data(obj, objcopy):
     return changed, len(rename)
 
 
+
+def encode_packed_pointers(objects, absolute_values, objcopy, table):
+    """Keep four-byte script fields; give every symbolic address an ASLR-safe
+    token whose actual pointer is relocated in a separate RELRO table.
+    Local section symbols receive unique global aliases without changing the
+    original symbol's visibility. Numeric enum relocations stay numeric.
+    """
+    entries = {}
+    for number, obj in enumerate(objects):
+        data = bytearray(obj.read_bytes())
+        if data[:6] != b"\x7fELF\x02\x01" or struct.unpack_from("<H", data, 18)[0] != 183:
+            raise ValueError(f"Expected little-endian AArch64 ELF: {obj}")
+        shoff = struct.unpack_from("<Q", data, 40)[0]
+        entsize, count, names_index = struct.unpack_from("<HHH", data, 58)
+        sections = [struct.unpack_from("<IIQQQQIIQQ", data, shoff+i*entsize)
+                    for i in range(count)]
+        def string(section, index):
+            start = section[4] + index
+            return data[start:data.index(0, start)].decode()
+        aliases = {}
+        changed = False
+        for rel in sections:
+            if rel[1] != 4:
+                continue
+            target = sections[rel[7]]
+            symtab = sections[rel[6]]
+            strings = sections[symtab[6]]
+            for at in range(rel[4], rel[4]+rel[5], rel[9]):
+                offset, info, addend = struct.unpack_from("<QQq", data, at)
+                kind, sym = info & 0xffffffff, info >> 32
+                if kind not in (258, 259):
+                    continue
+                name_idx, binding, _, shndx, value, _ = struct.unpack_from(
+                    "<IBBHQQ", data, symtab[4] + sym*symtab[9])
+                name = string(strings, name_idx)
+                width = 4 if kind == 258 else 2
+                if shndx == 0xfff1 or (binding >> 4 and name in absolute_values):
+                    value = (value if shndx == 0xfff1 else absolute_values[name]) + addend
+                    if not -(1 << (width*8-1)) <= value < (1 << (width*8)):
+                        raise ValueError(f"Numeric relocation overflow: {obj}:{name}")
+                else:
+                    if width != 4:
+                        raise ValueError(f"Unsupported 16-bit address: {obj}:{name}")
+                    if "songs" in obj.parts and "sound" in obj.parts:
+                        raise ValueError(f"Unexpected nonlocal packed music jump: {obj}:{name}")
+                    if binding >> 4 and name:
+                        symbol, displacement = name, addend
+                    elif 0 < shndx < count:
+                        section_name = string(sections[names_index], sections[shndx][0])
+                        if shndx not in aliases:
+                            aliases[shndx] = (f"brisk_packed_section_{number}_{shndx}", section_name)
+                        symbol, displacement = aliases[shndx][0], value + addend
+                    else:
+                        raise ValueError(f"Unsupported packed pointer: {obj}:{name}")
+                    key = (symbol, displacement)
+                    index = entries.setdefault(key, len(entries))
+                    if index >= 0x10000000:
+                        raise ValueError("Packed pointer table exhausted")
+                    value = 0xf0000000 | index
+                if target[1] == 8 or offset + width > target[5]:
+                    raise ValueError(f"Packed relocation outside initialized data: {obj}:{name}")
+                data[target[4]+offset:target[4]+offset+width] = (
+                    value & ((1 << (width*8))-1)).to_bytes(width, "little")
+                # R_AARCH64_NONE, with no symbol or addend: the operand is now complete.
+                struct.pack_into("<QQq", data, at, offset, 0, 0)
+                changed = True
+        if changed:
+            obj.write_bytes(data)
+        if aliases:
+            command = [objcopy]
+            for alias, section in aliases.values():
+                command += ["--add-symbol", f"{alias}={section}:0,global"]
+            subprocess.run(command + [str(obj)], check=True)
+    lines = ['.section .data.rel.ro.brisk_packed,"aw",%progbits', '.balign 8',
+             '.global brisk_android_pointer_table', '.hidden brisk_android_pointer_table',
+             'brisk_android_pointer_table:']
+    for symbol, displacement in entries:
+        lines.append(f'.quad {symbol} {displacement:+d}')
+    lines += ['.global brisk_android_pointer_count', '.hidden brisk_android_pointer_count',
+              'brisk_android_pointer_count:', f'.quad {len(entries)}',
+              '.section .note.GNU-stack,"",%progbits']
+    table.write_text("\n".join(lines) + "\n")
+    print(f"Encoded {len(entries)} unique packed game pointers in an ASLR-safe table.")
+
+
 def normalize_absolute_constants(argv):
     """Keep one global definition of each repeated, equal assembler constant.
 
@@ -85,6 +170,7 @@ def normalize_absolute_constants(argv):
     parser = argparse.ArgumentParser(description=normalize_absolute_constants.__doc__)
     parser.add_argument("--nm", required=True)
     parser.add_argument("--objcopy", required=True)
+    parser.add_argument("--pointer-table", type=Path)
     parser.add_argument("objects", nargs="+", type=Path)
     args = parser.parse_args(argv)
     definitions = defaultdict(list)
@@ -114,6 +200,10 @@ def normalize_absolute_constants(argv):
         a, b = relocate_assembly_data(obj, args.objcopy)
         relative += a
         relro += b
+    if args.pointer_table:
+        values = {name: entries[0][1] for name, entries in definitions.items()}
+        encode_packed_pointers(list(dict.fromkeys(args.objects)), values,
+                               args.objcopy, args.pointer_table)
     print(f"Converted {relative} packed song jumps to relative offsets; "
           f"moved {relro} pointer-bearing read-only sections to RELRO.")
     print(f"Localized {sum(map(len, changes.values()))} redundant absolute constants "

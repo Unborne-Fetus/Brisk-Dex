@@ -202,7 +202,7 @@ jobs:
             grep -Ei 'ld.lld: error:|undefined symbol|relocation|fatal error:|^FAILURE:|^\* What went wrong:|^> Task .*FAILED' gradle-ci.log | cut -c1-1500 | sort -u | head -n 300 || true
             tail -n 80 gradle-ci.log | cut -c1-1500
             echo "::endgroup::"
-            if ! grep -Eiq '429|Too Many Requests|503 Service Unavailable|Read timed out' gradle-ci.log; then
+            if grep -Eiq 'ld\.lld: error:|undefined symbol|fatal error:|relocation R_AARCH64_' gradle-ci.log || ! grep -Eiq 'HTTP[^[:alnum:]]+(429|503)|Too Many Requests|503 Service Unavailable|Read timed out' gradle-ci.log; then
               echo "::error::Gradle failed for a non-network reason; see the compiler log."
               exit 1
             fi

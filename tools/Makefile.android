@@ -79,8 +79,9 @@ android-port-pilot: $(OBJ_DIR)/src/main.o $(OBJ_DIR)/platform/gba_memmap.o \
 android-game-archive: objects $(ANDROID_PLATFORM_OBJS)
 	@mkdir -p $(dir $(ANDROID_ARCHIVE))
 	python3 tools/android_assemble.py --normalize-absolute-constants \
-	    --nm $(ANDROID_NM) --objcopy $(ANDROID_OBJCOPY) $(DATA_ASM_OBJS) $(MID_OBJS)
+	    --nm $(ANDROID_NM) --objcopy $(ANDROID_OBJCOPY) --pointer-table $(OBJ_DIR)/packed_pointers.s $(DATA_ASM_OBJS) $(MID_OBJS)
+	$(ANDROID_CC) -fPIC -c $(OBJ_DIR)/packed_pointers.s -o $(OBJ_DIR)/packed_pointers.o
 	$(RM) $(ANDROID_ARCHIVE)
-	$(ANDROID_AR) rcs $(ANDROID_ARCHIVE) $(OBJS) $(ANDROID_PLATFORM_OBJS)
+	$(ANDROID_AR) rcs $(ANDROID_ARCHIVE) $(OBJS) $(ANDROID_PLATFORM_OBJS) $(OBJ_DIR)/packed_pointers.o
 	@echo "Complete ARM64 game object archive: $(ANDROID_ARCHIVE)"
 	@echo "Must still pass the strict Android PIE shared-library link and gameplay tests."

@@ -97,5 +97,41 @@ class AbsoluteConstantTests(unittest.TestCase):
             self.assertIn(".data.rel.ro", sections)
 
 
+
+    def test_cross_object_constants_and_packed_local_global_pointers(self):
+        if not shutil.which("llvm-objcopy"):
+            self.skipTest("requires LLVM objcopy for AArch64")
+        a, b = self.root / "script.o", self.root / "target.o"
+        a.with_suffix(".s").write_text(
+            '.section script_data,"aw",%progbits\n.global event_script\n'
+            'event_script:\n.word target_fn\n.word local_target\n'
+            '.hword B_MSG_MON_ANGRY\nlocal_target: .byte 0\n')
+        b.with_suffix(".s").write_text(
+            '.global B_MSG_MON_ANGRY\n.equiv B_MSG_MON_ANGRY, 7\n'
+            '.text\n.global target_fn\ntarget_fn: ret\n')
+        for obj in (a, b):
+            subprocess.run(["clang", "--target=aarch64-linux-gnu", "-c",
+                            str(obj.with_suffix(".s")), "-o", str(obj)], check=True)
+        table = self.root / "packed.s"
+        result = subprocess.run([sys.executable, str(SCRIPT),
+            "--normalize-absolute-constants", "--nm", "nm",
+            "--objcopy", shutil.which("llvm-objcopy"),
+            "--pointer-table", str(table), str(a), str(b)],
+            capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Encoded 2 unique packed game pointers", result.stdout)
+        self.assertIn(".quad target_fn +0", table.read_text())
+        obj = table.with_suffix(".o")
+        subprocess.run(["clang", "--target=aarch64-linux-gnu", "-c",
+                        str(table), "-o", str(obj)], check=True)
+        output = self.root / "game.so"
+        subprocess.run(["ld.lld", "-shared", "-z", "defs", "-z", "text",
+                        str(a), str(b), str(obj), "-o", str(output)], check=True)
+        if shutil.which("readelf"):
+            report = subprocess.check_output(["readelf", "-x", "script_data",
+                                              str(output)], text=True)
+            self.assertIn("000000f0 010000f0 0700", report)
+
+
 if __name__ == "__main__":
     unittest.main()
