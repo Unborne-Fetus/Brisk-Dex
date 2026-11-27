@@ -113,6 +113,13 @@ try {
         throw "Android build completed but APK was not found at $apk."
     }
 
+    # Never distribute a companion build under the playable APK filename.
+    $pin = (Get-Content 'tools\brisk-native-source.json' -Raw | ConvertFrom-Json).brisk_commit
+    $python = Get-Command python.exe -ErrorAction SilentlyContinue
+    if (-not $python) { throw 'Python 3 is required to verify the Android game APK.' }
+    Invoke-Step 'Verify playable Android APK contains the real ARM64 game' {
+        & $python.Source tools/inspect_android_apk.py $apk --expected-commit $pin --require-game --output android-game-status.json
+    }
     Copy-Item -LiteralPath $apk -Destination 'dist\Brisk-Dex-Android.apk' -Force
 
     $exe = Get-ChildItem 'dist' -Filter '*.exe' -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
