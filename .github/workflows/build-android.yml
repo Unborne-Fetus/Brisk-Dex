@@ -273,6 +273,43 @@ jobs:
               out.write('game_integrated='+str(report['game_integrated']).lower()+'\n')
           PY
 
+      - name: Explain Android publication eligibility
+        shell: bash
+        env:
+          DISTRIBUTION_APPROVED: ${{ vars.BRISK_ANDROID_DISTRIBUTION_APPROVED }}
+          DEVICE_TESTS_APPROVED: ${{ vars.BRISK_ANDROID_DEVICE_TESTS_APPROVED }}
+          CHANNEL_SIGNING: ${{ steps.signing.outputs.channel_signing }}
+          GAME_INTEGRATED: ${{ steps.game.outputs.game_integrated }}
+        run: |
+          set -euo pipefail
+          {
+            echo '## Android publication status'
+            echo "- Native game packaged: ${GAME_INTEGRATED:-false}"
+            echo "- Distribution approved: ${DISTRIBUTION_APPROVED:-false}"
+            echo "- Trusted signing key verified: ${CHANNEL_SIGNING:-false}"
+            echo "- Device tests approved: ${DEVICE_TESTS_APPROVED:-false}"
+            if [ "$DISTRIBUTION_APPROVED" != true ]; then
+              echo '- APK upload and preview release blocked: repository distribution approval is not enabled.'
+              echo '::warning::Integrated APK upload and preview publication blocked by BRISK_ANDROID_DISTRIBUTION_APPROVED.' >&2
+            fi
+            if [ "$CHANNEL_SIGNING" != true ]; then
+              echo '- In-app update blocked: no matching persistent Android signer.'
+            fi
+            if [ "$DEVICE_TESTS_APPROVED" != true ]; then
+              echo '- In-app update blocked: device testing approval is not enabled.'
+            fi
+            if [ "$GITHUB_REF" != refs/heads/main ] || [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+              echo '- Preview publication requires a non-PR run on main.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload native game verification report
+        uses: actions/upload-artifact@v6
+        with:
+          name: Brisk-Dex-Android-Verification
+          path: android-game-status.json
+          if-no-files-found: error
+
       - name: Upload APK and verified manifest (authorized redistribution only)
         if: vars.BRISK_ANDROID_DISTRIBUTION_APPROVED == 'true'
         uses: actions/upload-artifact@v6
