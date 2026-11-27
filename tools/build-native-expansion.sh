@@ -53,6 +53,7 @@ if [ "$profile" = brisk ]; then
   if ! git -C "$checkout" cat-file -e "$base_pin^{commit}" 2>/dev/null; then
     fetch_source https://github.com/rh-hideout/pokeemerald-expansion.git "$base_pin"
   fi
+  python3 "$root/tools/test_prepare_brisk_native.py"
   python3 "$root/tools/prepare_brisk_native.py" "$checkout"
   # Extra wild slots are native-only. Keep the original GBA encounter data intact.
   python3 "$root/tools/test_expand_native_encounters.py"

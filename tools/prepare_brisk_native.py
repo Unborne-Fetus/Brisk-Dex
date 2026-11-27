@@ -6,6 +6,7 @@ files stay intact. Overlapping source changes are merged rather than overwriting
 native pointer/ABI guards. Unexpected conflicts stop the build.
 """
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -103,6 +104,33 @@ def resolve_conflicts(name, data):
     return result.encode()
 
 
+def merge_brisk_save_tests(brisk):
+    # The cartridge's fixed byte counts are not native host ABI counts.
+    start = b'#define T_SAVEBLOCK1_SIZE '
+    end = b'#undef T_POKEMONSTORAGE_SIZE\n'
+    if brisk.count(start) != 1 or brisk.count(end) != 1:
+        raise RuntimeError('Brisk save test layout anchors changed')
+    begin = brisk.index(start)
+    finish = brisk.index(end, begin) + len(end)
+    native_checks = b'''#if PLATFORM_NATIVE
+// Brisk has its own native save layout; cartridge byte counts are not
+// portable to the host ABI. Check the actual sector limits instead.
+TEST("Native Brisk save blocks fit their allocated sectors")
+{
+    EXPECT_LE(sizeof(struct SaveBlock1), (SECTOR_ID_SAVEBLOCK1_END - SECTOR_ID_SAVEBLOCK1_START + 1) * SECTOR_DATA_SIZE);
+    EXPECT_LE(sizeof(struct SaveBlock2), SECTOR_DATA_SIZE);
+    EXPECT_LE(sizeof(struct SaveBlock3), NUM_SECTORS_PER_SLOT * SAVE_BLOCK_3_CHUNK_SIZE);
+    EXPECT_EQ(sizeof(struct SaveSector), SECTOR_SIZE);
+}
+#else
+'''
+    return brisk[:begin] + native_checks + brisk[begin:finish] + b'#endif\n' + brisk[finish:]
+
+
+def git_blob_id(data):
+    return hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+
+
 def merge(name, native, base, brisk):
     with tempfile.TemporaryDirectory(prefix='brisk-merge-') as tmp:
         files = [Path(tmp) / name for name in ('native', 'base', 'brisk')]
@@ -114,6 +142,15 @@ def merge(name, native, base, brisk):
             return result.stdout, False
         if result.returncode >= 128:
             raise RuntimeError('Cannot merge ' + name + ': ' + result.stderr.decode(errors='replace'))
+        # Only this reviewed set of three source blobs is safe to resolve.
+        # Do not accept new save-test conflicts without another review.
+        if name == 'test/save.c':
+            reviewed = ('60698bbe20e95010dc274551dfc7eb5168cd492c',
+                        '4e3000a794bf35dcf3d9c77d12837b5f7ad62064',
+                        '841429b835f84790532f1c5bc3d6a801ae7034b6')
+            if tuple(map(git_blob_id, (native, base, brisk))) != reviewed:
+                raise RuntimeError('Unreviewed Brisk/native conflict: ' + name)
+            return merge_brisk_save_tests(brisk), True
         resolved = resolve_conflicts(name, result.stdout)
         return brisk if resolved is None else resolved, True
 

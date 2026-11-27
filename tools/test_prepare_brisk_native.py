@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 import subprocess
 import tempfile
-from prepare_brisk_native import apply_port_patch, merge, resolve_conflicts
+from prepare_brisk_native import apply_port_patch, merge, merge_brisk_save_tests, resolve_conflicts
 
 
 class SourceMergeTests(unittest.TestCase):
@@ -55,6 +55,23 @@ class SourceMergeTests(unittest.TestCase):
                 b'function after\n<<<<<<< native\nold2\n=======\nnew2\n>>>>>>> brisk\nlast function\n')
         result = resolve_conflicts('src/save.c', data)
         self.assertEqual(result, b'function before\nBrisk save\nfunction after\nnew2\nlast function\n')
+
+    def test_brisk_save_tests_keep_migration_checks_and_separate_abis(self):
+        brisk = (b'#include "save.h"\n#define T_SAVEBLOCK1_SIZE 15572\n'
+                 b'TEST("GBA layout") {}\n#undef T_POKEMONSTORAGE_SIZE\n'
+                 b'TEST("migration") {}\n')
+        result = merge_brisk_save_tests(brisk)
+        self.assertIn(b'#if PLATFORM_NATIVE\n', result)
+        self.assertIn(b'Native Brisk save blocks fit their allocated sectors', result)
+        self.assertIn(b'#else\n#define T_SAVEBLOCK1_SIZE 15572', result)
+        self.assertIn(b'#endif\nTEST("migration")', result)
+        self.assertEqual(result.count(b'TEST("migration")'), 1)
+        with self.assertRaisesRegex(RuntimeError, 'anchors changed'):
+            merge_brisk_save_tests(brisk.replace(b'#undef T_POKEMONSTORAGE_SIZE', b'#undef OTHER'))
+
+    def test_unreviewed_save_test_conflict_still_stops_the_build(self):
+        with self.assertRaisesRegex(RuntimeError, 'Unreviewed'):
+            merge('test/save.c', b'native\n', b'base\n', b'brisk\n')
 
     def test_new_unreviewed_conflicts_stop_the_build(self):
         with self.assertRaisesRegex(RuntimeError, 'Unreviewed'):
