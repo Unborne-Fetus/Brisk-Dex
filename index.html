@@ -7088,8 +7088,8 @@ localStorage.setItem('briskdex_trade_owner',TRADE_STATE.ownerToken);
 function tradeCandidates(){
   return allBattleCandidates().filter(function(x){
     if(x.key.indexOf('party:')===0||(!currentSave||currentSave._nativeReadOnly)&&x.key.indexOf('box:')===0)return false;
-    var raw=tradeSourceRaw(x.key);
-    if(!raw)return false;
+    var raw=tradeSourceRaw(x.key),pending=pendingLinkTrade();
+    if(!raw||pending&&(pending.key===x.key||pending.raw===raw))return false;
     var mon=decodePokemon(base64ToBytes(raw),false);
     return !!(mon&&mon.competitiveLegal&&competitiveLegality(mon).ok&&mon.checksumValid);
   });
@@ -7223,10 +7223,17 @@ function verifyLinkSource(session,received){
 }
 async function checkLinkTrade(session){
   var s=await tradeFetch(linkTradePath(session),linkTradeOptions(session,'GET'));
+  if(s.cancelled){
+    localStorage.removeItem(LINK_TRADE_KEY);
+    linkTradeMessage('Link Trade was cancelled. No Pokémon were exchanged.');
+    renderTrading();
+    return s;
+  }
   if(s.complete){
     verifyLinkSource(session,s.received);
     await replaceTradeSource(session.key,s.received);
     localStorage.removeItem(LINK_TRADE_KEY);
+    renderTrading();
     linkTradeMessage('Link Trade complete: received '+speciesName(s.receivedMon.species)+'.');
     return s;
   }
@@ -7266,7 +7273,7 @@ function confirmLinkTrade(){
   return runLinkTrade(async function(){
     var session=pendingLinkTrade();if(!session)throw new Error('Host or join a Link Trade first.');
     var s=await checkLinkTrade(session);
-    if(s.complete)return;
+    if(s.complete||s.cancelled)return;
     if(s.players.length!==2)throw new Error('Waiting for the other player.');
     verifyLinkSource(session);
     if(!window.confirm('Confirm this exchange? '+s.players.map(function(player){return player.name+': '+describeTradeOffer(player);}).join(' | ')))return;
@@ -7280,6 +7287,7 @@ function cancelLinkTrade(){
     await tradeFetch('/trades/link/cancel',linkTradeOptions(session,'POST',{code:session.code,playerId:session.playerId}));
     localStorage.removeItem(LINK_TRADE_KEY);
     linkTradeMessage('Link Trade cancelled. No Pokémon were exchanged.');
+    renderTrading();
   });
 }
 async function gtsDeposit(){

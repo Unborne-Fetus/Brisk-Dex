@@ -2289,7 +2289,7 @@ const server=http.createServer(async (req,res)=>{
     }
     if(req.method==='POST'&&url.pathname==='/trades/link/join'){
       const body=await readBody(req),room=linkTradeRooms.get(String(body.code||'').toUpperCase()),verified=tradePokemon(body.raw80);
-      if(!room)return json(res,404,{error:'Link Trade room not found.'});if(room.players.length>=2)return json(res,409,{error:'Link Trade room is full.'});
+      if(!room)return json(res,404,{error:'Link Trade room not found.'});if(room.cancelled)return json(res,409,{error:'Link Trade was cancelled.'});if(room.players.length>=2)return json(res,409,{error:'Link Trade room is full.'});
       if(!verified.ok)return json(res,400,{error:'Trade rejected: '+verified.reason});
       const playerId=id();room.players.push({id:playerId,name:cleanText(body.name,24)||'Trainer',raw:verified.raw,mon:verified.mon,confirmed:false});room.updatedAt=Date.now();
       return json(res,200,{ok:true,code:room.code,playerId});
@@ -2297,12 +2297,14 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==='GET'&&url.pathname==='/trades/link/status'){
       const room=linkTradeRooms.get(String(url.searchParams.get('code')||'').toUpperCase()),playerId=url.searchParams.get('playerId');
       if(!room)return json(res,404,{error:'Link Trade room not found.'});const pi=room.players.findIndex(p=>p.id===playerId);if(pi<0)return json(res,403,{error:'Invalid Link Trade token.'});
+      if(room.cancelled)return json(res,200,{ok:true,cancelled:true,complete:false,players:[],received:null,receivedMon:null});
       const complete=room.players.length===2&&room.players.every(p=>p.confirmed);
       return json(res,200,{ok:true,complete,players:room.players.map(p=>({name:p.name,offer:publicTradeMon(p),confirmed:p.confirmed})),received:complete?room.players[1-pi].raw:null,receivedMon:complete?publicTradeMon(room.players[1-pi]):null});
     }
     if(req.method==='POST'&&url.pathname==='/trades/link/confirm'){
       const body=await readBody(req),room=linkTradeRooms.get(String(body.code||'').toUpperCase());
       if(!room)return json(res,404,{error:'Link Trade room not found.'});const pi=room.players.findIndex(p=>p.id===body.playerId);if(pi<0)return json(res,403,{error:'Invalid Link Trade token.'});
+      if(room.cancelled)return json(res,409,{error:'Link Trade was cancelled.'});
       if(room.players.length!==2)return json(res,409,{error:'Waiting for another player.'});
       if(body.confirmed!==true)return json(res,400,{error:'Only explicit confirmation is supported.'});
       room.players[pi].confirmed=true;room.updatedAt=Date.now();
@@ -2313,8 +2315,11 @@ const server=http.createServer(async (req,res)=>{
       if(!room)return json(res,404,{error:'Link Trade room not found.'});
       if(!room.players.some(p=>p.id===body.playerId))return json(res,403,{error:'Invalid Link Trade token.'});
       if(room.players.some(p=>p.confirmed))return json(res,409,{error:'A player already confirmed; check the trade instead.'});
-      linkTradeRooms.delete(room.code);
-      return json(res,200,{ok:true});
+      room.cancelled=true;room.updatedAt=Date.now();
+      // Retain only the room identity and session tokens so both clients can
+      // recover a cancelled outcome after a dropped response.
+      room.players=room.players.map(p=>({id:p.id,confirmed:false}));
+      return json(res,200,{ok:true,cancelled:true});
     }
     const match=url.pathname.match(/^\/rooms\/([A-Z0-9]{6})(?:\/(join|action))?$/);
     if(!match) return json(res,404,{error:'Not found'});

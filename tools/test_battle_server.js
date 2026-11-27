@@ -122,9 +122,12 @@ async function waitForServer(){
     try{await post('/trades/link/cancel',{code:tradeHost.code,playerId:tradeHost.playerId});}catch(e){refused=true;}
     if(!refused)throw new Error('Confirmed trade was cancelled.');
     const cancelled=await post('/trades/link/host',{name:'Cancel',raw80:hostRaw});
+    const cancelGuest=await post('/trades/link/join',{code:cancelled.code,name:'Guest',raw80:guestRaw});
     await post('/trades/link/cancel',{code:cancelled.code,playerId:cancelled.playerId});
-    refused=false;try{await request('/trades/link/status?code='+cancelled.code+'&playerId='+cancelled.playerId);}catch(e){refused=true;}
-    if(!refused)throw new Error('Cancelled trade remained accessible.');
+    const cancelledStatus=await request('/trades/link/status?code='+cancelled.code+'&playerId='+cancelGuest.playerId);
+    if(!cancelledStatus.cancelled||cancelledStatus.complete||cancelledStatus.received)throw new Error('Partner could not recover cancellation.');
+    refused=false;try{await post('/trades/link/confirm',{code:cancelled.code,playerId:cancelGuest.playerId,confirmed:true});}catch(e){refused=true;}
+    if(!refused)throw new Error('Cancelled trade could still be confirmed.');
     console.log('Brisk Link Trade protocol smoke test passed.');
     const host=await request('/rooms',{method:'POST',body:JSON.stringify({name:'Host',team:[mon('Alpha',hostSpecies,1)],rules:{format:'singles',teamSize:1}})});
     if(!/^[A-Z0-9]{6}$/.test(host.code)) throw new Error('Room code was not generated correctly.');
