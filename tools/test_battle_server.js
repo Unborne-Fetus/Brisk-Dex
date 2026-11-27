@@ -139,6 +139,8 @@ async function waitForServer(){
     if(!refused)throw new Error('GTS allowed a mismatched species.');
     const take={listingId,ownerToken:takerToken,raw80:guestRaw};
     if((await post('/trades/gts/take',take)).received!==hostRaw||(await post('/trades/gts/take',take)).received!==hostRaw)throw new Error('GTS take retry failed.');
+    const takeStatus=await request('/trades/gts/take-status?listingId='+listingId+'&ownerToken='+takerToken);
+    if(takeStatus.status!=='completed')throw new Error('GTS taker recovery status failed.');
     const claim={listingId,ownerToken};
     if((await post('/trades/gts/claim',claim)).received!==guestRaw||(await post('/trades/gts/claim',claim)).received!==guestRaw)throw new Error('GTS claim retry failed.');
     await post('/trades/gts/ack',claim);

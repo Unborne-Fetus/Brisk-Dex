@@ -275,6 +275,9 @@ input[type=file]{ display:none; }
 .online-card{background:var(--panel);border:1px solid var(--line);padding:16px;}
 .online-card h4{margin:0 0 10px;color:var(--leaf-bright);}
 .online-form{display:grid;gap:10px;}
+#gts-browse[hidden],#gts-offer[hidden]{display:none !important;}
+#gts-browse label:has(input[type=checkbox]){display:flex;align-items:center;gap:8px;}
+#gts-browse input[type=checkbox]{min-height:0;width:18px;height:18px;}
 .online-form label{display:grid;gap:5px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
 .online-form input,.online-form select{min-height:38px;color:var(--text);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:8px 11px;font:inherit;text-transform:none;letter-spacing:0;}
 .online-actions{display:flex;gap:8px;flex-wrap:wrap;}
@@ -7314,7 +7317,7 @@ function cancelLinkTrade(){
     renderTrading();
   });
 }
-var GTS_PREFIX='briskdex_gts_',GTS_TAKE='briskdex_pending_gts_take_v2',gtsListingsCache=[],gtsMode='browse',gtsBusy=false;
+var GTS_PREFIX='briskdex_gts_',GTS_TAKE='briskdex_pending_gts_take_v2',gtsListingsCache=[],gtsListingsRelay='',gtsMode='browse',gtsBusy=false;
 function gtsRead(key){
   var value=localStorage.getItem(key);if(!value)return null;
   try{return JSON.parse(value);}catch(e){return {key:value,legacy:true};}
@@ -7350,11 +7353,10 @@ function renderGtsSpecies(){
   var previous=select.value||'0',query=search.value.trim();
   var ids=Object.keys(NAME_DATA.species||{}).filter(function(id){var sp=NAME_DATA.species[id];return Number(id)>0&&sp&&typeof sp==='object'&&!sp.isMega&&!sp.isGmax&&gtsMatchesName(id,query);});
   ids.sort(function(a,b){return gtsName(a).localeCompare(gtsName(b));});
-  if(previous!=='0'&&!ids.includes(previous)&&NAME_DATA.species[previous])ids.unshift(previous);
-  select.replaceChildren(el('option',{value:'0',text:'Any Pokémon'}));
+  select.replaceChildren(el('option',{value:'0',text:query?'Choose a matching Pokémon (or Any)':'Any Pokémon'}));
   ids.forEach(function(id){select.appendChild(el('option',{value:id,text:gtsName(id)}));});
-  select.value=previous;
-  if(query&&ids.length===1&&ids[0]!==previous)select.value=ids[0];
+  select.value=ids.includes(previous)?previous:'0';
+  if(query&&ids.length===1)select.value=ids[0];
   if(type.options.length===1)Object.keys(TYPE_COLORS).sort().forEach(function(t){type.appendChild(el('option',{value:t,text:t}));});
 }
 function gtsRequestFromForm(){
@@ -7388,6 +7390,10 @@ function gtsId(){return Array.from(crypto.getRandomValues(new Uint8Array(16)),fu
 function gtsPost(path,body,relay){return tradeFetch(path,{method:'POST',relayBase:relay,body:JSON.stringify(body)});}
 function gtsGet(path,relay){return tradeFetch(path,{method:'GET',relayBase:relay});}
 function gtsOwnerQuery(){return '?ownerToken='+encodeURIComponent(TRADE_STATE.ownerToken);}
+async function requireGtsRelay(relay){
+  var health=await gtsGet('/health',relay);
+  if(!health.ok||Number(health.gtsProtocol)<2)throw new Error('Update the shared Brisk Dex relay before using the redesigned GTS.');
+}
 async function gtsApply(session,received){
   if(!session||session.legacy||!session.raw)throw new Error('This is an older listing without a verified source record. Restore a backup or recover it using the older client; no Pokémon were overwritten.');
   verifyLinkSource(session,received);
@@ -7404,7 +7410,8 @@ function gtsDeposit(){
     var request=gtsRequestFromForm();
     if(!Number.isInteger(request.minLevel)||!Number.isInteger(request.maxLevel)||request.minLevel<1||request.maxLevel>100||request.minLevel>request.maxLevel)throw new Error('Choose a valid level range between 1 and 100.');
     if(!window.confirm('Offer '+mon.name+' Lv'+mon.level+' for '+gtsRequestLabel(request)+'? Keep this Pokémon in its original slot until the trade finishes.'))return;
-    var session=Object.assign(gtsSession(mon,tradeBase()),{id:gtsId(),request:request,trainer:currentSave?.trainer?.name||'Trainer',posted:false});
+    var relay=tradeBase();await requireGtsRelay(relay);
+    var session=Object.assign(gtsSession(mon,relay),{id:gtsId(),request:request,trainer:currentSave?.trainer?.name||'Trainer',posted:false});
     if(!session.raw||!session.identity)throw new Error('The selected Pokémon is unavailable.');
     localStorage.setItem(GTS_PREFIX+session.id,JSON.stringify(session));
     renderTrading();
@@ -7418,7 +7425,16 @@ async function gtsRecoverTake(){
   if(session.received){await gtsApply(session,session.received);}
   else{
     verifyLinkSource(session);
-    var x=await gtsPost('/trades/gts/take',{listingId:session.id,ownerToken:TRADE_STATE.ownerToken,raw80:session.raw},session.relay);
+    var x;
+    try{x=await gtsPost('/trades/gts/take',{listingId:session.id,ownerToken:TRADE_STATE.ownerToken,raw80:session.raw},session.relay);}
+    catch(err){
+      var state=await gtsGet('/trades/gts/take-status'+gtsOwnerQuery()+'&listingId='+encodeURIComponent(session.id),session.relay);
+      if(state.status==='unavailable'||state.status==='available'){
+        localStorage.removeItem(GTS_TAKE);renderTrading();
+        throw new Error(err.message+' No trade was recorded for your account. Refresh listings.');
+      }
+      throw err;
+    }
     session.received=x.received;session.receivedMon=x.receivedMon;localStorage.setItem(GTS_TAKE,JSON.stringify(session));
     await gtsApply(session,session.received);
   }
@@ -7428,7 +7444,8 @@ async function gtsRecoverTake(){
 }
 async function gtsLoadMine(){
   var relay=tradeBase(),out=gtsOut();
-  if(gtsRead(GTS_TAKE)){await gtsRecoverTake();}
+  await requireGtsRelay(relay);
+  if(gtsRead(GTS_TAKE)){await gtsRecoverTake();return;}
   var local=[];
   for(var i=0;i<localStorage.length;i++){var key=localStorage.key(i);if(key&&key.startsWith(GTS_PREFIX)){var s=gtsRead(key);if(s&&!s.legacy&&s.relay===relay)local.push(s);}}
   for(var session of local){
@@ -7479,7 +7496,10 @@ function renderGtsListings(){
       var mon=tradeCandidates().find(function(c){return c.key===picker.value;});
       if(!mon||!gtsEligible(mon,x.request))throw new Error('That Pokémon is no longer eligible. Refresh listings.');
       if(!window.confirm('Trade '+mon.name+' Lv'+mon.level+' for '+gtsMonLabel(x.offered)+'?'))return;
-      var session=Object.assign(gtsSession(mon,tradeBase()),{id:x.listingId});
+      var relay=tradeBase();
+      if(relay!==gtsListingsRelay)throw new Error('Relay address changed. Refresh listings before trading.');
+      await requireGtsRelay(relay);
+      var session=Object.assign(gtsSession(mon,relay),{id:x.listingId});
       if(!session.raw||!session.identity)throw new Error('The selected Pokémon is unavailable.');
       localStorage.setItem(GTS_TAKE,JSON.stringify(session));
       await gtsRecoverTake();
@@ -7491,8 +7511,9 @@ function gtsSearch(){
   setGtsMode('browse');
   return runGts(async function(){
     gtsMessage('Loading available trades…');
-    var d=await gtsGet('/trades/gts'+gtsOwnerQuery(),tradeBase());
-    gtsListingsCache=d.listings;
+    var relay=tradeBase();await requireGtsRelay(relay);
+    var d=await gtsGet('/trades/gts'+gtsOwnerQuery(),relay);
+    gtsListingsCache=d.listings;gtsListingsRelay=relay;
     renderGtsListings();
   });
 }

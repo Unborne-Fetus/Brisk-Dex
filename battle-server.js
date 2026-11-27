@@ -2099,7 +2099,7 @@ const server=http.createServer(async (req,res)=>{
   if(req.method==='OPTIONS') return json(res,204,{});
   const url=new URL(req.url,'http://localhost');
   try{
-    if(req.method==='GET'&&url.pathname==='/health') return json(res,200,{ok:true,rooms:rooms.size,engine:'advanced-v18'});
+    if(req.method==='GET'&&url.pathname==='/health') return json(res,200,{ok:true,rooms:rooms.size,engine:'advanced-v18',gtsProtocol:2});
     if(req.method==='GET'&&url.pathname==='/profile'){
       const token=url.searchParams.get('profileToken'),profile=ensureProfile(token,'');
       if(!profile)return json(res,400,{error:'Missing player profile token.'});
@@ -2284,6 +2284,12 @@ const server=http.createServer(async (req,res)=>{
       gtsListings.delete(listing.id);
       gtsCompleted.set(listing.id,{ownerToken:listing.ownerToken,takerToken:ownerToken,offeredRaw:listing.raw,offeredMon:publicTradeMon(listing),received:verified.raw,receivedMon:publicTradeMon(verified),completedAt:Date.now()});
       return json(res,200,{ok:true,received:listing.raw,receivedMon:publicTradeMon(listing),sentMon:publicTradeMon(verified)});
+    }
+    if(req.method==='GET'&&url.pathname==='/trades/gts/take-status'){
+      const listingId=String(url.searchParams.get('listingId')||''),ownerToken=cleanText(url.searchParams.get('ownerToken'),96);
+      if(!ownerToken)return json(res,400,{error:'Missing trade owner token.'});
+      const prior=gtsCompleted.get(listingId)||gtsAcknowledged.get(listingId);
+      return json(res,200,{ok:true,status:prior&&prior.takerToken===ownerToken?'completed':gtsListings.has(listingId)?'available':'unavailable'});
     }
     if(req.method==='GET'&&url.pathname==='/trades/gts/mine'){
       const ownerToken=cleanText(url.searchParams.get('ownerToken'),96),active=[],completed=[];
