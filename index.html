@@ -1242,7 +1242,29 @@ body.native-game-immersive #native-game-screen{box-sizing:border-box!important;w
         <div class="online-card"><h4>Offline Wonder Trade</h4><p class="route-intro">Open a Pokémon from your party or PC and choose Wonder Trade. Offline trades use Brisk's bundled eligible species pool and now enforce trusted provenance.</p></div>
         <div class="online-card"><h4>Wonder Box</h4><p class="route-intro">Deposit up to 10 Pokémon. Matches happen independently, like Pokémon HOME's Wonder Box.</p><div class="online-actions"><button class="primary" id="wonderbox-deposit">Deposit selected</button><button id="wonderbox-check">Check / claim matches</button></div><div id="wonderbox-list" class="online-status"></div></div>
         <div class="online-card"><h4>Link Trade</h4><div class="online-form"><label>Room code <input id="linktrade-code" maxlength="6" placeholder="ABC123"></label><div class="online-actions"><button class="primary" id="linktrade-host">Host</button><button id="linktrade-join">Join</button><button id="linktrade-review">Review / check trade</button><button id="linktrade-confirm">Confirm trade</button><button id="linktrade-cancel">Cancel unconfirmed trade</button></div><div id="linktrade-status" class="online-status"></div></div></div>
-        <div class="online-card"><h4>GTS</h4><div class="online-form"><label>Requested species # (0 = any) <input id="gts-species" type="number" min="0" step="1" value="0"></label><label>Requested type (blank = any) <input id="gts-type" placeholder="e.g. Water"></label><div style="display:flex;gap:8px"><label style="flex:1">Min Lv <input id="gts-min" type="number" min="1" max="100" value="1"></label><label style="flex:1">Max Lv <input id="gts-max" type="number" min="1" max="100" value="100"></label></div><div class="online-actions"><button class="primary" id="gts-deposit">Deposit selected</button><button id="gts-search">Search listings</button><button id="gts-check">Check my listing</button></div><div id="gts-list" class="online-status"></div></div></div>
+        <div class="online-card"><h4>Global Trade System (GTS)</h4>
+          <p class="route-intro">Offer a Pokémon for someone to trade later, or find a Pokémon you want now.</p>
+          <div class="online-actions" role="group" aria-label="GTS mode">
+            <button id="gts-search" class="primary">Find Pokémon</button><button id="gts-offer-mode">Offer Pokémon</button><button id="gts-check">My trades</button>
+          </div>
+          <div id="gts-browse" class="online-form">
+            <label>Find a Pokémon <input id="gts-browse-name" type="search" placeholder="e.g. Pikachu, Alolan Vulpix"></label>
+            <label><input id="gts-match-only" type="checkbox"> Only show trades I can make</label>
+            <div class="online-actions"><button id="gts-reload">Refresh listings</button></div>
+          </div>
+          <div id="gts-offer" class="online-form" hidden>
+            <p class="route-intro">Choose the Pokémon you are offering from the picker above, then choose what you want in return.</p>
+            <label>Search requested Pokémon <input id="gts-species-search" type="search" placeholder="Type a name or form"></label>
+            <label>Pokémon wanted <select id="gts-species"><option value="0">Any Pokémon</option></select></label>
+            <details><summary>Optional requirements</summary>
+              <label>Type <select id="gts-type"><option value="">Any type</option></select></label>
+              <div style="display:flex;gap:8px"><label style="flex:1">Min level <input id="gts-min" type="number" min="1" max="100" value="1"></label><label style="flex:1">Max level <input id="gts-max" type="number" min="1" max="100" value="100"></label></div>
+            </details>
+            <p id="gts-offer-preview" class="route-intro"></p>
+            <div class="online-actions"><button class="primary" id="gts-deposit">Post trade offer</button></div>
+          </div>
+          <div id="gts-list" class="online-status" aria-live="polite">Choose Find Pokémon to browse the relay.</div>
+        </div>
       </div>
     </div>
   </section>
@@ -7089,7 +7111,7 @@ function tradeCandidates(){
   return allBattleCandidates().filter(function(x){
     if(x.key.indexOf('party:')===0||(!currentSave||currentSave._nativeReadOnly)&&x.key.indexOf('box:')===0)return false;
     var raw=tradeSourceRaw(x.key),pending=pendingLinkTrade();
-    if(!raw||pending&&(pending.key===x.key||pending.raw===raw))return false;
+    if(!raw||pending&&(pending.key===x.key||pending.raw===raw)||gtsSourceReserved(x.key,raw))return false;
     var mon=decodePokemon(base64ToBytes(raw),false);
     return !!(mon&&mon.competitiveLegal&&competitiveLegality(mon).ok&&mon.checksumValid);
   });
@@ -7103,6 +7125,8 @@ function renderTrading(){
   if(!cands.length)select.innerHTML='<option value="">No verified boxed/storage Pokémon</option>';
   var pending=pendingLinkTrade();
   if(pending)document.getElementById('linktrade-code').value=pending.code;
+  renderGtsSpecies();
+  renderGtsOfferPreview();
 }
 function selectedTradeCandidate(){
   var key=document.getElementById('trade-mon').value;
@@ -7290,25 +7314,187 @@ function cancelLinkTrade(){
     renderTrading();
   });
 }
-async function gtsDeposit(){
- var out=document.getElementById('gts-list');try{var mon=selectedTradeCandidate();if(!mon)throw new Error('Choose an eligible Pokémon.');
- var request={species:Number(document.getElementById('gts-species').value)||0,type:document.getElementById('gts-type').value.trim(),minLevel:Number(document.getElementById('gts-min').value)||1,maxLevel:Number(document.getElementById('gts-max').value)||100};
- var d=await tradeFetch('/trades/gts/list',{method:'POST',body:JSON.stringify({ownerToken:TRADE_STATE.ownerToken,trainer:currentSave&&currentSave.trainerName||'Trainer',raw80:mon.rewardRaw80,request:request})});
- localStorage.setItem('briskdex_gts_'+d.listingId,mon.key);out.textContent='GTS listing posted. Listing '+d.listingId.slice(0,8)+'…';}catch(e){out.textContent=e.message;}
+var GTS_PREFIX='briskdex_gts_',GTS_TAKE='briskdex_pending_gts_take_v2',gtsListingsCache=[],gtsMode='browse',gtsBusy=false;
+function gtsRead(key){
+  var value=localStorage.getItem(key);if(!value)return null;
+  try{return JSON.parse(value);}catch(e){return {key:value,legacy:true};}
 }
-async function gtsCheckMine(){
- var out=document.getElementById('gts-list');try{var d=await tradeFetch('/trades/gts/mine?ownerToken='+encodeURIComponent(TRADE_STATE.ownerToken),{method:'GET'}),messages=[];
- for(var i=0;i<d.completed.length;i++){var x=d.completed[i],key=localStorage.getItem('briskdex_gts_'+x.listingId);if(!key)continue;var claimed=await tradeFetch('/trades/gts/claim',{method:'POST',body:JSON.stringify({ownerToken:TRADE_STATE.ownerToken,listingId:x.listingId})});await replaceTradeSource(key,claimed.received);localStorage.removeItem('briskdex_gts_'+x.listingId);messages.push('Trade complete: received '+speciesName(claimed.receivedMon.species)+'.');}
- if(!messages.length&&d.active.length)messages.push(d.active.length+' GTS listing'+(d.active.length===1?' is':'s are')+' still waiting.');
- out.textContent=messages.length?messages.join(' '):'You have no active or completed GTS listings.';
- }catch(e){out.textContent=e.message;}
+function gtsSourceReserved(key,raw){
+  var take=gtsRead(GTS_TAKE);if(take&&(take.key===key||take.raw===raw))return true;
+  for(var i=0;i<localStorage.length;i++){
+    var k=localStorage.key(i);if(!k||!k.startsWith(GTS_PREFIX))continue;
+    var pending=gtsRead(k);if(pending&&(pending.key===key||pending.raw===raw))return true;
+  }
+  return false;
 }
-async function gtsSearch(){
- var out=document.getElementById('gts-list');try{var d=await tradeFetch('/trades/gts?ownerToken='+encodeURIComponent(TRADE_STATE.ownerToken),{method:'GET'});
- if(!d.listings.length){out.textContent='No GTS listings are available right now.';return;}
- out.innerHTML=d.listings.slice(0,30).map(function(x){var req=[];if(x.request.species)req.push(speciesName(x.request.species));if(x.request.type)req.push(x.request.type+' type');req.push('Lv'+x.request.minLevel+'–'+x.request.maxLevel);return '<div style="padding:8px 0;border-bottom:1px solid var(--line-soft)"><strong>'+escapeHtml(speciesName(x.offered.species))+' Lv'+x.offered.level+'</strong> · wants '+escapeHtml(req.join(', '))+' <button data-gts-take="'+x.listingId+'" style="margin-left:8px">Trade selected</button></div>';}).join('');
- out.querySelectorAll('[data-gts-take]').forEach(function(btn){btn.addEventListener('click',async function(){try{var mon=selectedTradeCandidate();if(!mon)throw new Error('Choose the Pokémon you want to offer.');var x=await tradeFetch('/trades/gts/take',{method:'POST',body:JSON.stringify({listingId:btn.dataset.gtsTake,ownerToken:TRADE_STATE.ownerToken,raw80:mon.rewardRaw80})});await replaceTradeSource(mon.key,x.received);out.textContent='GTS trade complete: received '+speciesName(x.receivedMon.species)+'.';}catch(e){out.textContent=e.message;}});});
- }catch(e){out.textContent=e.message;}
+function gtsName(id){
+  return dexSpeciesDisplayName(NAME_DATA.species[String(id)]||{name:speciesName(id)});
+}
+function gtsRequestLabel(req){
+  var out=[req.species?gtsName(req.species):'Any Pokémon'];
+  if(req.type)out.push(req.type+' type');
+  if(req.minLevel>1||req.maxLevel<100)out.push('Lv'+req.minLevel+'–'+req.maxLevel);
+  return out.join(' · ');
+}
+function gtsMonLabel(mon){
+  return gtsName(mon.species)+' Lv'+mon.level+(mon.isShiny?' ✨':'')+(mon.heldItem?' · '+itemName(mon.heldItem):'');
+}
+function gtsNormalize(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
+function gtsMatchesName(id,query){
+  var entry=NAME_DATA.species[String(id)]||{},name=gtsNormalize(gtsName(id)+' '+(entry.constant||''));
+  return gtsNormalize(query).split(' ').every(function(part){return name.includes(part);});
+}
+function renderGtsSpecies(){
+  var select=document.getElementById('gts-species'),search=document.getElementById('gts-species-search'),type=document.getElementById('gts-type');
+  if(!select||!search)return;
+  var previous=select.value||'0',query=search.value.trim();
+  var ids=Object.keys(NAME_DATA.species||{}).filter(function(id){var sp=NAME_DATA.species[id];return Number(id)>0&&sp&&typeof sp==='object'&&!sp.isMega&&!sp.isGmax&&gtsMatchesName(id,query);});
+  ids.sort(function(a,b){return gtsName(a).localeCompare(gtsName(b));});
+  if(previous!=='0'&&!ids.includes(previous)&&NAME_DATA.species[previous])ids.unshift(previous);
+  select.replaceChildren(el('option',{value:'0',text:'Any Pokémon'}));
+  ids.forEach(function(id){select.appendChild(el('option',{value:id,text:gtsName(id)}));});
+  select.value=previous;
+  if(query&&ids.length===1&&ids[0]!==previous)select.value=ids[0];
+  if(type.options.length===1)Object.keys(TYPE_COLORS).sort().forEach(function(t){type.appendChild(el('option',{value:t,text:t}));});
+}
+function gtsRequestFromForm(){
+  return {species:Number(document.getElementById('gts-species').value)||0,type:document.getElementById('gts-type').value,minLevel:Number(document.getElementById('gts-min').value),maxLevel:Number(document.getElementById('gts-max').value)};
+}
+function renderGtsOfferPreview(){
+  var node=document.getElementById('gts-offer-preview');if(!node)return;
+  var select=document.getElementById('trade-mon'),option=select&&select.options[select.selectedIndex];
+  node.textContent='Offer: '+(select&&select.value&&option?option.textContent:'Choose a Pokémon above')+' → Receive: '+gtsRequestLabel(gtsRequestFromForm());
+}
+function setGtsMode(mode){
+  gtsMode=mode;
+  document.getElementById('gts-browse').hidden=mode!=='browse';
+  document.getElementById('gts-offer').hidden=mode!=='offer';
+  ['gts-search','gts-offer-mode','gts-check'].forEach(function(id,i){document.getElementById(id).classList.toggle('primary',['browse','offer','mine'][i]===mode);});
+}
+function gtsOut(){return document.getElementById('gts-list');}
+function gtsMessage(message){gtsOut().textContent=message;}
+async function runGts(action){
+  if(gtsBusy)return;
+  gtsBusy=true;
+  try{await action();}catch(e){gtsMessage(e.message);}finally{gtsBusy=false;}
+}
+function gtsEligible(mon,req){
+  return (!req.species||Number(req.species)===mon.species)&&(!req.type||(mon.types||[]).some(function(t){return gtsNormalize(t)===gtsNormalize(req.type);}))&&mon.level>=req.minLevel&&mon.level<=req.maxLevel;
+}
+function gtsSession(mon,relay){
+  return {key:mon.key,raw:tradeSourceRaw(mon.key),identity:tradeSourceIdentity(mon.key),relay:relay};
+}
+function gtsId(){return Array.from(crypto.getRandomValues(new Uint8Array(16)),function(b){return b.toString(16).padStart(2,'0');}).join('');}
+function gtsPost(path,body,relay){return tradeFetch(path,{method:'POST',relayBase:relay,body:JSON.stringify(body)});}
+function gtsGet(path,relay){return tradeFetch(path,{method:'GET',relayBase:relay});}
+function gtsOwnerQuery(){return '?ownerToken='+encodeURIComponent(TRADE_STATE.ownerToken);}
+async function gtsApply(session,received){
+  if(!session||session.legacy||!session.raw)throw new Error('This is an older listing without a verified source record. Restore a backup or recover it using the older client; no Pokémon were overwritten.');
+  verifyLinkSource(session,received);
+  await replaceTradeSource(session.key,received);
+}
+async function gtsSubmitListing(session){
+  var d=await gtsPost('/trades/gts/list',{ownerToken:TRADE_STATE.ownerToken,trainer:session.trainer,raw80:session.raw,request:session.request,listingId:session.id},session.relay);
+  if(d.listingId!==session.id)throw new Error('The relay needs an update to support recoverable listings.');
+  session.posted=true;localStorage.setItem(GTS_PREFIX+session.id,JSON.stringify(session));
+}
+function gtsDeposit(){
+  return runGts(async function(){
+    var mon=selectedTradeCandidate();if(!mon)throw new Error('Choose an eligible Pokémon above.');
+    var request=gtsRequestFromForm();
+    if(!Number.isInteger(request.minLevel)||!Number.isInteger(request.maxLevel)||request.minLevel<1||request.maxLevel>100||request.minLevel>request.maxLevel)throw new Error('Choose a valid level range between 1 and 100.');
+    if(!window.confirm('Offer '+mon.name+' Lv'+mon.level+' for '+gtsRequestLabel(request)+'? Keep this Pokémon in its original slot until the trade finishes.'))return;
+    var session=Object.assign(gtsSession(mon,tradeBase()),{id:gtsId(),request:request,trainer:currentSave?.trainer?.name||'Trainer',posted:false});
+    if(!session.raw||!session.identity)throw new Error('The selected Pokémon is unavailable.');
+    localStorage.setItem(GTS_PREFIX+session.id,JSON.stringify(session));
+    renderTrading();
+    await gtsSubmitListing(session);
+    setGtsMode('mine');
+    await gtsLoadMine();
+  });
+}
+async function gtsRecoverTake(){
+  var session=gtsRead(GTS_TAKE);if(!session)return false;
+  if(session.received){await gtsApply(session,session.received);}
+  else{
+    verifyLinkSource(session);
+    var x=await gtsPost('/trades/gts/take',{listingId:session.id,ownerToken:TRADE_STATE.ownerToken,raw80:session.raw},session.relay);
+    session.received=x.received;session.receivedMon=x.receivedMon;localStorage.setItem(GTS_TAKE,JSON.stringify(session));
+    await gtsApply(session,session.received);
+  }
+  localStorage.removeItem(GTS_TAKE);renderTrading();
+  gtsMessage('Trade complete: received '+gtsMonLabel(session.receivedMon)+'.');
+  return true;
+}
+async function gtsLoadMine(){
+  var relay=tradeBase(),out=gtsOut();
+  if(gtsRead(GTS_TAKE)){await gtsRecoverTake();}
+  var local=[];
+  for(var i=0;i<localStorage.length;i++){var key=localStorage.key(i);if(key&&key.startsWith(GTS_PREFIX)){var s=gtsRead(key);if(s&&!s.legacy&&s.relay===relay)local.push(s);}}
+  for(var session of local){
+    if(!session.posted){verifyLinkSource(session);await gtsSubmitListing(session);}
+  }
+  var d=await gtsGet('/trades/gts/mine'+gtsOwnerQuery(),relay);
+  out.replaceChildren();
+  for(var x of d.completed){
+    var pending=gtsRead(GTS_PREFIX+x.listingId);
+    if(!pending||pending.relay!==relay){out.appendChild(el('p',{text:'Completed: '+gtsMonLabel(x.receivedMon)+' · original source must be recovered.'}));continue;}
+    var claimed=await gtsPost('/trades/gts/claim',{ownerToken:TRADE_STATE.ownerToken,listingId:x.listingId},relay);
+    await gtsApply(pending,claimed.received);
+    await gtsPost('/trades/gts/ack',{ownerToken:TRADE_STATE.ownerToken,listingId:x.listingId},relay);
+    localStorage.removeItem(GTS_PREFIX+x.listingId);
+    out.appendChild(el('p',{text:'Received '+gtsMonLabel(claimed.receivedMon)+'!'}));
+  }
+  for(var entry of d.active){
+    var card=el('div',{style:'padding:8px 0;border-bottom:1px solid var(--line-soft)'},[el('strong',{text:gtsMonLabel(entry.offered)}),el('p',{text:'Waiting for '+gtsRequestLabel(entry.request)})]);
+    var cancel=el('button',{text:'Cancel offer'});card.appendChild(cancel);
+    cancel.addEventListener('click',function(item){return function(){runGts(async function(){
+      if(!window.confirm('Cancel this GTS offer?'))return;
+      await gtsPost('/trades/gts/cancel',{ownerToken:TRADE_STATE.ownerToken,listingId:item.listingId},relay);
+      localStorage.removeItem(GTS_PREFIX+item.listingId);renderTrading();await gtsLoadMine();
+    });};}(entry));
+    out.appendChild(card);
+  }
+  for(var item of d.cancelled||[]){localStorage.removeItem(GTS_PREFIX+item.listingId);}
+  for(var item of d.acknowledged||[]){localStorage.removeItem(GTS_PREFIX+item.listingId);}
+  if(!out.childNodes.length)out.textContent='No active or completed trades. Choose Offer Pokémon to post one.';
+  renderTrading();
+}
+function gtsCheckMine(){setGtsMode('mine');return runGts(gtsLoadMine);}
+function renderGtsListings(){
+  if(gtsMode!=='browse')return;
+  var out=gtsOut(),query=document.getElementById('gts-browse-name').value,only=document.getElementById('gts-match-only').checked,candidates=tradeCandidates();
+  var listings=gtsListingsCache.filter(function(x){return gtsMatchesName(x.offered.species,query)&&(!only||candidates.some(function(mon){return gtsEligible(mon,x.request);}));});
+  out.replaceChildren(el('p',{text:listings.length+' matching listing'+(listings.length===1?'':'s')}));
+  if(!listings.length){out.appendChild(el('p',{text:'No matching trades. Try clearing the filters or refresh.'}));return;}
+  listings.forEach(function(x){
+    var eligible=candidates.filter(function(mon){return gtsEligible(mon,x.request);});
+    var card=el('div',{style:'padding:10px 0;border-bottom:1px solid var(--line-soft)'},[el('strong',{text:gtsMonLabel(x.offered)}),el('p',{text:'Wants: '+gtsRequestLabel(x.request)})]);
+    if(!eligible.length){card.appendChild(el('p',{text:'No eligible Pokémon in your boxes or storage.'}));out.appendChild(card);return;}
+    var picker=el('select',{'aria-label':'Choose Pokémon to offer for '+gtsName(x.offered.species),style:'max-width:100%'});
+    eligible.forEach(function(mon){picker.appendChild(el('option',{value:mon.key,text:mon.name+' Lv'+mon.level+' · '+mon.sourceLabel}));});
+    var button=el('button',{class:'primary',text:'Trade'});card.appendChild(picker);card.appendChild(button);out.appendChild(card);
+    button.addEventListener('click',function(){runGts(async function(){
+      if(gtsRead(GTS_TAKE))throw new Error('A trade is pending. Open My trades to recover it first.');
+      var mon=tradeCandidates().find(function(c){return c.key===picker.value;});
+      if(!mon||!gtsEligible(mon,x.request))throw new Error('That Pokémon is no longer eligible. Refresh listings.');
+      if(!window.confirm('Trade '+mon.name+' Lv'+mon.level+' for '+gtsMonLabel(x.offered)+'?'))return;
+      var session=Object.assign(gtsSession(mon,tradeBase()),{id:x.listingId});
+      if(!session.raw||!session.identity)throw new Error('The selected Pokémon is unavailable.');
+      localStorage.setItem(GTS_TAKE,JSON.stringify(session));
+      await gtsRecoverTake();
+      gtsListingsCache=gtsListingsCache.filter(function(item){return item.listingId!==x.listingId;});
+    });});
+  });
+}
+function gtsSearch(){
+  setGtsMode('browse');
+  return runGts(async function(){
+    gtsMessage('Loading available trades…');
+    var d=await gtsGet('/trades/gts'+gtsOwnerQuery(),tradeBase());
+    gtsListingsCache=d.listings;
+    renderGtsListings();
+  });
 }
 document.getElementById('trade-refresh').addEventListener('click',renderTrading);
 document.getElementById('trade-connect').addEventListener('click',connectTradeRelay);
@@ -7322,6 +7508,12 @@ document.getElementById('linktrade-confirm').addEventListener('click',confirmLin
 document.getElementById('gts-deposit').addEventListener('click',gtsDeposit);
 document.getElementById('gts-search').addEventListener('click',gtsSearch);
 document.getElementById('gts-check').addEventListener('click',gtsCheckMine);
+document.getElementById('gts-reload').addEventListener('click',gtsSearch);
+document.getElementById('gts-offer-mode').addEventListener('click',function(){setGtsMode('offer');gtsMessage('Choose what you want and post your offer.');renderTrading();});
+document.getElementById('gts-species-search').addEventListener('input',function(){renderGtsSpecies();renderGtsOfferPreview();});
+['trade-mon','gts-species','gts-type','gts-min','gts-max'].forEach(function(id){document.getElementById(id).addEventListener('change',renderGtsOfferPreview);});
+document.getElementById('gts-browse-name').addEventListener('input',renderGtsListings);
+document.getElementById('gts-match-only').addEventListener('change',renderGtsListings);
 
 /* ============================================================
    Wiring

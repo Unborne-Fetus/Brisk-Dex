@@ -17,6 +17,8 @@ const matchmakingTickets = new Map();
 const wonderBoxDeposits = new Map();
 const gtsListings = new Map();
 const gtsCompleted = new Map();
+const gtsCancelled = new Map();
+const gtsAcknowledged = new Map();
 const linkTradeRooms = new Map();
 const rankedQueue = [];
 const rankedTickets = new Map();
@@ -2251,7 +2253,15 @@ const server=http.createServer(async (req,res)=>{
       if(!verified.ok)return json(res,400,{error:'Trade rejected: '+verified.reason});
       const request={species:Number(body.request&&body.request.species)||0,type:cleanText(body.request&&body.request.type,24),minLevel:clamp(Number(body.request&&body.request.minLevel)||1,1,100),maxLevel:clamp(Number(body.request&&body.request.maxLevel)||100,1,100)};
       if(request.minLevel>request.maxLevel)return json(res,400,{error:'Minimum level cannot exceed maximum level.'});
-      const listingId=id(),ownerToken=cleanText(body.ownerToken,96)||id();
+      if(request.species&&!BRISK_DATA.species?.[String(request.species)])return json(res,400,{error:'Unknown requested species.'});
+      const ownerToken=cleanText(body.ownerToken,96)||id(),listingId=body.listingId||id();
+      if(!/^[a-f0-9]{32}$/.test(listingId))return json(res,400,{error:'Invalid listing ID.'});
+      const prior=gtsListings.get(listingId)||gtsCompleted.get(listingId)||gtsCancelled.get(listingId)||gtsAcknowledged.get(listingId);
+      if(prior){
+        if(prior.ownerToken!==ownerToken)return json(res,403,{error:'Listing ID already in use.'});
+        return json(res,200,{ok:true,listingId,ownerToken});
+      }
+      if([...gtsListings.values()].some(x=>x.ownerToken===ownerToken&&x.raw===verified.raw))return json(res,409,{error:'This Pokémon is already listed.'});
       gtsListings.set(listingId,{id:listingId,ownerToken,trainer:cleanText(body.trainer,24)||'Trainer',raw:verified.raw,mon:verified.mon,request,createdAt:Date.now()});
       return json(res,200,{ok:true,listingId,ownerToken});
     }
@@ -2262,24 +2272,43 @@ const server=http.createServer(async (req,res)=>{
     }
     if(req.method==='POST'&&url.pathname==='/trades/gts/take'){
       const body=await readBody(req),listing=gtsListings.get(String(body.listingId||'')),verified=tradePokemon(body.raw80);
-      if(!listing)return json(res,404,{error:'That GTS listing is no longer available.'});
+      const ownerToken=cleanText(body.ownerToken,96),prior=gtsCompleted.get(String(body.listingId||''))||gtsAcknowledged.get(String(body.listingId||''));
+      if(!listing){
+        if(prior&&ownerToken&&prior.takerToken===ownerToken&&verified.ok&&prior.received===verified.raw)return json(res,200,{ok:true,received:prior.offeredRaw,receivedMon:prior.offeredMon,sentMon:prior.receivedMon});
+        return json(res,404,{error:'That GTS listing is no longer available.'});
+      }
+      if(!ownerToken)return json(res,400,{error:'Missing trade owner token.'});
       if(!verified.ok)return json(res,400,{error:'Trade rejected: '+verified.reason});
       if(!gtsMatches(listing.request,verified.mon))return json(res,409,{error:'That Pokémon does not meet the requested GTS conditions.'});
       if(listing.ownerToken===cleanText(body.ownerToken,96))return json(res,409,{error:'You cannot trade with your own GTS listing.'});
       gtsListings.delete(listing.id);
-      gtsCompleted.set(listing.id,{ownerToken:listing.ownerToken,received:verified.raw,receivedMon:publicTradeMon(verified),completedAt:Date.now()});
+      gtsCompleted.set(listing.id,{ownerToken:listing.ownerToken,takerToken:ownerToken,offeredRaw:listing.raw,offeredMon:publicTradeMon(listing),received:verified.raw,receivedMon:publicTradeMon(verified),completedAt:Date.now()});
       return json(res,200,{ok:true,received:listing.raw,receivedMon:publicTradeMon(listing),sentMon:publicTradeMon(verified)});
     }
     if(req.method==='GET'&&url.pathname==='/trades/gts/mine'){
       const ownerToken=cleanText(url.searchParams.get('ownerToken'),96),active=[],completed=[];
       for(const x of gtsListings.values())if(x.ownerToken===ownerToken)active.push({listingId:x.id,offered:publicTradeMon(x),request:x.request,createdAt:x.createdAt});
       for(const [listingId,x] of gtsCompleted)if(x.ownerToken===ownerToken)completed.push({listingId,receivedMon:x.receivedMon,completedAt:x.completedAt});
-      return json(res,200,{ok:true,active,completed});
+      const cancelled=[...gtsCancelled].filter(([,x])=>x.ownerToken===ownerToken).map(([listingId])=>({listingId}));
+      const acknowledged=[...gtsAcknowledged].filter(([,x])=>x.ownerToken===ownerToken).map(([listingId])=>({listingId}));
+      return json(res,200,{ok:true,active,completed,cancelled,acknowledged});
     }
     if(req.method==='POST'&&url.pathname==='/trades/gts/claim'){
       const body=await readBody(req),listingId=String(body.listingId||''),x=gtsCompleted.get(listingId);
       if(!x||x.ownerToken!==cleanText(body.ownerToken,96))return json(res,404,{error:'Completed GTS trade not found.'});
-      gtsCompleted.delete(listingId);return json(res,200,{ok:true,received:x.received,receivedMon:x.receivedMon});
+      return json(res,200,{ok:true,received:x.received,receivedMon:x.receivedMon});
+    }
+    if(req.method==='POST'&&url.pathname==='/trades/gts/ack'){
+      const body=await readBody(req),listingId=String(body.listingId||''),x=gtsCompleted.get(listingId)||gtsAcknowledged.get(listingId);
+      if(!x||x.ownerToken!==cleanText(body.ownerToken,96))return json(res,404,{error:'Completed GTS trade not found.'});
+      gtsAcknowledged.set(listingId,x);gtsCompleted.delete(listingId);
+      return json(res,200,{ok:true});
+    }
+    if(req.method==='POST'&&url.pathname==='/trades/gts/cancel'){
+      const body=await readBody(req),listingId=String(body.listingId||''),x=gtsListings.get(listingId)||gtsCancelled.get(listingId);
+      if(!x||x.ownerToken!==cleanText(body.ownerToken,96))return json(res,404,{error:'Active GTS listing not found. Check My trades for completed trades.'});
+      gtsCancelled.set(listingId,{ownerToken:x.ownerToken});gtsListings.delete(listingId);
+      return json(res,200,{ok:true});
     }
     if(req.method==='POST'&&url.pathname==='/trades/link/host'){
       const body=await readBody(req),verified=tradePokemon(body.raw80);

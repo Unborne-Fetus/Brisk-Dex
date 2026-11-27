@@ -129,6 +129,28 @@ async function waitForServer(){
     refused=false;try{await post('/trades/link/confirm',{code:cancelled.code,playerId:cancelGuest.playerId,confirmed:true});}catch(e){refused=true;}
     if(!refused)throw new Error('Cancelled trade could still be confirmed.');
     console.log('Brisk Link Trade protocol smoke test passed.');
+    const listingId='1234567890abcdef1234567890abcdef',ownerToken='smoke-owner',takerToken='smoke-taker';
+    const offer={listingId,ownerToken,raw80:hostRaw,request:{species:guestSpecies,minLevel:1,maxLevel:100}};
+    const listed=await post('/trades/gts/list',offer);
+    if(listed.listingId!==listingId||(await post('/trades/gts/list',offer)).listingId!==listingId)throw new Error('GTS listing retry failed.');
+    const browse=await request('/trades/gts?ownerToken='+takerToken);
+    if(browse.listings.filter(x=>x.listingId===listingId).length!==1)throw new Error('GTS browse failed.');
+    refused=false;try{await post('/trades/gts/take',{listingId,ownerToken:takerToken,raw80:hostRaw});}catch(e){refused=true;}
+    if(!refused)throw new Error('GTS allowed a mismatched species.');
+    const take={listingId,ownerToken:takerToken,raw80:guestRaw};
+    if((await post('/trades/gts/take',take)).received!==hostRaw||(await post('/trades/gts/take',take)).received!==hostRaw)throw new Error('GTS take retry failed.');
+    const claim={listingId,ownerToken};
+    if((await post('/trades/gts/claim',claim)).received!==guestRaw||(await post('/trades/gts/claim',claim)).received!==guestRaw)throw new Error('GTS claim retry failed.');
+    await post('/trades/gts/ack',claim);
+    const mine=await request('/trades/gts/mine?ownerToken='+ownerToken);
+    if(mine.completed.length||!mine.acknowledged.some(x=>x.listingId===listingId))throw new Error('GTS acknowledgement failed.');
+    if((await post('/trades/gts/take',take)).received!==hostRaw)throw new Error('GTS taker recovery after acknowledgement failed.');
+    const cancelId='abcdef1234567890abcdef1234567890';
+    await post('/trades/gts/list',Object.assign({},offer,{listingId:cancelId}));
+    await post('/trades/gts/cancel',{listingId:cancelId,ownerToken});
+    const afterCancel=await request('/trades/gts/mine?ownerToken='+ownerToken);
+    if(afterCancel.active.length||!afterCancel.cancelled.some(x=>x.listingId===cancelId))throw new Error('GTS cancellation failed.');
+    console.log('Brisk GTS protocol smoke test passed.');
     const host=await request('/rooms',{method:'POST',body:JSON.stringify({name:'Host',team:[mon('Alpha',hostSpecies,1)],rules:{format:'singles',teamSize:1}})});
     if(!/^[A-Z0-9]{6}$/.test(host.code)) throw new Error('Room code was not generated correctly.');
 

@@ -216,6 +216,10 @@ Rooms live in relay memory and are lost when it restarts. They expire after six 
 
 The shared relay must already be running. This project does not provide a managed public trading relay by default. Link rooms are currently held in relay memory, so a server restart can lose an unfinished trade; local save backups and a stable relay remain important. No guarantee of distributed atomicity is made for independently editable local save files. The public web and standalone editions intentionally do not enable online trading.
 
+### GTS: find or offer Pokémon
+
+Open Trading, connect to the same relay, and choose **Find Pokémon**, **Offer Pokémon**, or **My trades**. Search by name or form, optionally filter to trades your collection can fulfill, and select an eligible Pokémon directly from each listing. To post, choose a Pokémon from your boxes or external storage and select the requested species by name (or Any Pokémon). Type and level requirements are optional. My trades shows outstanding offers, allows cancellation before matching, and retrieves completed trades. Keep the offered Pokémon in its original slot until the trade completes. Use matching up-to-date client and relay builds; the relay still stores trades in memory.
+
 ### Battle engine scope
 
 The relay resolves battles on the server, including turn order, damage, RNG, switching, status, field effects, and supported gimmicks. Teams can use Pokémon from the loaded save or external storage.
