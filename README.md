@@ -43,6 +43,7 @@ Browser saves and external storage are private to that browser profile and web o
 - **External Pokémon storage:** keep a collection independent of one save, search and sort it, and export or merge portable JSON archives.
 - **Bag storage:** move existing item stacks between the game Bag and external storage, choosing the quantity to transfer. Key items stay in the game.
 - **Online Battle:** host or join a private singles battle with up to six Pokémon selected from your party, PC boxes, or external storage.
+- **Cross-platform trading:** Link Trade, Wonder Box and GTS use the same relay on installed desktop and mobile apps. Link Trade supports private room codes and mutual offer confirmation.
 - **Settings:** light/dark mode, zoom, and eight language choices.
 - **Guides:** player instructions inside the app.
 
@@ -204,6 +205,16 @@ A working relay returns JSON containing `"ok":true`. Check the same endpoint fro
 Both players need to reach the **same publicly accessible relay**, preferably through HTTPS. A local Wi-Fi address does not provide internet hosting on its own. Run `battle-server.js` on a reachable server and enter its relay URL on both devices.
 
 Rooms live in relay memory and are lost when it restarts. They expire after six hours of inactivity. Session tokens can reconnect a refreshed page while the room still exists.
+
+### Cross-platform Link Trade (installed desktop and mobile)
+
+1. Use matching Brisk Dex and Brisk Emerald data versions on both devices. Close the emulator before editing an imported save and keep a backup.
+2. Open Trading. For internet play, enter the same publicly reachable HTTPS relay URL on both devices. For LAN play, the desktop can use **Check / start local relay**, then share its LAN address; Android can enter that address or discover the LAN relay.
+3. Select an eligible Pokémon in an editable PC box or External Storage. Integrated native profiles are read-only and cannot be traded directly.
+4. One player hosts a Link Trade and shares the six-character code; the other joins. Both use **Review / check trade** to see the offers before choosing **Confirm trade**.
+5. After both confirm, use **Review / check trade** until the received Pokémon is applied. The pending Link Trade is remembered locally if the app is reopened. Do not move the offered Pokémon, switch saves, or clear app data while a trade is pending.
+
+The shared relay must already be running. This project does not provide a managed public trading relay by default. Link rooms are currently held in relay memory, so a server restart can lose an unfinished trade; local save backups and a stable relay remain important. No guarantee of distributed atomicity is made for independently editable local save files. The public web and standalone editions intentionally do not enable online trading.
 
 ### Battle engine scope
 

@@ -2303,8 +2303,18 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==='POST'&&url.pathname==='/trades/link/confirm'){
       const body=await readBody(req),room=linkTradeRooms.get(String(body.code||'').toUpperCase());
       if(!room)return json(res,404,{error:'Link Trade room not found.'});const pi=room.players.findIndex(p=>p.id===body.playerId);if(pi<0)return json(res,403,{error:'Invalid Link Trade token.'});
-      if(room.players.length!==2)return json(res,409,{error:'Waiting for another player.'});room.players[pi].confirmed=!!body.confirmed;room.updatedAt=Date.now();
+      if(room.players.length!==2)return json(res,409,{error:'Waiting for another player.'});
+      if(body.confirmed!==true)return json(res,400,{error:'Only explicit confirmation is supported.'});
+      room.players[pi].confirmed=true;room.updatedAt=Date.now();
       return json(res,200,{ok:true,complete:room.players.every(p=>p.confirmed)});
+    }
+    if(req.method==='POST'&&url.pathname==='/trades/link/cancel'){
+      const body=await readBody(req),room=linkTradeRooms.get(String(body.code||'').toUpperCase());
+      if(!room)return json(res,404,{error:'Link Trade room not found.'});
+      if(!room.players.some(p=>p.id===body.playerId))return json(res,403,{error:'Invalid Link Trade token.'});
+      if(room.players.some(p=>p.confirmed))return json(res,409,{error:'A player already confirmed; check the trade instead.'});
+      linkTradeRooms.delete(room.code);
+      return json(res,200,{ok:true});
     }
     const match=url.pathname.match(/^\/rooms\/([A-Z0-9]{6})(?:\/(join|action))?$/);
     if(!match) return json(res,404,{error:'Not found'});

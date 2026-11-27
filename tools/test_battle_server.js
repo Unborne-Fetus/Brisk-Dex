@@ -102,6 +102,30 @@ async function waitForServer(){
     const eligible=usableSpecies();
     if(eligible.length<2)throw new Error('Bundled data does not contain two smoke-test-compatible species.');
     const hostSpecies=eligible[0],guestSpecies=eligible[1];
+    // The same relay protocol is used by desktop fetch and Capacitor HTTP.
+    const post=(route,body)=>request(route,{method:'POST',body:JSON.stringify(body)});
+    const hostRaw=makeRawRecord(hostSpecies,31),guestRaw=makeRawRecord(guestSpecies,32);
+    const tradeHost=await post('/trades/link/host',{name:'Desktop',raw80:hostRaw});
+    const tradeGuest=await post('/trades/link/join',{code:tradeHost.code,name:'Android',raw80:guestRaw});
+    const status=player=>request('/trades/link/status?code='+tradeHost.code+'&playerId='+player.playerId);
+    let trade=await status(tradeHost);
+    if(trade.complete||trade.received||trade.players[1].offer.species!==guestSpecies)throw new Error('Trade preview or privacy failed.');
+    await post('/trades/link/confirm',{code:tradeHost.code,playerId:tradeHost.playerId,confirmed:true});
+    trade=await status(tradeGuest);
+    if(trade.complete||trade.received)throw new Error('Trade completed without mutual confirmation.');
+    await post('/trades/link/confirm',{code:tradeHost.code,playerId:tradeGuest.playerId,confirmed:true});
+    const [desktopResult,androidResult]=await Promise.all([status(tradeHost),status(tradeGuest)]);
+    if(!desktopResult.complete||desktopResult.received!==guestRaw||androidResult.received!==hostRaw)throw new Error('Trade did not exchange the exact records.');
+    const retry=await status(tradeGuest);
+    if(retry.received!==hostRaw)throw new Error('Trade result could not be recovered.');
+    let refused=false;
+    try{await post('/trades/link/cancel',{code:tradeHost.code,playerId:tradeHost.playerId});}catch(e){refused=true;}
+    if(!refused)throw new Error('Confirmed trade was cancelled.');
+    const cancelled=await post('/trades/link/host',{name:'Cancel',raw80:hostRaw});
+    await post('/trades/link/cancel',{code:cancelled.code,playerId:cancelled.playerId});
+    refused=false;try{await request('/trades/link/status?code='+cancelled.code+'&playerId='+cancelled.playerId);}catch(e){refused=true;}
+    if(!refused)throw new Error('Cancelled trade remained accessible.');
+    console.log('Brisk Link Trade protocol smoke test passed.');
     const host=await request('/rooms',{method:'POST',body:JSON.stringify({name:'Host',team:[mon('Alpha',hostSpecies,1)],rules:{format:'singles',teamSize:1}})});
     if(!/^[A-Z0-9]{6}$/.test(host.code)) throw new Error('Room code was not generated correctly.');
 
